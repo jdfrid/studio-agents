@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/providers" },
+    { "path": "./packages/orchestrator" },
+    { "path": "./packages/agents/brief" },
+    { "path": "./packages/agents/script" },
+    { "path": "./packages/agents/audio" },
+    { "path": "./packages/agents/asset" },
+    { "path": "./packages/agents/package" },
+    { "path": "./packages/agents/render" },
+    { "path": "./packages/agents/series" },
+    { "path": "./apps/api" },
+    { "path": "./apps/worker" },
+    { "path": "./apps/web" }
+  ]
+}

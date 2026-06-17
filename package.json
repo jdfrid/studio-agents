@@ -1,0 +1,35 @@
+{
+  "name": "studio-agents",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Modular 7-agent video production pipeline (LLM orchestrator + GCS).",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" build && pnpm -r --filter \"./apps/**\" build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint \"{apps,packages}/**/*.{ts,tsx}\"",
+    "format": "prettier --write \"{apps,packages,infra}/**/*.{ts,tsx,json,md}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:api": "pnpm --filter @studio/api dev",
+    "dev:worker": "pnpm --filter @studio/worker dev",
+    "dev:web": "pnpm --filter @studio/web dev",
+    "prisma:generate": "pnpm --filter @studio/infra-prisma prisma:generate",
+    "prisma:migrate": "pnpm --filter @studio/infra-prisma prisma:migrate",
+    "prisma:seed": "pnpm --filter @studio/infra-prisma seed",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@typescript-eslint/eslint-plugin": "^7.7.0",
+    "@typescript-eslint/parser": "^7.7.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.5",
+    "vitest": "^1.5.0"
+  }
+}

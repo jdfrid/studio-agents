@@ -1,0 +1,71 @@
+import type { z } from "zod";
+import type { StageName } from "./enums.js";
+import type { Logger } from "./logger.js";
+
+export interface ArtifactsRepository {
+  list(runId: string, stage?: StageName): Promise<ArtifactRecord[]>;
+  save(input: SaveArtifactInput): Promise<ArtifactRecord>;
+  signedUrl(artifactId: string): Promise<string>;
+}
+
+export interface ProvidersRepository {
+  /** Returns enabled provider credentials for a type, sorted ascending by priority (lowest first). */
+  listEnabled(type: string): Promise<ProviderCredentialView[]>;
+  /** Returns the single best (lowest-priority) enabled provider for a type, or null. */
+  primary(type: string): Promise<ProviderCredentialView | null>;
+}
+
+export interface ProviderCredentialView {
+  id: string;
+  type: string;
+  provider: string;
+  priority: number;
+  config: Record<string, unknown>;
+  /** Already-decrypted secret (orchestrator decrypts before passing). */
+  secret?: string;
+}
+
+export interface ArtifactRecord {
+  id: string;
+  runId: string;
+  stage: StageName;
+  kind: string;
+  gcsPath: string;
+  mimeType: string;
+  sizeBytes: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface SaveArtifactInput {
+  runId: string;
+  stage: StageName;
+  kind: string;
+  body: Buffer | Uint8Array | string;
+  mimeType: string;
+  filename: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface GcsClient {
+  upload(input: { gcsPath: string; body: Buffer | Uint8Array | string; mimeType: string }): Promise<{ gcsPath: string; sizeBytes: number }>;
+  signedUrl(gcsPath: string, ttlSeconds?: number): Promise<string>;
+  bucket(): string;
+}
+
+export interface AgentContext {
+  runId: string;
+  tenantId: string;
+  stage: StageName;
+  artifacts: ArtifactsRepository;
+  providers: ProvidersRepository;
+  storage: GcsClient;
+  log: Logger;
+}
+
+export interface Agent<I, O> {
+  name: StageName;
+  inputSchema: z.ZodType<I>;
+  outputSchema: z.ZodType<O>;
+  run(ctx: AgentContext, input: I): Promise<O>;
+}

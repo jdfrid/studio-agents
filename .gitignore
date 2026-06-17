@@ -1,0 +1,16 @@
+node_modules
+dist
+.turbo
+.next
+.cache
+*.log
+.env
+.env.*
+!.env.example
+coverage
+.vitest-cache
+.pnpm-store
+*.tsbuildinfo
+.DS_Store
+renders/
+tmp/
