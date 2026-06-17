@@ -1,0 +1,119 @@
+# Production stack for a single Hetzner VPS.
+# From repo root: docker compose -f infra/hetzner/docker-compose.yml --env-file infra/hetzner/.env up -d --build
+
+name: studio-agents
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-studio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in infra/hetzner/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-studio_agents}
+    volumes:
+      - studio_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-studio} -d ${POSTGRES_DB:-studio_agents}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --maxmemory-policy noeviction
+    volumes:
+      - studio_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/hetzner/Dockerfile
+      target: api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-studio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-studio_agents}?schema=public
+      REDIS_URL: redis://redis:6379
+      SECRETS_KEY_BASE64: ${SECRETS_KEY_BASE64:?Set SECRETS_KEY_BASE64}
+      GCS_BUCKET: ${GCS_BUCKET:?Set GCS_BUCKET}
+      GCS_CREDENTIALS_JSON: ${GCS_CREDENTIALS_JSON:-}
+      GCS_SIGNED_URL_TTL_SECONDS: ${GCS_SIGNED_URL_TTL_SECONDS:-3600}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+      GEMINI_LYRIA_ENABLED: ${GEMINI_LYRIA_ENABLED:-0}
+      DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-demo}
+      DEFAULT_ASPECT_RATIO: ${DEFAULT_ASPECT_RATIO:-9:16}
+      DEFAULT_DURATION_SECONDS: ${DEFAULT_DURATION_SECONDS:-30}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/hetzner/Dockerfile
+      target: worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-studio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-studio_agents}?schema=public
+      REDIS_URL: redis://redis:6379
+      SECRETS_KEY_BASE64: ${SECRETS_KEY_BASE64}
+      GCS_BUCKET: ${GCS_BUCKET}
+      GCS_CREDENTIALS_JSON: ${GCS_CREDENTIALS_JSON:-}
+      GCS_SIGNED_URL_TTL_SECONDS: ${GCS_SIGNED_URL_TTL_SECONDS:-3600}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+      GEMINI_LYRIA_ENABLED: ${GEMINI_LYRIA_ENABLED:-0}
+      DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-demo}
+      DEFAULT_ASPECT_RATIO: ${DEFAULT_ASPECT_RATIO:-9:16}
+      DEFAULT_DURATION_SECONDS: ${DEFAULT_DURATION_SECONDS:-30}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/hetzner/Dockerfile
+      target: web
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+
+volumes:
+  studio_pg:
+  studio_redis:
+
+networks:
+  internal:
+    driver: bridge

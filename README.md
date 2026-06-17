@@ -145,6 +145,54 @@ Render uses **Gemini/Veo only**. There is no silent placeholder fallback. If Veo
 | POST   | `/runs/:id/scenes/:sceneId/regenerate-visual` | Rerun visual asset stage for the run      |
 | POST   | `/runs/:id/scenes/:sceneId/regenerate-video`  | Rerun render stage for the run            |
 
+## Deploy on Hetzner (recommended — ~€5/month)
+
+Single VPS running Postgres, Redis, API, Worker, and Nginx (UI + `/api` proxy) via Docker.
+
+**Recommended server:** [Hetzner CX22](https://www.hetzner.com/cloud) (2 vCPU, 4 GB RAM, Ubuntu 24.04).
+
+### 1. Create the VPS
+
+1. Create a Hetzner Cloud server (Ubuntu 24.04).
+2. SSH in: `ssh root@YOUR_SERVER_IP`
+
+### 2. One-time server setup
+
+```bash
+git clone https://github.com/jdfrid/studio-agents.git
+cd studio-agents
+sudo bash infra/hetzner/setup-server.sh
+```
+
+### 3. Configure secrets
+
+```bash
+cp infra/hetzner/env.example infra/hetzner/.env
+nano infra/hetzner/.env
+```
+
+Fill in at minimum: `POSTGRES_PASSWORD`, `SECRETS_KEY_BASE64`, `GCS_BUCKET`, `GCS_CREDENTIALS_JSON`, `GEMINI_API_KEY`.
+
+### 4. Deploy
+
+```bash
+bash infra/hetzner/deploy.sh
+```
+
+Open `http://YOUR_SERVER_IP` in the browser.
+
+### Updates
+
+```bash
+cd studio-agents
+git pull
+bash infra/hetzner/deploy.sh
+```
+
+Files: [`infra/hetzner/docker-compose.yml`](./infra/hetzner/docker-compose.yml), [`infra/hetzner/Dockerfile`](./infra/hetzner/Dockerfile).
+
+**Notes:** Only port 80 is exposed publicly. Postgres and Redis stay on the internal Docker network. Redis uses `noeviction` for BullMQ. The worker image uses Debian + `ffmpeg-static` for mux/concat.
+
 ## Deploy on Render
 
 1. Push this repo to GitHub.

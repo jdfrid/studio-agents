@@ -26,7 +26,11 @@
     "prisma:deploy": "pnpm --filter @studio/infra-prisma prisma:deploy",
     "prisma:seed": "pnpm --filter @studio/infra-prisma seed",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
-    "infra:down": "docker compose -f infra/docker-compose.yml down"
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "hetzner:deploy": "bash infra/hetzner/deploy.sh",
+    "hetzner:up": "docker compose -f infra/hetzner/docker-compose.yml --env-file infra/hetzner/.env up -d --build",
+    "hetzner:down": "docker compose -f infra/hetzner/docker-compose.yml --env-file infra/hetzner/.env down",
+    "hetzner:logs": "docker compose -f infra/hetzner/docker-compose.yml --env-file infra/hetzner/.env logs -f"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
