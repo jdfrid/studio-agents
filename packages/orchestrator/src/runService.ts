@@ -1,4 +1,4 @@
-import { prisma } from "@studio/infra-prisma";
+import { prisma, Prisma } from "@studio/infra-prisma";
 import {
   BriefInputSchema,
   STAGE_ORDER,
@@ -84,7 +84,7 @@ export async function rerunStage(runId: string, stage: StageName): Promise<Proje
   await prisma.$transaction([
     prisma.stageExecution.update({
       where: { id: stageRow.id },
-      data: { status: "QUEUED", error: null, output: null as object | null, attempts: 0 }
+      data: { status: "QUEUED", error: null, output: Prisma.DbNull, attempts: 0 }
     }),
     prisma.projectRun.update({ where: { id: run.id }, data: { currentStage: toPrismaStage(stage), status: "RUNNING" } })
   ]);

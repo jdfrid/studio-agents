@@ -43,7 +43,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           body: audio.body,
           mimeType: audio.mimeType,
           filename: `voice-${scene.sceneId}.mp3`,
-          metadata: { sceneId: scene.sceneId, provider: audio.provider, model: "model" in audio ? audio.model : undefined }
+          metadata: { sceneId: scene.sceneId, provider: audio.provider, model: "model" in audio && typeof audio.model === "string" ? audio.model : undefined }
         });
         perScene.push({
           sceneId: scene.sceneId,
@@ -51,7 +51,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           voiceGcsPath: artifact.gcsPath,
           voiceDurationSeconds: audio.durationSeconds,
           provider: audio.provider,
-          model: "model" in audio ? audio.model : null
+          model: "model" in audio && typeof audio.model === "string" ? audio.model : null
         });
       } catch (error) {
         await ctx.log.log("audio_voice_failed", "TTS failed for scene", {

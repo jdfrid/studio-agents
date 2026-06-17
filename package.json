@@ -8,7 +8,11 @@
     "node": ">=20.10.0"
   },
   "scripts": {
-    "build": "pnpm -r --filter \"./packages/**\" build && pnpm -r --filter \"./apps/**\" build",
+    "build": "pnpm --filter @studio/infra-prisma build && pnpm --filter @studio/web... build",
+    "render:build": "pnpm prisma:generate && pnpm --filter @studio/api... build && pnpm --filter @studio/worker... build",
+    "render:build:web": "pnpm --filter @studio/web... build",
+    "render:start:api": "pnpm prisma:deploy && pnpm prisma:seed && pnpm --filter @studio/api start",
+    "render:start:worker": "pnpm --filter @studio/worker start",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint \"{apps,packages}/**/*.{ts,tsx}\"",
     "format": "prettier --write \"{apps,packages,infra}/**/*.{ts,tsx,json,md}\"",
@@ -19,6 +23,7 @@
     "dev:web": "pnpm --filter @studio/web dev",
     "prisma:generate": "pnpm --filter @studio/infra-prisma prisma:generate",
     "prisma:migrate": "pnpm --filter @studio/infra-prisma prisma:migrate",
+    "prisma:deploy": "pnpm --filter @studio/infra-prisma prisma:deploy",
     "prisma:seed": "pnpm --filter @studio/infra-prisma seed",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.yml down"

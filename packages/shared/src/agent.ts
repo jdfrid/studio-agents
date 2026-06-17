@@ -65,7 +65,7 @@ export interface AgentContext {
 
 export interface Agent<I, O> {
   name: StageName;
-  inputSchema: z.ZodType<I>;
-  outputSchema: z.ZodType<O>;
+  inputSchema: z.ZodType<I, z.ZodTypeDef, unknown>;
+  outputSchema: z.ZodType<O, z.ZodTypeDef, unknown>;
   run(ctx: AgentContext, input: I): Promise<O>;
 }

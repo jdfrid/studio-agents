@@ -1,0 +1,91 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploy: Dashboard → New → Blueprint → connect jdfrid/studio-agents
+
+databases:
+  - name: studio-agents-db
+    databaseName: studio_agents
+    user: studio_agents
+    plan: free
+
+services:
+  - type: redis
+    name: studio-agents-redis
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+  - type: web
+    name: studio-agents-api
+    runtime: node
+    plan: starter
+    buildCommand: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile && pnpm run render:build
+    startCommand: pnpm run render:start:api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.10.0
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: studio-agents-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: studio-agents-redis
+          property: connectionString
+      - key: SECRETS_KEY_BASE64
+        generateValue: true
+      - key: GCS_BUCKET
+        sync: false
+      - key: GCS_CREDENTIALS_JSON
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+  - type: worker
+    name: studio-agents-worker
+    runtime: node
+    plan: starter
+    buildCommand: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile && pnpm run render:build
+    startCommand: pnpm run render:start:worker
+    envVars:
+      - key: NODE_VERSION
+        value: 20.10.0
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: studio-agents-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: studio-agents-redis
+          property: connectionString
+      - key: SECRETS_KEY_BASE64
+        fromService:
+          type: web
+          name: studio-agents-api
+          envVarKey: SECRETS_KEY_BASE64
+      - key: GCS_BUCKET
+        sync: false
+      - key: GCS_CREDENTIALS_JSON
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+  - type: web
+    name: studio-agents-web
+    runtime: static
+    buildCommand: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile && pnpm run render:build:web
+    staticPublishPath: apps/web/dist
+    envVars:
+      - key: NODE_VERSION
+        value: 20.10.0
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: studio-agents-api
+          envVarKey: RENDER_EXTERNAL_URL

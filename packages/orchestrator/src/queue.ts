@@ -8,7 +8,10 @@ const queues = new Map<StageName, Queue>();
 export function redisConnection(): IORedis {
   if (connection) return connection;
   const url = process.env.REDIS_URL ?? "redis://localhost:6380";
-  connection = new IORedis(url, { maxRetriesPerRequest: null });
+  const opts = url.startsWith("rediss://")
+    ? { maxRetriesPerRequest: null, tls: {} }
+    : { maxRetriesPerRequest: null };
+  connection = new IORedis(url, opts);
   return connection;
 }
 

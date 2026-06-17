@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@studio/infra-prisma": "workspace:*",
+    "@studio/providers": "workspace:*",
     "@studio/shared": "workspace:*",
     "ffmpeg-static": "^5.2.0",
     "nanoid": "^5.0.7",

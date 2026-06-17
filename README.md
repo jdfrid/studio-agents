@@ -145,6 +145,19 @@ Render uses **Gemini/Veo only**. There is no silent placeholder fallback. If Veo
 | POST   | `/runs/:id/scenes/:sceneId/regenerate-visual` | Rerun visual asset stage for the run      |
 | POST   | `/runs/:id/scenes/:sceneId/regenerate-video`  | Rerun render stage for the run            |
 
+## Deploy on Render
+
+1. Push this repo to GitHub.
+2. In [Render](https://render.com) → **New** → **Blueprint** → connect `jdfrid/studio-agents`.
+3. Render creates Postgres, Redis, API, Worker, and static Web from [`render.yaml`](./render.yaml).
+4. After deploy, set these env vars on **API** and **Worker** (Dashboard → service → Environment):
+   - `GCS_BUCKET`
+   - `GCS_CREDENTIALS_JSON` (full service-account JSON, one line)
+   - `GEMINI_API_KEY`
+5. Open the **studio-agents-web** URL. The UI calls the API via `VITE_API_BASE_URL` (wired automatically).
+
+**Notes:** Redis uses `noeviction` for BullMQ. The worker runs `ffmpeg-static` for mux/concat. Use at least **Starter** plan on API/Worker for video jobs.
+
 ## Tests
 
 ```bash

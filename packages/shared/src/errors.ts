@@ -1,7 +1,7 @@
 export class AgentError extends Error {
   readonly stage?: string;
   readonly provider?: string;
-  readonly cause?: unknown;
+  override readonly cause?: unknown;
   readonly metadata?: Record<string, unknown>;
 
   constructor(message: string, opts: { stage?: string; provider?: string; cause?: unknown; metadata?: Record<string, unknown> } = {}) {
