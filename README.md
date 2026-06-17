@@ -1,5 +1,9 @@
 # Studio Agents
 
+**GitHub:** https://github.com/jdfrid/studio-agents  
+
+**התקנה מפורטת (Windows):** [SETUP.md](./SETUP.md)
+
 Modular 7-agent video production pipeline. Each step (Brief → Script → Audio → Asset → Package → Render → Series) is an independent TypeScript agent with strict Zod contracts, persisted state, and Google Cloud Storage for all artifacts.
 
 ## Architecture
@@ -40,9 +44,11 @@ brief → script → audio ┐
 
 ## Prerequisites
 
+See **[SETUP.md](./SETUP.md)** for a full install checklist (Node, pnpm via `corepack`, Docker, Gemini, GCS).
+
 - Node.js 20+
-- pnpm 9
-- Docker (for Postgres + Redis)
+- pnpm 9 (`corepack enable` then `corepack prepare pnpm@9 --activate`)
+- Docker Desktop (for Postgres + Redis)
 - A Google Cloud Storage bucket and a service-account JSON with object-create + signed-url permission
 - Gemini API key from Google AI Studio, plus GCS credentials.
 
