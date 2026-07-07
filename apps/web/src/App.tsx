@@ -11,6 +11,7 @@ export function App() {
   const [artifacts, setArtifacts] = useState<ArtifactRow[]>([]);
   const [capabilities, setCapabilities] = useState<GeminiCapabilityStatus | null>(null);
   const [operations, setOperations] = useState<GeminiOperationRow[]>([]);
+  const [queueStats, setQueueStats] = useState<Array<{ queue: string; waiting: number; active: number }> | null>(null);
   const [error, setError] = useState<string>("");
 
   async function refreshRuns() {
@@ -30,6 +31,12 @@ export function App() {
       const a = await apiGet<ArtifactRow[]>(`/runs/${id}/artifacts`);
       setArtifacts(a);
       setOperations(await apiGet<GeminiOperationRow[]>(`/runs/${id}/gemini-operations`));
+      try {
+        const q = await apiGet<{ queues: Array<{ queue: string; waiting: number; active: number }> }>("/health/queues");
+        setQueueStats(q.queues);
+      } catch {
+        setQueueStats(null);
+      }
     } catch (err) {
       setError((err as Error).message);
     }
@@ -77,6 +84,7 @@ export function App() {
               artifacts={artifacts}
               capabilities={capabilities}
               operations={operations}
+              queueStats={queueStats}
               onAction={() => void refreshRun(run.id)}
             />
           )}
@@ -127,12 +135,14 @@ function RunDetail({
   artifacts,
   capabilities,
   operations,
+  queueStats,
   onAction
 }: {
   run: ProjectRunView;
   artifacts: ArtifactRow[];
   capabilities: GeminiCapabilityStatus | null;
   operations: GeminiOperationRow[];
+  queueStats: Array<{ queue: string; waiting: number; active: number }> | null;
   onAction: () => void;
 }) {
   const scriptOutput = run.stages.find((s) => s.stage === "script")?.output as
@@ -148,6 +158,22 @@ function RunDetail({
         </p>
       </header>
       <GeminiCapabilitiesPanel capabilities={capabilities} />
+      {run.stages.some((s) => s.status === "QUEUED") && queueStats ? (
+        <section className="queue-panel">
+          <strong>תור Redis (worker)</strong>
+          <p className="muted">
+            אם <code>agent-brief</code> מראה waiting &gt; 0 והשלב לא זז — ה-worker לא רץ או לא עודכן. הרץ בשרת:{" "}
+            <code>docker compose -f infra/hetzner/docker-compose.yml up -d --build --force-recreate worker api</code>
+          </p>
+          <ul className="queue-list">
+            {queueStats.map((q) => (
+              <li key={q.queue}>
+                <code>{q.queue}</code> · waiting: {q.waiting} · active: {q.active}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {scriptOutput?.scenes?.length ? (
         <section className="scene-grid">
           {scriptOutput.scenes.map((scene) => (
@@ -309,9 +335,9 @@ function StagePanel({
             אשר והמשך
           </button>
         )}
-        {(status === "COMPLETED" || status === "FAILED" || status === "AWAITING_APPROVAL") && (
+        {(status === "COMPLETED" || status === "FAILED" || status === "AWAITING_APPROVAL" || status === "QUEUED") && (
           <button disabled={busy} onClick={() => void rerun()}>
-            הרץ מחדש
+            {status === "QUEUED" ? "שלח שוב ל-worker" : "הרץ מחדש"}
           </button>
         )}
       </div>

@@ -54,7 +54,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .error { color: #ff8080; background: #2a1414; padding: 6px; border-radius: 6px; font-size: 0.85rem; }
 .stage-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .scene-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 12px 0; }
-.scene-card, .capabilities-panel, .operations-panel { border: 1px solid #232733; border-radius: 10px; padding: 12px; background: #10141d; }
+.scene-card, .capabilities-panel, .operations-panel, .queue-panel { border: 1px solid #232733; border-radius: 10px; padding: 12px; background: #10141d; }
+.queue-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; font-size: 0.85rem; }
+.queue-panel code { background: #0c0f15; padding: 2px 6px; border-radius: 4px; }
 .scene-card p { margin: 6px 0; color: #ccd4e4; }
 .capability-list { display: grid; gap: 6px; margin-top: 8px; }
 .capability-ok { color: #7af0bf; }

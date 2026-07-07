@@ -26,8 +26,9 @@ if [ ! -f /swapfile ]; then
 fi
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache --progress=plain api
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build worker web
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache --progress=plain worker
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build web
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --force-recreate api worker web
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 
 echo ""

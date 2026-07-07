@@ -6,6 +6,7 @@ import {
   createArtifactsRepo,
   createProvidersRepo,
   createRun,
+  getQueueStats,
   getRun,
   rerunStage
 } from "@studio/orchestrator";
@@ -14,6 +15,11 @@ import { checkGeminiCapabilities } from "@studio/providers";
 
 export async function registerRoutes(app: FastifyInstance) {
   app.get("/health", async () => ({ ok: true }));
+
+  app.get("/health/queues", async () => {
+    const queues = await getQueueStats();
+    return { ok: true, queues };
+  });
 
   app.get("/gemini/capabilities", async () => {
     const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
