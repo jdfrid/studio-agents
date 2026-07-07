@@ -43,7 +43,7 @@ export interface StageJobData {
 
 export async function enqueueStage(stage: StageName, data: StageJobData): Promise<void> {
   const queue = queueFor(stage);
-  const jobId = `${data.runId}:${stage}`;
+  const jobId = `${data.runId}-${stage}`;
   const existing = await queue.getJob(jobId);
   if (existing) await existing.remove();
   await queue.add(`run-${data.runId}`, data, { jobId });
