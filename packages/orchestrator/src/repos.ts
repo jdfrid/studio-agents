@@ -53,15 +53,33 @@ export function createProvidersRepo(tenantId: string): ProvidersRepository {
         where: { tenantId, type: type as any, enabled: true },
         orderBy: [{ priority: "asc" }, { id: "asc" }]
       });
-      return rows.map(rowToProvider);
+      const fromDb = rows.map(rowToProvider);
+      const env = envProvider(type);
+      return env && !fromDb.some((p) => p.type === env.type) ? [...fromDb, env] : fromDb;
     },
     async primary(type) {
       const row = await prisma.providerCredential.findFirst({
         where: { tenantId, type: type as any, enabled: true },
         orderBy: [{ priority: "asc" }, { id: "asc" }]
       });
-      return row ? rowToProvider(row) : null;
+      if (row) return rowToProvider(row);
+      return envProvider(type);
     }
+  };
+}
+
+function envProvider(type: string): ProviderCredentialView | null {
+  const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
+  if (!key) return null;
+  const geminiTypes = new Set(["GEMINI", "LLM", "TTS", "MUSIC", "MEDIA_SEARCH"]);
+  if (!geminiTypes.has(type)) return null;
+  return {
+    id: "env-gemini",
+    type: type === "LLM" || type === "TTS" || type === "MUSIC" || type === "MEDIA_SEARCH" ? type : "GEMINI",
+    provider: "google-gemini",
+    priority: 0,
+    config: {},
+    secret: key
   };
 }
 

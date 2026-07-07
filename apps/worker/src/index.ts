@@ -1,6 +1,6 @@
 import { Worker, type Job, type WorkerOptions } from "bullmq";
 import { STAGE_ORDER, type StageName } from "@studio/shared";
-import { redisConnection, registerAgent, runStage } from "@studio/orchestrator";
+import { redisConnection, registerAgent, runStage, queueName } from "@studio/orchestrator";
 import { briefAgent } from "@studio/agent-brief";
 import { scriptAgent } from "@studio/agent-script";
 import { audioAgent } from "@studio/agent-audio";
@@ -30,7 +30,7 @@ const stageTimeouts: Record<StageName, number> = {
 const workers: Worker[] = [];
 for (const stage of STAGE_ORDER) {
   const w = new Worker(
-    `agent:${stage}`,
+    queueName(stage),
     async (job: Job<{ runId: string; stage: StageName }>) => {
       const start = Date.now();
       try {
@@ -48,8 +48,16 @@ for (const stage of STAGE_ORDER) {
     }
   );
   workers.push(w);
+  w.on("failed", (job, err) => {
+    // eslint-disable-next-line no-console
+    console.error(`[worker:${stage}] job ${job?.id ?? "?"} failed:`, err);
+  });
+  w.on("error", (err) => {
+    // eslint-disable-next-line no-console
+    console.error(`[worker:${stage}] error:`, err);
+  });
   // eslint-disable-next-line no-console
-  console.log(`Worker started for stage: ${stage}`);
+  console.log(`Worker started for queue: ${queueName(stage)}`);
 }
 
 async function shutdown() {

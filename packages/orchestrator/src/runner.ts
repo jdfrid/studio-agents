@@ -73,7 +73,15 @@ export async function runStage(runId: string, stage: StageName): Promise<void> {
       data: { status: "QUEUED" }
     });
     await setRunStatus(runId, "RUNNING", next);
-    await enqueueStage(next, { runId, stage: next });
+    try {
+      await enqueueStage(next, { runId, stage: next });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const nextRow = run.stages.find((s) => fromPrismaStage(s.stage) === next);
+      if (nextRow) await recordStageError(nextRow.id, `enqueue_failed: ${message}`);
+      await setRunStatus(runId, "FAILED", next);
+      throw error;
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await recordStageError(stageRow.id, message);

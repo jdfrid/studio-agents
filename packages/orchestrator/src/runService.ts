@@ -35,7 +35,15 @@ export async function createRun(input: { tenantSlug: string; brief: BriefInput }
     include: { stages: true }
   });
   await audit(tenant.id, "run_created", "ProjectRun", run.id, { brief });
-  await enqueueStage("brief", { runId: run.id, stage: "brief" });
+  const briefStage = run.stages.find((s) => fromPrismaStage(s.stage) === "brief");
+  try {
+    await enqueueStage("brief", { runId: run.id, stage: "brief" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (briefStage) await recordStageError(briefStage.id, `enqueue_failed: ${message}`);
+    await setRunStatus(run.id, "FAILED", "brief");
+    throw error;
+  }
   return toView(run);
 }
 
@@ -71,7 +79,14 @@ export async function approveStage(runId: string, stage: StageName): Promise<Pro
       prisma.projectRun.update({ where: { id: run.id }, data: { currentStage: toPrismaStage(next), status: "RUNNING" } })
     ]);
     await audit(run.tenantId, "stage_approved", "StageExecution", stageRow.id, { stage, next });
-    await enqueueStage(next, { runId: run.id, stage: next });
+    try {
+      await enqueueStage(next, { runId: run.id, stage: next });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (nextStageRow) await recordStageError(nextStageRow.id, `enqueue_failed: ${message}`);
+      await setRunStatus(run.id, "FAILED", next);
+      throw error;
+    }
   }
   return getRun(runId);
 }
@@ -89,7 +104,14 @@ export async function rerunStage(runId: string, stage: StageName): Promise<Proje
     prisma.projectRun.update({ where: { id: run.id }, data: { currentStage: toPrismaStage(stage), status: "RUNNING" } })
   ]);
   await audit(run.tenantId, "stage_rerun", "StageExecution", stageRow.id, { stage });
-  await enqueueStage(stage, { runId: run.id, stage });
+  try {
+    await enqueueStage(stage, { runId: run.id, stage });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await recordStageError(stageRow.id, `enqueue_failed: ${message}`);
+    await setRunStatus(run.id, "FAILED", stage);
+    throw error;
+  }
   return getRun(runId);
 }
 

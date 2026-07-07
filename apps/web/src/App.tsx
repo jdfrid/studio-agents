@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "./api.js";
+import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
 import type { ArtifactRow, GeminiCapabilityStatus, GeminiOperationRow, ProjectRunView, RunSummary, StageName } from "./types.js";
 import { STAGE_ORDER } from "@studio/shared";
 
@@ -54,8 +55,8 @@ export function App() {
       <main>
         <section className="panel runs-panel">
           <div className="panel-header">
-            <h2>Runs</h2>
-            <button onClick={() => void refreshRuns()}>Refresh</button>
+            <h2>ריצות</h2>
+            <button onClick={() => void refreshRuns()}>רענון</button>
           </div>
           <NewRunForm onCreated={(view) => { setSelectedId(view.id); void refreshRuns(); }} />
           <ul className="runs-list">
@@ -69,7 +70,7 @@ export function App() {
           </ul>
         </section>
         <section className="panel run-detail-panel">
-          {!run && <p className="muted">Select or create a run.</p>}
+          {!run && <p className="muted">בחר או צור ריצה חדשה.</p>}
           {run && (
             <RunDetail
               run={run}
@@ -115,7 +116,7 @@ function NewRunForm({ onCreated }: { onCreated: (view: ProjectRunView) => void }
         <option value="en">English</option>
       </select>
       <button disabled={busy || !title || !sourceText} onClick={() => void submit()}>
-        {busy ? "..." : "Create run"}
+        {busy ? "..." : "צור ריצה"}
       </button>
     </div>
   );
@@ -143,7 +144,7 @@ function RunDetail({
       <header className="run-header">
         <h2>{run.brief.title}</h2>
         <p>
-          <strong>Status:</strong> {run.status} · <strong>Stage:</strong> {run.currentStage ?? "—"}
+          <strong>סטטוס:</strong> {run.status} · <strong>שלב:</strong> {run.currentStage ? (STAGE_LABELS[run.currentStage] ?? run.currentStage) : "—"}
         </p>
       </header>
       <GeminiCapabilitiesPanel capabilities={capabilities} />
@@ -179,13 +180,14 @@ function RunDetail({
           </ul>
         </details>
       )}
-      <div className="stage-grid">
+      <div className="stage-grid stage-grid-full">
         {STAGE_ORDER.map((stage) => {
           const s = run.stages.find((x) => x.stage === stage);
           return (
             <StagePanel
               key={stage}
               stage={stage}
+              stageLabel={STAGE_LABELS[stage]}
               status={s?.status ?? "PENDING"}
               error={s?.error ?? null}
               output={s?.output ?? null}
@@ -230,6 +232,7 @@ async function regenerateScene(runId: string, sceneId: string, kind: "visual" | 
 
 function StagePanel({
   stage,
+  stageLabel,
   status,
   error,
   output,
@@ -238,6 +241,7 @@ function StagePanel({
   onAction
 }: {
   stage: StageName;
+  stageLabel: string;
   status: string;
   error: string | null;
   output: unknown;
@@ -245,6 +249,7 @@ function StagePanel({
   artifacts: ArtifactRow[];
   onAction: () => void;
 }) {
+  const showOutput = output && (status === "COMPLETED" || status === "AWAITING_APPROVAL" || status === "RUNNING" || status === "FAILED");
   const [busy, setBusy] = useState(false);
   async function approve() {
     setBusy(true);
@@ -271,10 +276,17 @@ function StagePanel({
   return (
     <article className={`stage-card stage-${status.toLowerCase()}`}>
       <header>
-        <strong>{stage}</strong>
+        <strong>{stageLabel}</strong>
+        <span className="stage-code">{stage}</span>
         <span className={`badge badge-${status.toLowerCase()}`}>{status}</span>
       </header>
+      {status === "QUEUED" && <p className="muted">ממתין ל-worker…</p>}
       {error && <p className="error">{error}</p>}
+      {showOutput ? (
+        <StageOutputView stage={stage} output={output} artifacts={artifacts} onOpenArtifact={openArtifact} />
+      ) : status === "PENDING" ? (
+        <p className="muted">טרם התחיל</p>
+      ) : null}
       {artifacts.length > 0 && (
         <ul className="artifacts">
           {artifacts.map((a) => (
@@ -285,21 +297,21 @@ function StagePanel({
           ))}
         </ul>
       )}
-      {output && (
+      {output != null && (
         <details>
-          <summary>Output</summary>
+          <summary>JSON גולמי</summary>
           <pre>{JSON.stringify(output, null, 2)}</pre>
         </details>
       )}
       <div className="stage-actions">
         {status === "AWAITING_APPROVAL" && (
           <button className="primary" disabled={busy} onClick={() => void approve()}>
-            Approve & continue
+            אשר והמשך
           </button>
         )}
         {(status === "COMPLETED" || status === "FAILED" || status === "AWAITING_APPROVAL") && (
           <button disabled={busy} onClick={() => void rerun()}>
-            Rerun
+            הרץ מחדש
           </button>
         )}
       </div>

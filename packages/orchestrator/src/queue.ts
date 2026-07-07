@@ -5,6 +5,10 @@ import type { StageName } from "@studio/shared";
 let connection: IORedis | null = null;
 const queues = new Map<StageName, Queue>();
 
+export function queueName(stage: StageName): string {
+  return `agent-${stage}`;
+}
+
 export function redisConnection(): IORedis {
   if (connection) return connection;
   const url = process.env.REDIS_URL ?? "redis://localhost:6380";
@@ -27,7 +31,7 @@ export function queueFor(stage: StageName): Queue {
       removeOnFail: 200
     }
   };
-  q = new Queue(`agent:${stage}`, opts);
+  q = new Queue(queueName(stage), opts);
   queues.set(stage, q);
   return q;
 }
@@ -38,7 +42,11 @@ export interface StageJobData {
 }
 
 export async function enqueueStage(stage: StageName, data: StageJobData): Promise<void> {
-  await queueFor(stage).add(`run:${data.runId}`, data, { jobId: `${data.runId}:${stage}` });
+  const queue = queueFor(stage);
+  const jobId = `${data.runId}:${stage}`;
+  const existing = await queue.getJob(jobId);
+  if (existing) await existing.remove();
+  await queue.add(`run-${data.runId}`, data, { jobId });
 }
 
 export async function shutdownQueues(): Promise<void> {
