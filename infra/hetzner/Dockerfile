@@ -16,10 +16,7 @@ COPY packages ./packages
 COPY infra/prisma ./infra/prisma
 
 RUN pnpm install --no-frozen-lockfile
-RUN pnpm prisma:generate \
-  && pnpm --filter @studio/api... build \
-  && pnpm --filter @studio/worker... build \
-  && pnpm --filter @studio/web... build
+RUN pnpm run render:build && pnpm run render:build:web
 
 FROM node:20-bookworm-slim AS runtime
 

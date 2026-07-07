@@ -5,6 +5,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git pull --ff-only || true
+fi
+
 ENV_FILE="infra/hetzner/.env"
 COMPOSE_FILE="infra/hetzner/docker-compose.yml"
 
@@ -13,7 +17,7 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 
