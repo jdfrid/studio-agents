@@ -1,4 +1,4 @@
-import { Worker, type Job } from "bullmq";
+import { Worker, type Job, type WorkerOptions } from "bullmq";
 import { STAGE_ORDER, type StageName } from "@studio/shared";
 import { redisConnection, registerAgent, runStage } from "@studio/orchestrator";
 import { briefAgent } from "@studio/agent-brief";
@@ -41,7 +41,7 @@ for (const stage of STAGE_ORDER) {
       }
     },
     {
-      connection: redisConnection(),
+      connection: redisConnection() as WorkerOptions["connection"],
       concurrency: stage === "render" ? 1 : 2,
       lockDuration: stageTimeouts[stage],
       stalledInterval: 30_000

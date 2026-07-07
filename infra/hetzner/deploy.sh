@@ -17,7 +17,16 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache
+if [ ! -f /swapfile ]; then
+  echo "Adding 2G swap for Docker build..."
+  fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+fi
+
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache --progress=plain api
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build worker web
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 
