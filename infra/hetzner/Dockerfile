@@ -15,7 +15,7 @@ COPY apps ./apps
 COPY packages ./packages
 COPY infra/prisma ./infra/prisma
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 RUN pnpm prisma:generate \
   && pnpm --filter @studio/api... build \
   && pnpm --filter @studio/worker... build \

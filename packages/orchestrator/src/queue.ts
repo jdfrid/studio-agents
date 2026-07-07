@@ -19,7 +19,7 @@ export function queueFor(stage: StageName): Queue {
   let q = queues.get(stage);
   if (q) return q;
   const opts: QueueOptions = {
-    connection: redisConnection(),
+    connection: redisConnection() as QueueOptions["connection"],
     defaultJobOptions: {
       attempts: 3,
       backoff: { type: "exponential", delay: 5000 },
