@@ -36,12 +36,41 @@ export async function geminiCompleteJson<T>(
     req.user
   ].join("\n");
 
-  const response = await httpJson<unknown>(geminiUrl(provider, `models/${model}:generateContent`), {
+  const baseTokens = req.maxOutputTokens ?? 4096;
+  const response = await callGemini(provider, model, prompt, req, baseTokens);
+  let raw = extractText(response);
+  try {
+    return { provider: "gemini", model, raw, parsed: parseJsonObject<T>(raw) };
+  } catch (firstError) {
+    if (baseTokens < 16384) {
+      const retry = await callGemini(provider, model, prompt, req, Math.min(baseTokens * 2, 16384));
+      raw = extractText(retry);
+      try {
+        return { provider: "gemini", model, raw, parsed: parseJsonObject<T>(raw) };
+      } catch {
+        /* fall through */
+      }
+    }
+    throw new ProviderError(`Gemini JSON response could not be parsed: ${(firstError as Error).message}`, {
+      provider: "gemini",
+      metadata: { model, rawPreview: raw.slice(0, 800) }
+    });
+  }
+}
+
+async function callGemini(
+  provider: ProviderCredentialView,
+  model: string,
+  prompt: string,
+  req: GeminiJsonRequest,
+  maxOutputTokens: number
+): Promise<unknown> {
+  return httpJson<unknown>(geminiUrl(provider, `models/${model}:generateContent`), {
     method: "POST",
     body: {
       generationConfig: {
         temperature: req.temperature ?? 0.3,
-        maxOutputTokens: req.maxOutputTokens ?? 4096,
+        maxOutputTokens,
         responseMimeType: "application/json"
       },
       systemInstruction: { parts: [{ text: req.system }] },
@@ -49,16 +78,6 @@ export async function geminiCompleteJson<T>(
     },
     timeoutMs: 120_000
   });
-
-  const raw = extractText(response);
-  try {
-    return { provider: "gemini", model, raw, parsed: parseJsonObject<T>(raw) };
-  } catch (error) {
-    throw new ProviderError(`Gemini JSON response could not be parsed: ${(error as Error).message}`, {
-      provider: "gemini",
-      metadata: { model, rawPreview: raw.slice(0, 800) }
-    });
-  }
 }
 
 function parseJsonObject<T>(raw: string): T {

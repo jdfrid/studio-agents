@@ -27,7 +27,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const sceneCount = Math.max(1, Math.round(brief.durationSeconds / targetSceneSeconds));
 
     const system =
-      "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline.";
+      "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline. Keep each narration under 120 characters. Keep visualPrompt and veoPrompt under 200 characters each.";
     const schemaHint = JSON.stringify(
       {
         scenes: [
@@ -64,8 +64,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       user: userPrompt,
       schemaName: "ScriptOutput",
       schemaHint,
-      temperature: 0.7,
-      maxOutputTokens: 3200
+      temperature: 0.5,
+      maxOutputTokens: 8192
     });
 
     const scenes: SceneSpec[] = (parsed.scenes ?? []).slice(0, 60).map((scene, index) => ({
