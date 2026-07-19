@@ -13,7 +13,8 @@ import {
   uploadStageArtifact
 } from "@studio/orchestrator";
 import { prisma } from "@studio/infra-prisma";
-import { checkGeminiCapabilities } from "@studio/providers";
+import { checkGeminiCapabilities, geminiModels } from "@studio/providers";
+import { buildProductionCostConfig, estimateRunCost } from "@studio/shared";
 
 export async function registerRoutes(app: FastifyInstance) {
   app.get("/health", async () => ({ ok: true }));
@@ -27,6 +28,20 @@ export async function registerRoutes(app: FastifyInstance) {
     const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
     const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
     return checkGeminiCapabilities(provider);
+  });
+
+  app.get("/config/cost", async () => {
+    const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
+    const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
+    const videoModel = geminiModels(provider).video;
+    const config = buildProductionCostConfig(videoModel);
+    return {
+      config,
+      examples: {
+        budget30s: estimateRunCost({ budgetMode: true, durationSeconds: 30 }, config),
+        normal30s: estimateRunCost({ budgetMode: false, durationSeconds: 30 }, config)
+      }
+    };
   });
 
   app.post("/runs", async (request, reply) => {

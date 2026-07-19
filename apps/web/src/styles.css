@@ -74,4 +74,48 @@ pre { background: #0c0f15; padding: 8px; border-radius: 6px; overflow: auto; max
 .upload-scene { display: grid; gap: 4px; padding: 6px 0; border-bottom: 1px solid #232733; }
 .upload-row input[type="file"] { font-size: 0.8rem; }
 .budget-row { display: flex; gap: 8px; align-items: center; font-size: 0.85rem; }
-.cost-estimate { color: #7af0bf; font-size: 0.85rem; margin: 0; }
+.cost-indicator {
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+  border: 2px solid #2a3041;
+  background: #101722;
+}
+.cost-indicator-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.cost-indicator-amount { font-size: 1.75rem; font-weight: 700; line-height: 1; }
+.cost-indicator-sub { color: #8b94a6; font-size: 0.85rem; }
+.cost-indicator-breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #b8c2d6;
+}
+.cost-indicator-breakdown code { font-size: 0.75rem; background: #0c0f15; padding: 2px 6px; border-radius: 4px; }
+.cost-indicator-warning { margin: 0; color: #ffb347; font-size: 0.9rem; font-weight: 600; }
+.cost-indicator-danger { margin: 0; color: #ff8080; font-size: 0.85rem; }
+.cost-cheap { border-color: #1a5a3b; background: #0f1a14; }
+.cost-cheap .cost-indicator-amount { color: #7af0bf; }
+.cost-moderate { border-color: #604414; background: #1a150c; }
+.cost-moderate .cost-indicator-amount { color: #ffd07a; }
+.cost-expensive { border-color: #8a2020; background: #221012; }
+.cost-expensive .cost-indicator-amount { color: #ff8080; }
+.cost-compact { padding: 8px 10px; }
+.cost-compact .cost-indicator-amount { font-size: 1.25rem; }
+.cost-compact .cost-indicator-breakdown { display: none; }
+.cost-confirm-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 0.9rem;
+  color: #ffb347;
+  padding: 8px;
+  border: 1px dashed #604414;
+  border-radius: 8px;
+}
+.capabilities-danger { border-color: #8a2020; }
+button.danger { background: #8a2020; border-color: #b03030; }
+button.danger:hover { background: #a02828; }

@@ -3,7 +3,8 @@ import { apiGet, apiPost } from "./api.js";
 import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
 import { BriefQuickEditor, StageEditor, StageUploadControls } from "./StageEditor.js";
 import type { ArtifactRow, GeminiCapabilityStatus, GeminiOperationRow, ProjectRunView, RunSummary, StageName } from "./types.js";
-import { STAGE_ORDER, estimateRunCostUsd } from "@studio/shared";
+import { STAGE_ORDER, estimateRunCost, formatCostNis, type ProductionCostConfig, type RunCostEstimate } from "@studio/shared";
+import { CostConfirmCheckbox, CostIndicator } from "./CostIndicator.js";
 
 export function App() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -11,6 +12,7 @@ export function App() {
   const [run, setRun] = useState<ProjectRunView | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactRow[]>([]);
   const [capabilities, setCapabilities] = useState<GeminiCapabilityStatus | null>(null);
+  const [costConfig, setCostConfig] = useState<ProductionCostConfig | null>(null);
   const [operations, setOperations] = useState<GeminiOperationRow[]>([]);
   const [queueStats, setQueueStats] = useState<Array<{ queue: string; waiting: number; active: number }> | null>(null);
   const [error, setError] = useState<string>("");
@@ -45,6 +47,7 @@ export function App() {
   useEffect(() => {
     void refreshRuns();
     void apiGet<GeminiCapabilityStatus>("/gemini/capabilities").then(setCapabilities).catch((err) => setError((err as Error).message));
+    void apiGet<{ config: ProductionCostConfig }>("/config/cost").then((r) => setCostConfig(r.config)).catch(() => setCostConfig(null));
   }, []);
   useEffect(() => {
     if (selectedId) void refreshRun(selectedId);
@@ -66,7 +69,7 @@ export function App() {
             <h2>ריצות</h2>
             <button onClick={() => void refreshRuns()}>רענון</button>
           </div>
-          <NewRunForm onCreated={(view) => { setSelectedId(view.id); void refreshRuns(); }} />
+          <NewRunForm costConfig={costConfig} capabilities={capabilities} onCreated={(view) => { setSelectedId(view.id); void refreshRuns(); }} />
           <ul className="runs-list">
             {runs.map((r) => (
               <li key={r.id} className={r.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(r.id)}>
@@ -84,6 +87,7 @@ export function App() {
               run={run}
               artifacts={artifacts}
               capabilities={capabilities}
+              costConfig={costConfig}
               operations={operations}
               queueStats={queueStats}
               onAction={() => void refreshRun(run.id)}
@@ -96,16 +100,27 @@ export function App() {
   );
 }
 
-function NewRunForm({ onCreated }: { onCreated: (view: ProjectRunView) => void }) {
+function NewRunForm({
+  onCreated,
+  costConfig,
+  capabilities
+}: {
+  onCreated: (view: ProjectRunView) => void;
+  costConfig: ProductionCostConfig | null;
+  capabilities: GeminiCapabilityStatus | null;
+}) {
   const [title, setTitle] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [language, setLanguage] = useState("he");
   const [durationSeconds, setDurationSeconds] = useState(30);
   const [budgetMode, setBudgetMode] = useState(true);
+  const [costConfirmed, setCostConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const estimate = estimateRunCostUsd({ budgetMode, durationSeconds });
+  const config: Partial<ProductionCostConfig> = costConfig ?? (capabilities?.video.model ? { videoModel: capabilities.video.model, veoGenerateAudio: true, usdToIls: 3.6 } : {});
+  const estimate = estimateRunCost({ budgetMode, durationSeconds }, config);
+  const canSubmit = Boolean(title.trim() && sourceText.trim() && (!estimate.isExpensive || costConfirmed));
   async function submit() {
-    if (!title.trim() || !sourceText.trim()) return;
+    if (!canSubmit) return;
     setBusy(true);
     try {
       const view = await apiPost<ProjectRunView>("/runs", {
@@ -114,6 +129,7 @@ function NewRunForm({ onCreated }: { onCreated: (view: ProjectRunView) => void }
       });
       setTitle("");
       setSourceText("");
+      setCostConfirmed(false);
       onCreated(view);
     } finally {
       setBusy(false);
@@ -121,6 +137,7 @@ function NewRunForm({ onCreated }: { onCreated: (view: ProjectRunView) => void }
   }
   return (
     <div className="new-run-form">
+      <CostIndicator estimate={estimate} />
       <input placeholder="כותרת" value={title} onChange={(e) => setTitle(e.target.value)} />
       <textarea placeholder="brief חופשי" rows={4} value={sourceText} onChange={(e) => setSourceText(e.target.value)} />
       <select value={language} onChange={(e) => setLanguage(e.target.value)}>
@@ -134,18 +151,26 @@ function NewRunForm({ onCreated }: { onCreated: (view: ProjectRunView) => void }
           min={5}
           max={180}
           value={durationSeconds}
-          onChange={(e) => setDurationSeconds(Number(e.target.value) || 30)}
+          onChange={(e) => {
+            setDurationSeconds(Number(e.target.value) || 30);
+            setCostConfirmed(false);
+          }}
         />
       </label>
       <label className="budget-row">
-        <input type="checkbox" checked={budgetMode} onChange={(e) => setBudgetMode(e.target.checked)} />
-        מצב חסכון (פחות סצנות, Veo 4s, Fast, בלי first/last frames)
+        <input
+          type="checkbox"
+          checked={budgetMode}
+          onChange={(e) => {
+            setBudgetMode(e.target.checked);
+            setCostConfirmed(false);
+          }}
+        />
+        מצב חסכון (פחות סצנות, Veo 4s, בלי first/last frames)
       </label>
-      <p className="cost-estimate">
-        הערכת עלות: ~${estimate.usd.toFixed(2)} · {estimate.sceneCount} סצנות × {estimate.bucket}s Veo ({estimate.label})
-      </p>
-      <button disabled={busy || !title || !sourceText} onClick={() => void submit()}>
-        {busy ? "..." : "צור ריצה"}
+      <CostConfirmCheckbox checked={costConfirmed} onChange={setCostConfirmed} estimate={estimate} />
+      <button className={estimate.isExpensive ? "danger" : "primary"} disabled={busy || !canSubmit} onClick={() => void submit()}>
+        {busy ? "..." : estimate.isExpensive ? `צור ריצה (${formatCostNis(estimate.nis)})` : "צור ריצה"}
       </button>
     </div>
   );
@@ -155,6 +180,7 @@ function RunDetail({
   run,
   artifacts,
   capabilities,
+  costConfig,
   operations,
   queueStats,
   onAction
@@ -162,6 +188,7 @@ function RunDetail({
   run: ProjectRunView;
   artifacts: ArtifactRow[];
   capabilities: GeminiCapabilityStatus | null;
+  costConfig: ProductionCostConfig | null;
   operations: GeminiOperationRow[];
   queueStats: Array<{ queue: string; waiting: number; active: number }> | null;
   onAction: () => void;
@@ -170,6 +197,18 @@ function RunDetail({
     | { scenes?: Array<{ id: string; order: number; title: string; veoPrompt?: string; referenceImagePrompt?: string; durationBucket?: string; audioPolicy?: string }> }
     | null
     | undefined;
+  const budgetMode = run.brief.budgetMode ?? false;
+  const config: Partial<ProductionCostConfig> =
+    costConfig ?? (capabilities?.video.model ? { videoModel: capabilities.video.model, veoGenerateAudio: true, usdToIls: 3.6 } : {});
+  const runEstimate = estimateRunCost(
+    {
+      budgetMode,
+      durationSeconds: run.brief.durationSeconds ?? 30,
+      scenes: scriptOutput?.scenes ?? null
+    },
+    config
+  );
+  const renderPending = run.stages.some((s) => s.stage === "render" && (s.status === "PENDING" || s.status === "QUEUED" || s.status === "RUNNING"));
   return (
     <>
       <header className="run-header">
@@ -178,6 +217,7 @@ function RunDetail({
           <strong>סטטוס:</strong> {run.status} · <strong>שלב:</strong> {run.currentStage ? (STAGE_LABELS[run.currentStage] ?? run.currentStage) : "—"}
         </p>
       </header>
+      <CostIndicator estimate={runEstimate} compact={!renderPending && run.status === "COMPLETED"} />
       <GeminiCapabilitiesPanel capabilities={capabilities} />
       {run.stages.some((s) => s.status === "QUEUED") && queueStats ? (
         <section className="queue-panel">
@@ -209,7 +249,16 @@ function RunDetail({
               </small>
               <div className="stage-actions">
                 <button onClick={() => void regenerateScene(run.id, scene.id, "visual", onAction)}>Regenerate visual</button>
-                <button onClick={() => void regenerateScene(run.id, scene.id, "video", onAction)}>Regenerate video</button>
+                <button
+                  title={`עלות משוערת: ${formatCostNis(estimateSceneVeoCost(scene, config))}`}
+                  onClick={() => {
+                    const cost = estimateSceneVeoCost(scene, config);
+                    if (cost.isExpensive && !window.confirm(`Regenerate video עלול לעלות ${formatCostNis(cost.nis)}. להמשיך?`)) return;
+                    void regenerateScene(run.id, scene.id, "video", onAction);
+                  }}
+                >
+                  Regenerate video ({formatCostNis(estimateSceneVeoCost(scene, config).nis)})
+                </button>
               </div>
             </article>
           ))}
@@ -240,6 +289,10 @@ function RunDetail({
               output={s?.output ?? null}
               runId={run.id}
               artifacts={artifacts.filter((a) => a.stage === stage)}
+              brief={run.brief}
+              scriptScenes={scriptOutput?.scenes ?? null}
+              costConfig={costConfig}
+              capabilities={capabilities}
               onAction={onAction}
             />
           );
@@ -251,6 +304,13 @@ function RunDetail({
 
 function GeminiCapabilitiesPanel({ capabilities }: { capabilities: GeminiCapabilityStatus | null }) {
   if (!capabilities) return null;
+  const videoTier = capabilities.video.model.includes("lite")
+    ? "lite"
+    : capabilities.video.model.includes("fast")
+      ? "fast"
+      : capabilities.video.model.includes("generate-preview")
+        ? "standard"
+        : "unknown";
   const entries = [
     ["Text", capabilities.text],
     ["TTS", capabilities.tts],
@@ -259,8 +319,13 @@ function GeminiCapabilitiesPanel({ capabilities }: { capabilities: GeminiCapabil
     ["Veo", capabilities.video]
   ] as const;
   return (
-    <section className="capabilities-panel">
+    <section className={`capabilities-panel${videoTier === "standard" ? " capabilities-danger" : ""}`}>
       <strong>Gemini capabilities</strong>
+      {videoTier === "standard" ? (
+        <p className="cost-indicator-warning">
+          אזהרה: השרת משתמש ב-Veo Standard — ~₪1.4 לכל שניית וידאו. שנה ל-fast או lite ב-.env
+        </p>
+      ) : null}
       <div className="capability-list">
         {entries.map(([label, item]) => (
           <span key={label} className={item.available ? "capability-ok" : "capability-missing"}>
@@ -277,6 +342,13 @@ async function regenerateScene(runId: string, sceneId: string, kind: "visual" | 
   onDone();
 }
 
+function estimateSceneVeoCost(
+  scene: { durationBucket?: string },
+  config: Partial<ProductionCostConfig>
+): RunCostEstimate {
+  return estimateRunCost({ budgetMode: true, durationSeconds: 4, scenes: [{ durationBucket: scene.durationBucket ?? "4" }] }, config);
+}
+
 function StagePanel({
   stage,
   stageLabel,
@@ -285,6 +357,10 @@ function StagePanel({
   output,
   runId,
   artifacts,
+  brief,
+  scriptScenes,
+  costConfig,
+  capabilities,
   onAction
 }: {
   stage: StageName;
@@ -294,14 +370,30 @@ function StagePanel({
   output: unknown;
   runId: string;
   artifacts: ArtifactRow[];
+  brief: ProjectRunView["brief"];
+  scriptScenes: Array<{ durationBucket?: string }> | null;
+  costConfig: ProductionCostConfig | null;
+  capabilities: GeminiCapabilityStatus | null;
   onAction: () => void;
 }) {
   const showOutput = output && (status === "COMPLETED" || status === "AWAITING_APPROVAL" || status === "RUNNING" || status === "FAILED");
   const [busy, setBusy] = useState(false);
+  const [approveConfirmed, setApproveConfirmed] = useState(false);
+  const config: Partial<ProductionCostConfig> =
+    costConfig ?? (capabilities?.video.model ? { videoModel: capabilities.video.model, veoGenerateAudio: true, usdToIls: 3.6 } : {});
+  const renderCost =
+    stage === "package" && status === "AWAITING_APPROVAL"
+      ? estimateRunCost(
+          { budgetMode: brief.budgetMode ?? false, durationSeconds: brief.durationSeconds ?? 30, scenes: scriptScenes },
+          config
+        )
+      : null;
   async function approve() {
+    if (renderCost?.isExpensive && !approveConfirmed) return;
     setBusy(true);
     try {
       await apiPost(`/runs/${runId}/stages/${stage}/approve`);
+      setApproveConfirmed(false);
       onAction();
     } finally {
       setBusy(false);
@@ -356,9 +448,21 @@ function StagePanel({
         </details>
       )}
       <div className="stage-actions">
+        {renderCost ? (
+          <>
+            <CostIndicator estimate={renderCost} compact showBreakdown={false} />
+            {renderCost.isExpensive ? (
+              <CostConfirmCheckbox checked={approveConfirmed} onChange={setApproveConfirmed} estimate={renderCost} />
+            ) : null}
+          </>
+        ) : null}
         {status === "AWAITING_APPROVAL" && (
-          <button className="primary" disabled={busy} onClick={() => void approve()}>
-            אשר והמשך
+          <button
+            className={renderCost?.isExpensive ? "danger" : "primary"}
+            disabled={busy || Boolean(renderCost?.isExpensive && !approveConfirmed)}
+            onClick={() => void approve()}
+          >
+            {renderCost ? `אשר והמשך ל-Veo (${formatCostNis(renderCost.nis)})` : "אשר והמשך"}
           </button>
         )}
         {(status === "COMPLETED" || status === "FAILED" || status === "AWAITING_APPROVAL" || status === "QUEUED") && (
