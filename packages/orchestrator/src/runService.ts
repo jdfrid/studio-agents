@@ -11,6 +11,8 @@ import {
 } from "@studio/shared";
 import { enqueueStage } from "./queue.js";
 import { fromPrismaStage, toPrismaStage } from "./stageMap.js";
+import { createArtifactsRepo } from "./repos.js";
+import { downstreamStages, parseStageOutput } from "./stageOutput.js";
 
 export async function createRun(input: { tenantSlug: string; brief: BriefInput }): Promise<ProjectRunView> {
   const tenant = await prisma.tenant.upsert({
@@ -89,6 +91,177 @@ export async function approveStage(runId: string, stage: StageName): Promise<Pro
     }
   }
   return getRun(runId);
+}
+
+export async function updateStageOutput(
+  runId: string,
+  stage: StageName,
+  output: unknown
+): Promise<ProjectRunView | null> {
+  const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
+  if (!run) return null;
+  const stageRow = run.stages.find((s) => fromPrismaStage(s.stage) === stage);
+  if (!stageRow) return toView(run);
+
+  const validated = parseStageOutput(stage, output);
+  const status = shouldWaitForApproval(stage) ? "AWAITING_APPROVAL" : "COMPLETED";
+
+  await invalidateDownstreamStages(runId, stage);
+  await recordStageOutput(stageRow.id, validated, status);
+  await audit(run.tenantId, "stage_output_updated", "StageExecution", stageRow.id, { stage, manual: true });
+  return getRun(runId);
+}
+
+export interface StageArtifactAttachVoice {
+  type: "voice";
+  sceneId: string;
+}
+export interface StageArtifactAttachMusic {
+  type: "music";
+}
+export interface StageArtifactAttachFrame {
+  type: "referenceFrame" | "firstFrame" | "lastFrame" | "background";
+  sceneId: string;
+}
+export interface StageArtifactAttachSceneClip {
+  type: "sceneClip";
+  sceneId: string;
+}
+export interface StageArtifactAttachFinal {
+  type: "final";
+}
+
+export type StageArtifactAttach =
+  | StageArtifactAttachVoice
+  | StageArtifactAttachMusic
+  | StageArtifactAttachFrame
+  | StageArtifactAttachSceneClip
+  | StageArtifactAttachFinal;
+
+export async function uploadStageArtifact(
+  runId: string,
+  stage: StageName,
+  input: {
+    kind: string;
+    filename: string;
+    mimeType: string;
+    body: Buffer;
+    attach: StageArtifactAttach;
+  }
+): Promise<ProjectRunView | null> {
+  const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
+  if (!run) return null;
+  const stageRow = run.stages.find((s) => fromPrismaStage(s.stage) === stage);
+  if (!stageRow?.output) throw new Error(`Stage ${stage} has no output to attach artifact to`);
+
+  const artifacts = createArtifactsRepo();
+  const saved = await artifacts.save({
+    runId,
+    stage,
+    kind: input.kind as any,
+    body: input.body,
+    mimeType: input.mimeType,
+    filename: input.filename,
+    metadata: { manualUpload: true, attach: input.attach }
+  });
+
+  const output = applyArtifactAttach(stageRow.output, input.attach, saved);
+  return updateStageOutput(runId, stage, output);
+}
+
+function applyArtifactAttach(
+  rawOutput: unknown,
+  attach: StageArtifactAttach,
+  artifact: { id: string; gcsPath: string; mimeType: string }
+): unknown {
+  const output = structuredClone(rawOutput) as Record<string, unknown>;
+
+  if (attach.type === "music") {
+    const music = (output.music ?? {}) as Record<string, unknown>;
+    music.artifactId = artifact.id;
+    music.gcsPath = artifact.gcsPath;
+    music.requiresExternalMusic = false;
+    music.unavailableReason = null;
+    output.music = music;
+    return output;
+  }
+
+  if (attach.type === "voice") {
+    const perScene = Array.isArray(output.perScene) ? (output.perScene as Array<Record<string, unknown>>) : [];
+    const row = perScene.find((s) => s.sceneId === attach.sceneId);
+    if (!row) throw new Error(`Scene ${attach.sceneId} not found in audio output`);
+    row.voiceArtifactId = artifact.id;
+    row.voiceGcsPath = artifact.gcsPath;
+    row.voiceError = null;
+    output.perScene = perScene;
+    return output;
+  }
+
+  if (attach.type === "sceneClip") {
+    const perScene = Array.isArray(output.perScene) ? (output.perScene as Array<Record<string, unknown>>) : [];
+    let row = perScene.find((s) => s.sceneId === attach.sceneId);
+    if (!row) {
+      row = { sceneId: attach.sceneId, durationSeconds: 0, provider: "manual" };
+      perScene.push(row);
+    }
+    row.artifactId = artifact.id;
+    row.gcsPath = artifact.gcsPath;
+    output.perScene = perScene;
+    return output;
+  }
+
+  if (attach.type === "final") {
+    output.finalArtifactId = artifact.id;
+    output.finalGcsPath = artifact.gcsPath;
+    output.finalSignedUrl = null;
+    return output;
+  }
+
+  const perScene = Array.isArray(output.perScene) ? (output.perScene as Array<Record<string, unknown>>) : [];
+  let row = perScene.find((s) => s.sceneId === attach.sceneId);
+  if (!row) {
+    row = {
+      sceneId: attach.sceneId,
+      kind: "image",
+      sourceProvider: "manual",
+      sourceUrl: null,
+      artifactId: artifact.id,
+      gcsPath: artifact.gcsPath,
+      mimeType: artifact.mimeType,
+      width: null,
+      height: null
+    };
+    perScene.push(row);
+    output.perScene = perScene;
+  }
+
+  row.artifactId = artifact.id;
+  row.gcsPath = artifact.gcsPath;
+  row.mimeType = artifact.mimeType;
+  row.kind = artifact.mimeType.startsWith("video/") ? "video" : "image";
+
+  if (attach.type === "background") {
+    return output;
+  }
+
+  const frame = {
+    artifactId: artifact.id,
+    gcsPath: artifact.gcsPath,
+    signedUrl: null,
+    prompt: "manual upload",
+    model: "manual"
+  };
+  row[attach.type] = frame;
+  return output;
+}
+
+async function invalidateDownstreamStages(runId: string, fromStage: StageName): Promise<void> {
+  for (const stage of downstreamStages(fromStage)) {
+    await prisma.stageExecution.updateMany({
+      where: { runId, stage: toPrismaStage(stage), status: { not: "PENDING" } },
+      data: { status: "PENDING", output: Prisma.DbNull, error: null, attempts: 0, completedAt: null, startedAt: null }
+    });
+  }
 }
 
 export async function rerunStage(runId: string, stage: StageName): Promise<ProjectRunView | null> {

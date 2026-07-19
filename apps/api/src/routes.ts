@@ -8,7 +8,9 @@ import {
   createRun,
   getQueueStats,
   getRun,
-  rerunStage
+  rerunStage,
+  updateStageOutput,
+  uploadStageArtifact
 } from "@studio/orchestrator";
 import { prisma } from "@studio/infra-prisma";
 import { checkGeminiCapabilities } from "@studio/providers";
@@ -77,6 +79,60 @@ export async function registerRoutes(app: FastifyInstance) {
       return { error: "not_found" };
     }
     return view;
+  });
+
+  app.patch("/runs/:id/stages/:stage/output", async (request, reply) => {
+    const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
+    try {
+      const view = await updateStageOutput(id, stage, request.body);
+      if (!view) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return view;
+    } catch (error) {
+      reply.code(400);
+      return { error: (error as Error).message };
+    }
+  });
+
+  app.post("/runs/:id/stages/:stage/artifacts", async (request, reply) => {
+    const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
+    const body = z
+      .object({
+        kind: z.string().min(1),
+        filename: z.string().min(1),
+        mimeType: z.string().min(1),
+        base64: z.string().min(1),
+        attach: z.discriminatedUnion("type", [
+          z.object({ type: z.literal("voice"), sceneId: z.string() }),
+          z.object({ type: z.literal("music") }),
+          z.object({
+            type: z.enum(["referenceFrame", "firstFrame", "lastFrame", "background"]),
+            sceneId: z.string()
+          }),
+          z.object({ type: z.literal("sceneClip"), sceneId: z.string() }),
+          z.object({ type: z.literal("final") })
+        ])
+      })
+      .parse(request.body);
+    try {
+      const view = await uploadStageArtifact(id, stage, {
+        kind: body.kind,
+        filename: body.filename,
+        mimeType: body.mimeType,
+        body: Buffer.from(body.base64, "base64"),
+        attach: body.attach
+      });
+      if (!view) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return view;
+    } catch (error) {
+      reply.code(400);
+      return { error: (error as Error).message };
+    }
   });
 
   app.post("/runs/:id/scenes/:sceneId/regenerate-visual", async (request, reply) => {

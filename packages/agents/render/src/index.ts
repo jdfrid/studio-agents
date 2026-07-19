@@ -6,7 +6,8 @@ import {
   type Agent,
   type RenderInput,
   type RenderOutput,
-  type RenderSceneResult
+  type RenderSceneResult,
+  type SceneTimelineEntry
 } from "@studio/shared";
 import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
@@ -89,21 +90,16 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           }
         });
 
-        const muxedPath = path.join(dir, `scene-${scene.order}.mp4`);
-        await writeFile(muxedPath, result.videoBytes);
-
-        if (scene.music.signedUrl) {
-          const withMusic = await muxMusic(muxedPath, scene.music.signedUrl, scene.durationSeconds, dir);
-          clipFiles.push(withMusic);
-        } else {
-          clipFiles.push(muxedPath);
-        }
+        const rawPath = path.join(dir, `scene-${scene.order}-raw.mp4`);
+        await writeFile(rawPath, result.videoBytes);
+        const scenePath = await mixSceneAudio(rawPath, scene, dir);
+        clipFiles.push(scenePath);
 
         const clipArtifact = await ctx.artifacts.save({
           runId: ctx.runId,
           stage: "render",
           kind: "scene_rendered_clip",
-          body: await readFile(clipFiles[clipFiles.length - 1]!),
+          body: await readFile(scenePath),
           mimeType: result.mimeType ?? "video/mp4",
           filename: `scene-${scene.order}.mp4`,
           metadata: {
@@ -128,8 +124,18 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         });
       }
 
-      const finalPath = path.join(dir, `final-${nanoid(8)}.mp4`);
-      await concatClips(clipFiles, finalPath, dir);
+      const concatPath = path.join(dir, `concat-${nanoid(8)}.mp4`);
+      await concatClips(clipFiles, concatPath, dir);
+
+      const musicUrl = input.timeline.find((s) => s.music.signedUrl)?.music.signedUrl ?? null;
+      const totalDurationSeconds = perScene.reduce((sum, s) => sum + s.durationSeconds, 0);
+      let finalPath = concatPath;
+      if (musicUrl) {
+        const musicLocal = path.join(dir, `music-${nanoid(4)}${musicExtension(musicUrl)}`);
+        await fetchToFile(musicUrl, musicLocal);
+        finalPath = await muxMusicTrack(concatPath, musicLocal, dir);
+      }
+
       const finalArtifact = await ctx.artifacts.save({
         runId: ctx.runId,
         stage: "render",
@@ -140,7 +146,6 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       });
       const finalSignedUrl = await ctx.storage.signedUrl(finalArtifact.gcsPath);
 
-      const totalDurationSeconds = perScene.reduce((sum, s) => sum + s.durationSeconds, 0);
       await ctx.log.log("render_done", "Render Agent finished", { scenes: perScene.length, totalDurationSeconds });
       return {
         provider: provider.provider,
@@ -157,22 +162,117 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
   }
 };
 
-async function muxMusic(videoPath: string, musicUrl: string, durationSeconds: number, dir: string): Promise<string> {
-  const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-music.mp4`);
+function shouldUseVoice(scene: SceneTimelineEntry): boolean {
+  const policy = scene.audioPolicy ?? "gemini_tts_plus_music";
+  return policy !== "muted" && policy !== "veo_native_audio" && Boolean(scene.voice.signedUrl);
+}
+
+async function mixSceneAudio(videoPath: string, scene: SceneTimelineEntry, dir: string): Promise<string> {
+  if (scene.audioPolicy === "veo_native_audio") {
+    return videoPath;
+  }
+  if (!shouldUseVoice(scene) || !scene.voice.signedUrl) {
+    return stripAudio(videoPath, dir);
+  }
+  const voiceLocal = path.join(dir, `voice-${scene.sceneId}-${nanoid(4)}.audio`);
+  await fetchToFile(scene.voice.signedUrl, voiceLocal);
+  const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-voice.mp4`);
   await runFfmpeg([
-    "-i", videoPath,
-    "-stream_loop", "-1", "-i", musicUrl,
-    "-t", String(durationSeconds),
-    "-map", "0:v:0",
-    "-map", "1:a:0",
-    "-c:v", "copy",
-    "-c:a", "aac",
+    "-i",
+    videoPath,
+    "-i",
+    voiceLocal,
+    "-map",
+    "0:v:0",
+    "-map",
+    "1:a:0",
+    "-c:v",
+    "copy",
+    "-c:a",
+    "aac",
     "-shortest",
-    "-movflags", "+faststart",
+    "-movflags",
+    "+faststart",
     "-y",
     out
   ]);
   return out;
+}
+
+async function stripAudio(videoPath: string, dir: string): Promise<string> {
+  const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-silent.mp4`);
+  await runFfmpeg(["-i", videoPath, "-map", "0:v:0", "-c:v", "copy", "-an", "-movflags", "+faststart", "-y", out]);
+  return out;
+}
+
+async function muxMusicTrack(videoPath: string, musicPath: string, dir: string): Promise<string> {
+  const out = path.join(dir, `final-with-music-${nanoid(4)}.mp4`);
+  await runFfmpeg([
+    "-i",
+    videoPath,
+    "-stream_loop",
+    "-1",
+    "-i",
+    musicPath,
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a?",
+    "-map",
+    "1:a:0",
+    "-filter_complex",
+    "[0:a]volume=1.0[voice];[1:a]volume=0.28[music];[voice][music]amix=inputs=2:duration=first:dropout_transition=0[aout]",
+    "-map",
+    "[aout]",
+    "-c:v",
+    "copy",
+    "-c:a",
+    "aac",
+    "-shortest",
+    "-movflags",
+    "+faststart",
+    "-y",
+    out
+  ]).catch(async () => {
+    await runFfmpeg([
+      "-i",
+      videoPath,
+      "-stream_loop",
+      "-1",
+      "-i",
+      musicPath,
+      "-map",
+      "0:v:0",
+      "-map",
+      "1:a:0",
+      "-filter:a",
+      "volume=0.35",
+      "-c:v",
+      "copy",
+      "-c:a",
+      "aac",
+      "-shortest",
+      "-movflags",
+      "+faststart",
+      "-y",
+      out
+    ]);
+  });
+  return out;
+}
+
+function musicExtension(url: string): string {
+  if (url.includes(".wav")) return ".wav";
+  if (url.includes(".mp3") || url.includes("mpeg")) return ".mp3";
+  return ".audio";
+}
+
+async function fetchToFile(url: string, dest: string): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to download ${url}: HTTP ${res.status}`);
+  }
+  await writeFile(dest, Buffer.from(await res.arrayBuffer()));
 }
 
 async function concatClips(clipPaths: string[], outputPath: string, dir: string): Promise<void> {
@@ -186,11 +286,16 @@ async function concatClips(clipPaths: string[], outputPath: string, dir: string)
     "utf8"
   );
   await runFfmpeg([
-    "-f", "concat",
-    "-safe", "0",
-    "-i", listPath,
-    "-c", "copy",
-    "-movflags", "+faststart",
+    "-f",
+    "concat",
+    "-safe",
+    "0",
+    "-i",
+    listPath,
+    "-c",
+    "copy",
+    "-movflags",
+    "+faststart",
     "-y",
     outputPath
   ]);

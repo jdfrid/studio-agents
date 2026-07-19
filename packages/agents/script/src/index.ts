@@ -27,7 +27,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const sceneCount = Math.max(1, Math.round(brief.durationSeconds / targetSceneSeconds));
 
     const system =
-      "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline. Keep each narration under 120 characters. Keep visualPrompt and veoPrompt under 200 characters each.";
+      "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline. Keep each narration under 120 characters. Keep visualPrompt and veoPrompt under 200 characters each. CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette. Each veoPrompt must explicitly continue from the previous scene without changing setting.";
     const schemaHint = JSON.stringify(
       {
         scenes: [
@@ -68,21 +68,24 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       maxOutputTokens: 8192
     });
 
-    const scenes: SceneSpec[] = (parsed.scenes ?? []).slice(0, 60).map((scene, index) => ({
-      id: nanoid(10),
-      order: index,
-      title: scene.title ?? `Scene ${index + 1}`,
-      narration: scene.narration ?? "",
-      visualPrompt: scene.visualPrompt ?? "",
-      veoPrompt: scene.veoPrompt ?? scene.visualPrompt ?? "",
-      referenceImagePrompt: scene.referenceImagePrompt ?? scene.visualPrompt ?? undefined,
-      firstFramePrompt: scene.firstFramePrompt,
-      lastFramePrompt: scene.lastFramePrompt,
-      durationBucket: normalizeDurationBucket(scene.durationBucket, scene.durationSeconds ?? targetSceneSeconds),
-      audioPolicy: scene.audioPolicy ?? "gemini_tts_plus_music",
-      durationSeconds: Math.max(1, Math.min(60, Math.round(scene.durationSeconds ?? targetSceneSeconds))),
-      requiredAssets: scene.requiredAssets?.length ? scene.requiredAssets : ["voice", "music", "video"]
-    }));
+    const scenes: SceneSpec[] = (parsed.scenes ?? []).slice(0, 60).map((scene, index) => {
+      const durationBucket = normalizeDurationBucket(scene.durationBucket, scene.durationSeconds ?? targetSceneSeconds);
+      return {
+        id: nanoid(10),
+        order: index,
+        title: scene.title ?? `Scene ${index + 1}`,
+        narration: scene.narration ?? "",
+        visualPrompt: scene.visualPrompt ?? "",
+        veoPrompt: scene.veoPrompt ?? scene.visualPrompt ?? "",
+        referenceImagePrompt: scene.referenceImagePrompt ?? scene.visualPrompt ?? undefined,
+        firstFramePrompt: scene.firstFramePrompt ?? scene.visualPrompt ?? undefined,
+        lastFramePrompt: scene.lastFramePrompt ?? scene.visualPrompt ?? undefined,
+        durationBucket,
+        audioPolicy: scene.audioPolicy ?? "gemini_tts_plus_music",
+        durationSeconds: Number(durationBucket),
+        requiredAssets: scene.requiredAssets?.length ? scene.requiredAssets : ["voice", "music", "video"]
+      };
+    });
 
     if (scenes.length === 0) {
       throw new Error("Script Agent produced no scenes");

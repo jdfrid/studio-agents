@@ -66,3 +66,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 pre { background: #0c0f15; padding: 8px; border-radius: 6px; overflow: auto; max-height: 200px; font-size: 0.75rem; }
 .error-banner { position: fixed; bottom: 16px; right: 16px; background: #6a1d1d; padding: 10px 16px; border-radius: 8px; }
 .muted { color: #8b94a6; }
+.stage-editor, .upload-controls, .quick-editor, .editor-panel { display: grid; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #232733; }
+.editor-textarea, .quick-editor textarea, .quick-editor input {
+  width: 100%; background: #0f131b; color: #e8ecf2; border: 1px solid #2a3041; border-radius: 8px; padding: 8px; font-family: inherit;
+}
+.quick-editor label, .upload-row { display: grid; gap: 4px; font-size: 0.85rem; }
+.upload-scene { display: grid; gap: 4px; padding: 6px 0; border-bottom: 1px solid #232733; }
+.upload-row input[type="file"] { font-size: 0.8rem; }

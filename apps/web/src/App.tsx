@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "./api.js";
 import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
+import { BriefQuickEditor, StageEditor, StageUploadControls } from "./StageEditor.js";
 import type { ArtifactRow, GeminiCapabilityStatus, GeminiOperationRow, ProjectRunView, RunSummary, StageName } from "./types.js";
 import { STAGE_ORDER } from "@studio/shared";
 
@@ -309,7 +310,12 @@ function StagePanel({
       {status === "QUEUED" && <p className="muted">ממתין ל-worker…</p>}
       {error && <p className="error">{error}</p>}
       {showOutput ? (
-        <StageOutputView stage={stage} output={output} artifacts={artifacts} onOpenArtifact={openArtifact} />
+        <>
+          <StageOutputView stage={stage} output={output} artifacts={artifacts} onOpenArtifact={openArtifact} />
+          {stage === "brief" ? <BriefQuickEditor runId={runId} output={output} onSaved={onAction} /> : null}
+          <StageUploadControls runId={runId} stage={stage} output={output} onSaved={onAction} />
+          <StageEditor runId={runId} stage={stage} output={output} onSaved={onAction} />
+        </>
       ) : status === "PENDING" ? (
         <p className="muted">טרם התחיל</p>
       ) : null}

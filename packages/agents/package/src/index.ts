@@ -47,7 +47,7 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
         title: scene.title,
         narration: scene.narration,
         visualPrompt: scene.visualPrompt,
-        veoPrompt: scene.veoPrompt,
+        veoPrompt: enrichVeoPrompt(scene.veoPrompt, script.backgroundVisualPrompt, scene.order, script.scenes.length),
         referenceImagePrompt: scene.referenceImagePrompt ?? null,
         firstFramePrompt: scene.firstFramePrompt ?? null,
         lastFramePrompt: scene.lastFramePrompt ?? null,
@@ -217,4 +217,11 @@ function renderInstructionsMarkdown(brief: BriefOutput, script: ScriptOutput, ti
     lines.push("");
   }
   return lines.join("\n");
+}
+
+function enrichVeoPrompt(veoPrompt: string, backgroundVisualPrompt: string, order: number, total: number): string {
+  const bible = backgroundVisualPrompt.trim();
+  const continuity = `Same location, characters, lighting and wardrobe throughout. Scene ${order + 1} of ${total}.`;
+  const prefix = bible ? `${continuity} Visual bible: ${bible}. ` : `${continuity} `;
+  return `${prefix}${veoPrompt}`;
 }
