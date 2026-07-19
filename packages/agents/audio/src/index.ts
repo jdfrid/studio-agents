@@ -19,6 +19,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
     const music = gemini ?? (await ctx.providers.primary("MUSIC"));
 
     const perScene: AudioOutput["perScene"] = [];
+    let lastVoiceError: string | null = null;
     for (const scene of input.scenes) {
       if (!tts || scene.audioPolicy === "veo_native_audio" || scene.audioPolicy === "muted") {
         perScene.push({
@@ -27,7 +28,8 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           voiceGcsPath: null,
           voiceDurationSeconds: null,
           provider: null,
-          model: null
+          model: null,
+          voiceError: null
         });
         continue;
       }
@@ -36,13 +38,14 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           tts.type === "GEMINI"
             ? await geminiSynthesizeSpeech(tts, { text: scene.narration, language: input.language })
             : await synthesizeSpeech(tts, { text: scene.narration, language: input.language });
+        const voiceExt = audio.mimeType.includes("wav") ? "wav" : audio.mimeType.includes("mpeg") ? "mp3" : "audio";
         const artifact = await ctx.artifacts.save({
           runId: ctx.runId,
           stage: "audio",
           kind: "voice_clip",
           body: audio.body,
           mimeType: audio.mimeType,
-          filename: `voice-${scene.sceneId}.mp3`,
+          filename: `voice-${scene.sceneId}.${voiceExt}`,
           metadata: { sceneId: scene.sceneId, provider: audio.provider, model: "model" in audio && typeof audio.model === "string" ? audio.model : undefined }
         });
         perScene.push({
@@ -51,12 +54,15 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           voiceGcsPath: artifact.gcsPath,
           voiceDurationSeconds: audio.durationSeconds,
           provider: audio.provider,
-          model: "model" in audio && typeof audio.model === "string" ? audio.model : null
+          model: "model" in audio && typeof audio.model === "string" ? audio.model : null,
+          voiceError: null
         });
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        lastVoiceError = message;
         await ctx.log.log("audio_voice_failed", "TTS failed for scene", {
           sceneId: scene.sceneId,
-          error: (error as Error).message
+          error: message
         });
         perScene.push({
           sceneId: scene.sceneId,
@@ -64,9 +70,18 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           voiceGcsPath: null,
           voiceDurationSeconds: null,
           provider: null,
-          model: null
+          model: null,
+          voiceError: message
         });
       }
+    }
+
+    const scenesNeedingVoice = input.scenes.filter(
+      (scene) => scene.audioPolicy !== "veo_native_audio" && scene.audioPolicy !== "muted"
+    );
+    const voicedCount = perScene.filter((row) => row.voiceArtifactId).length;
+    if (scenesNeedingVoice.length > 0 && voicedCount === 0) {
+      throw new Error(`TTS failed for all scenes${lastVoiceError ? `: ${lastVoiceError}` : ""}`);
     }
 
     let musicOut: AudioOutput["music"] = {

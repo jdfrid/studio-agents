@@ -1,6 +1,7 @@
 import type { ProviderCredentialView } from "@studio/shared";
 import { ProviderError } from "@studio/shared";
 import { httpJson } from "../http.js";
+import { normalizeAudioForPlayback } from "../audio/pcm.js";
 import { extractInlineData, geminiModels, geminiUrl } from "./common.js";
 
 export interface GeminiTtsRequest {
@@ -25,6 +26,7 @@ export async function geminiSynthesizeSpeech(
   const model = geminiModels(provider).tts;
   const voiceName = req.voiceName ?? String(provider.config.voiceName ?? "Kore");
   const style = req.style ? `[${req.style}] ` : "";
+  const languageCode = toSpeechLanguageCode(req.language);
 
   const response = await httpJson<unknown>(geminiUrl(provider, `models/${model}:generateContent`), {
     method: "POST",
@@ -32,6 +34,7 @@ export async function geminiSynthesizeSpeech(
       generationConfig: {
         responseModalities: ["AUDIO"],
         speechConfig: {
+          languageCode,
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName }
           }
@@ -51,5 +54,20 @@ export async function geminiSynthesizeSpeech(
   if (!inline) {
     throw new ProviderError("Gemini TTS returned no audio inline data", { provider: "gemini", metadata: { model } });
   }
-  return { provider: "gemini", model, body: inline.data, mimeType: inline.mimeType, durationSeconds: null };
+  const normalized = normalizeAudioForPlayback(inline.data, inline.mimeType);
+  return {
+    provider: "gemini",
+    model,
+    body: normalized.body,
+    mimeType: normalized.mimeType,
+    durationSeconds: null
+  };
+}
+
+function toSpeechLanguageCode(language: string): string {
+  const normalized = language.trim().toLowerCase();
+  if (normalized.startsWith("he")) return "he-IL";
+  if (normalized.startsWith("en")) return "en-US";
+  if (normalized.includes("-")) return language;
+  return `${normalized}-${normalized.toUpperCase()}`;
 }

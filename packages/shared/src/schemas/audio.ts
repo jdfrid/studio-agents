@@ -22,7 +22,8 @@ export const AudioOutputSchema = z.object({
       voiceGcsPath: z.string().nullable(),
       voiceDurationSeconds: z.number().nullable(),
       provider: z.string().nullable().optional(),
-      model: z.string().nullable().optional()
+      model: z.string().nullable().optional(),
+      voiceError: z.string().nullable().optional()
     })
   ),
   music: z.object({

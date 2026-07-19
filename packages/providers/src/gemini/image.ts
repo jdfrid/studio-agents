@@ -28,8 +28,7 @@ export async function geminiGenerateImage(
     method: "POST",
     body: {
       generationConfig: {
-        responseModalities: ["IMAGE"],
-        responseMimeType: "image/png"
+        responseModalities: ["IMAGE"]
       },
       contents: [
         {

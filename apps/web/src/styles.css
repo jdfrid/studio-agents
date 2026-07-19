@@ -41,6 +41,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .timeline-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .timeline-table th, .timeline-table td { border: 1px solid #232733; padding: 4px 8px; text-align: start; }
 .link-btn { background: transparent; border: none; color: #7ab5ff; padding: 0; text-decoration: underline; cursor: pointer; }
+.error-inline { color: #ff8080; font-size: 0.8rem; display: block; word-break: break-word; }
+.warn-inline { color: #ffb347; font-size: 0.85rem; margin: 0.25rem 0; word-break: break-word; }
 .badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; border: 1px solid #2a3041; }
 .badge-pending { color: #8b94a6; }
 .badge-queued { color: #ffd07a; border-color: #604414; }

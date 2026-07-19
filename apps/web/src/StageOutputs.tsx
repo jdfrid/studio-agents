@@ -110,6 +110,8 @@ function AudioOutputView({
             <strong>קול · סצנה {String(row.sceneId)}</strong>
             {artifact ? (
               <ArtifactPlayer artifact={artifact} onOpenArtifact={onOpenArtifact} />
+            ) : row.voiceError ? (
+              <small className="error-inline">{String(row.voiceError)}</small>
             ) : (
               <small className="muted">אין קובץ קול</small>
             )}
@@ -119,7 +121,7 @@ function AudioOutputView({
       <article className="scene-mini">
         <strong>מוזיקה</strong>
         {music.unavailableReason ? (
-          <small className="muted">{String(music.unavailableReason)}</small>
+          <p className="warn-inline">מוזיקה לא זמינה: {String(music.unavailableReason)}</p>
         ) : musicArtifact ? (
           <ArtifactPlayer artifact={musicArtifact} onOpenArtifact={onOpenArtifact} />
         ) : (
