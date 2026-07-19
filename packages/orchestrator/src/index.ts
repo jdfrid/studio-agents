@@ -4,3 +4,4 @@ export * from "./repos.js";
 export * from "./runService.js";
 export * from "./runner.js";
 export * from "./stageOutput.js";
+export * from "./registry.js";
