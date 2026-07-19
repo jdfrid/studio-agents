@@ -92,7 +92,9 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
 
         const rawPath = path.join(dir, `scene-${scene.order}-raw.mp4`);
         await writeFile(rawPath, result.videoBytes);
-        const scenePath = await mixSceneAudio(rawPath, scene, dir);
+        const mixedPath = await mixSceneAudio(rawPath, scene, dir);
+        const finalized = await finalizeSceneClip(mixedPath, dir, scene.sceneId);
+        const scenePath = finalized.path;
         clipFiles.push(scenePath);
 
         const clipArtifact = await ctx.artifacts.save({
@@ -116,7 +118,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           sceneId: scene.sceneId,
           artifactId: clipArtifact.id,
           gcsPath: clipArtifact.gcsPath,
-          durationSeconds: scene.durationSeconds,
+          durationSeconds: finalized.durationSeconds,
           provider: "gemini-veo",
           model: result.model,
           geminiOperationName: result.operationName,
@@ -179,23 +181,28 @@ async function mixSceneAudio(videoPath: string, scene: SceneTimelineEntry, dir: 
   if (!shouldUseVoice(scene) || !scene.voice.signedUrl) {
     return stripAudio(videoPath, dir);
   }
+  const videoDur = await probeDuration(videoPath);
   const voiceLocal = path.join(dir, `voice-${scene.sceneId}-${nanoid(4)}.audio`);
   await fetchToFile(scene.voice.signedUrl, voiceLocal);
   const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-voice.mp4`);
+  // Keep full Veo clip; trim or pad narration to match video length (never shorten video with -shortest).
   await runFfmpeg([
     "-i",
     videoPath,
     "-i",
     voiceLocal,
+    "-filter_complex",
+    `[1:a]atrim=0:${videoDur},asetpts=PTS-STARTPTS,apad=whole_dur=${videoDur}[aout]`,
     "-map",
     "0:v:0",
     "-map",
-    "1:a:0",
+    "[aout]",
     "-c:v",
     "copy",
     "-c:a",
     "aac",
-    "-shortest",
+    "-t",
+    String(videoDur),
     "-movflags",
     "+faststart",
     "-y",
@@ -212,33 +219,9 @@ async function stripAudio(videoPath: string, dir: string): Promise<string> {
 
 async function muxMusicTrack(videoPath: string, musicPath: string, dir: string): Promise<string> {
   const out = path.join(dir, `final-with-music-${nanoid(4)}.mp4`);
-  await runFfmpeg([
-    "-i",
-    videoPath,
-    "-stream_loop",
-    "-1",
-    "-i",
-    musicPath,
-    "-map",
-    "0:v:0",
-    "-map",
-    "0:a?",
-    "-map",
-    "1:a:0",
-    "-filter_complex",
-    "[0:a]volume=1.0[voice];[1:a]volume=0.28[music];[voice][music]amix=inputs=2:duration=first:dropout_transition=0[aout]",
-    "-map",
-    "[aout]",
-    "-c:v",
-    "copy",
-    "-c:a",
-    "aac",
-    "-shortest",
-    "-movflags",
-    "+faststart",
-    "-y",
-    out
-  ]).catch(async () => {
+  const videoDur = await probeDuration(videoPath);
+  const hasAudio = await probeHasAudio(videoPath);
+  if (hasAudio) {
     await runFfmpeg([
       "-i",
       videoPath,
@@ -246,23 +229,49 @@ async function muxMusicTrack(videoPath: string, musicPath: string, dir: string):
       "-1",
       "-i",
       musicPath,
+      "-filter_complex",
+      `[0:a]volume=1.0[voice];[1:a]volume=0.28[music];[voice][music]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
       "-map",
       "0:v:0",
       "-map",
-      "1:a:0",
-      "-filter:a",
-      "volume=0.35",
+      "[aout]",
       "-c:v",
       "copy",
       "-c:a",
       "aac",
-      "-shortest",
+      "-t",
+      String(videoDur),
       "-movflags",
       "+faststart",
       "-y",
       out
     ]);
-  });
+  } else {
+    await runFfmpeg([
+      "-i",
+      videoPath,
+      "-stream_loop",
+      "-1",
+      "-i",
+      musicPath,
+      "-filter_complex",
+      `[1:a]volume=0.35,apad=whole_dur=${videoDur}[aout]`,
+      "-map",
+      "0:v:0",
+      "-map",
+      "[aout]",
+      "-c:v",
+      "copy",
+      "-c:a",
+      "aac",
+      "-t",
+      String(videoDur),
+      "-movflags",
+      "+faststart",
+      "-y",
+      out
+    ]);
+  }
   return out;
 }
 
@@ -305,12 +314,17 @@ async function concatClips(clipPaths: string[], outputPath: string, dir: string)
   if (clipPaths.length === 0) {
     throw new Error("Cannot concat: no clips rendered");
   }
+  if (clipPaths.length === 1) {
+    await runFfmpeg(["-i", clipPaths[0]!, "-c", "copy", "-movflags", "+faststart", "-y", outputPath]);
+    return;
+  }
   const listPath = path.join(dir, `concat-${nanoid(6)}.txt`);
   await writeFile(
     listPath,
     clipPaths.map((p) => `file '${p.replace(/\\/g, "/")}'`).join("\n"),
     "utf8"
   );
+  // Re-encode for seamless joins (copy concat glitches when clip codecs differ).
   await runFfmpeg([
     "-f",
     "concat",
@@ -318,13 +332,132 @@ async function concatClips(clipPaths: string[], outputPath: string, dir: string)
     "0",
     "-i",
     listPath,
-    "-c",
-    "copy",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-pix_fmt",
+    "yuv420p",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
     "-movflags",
     "+faststart",
     "-y",
     outputPath
   ]);
+}
+
+/** Normalize each scene clip to the same codec and ensure an audio track exists. */
+async function finalizeSceneClip(
+  inputPath: string,
+  dir: string,
+  sceneId: string
+): Promise<{ path: string; durationSeconds: number }> {
+  const dur = await probeDuration(inputPath);
+  const hasAudio = await probeHasAudio(inputPath);
+  const out = path.join(dir, `scene-final-${sceneId}-${nanoid(4)}.mp4`);
+  if (hasAudio) {
+    await runFfmpeg([
+      "-i",
+      inputPath,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      "-t",
+      String(dur),
+      "-movflags",
+      "+faststart",
+      "-y",
+      out
+    ]);
+  } else {
+    await runFfmpeg([
+      "-i",
+      inputPath,
+      "-f",
+      "lavfi",
+      "-i",
+      "anullsrc=r=44100:cl=stereo",
+      "-map",
+      "0:v:0",
+      "-map",
+      "1:a:0",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-t",
+      String(dur),
+      "-shortest",
+      "-movflags",
+      "+faststart",
+      "-y",
+      out
+    ]);
+  }
+  return { path: out, durationSeconds: dur };
+}
+
+async function probeDuration(filePath: string): Promise<number> {
+  const stderr = await ffmpegStderr(["-i", filePath, "-f", "null", "-"]);
+  const match = stderr.match(/Duration:\s(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  if (!match) {
+    throw new Error(`Could not probe duration for ${filePath}`);
+  }
+  return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+}
+
+async function probeHasAudio(filePath: string): Promise<boolean> {
+  const stderr = await ffmpegStderr(["-i", filePath, "-f", "null", "-"]);
+  return /Stream #\d+:\d+.*Audio:/i.test(stderr);
+}
+
+async function ffmpegStderr(args: string[]): Promise<string> {
+  const bin = (ffmpegStatic as unknown as string) ?? "ffmpeg";
+  return new Promise((resolve, reject) => {
+    const child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => reject(error));
+    child.on("close", (code) => {
+      if (code === 0 || stderr.includes("Duration:")) {
+        resolve(stderr);
+        return;
+      }
+      reject(new Error(`ffmpeg probe exited ${code}: ${stderr.slice(-800)}`));
+    });
+  });
 }
 
 async function runFfmpeg(args: string[]): Promise<void> {
