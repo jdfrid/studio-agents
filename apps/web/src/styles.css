@@ -37,9 +37,19 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .scene-list, .asset-grid { display: grid; gap: 8px; }
 .scene-mini { border: 1px solid #232733; border-radius: 8px; padding: 8px; background: #0f131b; }
 .scene-mini p { margin: 4px 0; color: #ccd4e4; }
-.media-preview { margin: 0; display: grid; gap: 4px; }
-.media-preview img, .media-preview video { max-width: 100%; border-radius: 8px; background: #000; }
-.media-preview audio { width: 100%; }
+.media-preview { margin: 0; display: grid; gap: 4px; max-width: 50%; }
+.media-preview img, .media-preview video {
+  max-width: 100%;
+  max-height: 240px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #000;
+}
+.media-preview audio { width: 100%; max-width: 100%; }
+.asset-grid .media-preview { max-width: 45%; }
+.stage-output .media-preview figcaption { font-size: 0.8rem; color: #8b94a6; }
 .timeline-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .timeline-table th, .timeline-table td { border: 1px solid #232733; padding: 4px 8px; text-align: start; }
 .link-btn { background: transparent; border: none; color: #7ab5ff; padding: 0; text-decoration: underline; cursor: pointer; }

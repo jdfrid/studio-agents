@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const SeriesInputSchema = z.object({
-  runIds: z.array(z.string()).min(2).max(50),
+  runIds: z.array(z.string()).min(1).max(50),
   introText: z.string().optional(),
   outroText: z.string().optional(),
   transitionSeconds: z.number().min(0).max(3).default(0.5)
@@ -13,6 +13,8 @@ export const SeriesOutputSchema = z.object({
   finalGcsPath: z.string(),
   finalSignedUrl: z.string(),
   totalDurationSeconds: z.number(),
-  includedRunIds: z.array(z.string())
+  includedRunIds: z.array(z.string()),
+  /** True when a single run reuses render final_video (no multi-run concat). */
+  passthrough: z.boolean().optional()
 });
 export type SeriesOutput = z.infer<typeof SeriesOutputSchema>;

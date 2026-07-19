@@ -237,7 +237,7 @@ function SeriesOutputView({
   const url = typeof data.finalSignedUrl === "string" ? data.finalSignedUrl : null;
   return (
     <div className="stage-output">
-      {url ? <SignedMedia label="סרטון סדרה" url={url} mimeType="video/mp4" /> : null}
+      {url ? <SignedMedia label={data.passthrough ? "סרטון סופי (מ-render)" : "סרטון סדרה"} url={url} mimeType="video/mp4" /> : null}
       {data.finalArtifactId ? (
         <button type="button" onClick={() => void onOpenArtifact(String(data.finalArtifactId))}>
           פתח artifact

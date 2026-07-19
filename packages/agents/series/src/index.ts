@@ -21,6 +21,26 @@ export const seriesAgent: Agent<SeriesInput, SeriesOutput> = {
   async run(ctx, input) {
     await ctx.log.log("series_start", "Series Agent started", { runIds: input.runIds.length });
 
+    if (input.runIds.length === 1) {
+      const final = await prisma.artifact.findFirst({
+        where: { runId: input.runIds[0], kind: "final_video" },
+        orderBy: { createdAt: "desc" }
+      });
+      if (!final) {
+        throw new Error("Single-run series passthrough requires a final_video from the render stage.");
+      }
+      const signedUrl = await ctx.storage.signedUrl(final.gcsPath);
+      await ctx.log.log("series_passthrough", "Reusing render final_video for single run", { artifactId: final.id });
+      return {
+        finalArtifactId: final.id,
+        finalGcsPath: final.gcsPath,
+        finalSignedUrl: signedUrl,
+        totalDurationSeconds: 0,
+        includedRunIds: input.runIds,
+        passthrough: true
+      };
+    }
+
     const finals = await prisma.artifact.findMany({
       where: { runId: { in: input.runIds }, kind: "final_video" },
       orderBy: { createdAt: "asc" }
