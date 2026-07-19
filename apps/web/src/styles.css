@@ -10,6 +10,8 @@ body { margin: 0; }
 header { padding: 16px 24px; border-bottom: 1px solid #232733; display: flex; gap: 16px; align-items: baseline; }
 header h1 { margin: 0; font-size: 1.4rem; }
 header small { color: #8b94a6; }
+.api-offline-badge { color: #ff8080; font-size: 0.85rem; font-weight: 600; margin-inline-start: auto; }
+.api-online-badge { color: #7af0bf; font-size: 0.85rem; margin-inline-start: auto; }
 main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px; }
 .panel { border: 1px solid #232733; border-radius: 12px; padding: 16px; background: #151a23; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }

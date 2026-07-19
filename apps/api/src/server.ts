@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import sensible from "@fastify/sensible";
+import { ZodError } from "zod";
 import { registerRoutes } from "./routes.js";
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info" } });
@@ -8,8 +9,16 @@ const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info" } });
 await app.register(cors, { origin: true });
 await app.register(sensible);
 
-await registerRoutes(app);
+app.setErrorHandler((error, _request, reply) => {
+  if (error instanceof ZodError) {
+    reply.code(400).send({ error: "validation_error", details: error.flatten() });
+    return;
+  }
+  app.log.error(error);
+  reply.code(500).send({ error: "internal_error", message: error instanceof Error ? error.message : String(error) });
+});
 
+await registerRoutes(app);
 const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
 app
   .listen({ port, host: "0.0.0.0" })

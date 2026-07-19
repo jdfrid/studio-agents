@@ -13,6 +13,7 @@ export function App() {
   const [artifacts, setArtifacts] = useState<ArtifactRow[]>([]);
   const [capabilities, setCapabilities] = useState<GeminiCapabilityStatus | null>(null);
   const [costConfig, setCostConfig] = useState<ProductionCostConfig | null>(null);
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
   const [operations, setOperations] = useState<GeminiOperationRow[]>([]);
   const [queueStats, setQueueStats] = useState<Array<{ queue: string; waiting: number; active: number }> | null>(null);
   const [error, setError] = useState<string>("");
@@ -46,7 +47,13 @@ export function App() {
   }
   useEffect(() => {
     void refreshRuns();
-    void apiGet<GeminiCapabilityStatus>("/gemini/capabilities").then(setCapabilities).catch((err) => setError((err as Error).message));
+    void apiGet<{ ok: boolean }>("/health")
+      .then(() => setApiOnline(true))
+      .catch(() => setApiOnline(false));
+    void apiGet<GeminiCapabilityStatus>("/gemini/capabilities").then(setCapabilities).catch((err) => {
+      setApiOnline(false);
+      setError((err as Error).message);
+    });
     void apiGet<{ config: ProductionCostConfig }>("/config/cost").then((r) => setCostConfig(r.config)).catch(() => setCostConfig(null));
   }, []);
   useEffect(() => {
@@ -62,6 +69,11 @@ export function App() {
       <header>
         <h1>Studio Agents</h1>
         <small>7-stage video production pipeline</small>
+        {apiOnline === false ? (
+          <span className="api-offline-badge">API לא זמין — בדוק שה-containers רצים</span>
+        ) : apiOnline === true ? (
+          <span className="api-online-badge">API מחובר</span>
+        ) : null}
       </header>
       <main>
         <section className="panel runs-panel">
@@ -69,7 +81,13 @@ export function App() {
             <h2>ריצות</h2>
             <button onClick={() => void refreshRuns()}>רענון</button>
           </div>
-          <NewRunForm costConfig={costConfig} capabilities={capabilities} onCreated={(view) => { setSelectedId(view.id); void refreshRuns(); }} />
+          <NewRunForm
+            apiOnline={apiOnline}
+            costConfig={costConfig}
+            capabilities={capabilities}
+            onError={setError}
+            onCreated={(view) => { setSelectedId(view.id); void refreshRuns(); }}
+          />
           <ul className="runs-list">
             {runs.map((r) => (
               <li key={r.id} className={r.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(r.id)}>
@@ -102,12 +120,16 @@ export function App() {
 
 function NewRunForm({
   onCreated,
+  onError,
   costConfig,
-  capabilities
+  capabilities,
+  apiOnline
 }: {
   onCreated: (view: ProjectRunView) => void;
+  onError: (message: string) => void;
   costConfig: ProductionCostConfig | null;
   capabilities: GeminiCapabilityStatus | null;
+  apiOnline: boolean | null;
 }) {
   const [title, setTitle] = useState("");
   const [sourceText, setSourceText] = useState("");
@@ -118,7 +140,8 @@ function NewRunForm({
   const [busy, setBusy] = useState(false);
   const config: Partial<ProductionCostConfig> = costConfig ?? (capabilities?.video.model ? { videoModel: capabilities.video.model, veoGenerateAudio: true, usdToIls: 3.6 } : {});
   const estimate = estimateRunCost({ budgetMode, durationSeconds }, config);
-  const canSubmit = Boolean(title.trim() && sourceText.trim() && (!estimate.isExpensive || costConfirmed));
+  const estimateFromServer = apiOnline === true && Boolean(costConfig ?? capabilities?.video.model);
+  const canSubmit = Boolean(title.trim() && sourceText.trim() && apiOnline === true && (!estimate.isExpensive || costConfirmed));
   async function submit() {
     if (!canSubmit) return;
     setBusy(true);
@@ -131,12 +154,20 @@ function NewRunForm({
       setSourceText("");
       setCostConfirmed(false);
       onCreated(view);
+    } catch (err) {
+      onError((err as Error).message);
     } finally {
       setBusy(false);
     }
   }
   return (
     <div className="new-run-form">
+      {apiOnline === false ? (
+        <p className="cost-indicator-warning">ה-API לא מגיב (500). הרץ בשרת: docker compose -f infra/hetzner/docker-compose.yml ps && docker compose logs api --tail 40</p>
+      ) : null}
+      {!estimateFromServer ? (
+        <p className="cost-indicator-warning">הערכת עלות זו היא ברירת מחדל — לא מהשרver. אחרי תיקון ה-API תראה את המודל האמיתי.</p>
+      ) : null}
       <CostIndicator estimate={estimate} />
       <input placeholder="כותרת" value={title} onChange={(e) => setTitle(e.target.value)} />
       <textarea placeholder="brief חופשי" rows={4} value={sourceText} onChange={(e) => setSourceText(e.target.value)} />

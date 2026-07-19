@@ -29,6 +29,8 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache --prog
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache --progress=plain worker
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build web
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --force-recreate api worker web
+echo "Restarting web so nginx picks up api container..."
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" restart web
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 
 echo ""
