@@ -115,7 +115,7 @@ export function checkGeminiCapabilities(provider: ProviderCredentialView | null)
   const models = geminiModels(provider);
   const apiKeyConfigured = Boolean(provider?.secret ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY);
   const configured = (provider?.config.capabilities ?? {}) as Record<string, boolean>;
-  const musicAvailable = configured.music === true || process.env.GEMINI_LYRIA_ENABLED === "1";
+  const musicDisabled = configured.music === false || process.env.GEMINI_LYRIA_ENABLED === "0";
   const missingKey = apiKeyConfigured ? undefined : "Gemini API key is not configured.";
   return {
     apiKeyConfigured,
@@ -123,13 +123,13 @@ export function checkGeminiCapabilities(provider: ProviderCredentialView | null)
     tts: { available: apiKeyConfigured, model: models.tts, reason: missingKey },
     image: { available: apiKeyConfigured, model: models.image, reason: missingKey },
     music: {
-      available: apiKeyConfigured && musicAvailable,
+      available: apiKeyConfigured && !musicDisabled,
       model: models.music,
       reason: !apiKeyConfigured
         ? missingKey
-        : musicAvailable
-          ? undefined
-          : "Lyria/music access must be explicitly enabled after account verification."
+        : musicDisabled
+          ? "Set GEMINI_LYRIA_ENABLED=1 in .env to enable Lyria music generation."
+          : undefined
     },
     video: { available: apiKeyConfigured, model: models.video, reason: missingKey }
   };

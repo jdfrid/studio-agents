@@ -107,7 +107,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           kind: "music_track",
           body: track.body,
           mimeType: track.mimeType,
-          filename: `music.mp3`,
+          filename: `music.${track.mimeType.includes("wav") ? "wav" : track.mimeType.includes("mpeg") ? "mp3" : "audio"}`,
           metadata: {
             provider: track.provider,
             sourceUrl: "sourceUrl" in track ? track.sourceUrl : undefined,
