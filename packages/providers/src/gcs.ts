@@ -6,15 +6,17 @@ let cached: Storage | null = null;
 function client(): Storage {
   if (cached) return cached;
   const opts: StorageOptions = {};
-  const inline = process.env.GCS_CREDENTIALS_JSON;
-  if (inline) {
-    try {
-      opts.credentials = JSON.parse(inline);
-    } catch (error) {
-      throw new Error(`GCS_CREDENTIALS_JSON is not valid JSON: ${(error as Error).message}`);
-    }
-  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     opts.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  } else {
+    const inline = process.env.GCS_CREDENTIALS_JSON?.trim();
+    if (inline) {
+      try {
+        opts.credentials = JSON.parse(inline);
+      } catch (error) {
+        throw new Error(`GCS_CREDENTIALS_JSON is not valid JSON: ${(error as Error).message}`);
+      }
+    }
   }
   cached = new Storage(opts);
   return cached;

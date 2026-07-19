@@ -50,6 +50,7 @@ services:
       SECRETS_KEY_BASE64: ${SECRETS_KEY_BASE64:?Set SECRETS_KEY_BASE64}
       GCS_BUCKET: ${GCS_BUCKET:?Set GCS_BUCKET}
       GCS_CREDENTIALS_JSON: ${GCS_CREDENTIALS_JSON:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcs-key.json
       GCS_SIGNED_URL_TTL_SECONDS: ${GCS_SIGNED_URL_TTL_SECONDS:-3600}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
@@ -57,6 +58,8 @@ services:
       DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-demo}
       DEFAULT_ASPECT_RATIO: ${DEFAULT_ASPECT_RATIO:-9:16}
       DEFAULT_DURATION_SECONDS: ${DEFAULT_DURATION_SECONDS:-30}
+    volumes:
+      - ${GCS_CREDENTIALS_FILE:?Set GCS_CREDENTIALS_FILE to the service account JSON path on the host}:/run/secrets/gcs-key.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,6 +82,7 @@ services:
       SECRETS_KEY_BASE64: ${SECRETS_KEY_BASE64}
       GCS_BUCKET: ${GCS_BUCKET}
       GCS_CREDENTIALS_JSON: ${GCS_CREDENTIALS_JSON:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcs-key.json
       GCS_SIGNED_URL_TTL_SECONDS: ${GCS_SIGNED_URL_TTL_SECONDS:-3600}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
@@ -86,6 +90,8 @@ services:
       DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-demo}
       DEFAULT_ASPECT_RATIO: ${DEFAULT_ASPECT_RATIO:-9:16}
       DEFAULT_DURATION_SECONDS: ${DEFAULT_DURATION_SECONDS:-30}
+    volumes:
+      - ${GCS_CREDENTIALS_FILE:?Set GCS_CREDENTIALS_FILE to the service account JSON path on the host}:/run/secrets/gcs-key.json:ro
     depends_on:
       postgres:
         condition: service_healthy
