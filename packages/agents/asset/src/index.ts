@@ -2,6 +2,8 @@ import {
   NoProviderConfiguredError,
   AssetInputSchema,
   AssetOutputSchema,
+  assetGenerationMode,
+  isBudgetMode,
   type Agent,
   type AgentContext,
   type AssetInput,
@@ -20,6 +22,9 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
     const mediaProvider = await ctx.providers.primary("MEDIA_SEARCH");
 
     const perScene: AssetOutput["perScene"] = [];
+    const assetMode = assetGenerationMode(isBudgetMode({ budgetMode: input.budgetMode }));
+    let sharedReference: AssetOutput["perScene"][number]["referenceFrame"] | null = null;
+
     for (const scene of input.scenes) {
       if (scene.uploadedAssetGcsPath) {
         // Trust the upload from the brief stage; create an artifact record pointing at it.
@@ -47,42 +52,71 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
       }
       if (gemini) {
         const referencePrompt = scene.referenceImagePrompt ?? scene.visualPrompt;
-        const reference = await geminiGenerateImage(gemini, { prompt: referencePrompt, aspectRatio: input.aspectRatio });
-        const referenceArtifact = await ctx.artifacts.save({
-          runId: ctx.runId,
-          stage: "asset",
-          kind: "scene_reference_frame",
-          body: reference.body,
-          mimeType: reference.mimeType,
-          filename: `scene-${scene.sceneId}-reference.png`,
-          metadata: { sceneId: scene.sceneId, prompt: referencePrompt, provider: reference.provider, model: reference.model }
-        });
-        const referenceSignedUrl = await ctx.storage.signedUrl(referenceArtifact.gcsPath);
+        let referenceArtifactId: string;
+        let referenceGcsPath: string;
+        let referenceMimeType: string;
+        let referenceModel: string;
+        let referenceSignedUrl: string;
 
-        const firstFrame = scene.firstFramePrompt
-          ? await saveGeneratedFrame(ctx, gemini, scene.sceneId, "scene_first_frame", "first", scene.firstFramePrompt, input.aspectRatio)
-          : null;
-        const lastFrame = scene.lastFramePrompt
-          ? await saveGeneratedFrame(ctx, gemini, scene.sceneId, "scene_last_frame", "last", scene.lastFramePrompt, input.aspectRatio)
-          : null;
+        if (assetMode === "shared_reference" && sharedReference) {
+          referenceArtifactId = sharedReference.artifactId;
+          referenceGcsPath = sharedReference.gcsPath;
+          referenceSignedUrl = sharedReference.signedUrl ?? (await ctx.storage.signedUrl(referenceGcsPath));
+          referenceMimeType = "image/png";
+          referenceModel = sharedReference.model;
+        } else {
+          const reference = await geminiGenerateImage(gemini, { prompt: referencePrompt, aspectRatio: input.aspectRatio });
+          const referenceArtifact = await ctx.artifacts.save({
+            runId: ctx.runId,
+            stage: "asset",
+            kind: "scene_reference_frame",
+            body: reference.body,
+            mimeType: reference.mimeType,
+            filename: `scene-${scene.sceneId}-reference.png`,
+            metadata: { sceneId: scene.sceneId, prompt: referencePrompt, provider: reference.provider, model: reference.model }
+          });
+          referenceArtifactId = referenceArtifact.id;
+          referenceGcsPath = referenceArtifact.gcsPath;
+          referenceMimeType = reference.mimeType;
+          referenceModel = reference.model;
+          referenceSignedUrl = await ctx.storage.signedUrl(referenceArtifact.gcsPath);
+          if (assetMode === "shared_reference") {
+            sharedReference = {
+              artifactId: referenceArtifactId,
+              gcsPath: referenceGcsPath,
+              signedUrl: referenceSignedUrl,
+              prompt: referencePrompt,
+              model: referenceModel
+            };
+          }
+        }
+
+        const firstFrame =
+          assetMode === "full" && scene.firstFramePrompt
+            ? await saveGeneratedFrame(ctx, gemini, scene.sceneId, "scene_first_frame", "first", scene.firstFramePrompt, input.aspectRatio)
+            : null;
+        const lastFrame =
+          assetMode === "full" && scene.lastFramePrompt
+            ? await saveGeneratedFrame(ctx, gemini, scene.sceneId, "scene_last_frame", "last", scene.lastFramePrompt, input.aspectRatio)
+            : null;
 
         perScene.push({
           sceneId: scene.sceneId,
           kind: "image",
           sourceProvider: "gemini",
           sourceUrl: null,
-          artifactId: referenceArtifact.id,
-          gcsPath: referenceArtifact.gcsPath,
-          mimeType: reference.mimeType,
+          artifactId: referenceArtifactId,
+          gcsPath: referenceGcsPath,
+          mimeType: referenceMimeType,
           width: null,
           height: null,
-          model: reference.model,
+          model: referenceModel,
           referenceFrame: {
-            artifactId: referenceArtifact.id,
-            gcsPath: referenceArtifact.gcsPath,
+            artifactId: referenceArtifactId,
+            gcsPath: referenceGcsPath,
             signedUrl: referenceSignedUrl,
             prompt: referencePrompt,
-            model: reference.model
+            model: referenceModel
           },
           firstFrame,
           lastFrame

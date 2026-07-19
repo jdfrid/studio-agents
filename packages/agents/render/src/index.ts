@@ -136,6 +136,11 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         finalPath = await muxMusicTrack(concatPath, musicLocal, dir);
       }
 
+      const outputScale = Number(process.env.RENDER_OUTPUT_SCALE ?? 0);
+      if (outputScale > 0) {
+        finalPath = await downscaleVideo(finalPath, outputScale, dir);
+      }
+
       const finalArtifact = await ctx.artifacts.save({
         runId: ctx.runId,
         stage: "render",
@@ -273,6 +278,27 @@ async function fetchToFile(url: string, dest: string): Promise<void> {
     throw new Error(`Failed to download ${url}: HTTP ${res.status}`);
   }
   await writeFile(dest, Buffer.from(await res.arrayBuffer()));
+}
+
+async function downscaleVideo(videoPath: string, width: number, dir: string): Promise<string> {
+  const out = path.join(dir, `scaled-${width}-${nanoid(4)}.mp4`);
+  await runFfmpeg([
+    "-i",
+    videoPath,
+    "-vf",
+    `scale=${width}:-2`,
+    "-c:v",
+    "libx264",
+    "-crf",
+    "28",
+    "-c:a",
+    "copy",
+    "-movflags",
+    "+faststart",
+    "-y",
+    out
+  ]);
+  return out;
 }
 
 async function concatClips(clipPaths: string[], outputPath: string, dir: string): Promise<void> {

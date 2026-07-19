@@ -4,6 +4,9 @@ import {
   NoProviderConfiguredError,
   ScriptInputSchema,
   ScriptOutputSchema,
+  forcedVeoDurationBucket,
+  isBudgetMode,
+  targetSceneSeconds,
   type Agent,
   type BriefOutput,
   type ScriptInput,
@@ -23,8 +26,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const provider = (await ctx.providers.primary("GEMINI")) ?? (await ctx.providers.primary("LLM"));
     if (!provider) throw new NoProviderConfiguredError("GEMINI");
 
-    const targetSceneSeconds = 5;
-    const sceneCount = Math.max(1, Math.round(brief.durationSeconds / targetSceneSeconds));
+    const budget = isBudgetMode(brief);
+    const sceneTargetSeconds = targetSceneSeconds(budget);
+    const sceneCount = Math.max(1, Math.round(brief.durationSeconds / sceneTargetSeconds));
 
     const system =
       "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline. Keep each narration under 120 characters. Keep visualPrompt and veoPrompt under 200 characters each. CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette. Each veoPrompt must explicitly continue from the previous scene without changing setting.";
@@ -52,7 +56,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       2
     );
 
-    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}\n\nProduce exactly ${sceneCount} scenes of roughly ${targetSceneSeconds}s each, summing to ${brief.durationSeconds}s.`;
+    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}\n\nProduce exactly ${sceneCount} scenes of roughly ${sceneTargetSeconds}s each, summing to ${brief.durationSeconds}s.${budget ? " Budget mode: keep scenes concise; narration must fit short 4s video clips." : ""}`;
 
     const completeJson = provider.type === "GEMINI" ? geminiCompleteJson : llmCompleteJson;
     const { parsed, model } = await completeJson<{
@@ -69,7 +73,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     });
 
     const scenes: SceneSpec[] = (parsed.scenes ?? []).slice(0, 60).map((scene, index) => {
-      const durationBucket = normalizeDurationBucket(scene.durationBucket, scene.durationSeconds ?? targetSceneSeconds);
+      const durationBucket = normalizeDurationBucket(scene.durationBucket, scene.durationSeconds ?? sceneTargetSeconds, budget);
+      const includeExtraFrames = !budget;
       return {
         id: nanoid(10),
         order: index,
@@ -78,10 +83,10 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         visualPrompt: scene.visualPrompt ?? "",
         veoPrompt: scene.veoPrompt ?? scene.visualPrompt ?? "",
         referenceImagePrompt: scene.referenceImagePrompt ?? scene.visualPrompt ?? undefined,
-        firstFramePrompt: scene.firstFramePrompt ?? scene.visualPrompt ?? undefined,
-        lastFramePrompt: scene.lastFramePrompt ?? scene.visualPrompt ?? undefined,
+        firstFramePrompt: includeExtraFrames ? (scene.firstFramePrompt ?? scene.visualPrompt ?? undefined) : scene.firstFramePrompt,
+        lastFramePrompt: includeExtraFrames ? (scene.lastFramePrompt ?? scene.visualPrompt ?? undefined) : scene.lastFramePrompt,
         durationBucket,
-        audioPolicy: scene.audioPolicy ?? "gemini_tts_plus_music",
+        audioPolicy: budget ? "gemini_tts_only" : (scene.audioPolicy ?? "gemini_tts_plus_music"),
         durationSeconds: Number(durationBucket),
         requiredAssets: scene.requiredAssets?.length ? scene.requiredAssets : ["voice", "music", "video"]
       };
@@ -114,9 +119,11 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
   }
 };
 
-function normalizeDurationBucket(value: unknown, durationSeconds: number): "4" | "6" | "8" {
-  if (value === "4" || value === "6" || value === "8") return value;
-  if (durationSeconds <= 4) return "4";
+function normalizeDurationBucket(value: unknown, durationSeconds: number, budget: boolean): "4" | "6" | "8" {
+  const forced = forcedVeoDurationBucket();
+  if (forced) return forced;
+  if (value === "4" || value === "6" || value === "8") return budget ? "4" : value;
+  if (budget || durationSeconds <= 4) return "4";
   if (durationSeconds <= 6) return "6";
   return "8";
 }

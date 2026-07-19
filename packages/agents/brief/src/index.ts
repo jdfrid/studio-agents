@@ -72,6 +72,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       visualDirection: parsed.visualDirection ?? "",
       musicDirection: parsed.musicDirection ?? "",
       callToAction: parsed.callToAction,
+      budgetMode: input.budgetMode ?? false,
       references:
         parsed.references ??
         input.referenceLinks.map((link) => ({ kind: "link" as const, ref: link, note: undefined }))

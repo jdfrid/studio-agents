@@ -73,3 +73,5 @@ pre { background: #0c0f15; padding: 8px; border-radius: 6px; overflow: auto; max
 .quick-editor label, .upload-row { display: grid; gap: 4px; font-size: 0.85rem; }
 .upload-scene { display: grid; gap: 4px; padding: 6px 0; border-bottom: 1px solid #232733; }
 .upload-row input[type="file"] { font-size: 0.8rem; }
+.budget-row { display: flex; gap: 8px; align-items: center; font-size: 0.85rem; }
+.cost-estimate { color: #7af0bf; font-size: 0.85rem; margin: 0; }

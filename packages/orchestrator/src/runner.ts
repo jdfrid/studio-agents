@@ -127,9 +127,14 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           lastFramePrompt?: string;
         }>;
       } | undefined;
-      const briefData = (byName.get("brief") ?? brief) as { aspectRatio?: string; attachments?: Array<{ gcsPath?: string }> };
+      const briefData = (byName.get("brief") ?? brief) as {
+        aspectRatio?: string;
+        budgetMode?: boolean;
+        attachments?: Array<{ gcsPath?: string }>;
+      };
       return {
         aspectRatio: briefData.aspectRatio ?? "9:16",
+        budgetMode: briefData.budgetMode ?? false,
         scenes: (script?.scenes ?? []).map((scene, index) => ({
           sceneId: scene.id,
           visualPrompt: scene.visualPrompt,

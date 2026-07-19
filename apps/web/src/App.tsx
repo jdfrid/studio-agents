@@ -3,7 +3,7 @@ import { apiGet, apiPost } from "./api.js";
 import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
 import { BriefQuickEditor, StageEditor, StageUploadControls } from "./StageEditor.js";
 import type { ArtifactRow, GeminiCapabilityStatus, GeminiOperationRow, ProjectRunView, RunSummary, StageName } from "./types.js";
-import { STAGE_ORDER } from "@studio/shared";
+import { STAGE_ORDER, estimateRunCostUsd } from "@studio/shared";
 
 export function App() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -100,14 +100,17 @@ function NewRunForm({ onCreated }: { onCreated: (view: ProjectRunView) => void }
   const [title, setTitle] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [language, setLanguage] = useState("he");
+  const [durationSeconds, setDurationSeconds] = useState(30);
+  const [budgetMode, setBudgetMode] = useState(true);
   const [busy, setBusy] = useState(false);
+  const estimate = estimateRunCostUsd({ budgetMode, durationSeconds });
   async function submit() {
     if (!title.trim() || !sourceText.trim()) return;
     setBusy(true);
     try {
       const view = await apiPost<ProjectRunView>("/runs", {
         tenantSlug: "demo",
-        brief: { title, sourceText, language, durationSeconds: 30, aspectRatio: "9:16" }
+        brief: { title, sourceText, language, durationSeconds, aspectRatio: "9:16", budgetMode }
       });
       setTitle("");
       setSourceText("");
@@ -124,6 +127,23 @@ function NewRunForm({ onCreated }: { onCreated: (view: ProjectRunView) => void }
         <option value="he">עברית</option>
         <option value="en">English</option>
       </select>
+      <label className="budget-row">
+        משך (שניות)
+        <input
+          type="number"
+          min={5}
+          max={180}
+          value={durationSeconds}
+          onChange={(e) => setDurationSeconds(Number(e.target.value) || 30)}
+        />
+      </label>
+      <label className="budget-row">
+        <input type="checkbox" checked={budgetMode} onChange={(e) => setBudgetMode(e.target.checked)} />
+        מצב חסכון (פחות סצנות, Veo 4s, Fast, בלי first/last frames)
+      </label>
+      <p className="cost-estimate">
+        הערכת עלות: ~${estimate.usd.toFixed(2)} · {estimate.sceneCount} סצנות × {estimate.bucket}s Veo ({estimate.label})
+      </p>
       <button disabled={busy || !title || !sourceText} onClick={() => void submit()}>
         {busy ? "..." : "צור ריצה"}
       </button>

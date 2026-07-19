@@ -30,7 +30,7 @@ export function geminiModels(provider?: ProviderCredentialView | null): GeminiMo
     tts: pickModel(models.tts, provider?.config.ttsModel, process.env.GEMINI_TTS_MODEL, "gemini-2.5-flash-preview-tts"),
     image: pickModel(models.image, provider?.config.imageModel, process.env.GEMINI_IMAGE_MODEL, "gemini-3.1-flash-image"),
     music: pickModel(models.music, provider?.config.musicModel, process.env.GEMINI_MUSIC_MODEL, "lyria-3-clip-preview"),
-    video: pickModel(models.video, provider?.config.videoModel, process.env.GEMINI_VIDEO_MODEL, "veo-3.1-generate-preview")
+    video: pickModel(models.video, provider?.config.videoModel, process.env.GEMINI_VIDEO_MODEL, "veo-3.1-fast-generate-preview")
   };
 }
 

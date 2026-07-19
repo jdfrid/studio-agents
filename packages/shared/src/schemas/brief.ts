@@ -23,7 +23,9 @@ export const BriefInputSchema = z.object({
       })
     )
     .max(20)
-    .default([])
+    .default([]),
+  /** Fewer scenes, 4s Veo buckets, reference-only assets, TTS without Lyria. */
+  budgetMode: z.boolean().default(false)
 });
 export type BriefInput = z.infer<typeof BriefInputSchema>;
 
@@ -41,6 +43,7 @@ export const BriefOutputSchema = z.object({
   visualDirection: z.string(),
   musicDirection: z.string(),
   callToAction: z.string().optional(),
+  budgetMode: z.boolean().default(false),
   references: z
     .array(
       z.object({

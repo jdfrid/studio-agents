@@ -3,6 +3,7 @@ import { ProviderError } from "@studio/shared";
 import { httpBytes, httpJson } from "../http.js";
 import { geminiDownloadReference } from "./files.js";
 import { geminiApiKey, geminiBaseUrl, geminiModels, geminiUrl } from "./common.js";
+import { veoGenerateAudio, veoResolution } from "@studio/shared";
 
 export interface GeminiVeoRequest {
   sceneId: string;
@@ -52,7 +53,7 @@ export async function geminiGenerateVeoVideo(
           aspectRatio: req.aspectRatio,
           durationSeconds: Number(req.durationBucket),
           sampleCount: 1,
-          resolution: "720p"
+          resolution: veoResolution()
         }
       },
       timeoutMs: 120_000
