@@ -26,12 +26,26 @@ export function geminiBaseUrl(provider?: ProviderCredentialView | null): string 
 export function geminiModels(provider?: ProviderCredentialView | null): GeminiModelConfig {
   const models = (provider?.config.models ?? {}) as Partial<GeminiModelConfig>;
   return {
-    text: String(models.text ?? provider?.config.textModel ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3.5-flash"),
-    tts: String(models.tts ?? provider?.config.ttsModel ?? process.env.GEMINI_TTS_MODEL ?? "gemini-2.5-flash-preview-tts"),
-    image: String(models.image ?? provider?.config.imageModel ?? process.env.GEMINI_IMAGE_MODEL ?? "gemini-3.1-flash-image"),
-    music: String(models.music ?? provider?.config.musicModel ?? process.env.GEMINI_MUSIC_MODEL ?? "lyria-3-clip-preview"),
-    video: String(models.video ?? provider?.config.videoModel ?? process.env.GEMINI_VIDEO_MODEL ?? "veo-3.1-generate-preview")
+    text: pickModel(models.text, provider?.config.textModel, process.env.GEMINI_TEXT_MODEL, "gemini-3.5-flash"),
+    tts: pickModel(models.tts, provider?.config.ttsModel, process.env.GEMINI_TTS_MODEL, "gemini-2.5-flash-preview-tts"),
+    image: pickModel(models.image, provider?.config.imageModel, process.env.GEMINI_IMAGE_MODEL, "gemini-3.1-flash-image"),
+    music: pickModel(models.music, provider?.config.musicModel, process.env.GEMINI_MUSIC_MODEL, "lyria-3-clip-preview"),
+    video: pickModel(models.video, provider?.config.videoModel, process.env.GEMINI_VIDEO_MODEL, "veo-3.1-generate-preview")
   };
+}
+
+function pickModel(
+  fromModels: string | undefined,
+  fromConfig: unknown,
+  fromEnv: string | undefined,
+  fallback: string
+): string {
+  const candidates = [fromModels, typeof fromConfig === "string" ? fromConfig : undefined, fromEnv];
+  for (const value of candidates) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+  return fallback;
 }
 
 export function isGeminiProvider(provider?: ProviderCredentialView | null): boolean {
