@@ -7,7 +7,8 @@ import {
   type BriefInput,
   type ProjectRunView,
   type StageName,
-  type StageStatus
+  type StageStatus,
+  type ArtifactKind
 } from "@studio/shared";
 import { enqueueStage } from "./queue.js";
 import { fromPrismaStage, toPrismaStage } from "./stageMap.js";
@@ -155,24 +156,55 @@ export async function uploadStageArtifact(
   if (!stageRow?.output) throw new Error(`Stage ${stage} has no output to attach artifact to`);
 
   const artifacts = createArtifactsRepo();
+  const kind = resolveArtifactKind(input.attach, input.mimeType);
   const saved = await artifacts.save({
     runId,
     stage,
-    kind: input.kind as any,
+    kind,
     body: input.body,
     mimeType: input.mimeType,
     filename: input.filename,
     metadata: { manualUpload: true, attach: input.attach }
   });
 
-  const output = applyArtifactAttach(stageRow.output, input.attach, saved);
+  let signedUrl: string | null = null;
+  try {
+    signedUrl = await artifacts.signedUrl(saved.id);
+  } catch {
+    signedUrl = null;
+  }
+  const output = applyArtifactAttach(stageRow.output, input.attach, saved, signedUrl);
   return updateStageOutput(runId, stage, output);
+}
+
+function resolveArtifactKind(attach: StageArtifactAttach, mimeType: string): ArtifactKind {
+  switch (attach.type) {
+    case "voice":
+      return "voice_clip";
+    case "music":
+      return "music_track";
+    case "sceneClip":
+      return "scene_rendered_clip";
+    case "final":
+      return "final_video";
+    case "referenceFrame":
+      return "scene_reference_frame";
+    case "firstFrame":
+      return "scene_first_frame";
+    case "lastFrame":
+      return "scene_last_frame";
+    case "background":
+      return mimeType.startsWith("video/") ? "scene_video_source" : "scene_image_source";
+    default:
+      return mimeType.startsWith("video/") ? "scene_video_source" : "scene_image_source";
+  }
 }
 
 function applyArtifactAttach(
   rawOutput: unknown,
   attach: StageArtifactAttach,
-  artifact: { id: string; gcsPath: string; mimeType: string }
+  artifact: { id: string; gcsPath: string; mimeType: string },
+  signedUrl: string | null = null
 ): unknown {
   const output = structuredClone(rawOutput) as Record<string, unknown>;
 
@@ -247,7 +279,7 @@ function applyArtifactAttach(
   const frame = {
     artifactId: artifact.id,
     gcsPath: artifact.gcsPath,
-    signedUrl: null,
+    signedUrl,
     prompt: "manual upload",
     model: "manual"
   };

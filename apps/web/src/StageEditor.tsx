@@ -94,12 +94,12 @@ export function StageUploadControls({
       | { type: "music" }
       | { type: "referenceFrame" | "firstFrame" | "lastFrame" | "background"; sceneId: string }
       | { type: "sceneClip"; sceneId: string }
-      | { type: "final" },
-    kind: string
+      | { type: "final" }
   ) {
     setBusy(true);
     setError("");
     try {
+      const kind = artifactKindForUpload(attach, file.type);
       await uploadStageArtifact(runId, stage, file, { kind, attach });
       onSaved();
     } catch (err) {
@@ -123,7 +123,7 @@ export function StageUploadControls({
               disabled={busy}
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) void onFile(file, { type: "voice", sceneId: String(row.sceneId) }, "voice_clip");
+                if (file) void onFile(file, { type: "voice", sceneId: String(row.sceneId) });
                 e.target.value = "";
               }}
             />
@@ -137,7 +137,7 @@ export function StageUploadControls({
             disabled={busy}
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void onFile(file, { type: "music" }, "music_track");
+              if (file) void onFile(file, { type: "music" });
               e.target.value = "";
             }}
           />
@@ -164,7 +164,7 @@ export function StageUploadControls({
                   disabled={busy}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) void onFile(file, { type: frameType, sceneId: String(row.sceneId) }, "image");
+                    if (file) void onFile(file, { type: frameType, sceneId: String(row.sceneId) });
                     e.target.value = "";
                   }}
                 />
@@ -191,7 +191,7 @@ export function StageUploadControls({
               disabled={busy}
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) void onFile(file, { type: "sceneClip", sceneId: String(row.sceneId) }, "scene_rendered_clip");
+                if (file) void onFile(file, { type: "sceneClip", sceneId: String(row.sceneId) });
                 e.target.value = "";
               }}
             />
@@ -205,7 +205,7 @@ export function StageUploadControls({
             disabled={busy}
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void onFile(file, { type: "final" }, "final_video");
+              if (file) void onFile(file, { type: "final" });
               e.target.value = "";
             }}
           />
@@ -216,6 +216,37 @@ export function StageUploadControls({
   }
 
   return null;
+}
+
+function artifactKindForUpload(
+  attach:
+    | { type: "voice" }
+    | { type: "music" }
+    | { type: "referenceFrame" | "firstFrame" | "lastFrame" | "background" }
+    | { type: "sceneClip" }
+    | { type: "final" },
+  mimeType: string
+): string {
+  switch (attach.type) {
+    case "voice":
+      return "voice_clip";
+    case "music":
+      return "music_track";
+    case "sceneClip":
+      return "scene_rendered_clip";
+    case "final":
+      return "final_video";
+    case "referenceFrame":
+      return "scene_reference_frame";
+    case "firstFrame":
+      return "scene_first_frame";
+    case "lastFrame":
+      return "scene_last_frame";
+    case "background":
+      return mimeType.startsWith("video/") ? "scene_video_source" : "scene_image_source";
+    default:
+      return "scene_image_source";
+  }
 }
 
 export function BriefQuickEditor({
