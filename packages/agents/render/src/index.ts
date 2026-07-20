@@ -194,13 +194,27 @@ function shouldUseVoice(scene: SceneTimelineEntry): boolean {
 
 type MediaRef = { gcsPath?: string | null; signedUrl?: string | null };
 
+function gcsPathFromSignedUrl(url: string, bucket: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "storage.googleapis.com") return null;
+    const parts = parsed.pathname.replace(/^\/+/, "").split("/");
+    if (parts[0] !== bucket || parts.length < 2) return null;
+    return parts.slice(1).join("/");
+  } catch {
+    return null;
+  }
+}
+
 async function resolveFreshUrl(
   storage: GcsClient,
   ref: MediaRef | null | undefined
 ): Promise<string | null> {
   if (!ref) return null;
-  if (ref.gcsPath) {
-    return storage.signedUrl(ref.gcsPath);
+  const gcsPath =
+    ref.gcsPath ?? (ref.signedUrl ? gcsPathFromSignedUrl(ref.signedUrl, storage.bucket()) : null);
+  if (gcsPath) {
+    return storage.signedUrl(gcsPath);
   }
   return ref.signedUrl ?? null;
 }
