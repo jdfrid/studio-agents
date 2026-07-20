@@ -34,6 +34,7 @@ function makeStubCtx(): AgentContext {
     storage: {
       bucket: () => "test",
       upload: async (input) => ({ gcsPath: input.gcsPath, sizeBytes: 0 }),
+      download: async () => ({ body: Buffer.from(""), mimeType: "application/octet-stream" }),
       signedUrl: async (p) => `https://signed.example/${p}`
     },
     log: makeNoopLogger()

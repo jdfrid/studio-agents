@@ -49,6 +49,7 @@ export interface SaveArtifactInput {
 
 export interface GcsClient {
   upload(input: { gcsPath: string; body: Buffer | Uint8Array | string; mimeType: string }): Promise<{ gcsPath: string; sizeBytes: number }>;
+  download(gcsPath: string): Promise<{ body: Buffer; mimeType: string }>;
   signedUrl(gcsPath: string, ttlSeconds?: number): Promise<string>;
   bucket(): string;
 }

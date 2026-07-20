@@ -39,6 +39,15 @@ export function gcsClient(): GcsClient {
       await file.save(body, { contentType: input.mimeType, resumable: false });
       return { gcsPath: input.gcsPath, sizeBytes: body.byteLength };
     },
+    async download(gcsPath) {
+      const file = client().bucket(bucketName()).file(gcsPath);
+      const [body] = await file.download();
+      const [meta] = await file.getMetadata().catch(() => [{ contentType: undefined }]);
+      return {
+        body: Buffer.from(body),
+        mimeType: meta.contentType ?? "application/octet-stream"
+      };
+    },
     async signedUrl(gcsPath, ttlSeconds) {
       const ttl = ttlSeconds ?? Number(process.env.GCS_SIGNED_URL_TTL_SECONDS ?? 3600);
       const [url] = await client().bucket(bucketName()).file(gcsPath).getSignedUrl({

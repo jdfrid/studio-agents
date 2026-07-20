@@ -53,7 +53,8 @@ export function userFacingGeminiError(raw: string, httpStatus?: number): string 
 export function formatApiErrorMessage(raw: string): string {
   const sanitized = raw
     .replace(/key=[^&\s"']+/gi, "key=***")
-    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "AIza***");
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "AIza***")
+    .replace(/https:\/\/storage\.googleapis\.com\/[^\s]+/g, "[gcs-object]");
 
   let httpStatus: number | undefined;
   let body = sanitized;
@@ -66,8 +67,11 @@ export function formatApiErrorMessage(raw: string): string {
   const jsonMessage = extractJsonErrorMessage(body);
   const probe = `${body} ${jsonMessage ?? ""}`;
   const lower = probe.toLowerCase();
-  if (lower.includes("failed to download") && (lower.includes("403") || lower.includes("expired"))) {
-    return "לא ניתן להוריד קובץ מ-Google Cloud Storage — הקישור החתום פג תוקף או חסרה הרשאה. הרץ מחדש את שלב הרינדור (אחרי deploy עדכני זה אמור להיפתר אוטומטית).";
+  if (lower.includes("failed to download")) {
+    if (lower.includes("403") || lower.includes("expired")) {
+      return "לא ניתן להוריד קובץ מ-Google Cloud Storage. ודא ש-GCS_CREDENTIALS_FILE תקין בשרת, ואז הרץ מחדש את שלב הרינדור.";
+    }
+    return `שגיאה בהורדת קובץ מהאחסון: ${sanitized.slice(0, 220)}`;
   }
   if (
     lower.includes("real people's names") ||

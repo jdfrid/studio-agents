@@ -147,12 +147,12 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       await concatClips(clipFiles, concatPath, dir);
 
       const musicScene = input.timeline.find((s) => s.music.gcsPath || s.music.signedUrl);
-      const musicUrl = musicScene ? await resolveFreshUrl(ctx.storage, musicScene.music) : null;
+      const musicGcsPath = musicScene ? resolveGcsPath(ctx.storage, musicScene.music) : null;
       const totalDurationSeconds = perScene.reduce((sum, s) => sum + s.durationSeconds, 0);
       let finalPath = concatPath;
-      if (musicUrl && musicScene) {
-        const musicLocal = path.join(dir, `music-${nanoid(4)}${musicExtension(musicUrl)}`);
-        await fetchToFile(musicUrl, musicLocal, musicScene.music.gcsPath ?? "music");
+      if (musicGcsPath) {
+        const musicLocal = path.join(dir, `music-${nanoid(4)}${musicExtension(musicGcsPath)}`);
+        await downloadMediaToFile(ctx.storage, musicGcsPath, musicLocal);
         finalPath = await muxMusicTrack(concatPath, musicLocal, dir);
       }
 
@@ -206,17 +206,39 @@ function gcsPathFromSignedUrl(url: string, bucket: string): string | null {
   }
 }
 
+function resolveGcsPath(storage: GcsClient, ref: MediaRef | null | undefined): string | null {
+  if (!ref) return null;
+  if (ref.gcsPath) return ref.gcsPath;
+  if (ref.signedUrl) return gcsPathFromSignedUrl(ref.signedUrl, storage.bucket());
+  return null;
+}
+
 async function resolveFreshUrl(
   storage: GcsClient,
   ref: MediaRef | null | undefined
 ): Promise<string | null> {
-  if (!ref) return null;
-  const gcsPath =
-    ref.gcsPath ?? (ref.signedUrl ? gcsPathFromSignedUrl(ref.signedUrl, storage.bucket()) : null);
+  const gcsPath = resolveGcsPath(storage, ref);
   if (gcsPath) {
     return storage.signedUrl(gcsPath);
   }
-  return ref.signedUrl ?? null;
+  return ref?.signedUrl ?? null;
+}
+
+async function downloadMediaToFile(storage: GcsClient, gcsPath: string, dest: string): Promise<void> {
+  try {
+    const { body } = await storage.download(gcsPath);
+    await writeFile(dest, body);
+    return;
+  } catch (sdkError) {
+    try {
+      const url = await storage.signedUrl(gcsPath);
+      await fetchToFile(url, dest, gcsPath);
+      return;
+    } catch {
+      const reason = sdkError instanceof Error ? sdkError.message : String(sdkError);
+      throw new Error(`Failed to download ${gcsPath}: ${reason}`);
+    }
+  }
 }
 
 async function mixSceneAudio(
@@ -231,13 +253,13 @@ async function mixSceneAudio(
   if (!shouldUseVoice(scene)) {
     return stripAudio(videoPath, dir);
   }
-  const voiceUrl = await resolveFreshUrl(storage, scene.voice);
-  if (!voiceUrl) {
+  const voiceGcsPath = resolveGcsPath(storage, scene.voice);
+  if (!voiceGcsPath) {
     return stripAudio(videoPath, dir);
   }
   const videoDur = await probeDuration(videoPath);
   const voiceLocal = path.join(dir, `voice-${scene.sceneId}-${nanoid(4)}.audio`);
-  await fetchToFile(voiceUrl, voiceLocal, scene.voice.gcsPath ?? `voice-${scene.sceneId}`);
+  await downloadMediaToFile(storage, voiceGcsPath, voiceLocal);
   const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-voice.mp4`);
   // Keep full Veo clip; trim or pad narration to match video length (never shorten video with -shortest).
   await runFfmpeg([
@@ -329,9 +351,9 @@ async function muxMusicTrack(videoPath: string, musicPath: string, dir: string):
   return out;
 }
 
-function musicExtension(url: string): string {
-  if (url.includes(".wav")) return ".wav";
-  if (url.includes(".mp3") || url.includes("mpeg")) return ".mp3";
+function musicExtension(pathOrUrl: string): string {
+  if (pathOrUrl.includes(".wav")) return ".wav";
+  if (pathOrUrl.includes(".mp3") || pathOrUrl.includes("mpeg")) return ".mp3";
   return ".audio";
 }
 
