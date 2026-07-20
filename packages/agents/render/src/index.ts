@@ -150,7 +150,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       const musicUrl = musicScene ? await resolveFreshUrl(ctx.storage, musicScene.music) : null;
       const totalDurationSeconds = perScene.reduce((sum, s) => sum + s.durationSeconds, 0);
       let finalPath = concatPath;
-      if (musicUrl) {
+      if (musicUrl && musicScene) {
         const musicLocal = path.join(dir, `music-${nanoid(4)}${musicExtension(musicUrl)}`);
         await fetchToFile(musicUrl, musicLocal, musicScene.music.gcsPath ?? "music");
         finalPath = await muxMusicTrack(concatPath, musicLocal, dir);
