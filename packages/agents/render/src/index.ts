@@ -74,11 +74,20 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           model: result.model,
           error: result.error ?? null
         });
+        const { videoBytes, ...operationSummary } = result;
         await ctx.artifacts.save({
           runId: ctx.runId,
           stage: "render",
           kind: "gemini_operation",
-          body: JSON.stringify({ sceneId: scene.sceneId, promptHash, operation: result }, null, 2),
+          body: JSON.stringify(
+            {
+              sceneId: scene.sceneId,
+              promptHash,
+              operation: { ...operationSummary, videoBytesLength: videoBytes.length }
+            },
+            null,
+            2
+          ),
           mimeType: "application/json",
           filename: `scene-${scene.order}-veo-operation.json`,
           metadata: {

@@ -65,6 +65,15 @@ export function formatApiErrorMessage(raw: string): string {
 
   const jsonMessage = extractJsonErrorMessage(body);
   const probe = `${body} ${jsonMessage ?? ""}`;
+  const lower = probe.toLowerCase();
+  if (
+    lower.includes("content policy") ||
+    lower.includes("content filtered") ||
+    lower.includes("blocked by gemini") ||
+    lower.includes("rai media filtered")
+  ) {
+    return "הווידאו נחסם על ידי מדיניות התוכן של Google (Veo). נסה לשנות את הפרומпт או את התמונות ולהריץ מחדש.";
+  }
   const friendly = userFacingGeminiError(probe, httpStatus);
   if (friendly) return friendly;
 

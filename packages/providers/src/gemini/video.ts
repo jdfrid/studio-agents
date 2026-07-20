@@ -21,6 +21,7 @@ export interface GeminiVeoOperation {
   model: string;
   status: "queued" | "polling" | "completed" | "failed";
   videoUrl?: string;
+  videoFileName?: string;
   videoBytes?: Buffer;
   mimeType?: string;
   error?: string;
@@ -115,14 +116,23 @@ async function runVeoGeneration(
     }
     if (lastStatus.status === "completed") {
       if (lastStatus.videoBytes) return lastStatus;
-      if (lastStatus.videoUrl) {
-        const downloaded = await downloadGeminiVideo(provider, lastStatus.videoUrl);
+      const downloaded = await downloadVeoResult(provider, lastStatus);
+      if (downloaded) {
         return { ...lastStatus, videoBytes: downloaded.body, mimeType: downloaded.mimeType };
       }
-      throw new ProviderError("Gemini Veo completed without downloadable video data", {
-        provider: "gemini",
-        metadata: { model, operationName }
-      });
+      throw new ProviderError(
+        "Gemini Veo completed without downloadable video data — ייתכן שתוכן נחסם או שהתגובה מה-API השתנתה. נסה rerun או בדוק את gemini_operation.",
+        {
+          provider: "gemini",
+          metadata: {
+            model,
+            operationName,
+            error: lastStatus.error ?? null,
+            videoUrl: lastStatus.videoUrl ?? null,
+            videoFileName: lastStatus.videoFileName ?? null
+          }
+        }
+      );
     }
   }
   throw new ProviderError(`Gemini Veo timed out after ${Math.round(timeoutMs / 1000)}s`, {
@@ -196,11 +206,52 @@ function resolveGeminiResourceUrl(provider: ProviderCredentialView, uri: string)
   return withApiKey(`${base}/${uri.replace(/^\/+/, "")}`, geminiApiKey(provider));
 }
 
+async function downloadVeoResult(
+  provider: ProviderCredentialView,
+  operation: GeminiVeoOperation
+): Promise<{ body: Buffer; mimeType: string } | null> {
+  const attempts: Array<{ uri?: string; fileName?: string }> = [];
+  if (operation.videoUrl) attempts.push({ uri: operation.videoUrl });
+  if (operation.videoFileName) attempts.push({ fileName: operation.videoFileName });
+
+  for (const attempt of attempts) {
+    try {
+      return await downloadGeminiVideo(provider, attempt);
+    } catch {
+      // try next shape / auth mode
+    }
+  }
+  return null;
+}
+
 async function downloadGeminiVideo(
   provider: ProviderCredentialView,
-  uri: string
+  target: { uri?: string; fileName?: string }
 ): Promise<{ body: Buffer; mimeType: string }> {
-  return httpBytes(resolveGeminiResourceUrl(provider, uri), { timeoutMs: 240_000 });
+  const apiKey = geminiApiKey(provider);
+  let url: string;
+  if (target.fileName) {
+    const name = target.fileName.replace(/^\/+/, "");
+    const path = name.startsWith("files/") ? `${name}:download?alt=media` : `files/${name}:download?alt=media`;
+    url = geminiUrl(provider, path);
+  } else if (target.uri) {
+    url = target.uri.startsWith("http://") || target.uri.startsWith("https://")
+      ? target.uri
+      : resolveGeminiResourceUrl(provider, target.uri);
+  } else {
+    throw new Error("No Veo download target");
+  }
+
+  // Google recommends x-goog-api-key header; also try query key as fallback.
+  const urlWithoutKey = url.replace(/([?&])key=[^&]*(&)?/g, (_, sep, tail) => (tail ? sep : "")).replace(/[?&]$/, "");
+  try {
+    return await httpBytes(urlWithoutKey, {
+      headers: { "x-goog-api-key": apiKey },
+      timeoutMs: 240_000
+    });
+  } catch {
+    return httpBytes(withApiKey(urlWithoutKey, apiKey), { timeoutMs: 240_000 });
+  }
 }
 
 export function normalizeOperation(operationName: string, model: string, raw: unknown): GeminiVeoOperation {
@@ -220,28 +271,88 @@ export function normalizeOperation(operationName: string, model: string, raw: un
   }
   if (!r.done) return { operationName, model, status: "polling" };
 
-  const response = (r.response ?? r.result ?? {}) as Record<string, unknown>;
-  const generateVideoResponse = (response.generateVideoResponse ??
-    response.generate_video_response ??
-    response) as Record<string, unknown>;
-  const generatedSamples = (generateVideoResponse.generatedSamples ??
-    generateVideoResponse.generated_samples ??
-    []) as Array<Record<string, unknown>>;
-  const sample = generatedSamples[0];
-  const video = (sample?.video ?? sample) as Record<string, unknown> | undefined;
-
-  const legacyGenerated = (response.generatedVideos ?? response.generated_videos ?? []) as Array<Record<string, unknown>>;
-  const legacyVideo = legacyGenerated[0]?.video as Record<string, unknown> | undefined;
-  const listed = (response.videos as Array<Record<string, unknown>> | undefined)?.[0];
-  const resolvedVideo = video ?? legacyVideo ?? listed;
-  const data = resolvedVideo?.data as string | undefined;
+  const payload = extractVideoPayload(r.response ?? r.result ?? {});
+  if (payload?.blocked) {
+    return {
+      operationName,
+      model,
+      status: "failed",
+      error: payload.blockedReason ?? "Video blocked by Gemini content policy"
+    };
+  }
+  if (!payload) {
+    return {
+      operationName,
+      model,
+      status: "completed",
+      error: "No video payload in completed operation"
+    };
+  }
 
   return {
     operationName,
     model,
     status: "completed",
-    videoUrl: (resolvedVideo?.uri ?? resolvedVideo?.gcsUri ?? listed?.gcsUri ?? listed?.uri) as string | undefined,
-    videoBytes: data ? Buffer.from(data, "base64") : undefined,
-    mimeType: (resolvedVideo?.mimeType ?? resolvedVideo?.mime_type ?? listed?.mimeType ?? "video/mp4") as string
+    videoUrl: payload.uri,
+    videoFileName: payload.fileName,
+    videoBytes: payload.data ? Buffer.from(payload.data, "base64") : undefined,
+    mimeType: payload.mimeType ?? "video/mp4"
   };
+}
+
+type ExtractedVideoPayload = {
+  uri?: string;
+  fileName?: string;
+  data?: string;
+  mimeType?: string;
+  blocked?: boolean;
+  blockedReason?: string;
+};
+
+function extractVideoPayload(response: Record<string, unknown>): ExtractedVideoPayload | null {
+  const generateVideoResponse = (response.generateVideoResponse ??
+    response.generate_video_response ??
+    response) as Record<string, unknown>;
+
+  const filteredReasons = (generateVideoResponse.raiMediaFilteredReasons ??
+    generateVideoResponse.rai_media_filtered_reasons ??
+    []) as string[];
+  const generatedSamples = (generateVideoResponse.generatedSamples ??
+    generateVideoResponse.generated_samples ??
+    []) as Array<Record<string, unknown>>;
+
+  for (const sample of generatedSamples) {
+    const fromSample = videoPayloadFromRecord((sample.video ?? sample) as Record<string, unknown>);
+    if (fromSample) return fromSample;
+  }
+
+  const legacyGenerated = (response.generatedVideos ?? response.generated_videos ?? []) as Array<Record<string, unknown>>;
+  for (const item of legacyGenerated) {
+    const fromLegacy = videoPayloadFromRecord((item.video ?? item) as Record<string, unknown>);
+    if (fromLegacy) return fromLegacy;
+  }
+
+  const listed = (response.videos as Array<Record<string, unknown>> | undefined) ?? [];
+  for (const item of listed) {
+    const fromListed = videoPayloadFromRecord(item);
+    if (fromListed) return fromListed;
+  }
+
+  if (filteredReasons.length > 0) {
+    return { blocked: true, blockedReason: filteredReasons.join(" ") };
+  }
+
+  return null;
+}
+
+function videoPayloadFromRecord(video: Record<string, unknown> | undefined): ExtractedVideoPayload | null {
+  if (!video) return null;
+  const uri = (video.uri ?? video.url) as string | undefined;
+  const fileName = (video.name ?? video.file) as string | undefined;
+  const data = (video.data ?? video.bytesBase64Encoded) as string | undefined;
+  const mimeType = (video.mimeType ?? video.mime_type) as string | undefined;
+  if (uri) return { uri, mimeType };
+  if (fileName) return { fileName: String(fileName), mimeType };
+  if (data) return { data: String(data), mimeType };
+  return null;
 }
