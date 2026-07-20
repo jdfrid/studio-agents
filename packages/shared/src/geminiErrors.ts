@@ -35,10 +35,10 @@ export function userFacingGeminiError(raw: string, httpStatus?: number): string 
   switch (kind) {
     case "billing_quota":
       return [
-        "הגעת למגבלת התקציב / יתרה ב-Google Cloud.",
-        "אין מספיק כסף בחשבון להמשך ייצור (Veo, תמונות, TTS).",
-        "הוסף תקציב או המתן לחידוש מכסה, ואז הרץ מחדש את השלב.",
-        "ניהול תקציב: https://console.cloud.google.com/billing"
+        "נגמרו קרדיטים ב-Google AI Studio (Prepay) או שאין מספיק יתרה ל-Veo/TTS.",
+        "Billing → How you pay → Prepay AI Studio → Buy credits (לא רק Cloud Billing).",
+        "מומלץ לפחות ₪30–50 יתרה לפני run. אחרי הקנייה המתן דקה ורענן, ואז rerender.",
+        "יתרה: https://console.cloud.google.com/billing → How you pay"
       ].join(" ");
     case "rate_limit":
       return "יותר מדי בקשות ל-Gemini בזמן קצר. המתן כמה דקות ונסה שוב.";
