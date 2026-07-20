@@ -74,7 +74,12 @@ export function formatApiErrorMessage(raw: string): string {
     return `שגיאה בהורדת קובץ מהאחסון: ${sanitized.slice(0, 220)}`;
   }
   if (
-    lower.includes("real people's names") ||
+    lower.includes("issue with the audio") ||
+    lower.includes("audio for your prompt")
+  ) {
+    return "Veo נכשל ביצירת אודיו מקורי לפרומпт (מסנן בטיחות או בעיית עיבוד). הקול ממילא מגיע מ-TTS נפרד — ודא ש-GEMINI_VEO_AUDIO=0 בשרת והרץ rerender.";
+  }
+  if (
     lower.includes("real people") ||
     lower.includes("celebrity") ||
     lower.includes("likenesses") ||

@@ -60,7 +60,8 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
             durationBucket: scene.durationBucket,
             referenceImage,
             firstFrame,
-            lastFrame
+            lastFrame,
+            generateAudio: scene.audioPolicy === "veo_native_audio"
           },
           async (operation) => {
             await ctx.log.log("gemini_veo_operation_status", "Gemini Veo operation status", {

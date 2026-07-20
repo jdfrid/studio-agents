@@ -40,7 +40,7 @@ export function veoResolution(): "720p" | "1080p" | "4k" {
 
 export function veoGenerateAudio(override?: boolean): boolean {
   if (override != null) return override;
-  return process.env.GEMINI_VEO_AUDIO !== "0";
+  return process.env.GEMINI_VEO_AUDIO === "1";
 }
 
 export type VeoModelTier = "lite" | "fast" | "standard" | "unknown";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateRunCost, veoModelTier } from "../budget.js";
+import { estimateRunCost, veoGenerateAudio, veoModelTier } from "../budget.js";
 
 describe("estimateRunCost", () => {
   it("flags Standard Veo as expensive (~50 NIS for 30s normal)", () => {
@@ -38,5 +38,17 @@ describe("veoModelTier", () => {
     expect(veoModelTier("veo-3.1-lite-generate-preview")).toBe("lite");
     expect(veoModelTier("veo-3.1-fast-generate-preview")).toBe("fast");
     expect(veoModelTier("veo-3.1-generate-preview")).toBe("standard");
+  });
+});
+
+describe("veoGenerateAudio", () => {
+  it("defaults to off unless GEMINI_VEO_AUDIO=1", () => {
+    const prev = process.env.GEMINI_VEO_AUDIO;
+    delete process.env.GEMINI_VEO_AUDIO;
+    expect(veoGenerateAudio()).toBe(false);
+    process.env.GEMINI_VEO_AUDIO = "1";
+    expect(veoGenerateAudio()).toBe(true);
+    if (prev === undefined) delete process.env.GEMINI_VEO_AUDIO;
+    else process.env.GEMINI_VEO_AUDIO = prev;
   });
 });

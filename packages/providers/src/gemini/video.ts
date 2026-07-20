@@ -22,6 +22,8 @@ export interface GeminiVeoRequest {
   lastFrameUrl?: string | null;
   lastFrame?: GeminiInlineMedia | null;
   extendVideoHandle?: string | null;
+  /** When false, Veo renders silent video (TTS/mix handled downstream). Default false unless veo_native_audio. */
+  generateAudio?: boolean;
 }
 
 export interface GeminiVeoOperation {
@@ -157,7 +159,7 @@ function buildVeoParameters(req: GeminiVeoRequest, model: string): Record<string
     resolution: veoResolution()
   };
   if (!model.includes("lite")) {
-    params.generateAudio = veoGenerateAudio();
+    params.generateAudio = req.generateAudio ?? veoGenerateAudio();
   }
   return params;
 }
