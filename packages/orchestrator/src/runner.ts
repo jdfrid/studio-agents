@@ -2,6 +2,7 @@ import { prisma } from "@studio/infra-prisma";
 import {
   STAGE_ORDER,
   createConsoleLogger,
+  formatApiErrorMessage,
   nextStage,
   type AgentContext,
   type StageName
@@ -84,7 +85,7 @@ export async function runStage(runId: string, stage: StageName): Promise<void> {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await recordStageError(stageRow.id, message);
+    await recordStageError(stageRow.id, formatApiErrorMessage(message));
     await setRunStatus(runId, "FAILED", stage);
     await audit(run.tenantId, "stage_failed", "StageExecution", stageRow.id, { stage, error: message });
     throw error;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost } from "./api.js";
+import { apiGet, apiPost, formatApiErrorMessage, isQuotaErrorMessage } from "./api.js";
 import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
 import { BriefQuickEditor, StageEditor, StageUploadControls } from "./StageEditor.js";
 import type { ArtifactRow, GeminiCapabilityStatus, GeminiOperationRow, ProjectRunView, RunSummary, StageName } from "./types.js";
@@ -113,7 +113,9 @@ export function App() {
           )}
         </section>
       </main>
-      {error && <div className="error-banner">{error}</div>}
+      {error ? (
+        <div className={`error-banner${isQuotaErrorMessage(error) ? " error-banner-quota" : ""}`}>{formatApiErrorMessage(error)}</div>
+      ) : null}
     </div>
   );
 }
@@ -455,7 +457,9 @@ function StagePanel({
         <span className={`badge badge-${status.toLowerCase()}`}>{status}</span>
       </header>
       {status === "QUEUED" && <p className="muted">ממתין ל-worker…</p>}
-      {error && <p className="error">{error}</p>}
+      {error ? (
+        <p className={isQuotaErrorMessage(error) ? "error error-quota" : "error"}>{formatApiErrorMessage(error)}</p>
+      ) : null}
       {showOutput ? (
         <>
           <StageOutputView stage={stage} output={output} artifacts={artifacts} onOpenArtifact={openArtifact} />

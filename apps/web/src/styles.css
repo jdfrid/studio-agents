@@ -76,7 +76,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .capability-ok { color: #7af0bf; }
 .capability-missing { color: #ffb56b; }
 pre { background: #0c0f15; padding: 8px; border-radius: 6px; overflow: auto; max-height: 200px; font-size: 0.75rem; }
-.error-banner { position: fixed; bottom: 16px; right: 16px; background: #6a1d1d; padding: 10px 16px; border-radius: 8px; }
+.error-banner { position: fixed; bottom: 16px; right: 16px; background: #6a1d1d; padding: 10px 16px; border-radius: 8px; max-width: min(520px, 92vw); line-height: 1.45; }
+.error-banner-quota { background: #4a2808; border: 2px solid #ffb347; color: #ffe8c8; font-weight: 600; }
+.error-quota { border: 1px solid #604414; background: #2a1a0c; font-weight: 600; line-height: 1.45; }
 .muted { color: #8b94a6; }
 .stage-editor, .upload-controls, .quick-editor, .editor-panel { display: grid; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #232733; }
 .editor-textarea, .quick-editor textarea, .quick-editor input {
