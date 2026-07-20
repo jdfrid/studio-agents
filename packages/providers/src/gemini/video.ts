@@ -5,14 +5,22 @@ import { geminiDownloadReference } from "./files.js";
 import { geminiApiKey, geminiBaseUrl, geminiModels, geminiUrl } from "./common.js";
 import { veoGenerateAudio, veoResolution } from "@studio/shared";
 
+export interface GeminiInlineMedia {
+  body: Buffer;
+  mimeType: string;
+}
+
 export interface GeminiVeoRequest {
   sceneId: string;
   prompt: string;
   aspectRatio: "9:16" | "16:9";
   durationBucket: "4" | "6" | "8";
   referenceImageUrl?: string | null;
+  referenceImage?: GeminiInlineMedia | null;
   firstFrameUrl?: string | null;
+  firstFrame?: GeminiInlineMedia | null;
   lastFrameUrl?: string | null;
+  lastFrame?: GeminiInlineMedia | null;
   extendVideoHandle?: string | null;
 }
 
@@ -168,15 +176,30 @@ async function buildVeoInstance(
   // Veo Lite: text-to-video only — reference / first / last frames are not supported.
   const includeImages = !model.includes("lite");
 
-  if (includeImages && req.firstFrameUrl) {
+  if (includeImages && req.firstFrame) {
+    instance.image = {
+      bytesBase64Encoded: req.firstFrame.body.toString("base64"),
+      mimeType: req.firstFrame.mimeType
+    };
+  } else if (includeImages && req.firstFrameUrl) {
     const first = await geminiDownloadReference(provider, req.firstFrameUrl);
     instance.image = { bytesBase64Encoded: first.body.toString("base64"), mimeType: first.mimeType };
+  } else if (includeImages && req.referenceImage) {
+    instance.image = {
+      bytesBase64Encoded: req.referenceImage.body.toString("base64"),
+      mimeType: req.referenceImage.mimeType
+    };
   } else if (includeImages && req.referenceImageUrl) {
     const ref = await geminiDownloadReference(provider, req.referenceImageUrl);
     instance.image = { bytesBase64Encoded: ref.body.toString("base64"), mimeType: ref.mimeType };
   }
 
-  if (includeImages && req.lastFrameUrl) {
+  if (includeImages && req.lastFrame) {
+    instance.lastFrame = {
+      bytesBase64Encoded: req.lastFrame.body.toString("base64"),
+      mimeType: req.lastFrame.mimeType
+    };
+  } else if (includeImages && req.lastFrameUrl) {
     const last = await geminiDownloadReference(provider, req.lastFrameUrl);
     instance.lastFrame = { bytesBase64Encoded: last.body.toString("base64"), mimeType: last.mimeType };
   }

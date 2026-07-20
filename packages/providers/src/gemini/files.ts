@@ -1,5 +1,6 @@
 import type { ProviderCredentialView } from "@studio/shared";
 import { httpBytes, httpJson } from "../http.js";
+import { gcsClient, gcsPathFromStorageUrl } from "../gcs.js";
 import { geminiUrl } from "./common.js";
 
 export interface GeminiFileRef {
@@ -17,6 +18,14 @@ export async function geminiDownloadReference(
   _provider: ProviderCredentialView,
   url: string
 ): Promise<{ body: Buffer; mimeType: string }> {
+  const gcsPath = gcsPathFromStorageUrl(url);
+  if (gcsPath) {
+    try {
+      return await gcsClient().download(gcsPath);
+    } catch {
+      // fall through to signed URL fetch
+    }
+  }
   return httpBytes(url, { timeoutMs: 180_000 });
 }
 

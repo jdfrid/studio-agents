@@ -28,6 +28,21 @@ export function bucketName(): string {
   return name;
 }
 
+/** Extract object path from a storage.googleapis.com URL (signed or public). */
+export function gcsPathFromStorageUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "storage.googleapis.com") return null;
+    const parts = parsed.pathname.replace(/^\/+/, "").split("/");
+    if (parts.length < 2) return null;
+    const bucket = parts[0];
+    if (bucket !== bucketName()) return null;
+    return parts.slice(1).join("/");
+  } catch {
+    return null;
+  }
+}
+
 export function gcsClient(): GcsClient {
   return {
     bucket(): string {

@@ -46,10 +46,10 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         await ctx.log.log("render_scene_start", "Rendering scene", { sceneId: scene.sceneId, order: scene.order });
         const referenceSource =
           scene.referenceFrame?.gcsPath || scene.referenceFrame?.signedUrl ? scene.referenceFrame : scene.background;
-        const [referenceImageUrl, firstFrameUrl, lastFrameUrl] = await Promise.all([
-          resolveFreshUrl(ctx.storage, referenceSource),
-          resolveFreshUrl(ctx.storage, scene.firstFrame),
-          resolveFreshUrl(ctx.storage, scene.lastFrame)
+        const [referenceImage, firstFrame, lastFrame] = await Promise.all([
+          loadMediaBytes(ctx.storage, referenceSource),
+          loadMediaBytes(ctx.storage, scene.firstFrame),
+          loadMediaBytes(ctx.storage, scene.lastFrame)
         ]);
         const result = await geminiGenerateVeoVideo(
           provider,
@@ -58,9 +58,9 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
             prompt: scene.veoPrompt,
             aspectRatio: input.aspectRatio === "16:9" ? "16:9" : "9:16",
             durationBucket: scene.durationBucket,
-            referenceImageUrl,
-            firstFrameUrl,
-            lastFrameUrl
+            referenceImage,
+            firstFrame,
+            lastFrame
           },
           async (operation) => {
             await ctx.log.log("gemini_veo_operation_status", "Gemini Veo operation status", {
@@ -213,30 +213,30 @@ function resolveGcsPath(storage: GcsClient, ref: MediaRef | null | undefined): s
   return null;
 }
 
-async function resolveFreshUrl(
+async function loadMediaBytes(
   storage: GcsClient,
   ref: MediaRef | null | undefined
-): Promise<string | null> {
+): Promise<{ body: Buffer; mimeType: string } | null> {
   const gcsPath = resolveGcsPath(storage, ref);
-  if (gcsPath) {
-    return storage.signedUrl(gcsPath);
-  }
-  return ref?.signedUrl ?? null;
+  if (!gcsPath) return null;
+  return storage.download(gcsPath);
 }
 
 async function downloadMediaToFile(storage: GcsClient, gcsPath: string, dest: string): Promise<void> {
+  let fetchError: string | null = null;
   try {
     const { body } = await storage.download(gcsPath);
     await writeFile(dest, body);
     return;
   } catch (sdkError) {
+    const sdkMessage = sdkError instanceof Error ? sdkError.message : String(sdkError);
     try {
       const url = await storage.signedUrl(gcsPath);
       await fetchToFile(url, dest, gcsPath);
       return;
-    } catch {
-      const reason = sdkError instanceof Error ? sdkError.message : String(sdkError);
-      throw new Error(`Failed to download ${gcsPath}: ${reason}`);
+    } catch (error) {
+      fetchError = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to download ${gcsPath}: ${sdkMessage}${fetchError ? `; ${fetchError}` : ""}`);
     }
   }
 }
