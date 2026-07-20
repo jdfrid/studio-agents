@@ -66,6 +66,9 @@ export function formatApiErrorMessage(raw: string): string {
   const jsonMessage = extractJsonErrorMessage(body);
   const probe = `${body} ${jsonMessage ?? ""}`;
   const lower = probe.toLowerCase();
+  if (lower.includes("failed to download") && (lower.includes("403") || lower.includes("expired"))) {
+    return "לא ניתן להוריד קובץ מ-Google Cloud Storage — הקישור החתום פג תוקף או חסרה הרשאה. הרץ מחדש את שלב הרינדור (אחרי deploy עדכני זה אמור להיפתר אוטומטית).";
+  }
   if (
     lower.includes("real people's names") ||
     lower.includes("real people") ||

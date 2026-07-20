@@ -4,6 +4,7 @@ import {
   RenderInputSchema,
   RenderOutputSchema,
   type Agent,
+  type GcsClient,
   type RenderInput,
   type RenderOutput,
   type RenderSceneResult,
@@ -43,6 +44,13 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       for (const scene of input.timeline) {
         const promptHash = stablePromptHash(scene.veoPrompt);
         await ctx.log.log("render_scene_start", "Rendering scene", { sceneId: scene.sceneId, order: scene.order });
+        const referenceSource =
+          scene.referenceFrame?.gcsPath || scene.referenceFrame?.signedUrl ? scene.referenceFrame : scene.background;
+        const [referenceImageUrl, firstFrameUrl, lastFrameUrl] = await Promise.all([
+          resolveFreshUrl(ctx.storage, referenceSource),
+          resolveFreshUrl(ctx.storage, scene.firstFrame),
+          resolveFreshUrl(ctx.storage, scene.lastFrame)
+        ]);
         const result = await geminiGenerateVeoVideo(
           provider,
           {
@@ -50,9 +58,9 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
             prompt: scene.veoPrompt,
             aspectRatio: input.aspectRatio === "16:9" ? "16:9" : "9:16",
             durationBucket: scene.durationBucket,
-            referenceImageUrl: scene.referenceFrame?.signedUrl ?? scene.background.signedUrl,
-            firstFrameUrl: scene.firstFrame?.signedUrl ?? null,
-            lastFrameUrl: scene.lastFrame?.signedUrl ?? null
+            referenceImageUrl,
+            firstFrameUrl,
+            lastFrameUrl
           },
           async (operation) => {
             await ctx.log.log("gemini_veo_operation_status", "Gemini Veo operation status", {
@@ -101,7 +109,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
 
         const rawPath = path.join(dir, `scene-${scene.order}-raw.mp4`);
         await writeFile(rawPath, result.videoBytes);
-        const mixedPath = await mixSceneAudio(rawPath, scene, dir);
+        const mixedPath = await mixSceneAudio(rawPath, scene, dir, ctx.storage);
         const finalized = await finalizeSceneClip(mixedPath, dir, scene.sceneId);
         const scenePath = finalized.path;
         clipFiles.push(scenePath);
@@ -138,12 +146,13 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       const concatPath = path.join(dir, `concat-${nanoid(8)}.mp4`);
       await concatClips(clipFiles, concatPath, dir);
 
-      const musicUrl = input.timeline.find((s) => s.music.signedUrl)?.music.signedUrl ?? null;
+      const musicScene = input.timeline.find((s) => s.music.gcsPath || s.music.signedUrl);
+      const musicUrl = musicScene ? await resolveFreshUrl(ctx.storage, musicScene.music) : null;
       const totalDurationSeconds = perScene.reduce((sum, s) => sum + s.durationSeconds, 0);
       let finalPath = concatPath;
       if (musicUrl) {
         const musicLocal = path.join(dir, `music-${nanoid(4)}${musicExtension(musicUrl)}`);
-        await fetchToFile(musicUrl, musicLocal);
+        await fetchToFile(musicUrl, musicLocal, musicScene.music.gcsPath ?? "music");
         finalPath = await muxMusicTrack(concatPath, musicLocal, dir);
       }
 
@@ -180,19 +189,41 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
 
 function shouldUseVoice(scene: SceneTimelineEntry): boolean {
   const policy = scene.audioPolicy ?? "gemini_tts_plus_music";
-  return policy !== "muted" && policy !== "veo_native_audio" && Boolean(scene.voice.signedUrl);
+  return policy !== "muted" && policy !== "veo_native_audio" && Boolean(scene.voice.gcsPath || scene.voice.signedUrl);
 }
 
-async function mixSceneAudio(videoPath: string, scene: SceneTimelineEntry, dir: string): Promise<string> {
+type MediaRef = { gcsPath?: string | null; signedUrl?: string | null };
+
+async function resolveFreshUrl(
+  storage: GcsClient,
+  ref: MediaRef | null | undefined
+): Promise<string | null> {
+  if (!ref) return null;
+  if (ref.gcsPath) {
+    return storage.signedUrl(ref.gcsPath);
+  }
+  return ref.signedUrl ?? null;
+}
+
+async function mixSceneAudio(
+  videoPath: string,
+  scene: SceneTimelineEntry,
+  dir: string,
+  storage: GcsClient
+): Promise<string> {
   if (scene.audioPolicy === "veo_native_audio") {
     return videoPath;
   }
-  if (!shouldUseVoice(scene) || !scene.voice.signedUrl) {
+  if (!shouldUseVoice(scene)) {
+    return stripAudio(videoPath, dir);
+  }
+  const voiceUrl = await resolveFreshUrl(storage, scene.voice);
+  if (!voiceUrl) {
     return stripAudio(videoPath, dir);
   }
   const videoDur = await probeDuration(videoPath);
   const voiceLocal = path.join(dir, `voice-${scene.sceneId}-${nanoid(4)}.audio`);
-  await fetchToFile(scene.voice.signedUrl, voiceLocal);
+  await fetchToFile(voiceUrl, voiceLocal, scene.voice.gcsPath ?? `voice-${scene.sceneId}`);
   const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-voice.mp4`);
   // Keep full Veo clip; trim or pad narration to match video length (never shorten video with -shortest).
   await runFfmpeg([
@@ -290,10 +321,12 @@ function musicExtension(url: string): string {
   return ".audio";
 }
 
-async function fetchToFile(url: string, dest: string): Promise<void> {
+async function fetchToFile(url: string, dest: string, label?: string): Promise<void> {
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Failed to download ${url}: HTTP ${res.status}`);
+    const name = label ?? url.split("?")[0]?.split("/").slice(-1)[0] ?? "media";
+    const expiredHint = res.status === 403 ? " (ייתכן שפג תוקף הקישור)" : "";
+    throw new Error(`Failed to download ${name}: HTTP ${res.status}${expiredHint}`);
   }
   await writeFile(dest, Buffer.from(await res.arrayBuffer()));
 }
