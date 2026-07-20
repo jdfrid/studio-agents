@@ -31,7 +31,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const sceneCount = Math.max(1, Math.round(brief.durationSeconds / sceneTargetSeconds));
 
     const system =
-      "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline. Keep each narration under 120 characters. Keep visualPrompt and veoPrompt under 200 characters each. CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette. Each veoPrompt must explicitly continue from the previous scene without changing setting.";
+      "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline. Keep each narration under 120 characters. Keep visualPrompt and veoPrompt under 200 characters each. CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette. Each veoPrompt must explicitly continue from the previous scene without changing setting. NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt or visualPrompt — use generic fictional people only (Veo blocks real-person likenesses).";
     const schemaHint = JSON.stringify(
       {
         scenes: [

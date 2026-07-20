@@ -67,6 +67,15 @@ export function formatApiErrorMessage(raw: string): string {
   const probe = `${body} ${jsonMessage ?? ""}`;
   const lower = probe.toLowerCase();
   if (
+    lower.includes("real people's names") ||
+    lower.includes("real people") ||
+    lower.includes("celebrity") ||
+    lower.includes("likenesses") ||
+    lower.includes("likeness")
+  ) {
+    return "Veo לא מאפשר יצירת וידאו עם שמות או דמיון לדמויות/סלבריטאים אמיתיים. הסר אזכורים כאלה מהבריף, מהסקריפט או מהתמונות, ואז הרץ מחדש את שלב הסקריפט והרינדור.";
+  }
+  if (
     lower.includes("content policy") ||
     lower.includes("content filtered") ||
     lower.includes("blocked by gemini") ||

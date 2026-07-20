@@ -16,6 +16,14 @@ describe("geminiErrors", () => {
     expect(msg).not.toContain("AIzaSySecret");
   });
 
+  it("maps celebrity likeness blocks to Hebrew", () => {
+    const msg = formatApiErrorMessage(
+      "Gemini Veo operation failed: Sorry, we can't create videos with real people's names or likenesses. Please remove the celebrity reference and try again."
+    );
+    expect(msg).toContain("סלבריטאים");
+    expect(msg).not.toContain("celebrity reference");
+  });
+
   it("passes through unknown errors truncated", () => {
     const msg = formatApiErrorMessage("500 internal server error");
     expect(msg).toContain("500");
