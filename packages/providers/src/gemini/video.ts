@@ -31,30 +31,63 @@ export async function geminiGenerateVeoVideo(
   req: GeminiVeoRequest,
   onPoll?: (operation: GeminiVeoOperation) => Promise<void> | void
 ): Promise<GeminiVeoOperation> {
-  const model = geminiModels(provider).video;
+  const configuredModel = geminiModels(provider).video;
   if (provider.config.mock === true || process.env.GEMINI_MOCK === "1") {
     return {
       operationName: `mock/operations/${req.sceneId}`,
-      model,
+      model: configuredModel,
       status: "completed",
       videoBytes: Buffer.from(`mock video for ${req.sceneId}`),
       mimeType: "video/mp4"
     };
   }
 
-  const instance = await buildVeoInstance(provider, req);
+  const modelsToTry = veoModelFallbackChain(configuredModel);
+  let lastError: unknown;
+  for (const model of modelsToTry) {
+    try {
+      return await runVeoGeneration(provider, req, model, onPoll);
+    } catch (error) {
+      lastError = error;
+      if (!isRetriableVeoModelError(error) || model === modelsToTry[modelsToTry.length - 1]) {
+        break;
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+function veoModelFallbackChain(model: string): string[] {
+  if (model.includes("lite")) {
+    return [model, "veo-3.1-fast-generate-preview"];
+  }
+  return [model];
+}
+
+function isRetriableVeoModelError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("400") &&
+    (message.includes("not supported") ||
+      message.includes("INVALID_ARGUMENT") ||
+      message.includes("use case is currently not supported"))
+  );
+}
+
+async function runVeoGeneration(
+  provider: ProviderCredentialView,
+  req: GeminiVeoRequest,
+  model: string,
+  onPoll?: (operation: GeminiVeoOperation) => Promise<void> | void
+): Promise<GeminiVeoOperation> {
+  const instance = await buildVeoInstance(provider, req, model);
   const queued = await httpJson<{ name?: string; operationName?: string }>(
     geminiUrl(provider, `models/${model}:predictLongRunning`),
     {
       method: "POST",
       body: {
         instances: [instance],
-        parameters: {
-          aspectRatio: req.aspectRatio,
-          durationSeconds: Number(req.durationBucket),
-          sampleCount: 1,
-          resolution: veoResolution()
-        }
+        parameters: buildVeoParameters(req, model)
       },
       timeoutMs: 120_000
     }
@@ -98,22 +131,42 @@ export async function geminiGenerateVeoVideo(
   });
 }
 
-async function buildVeoInstance(provider: ProviderCredentialView, req: GeminiVeoRequest): Promise<Record<string, unknown>> {
+function buildVeoParameters(req: GeminiVeoRequest, model: string): Record<string, unknown> {
+  const params: Record<string, unknown> = {
+    aspectRatio: req.aspectRatio,
+    durationSeconds: Number(req.durationBucket),
+    sampleCount: 1,
+    resolution: veoResolution()
+  };
+  if (!model.includes("lite")) {
+    params.generateAudio = veoGenerateAudio();
+  }
+  return params;
+}
+
+async function buildVeoInstance(
+  provider: ProviderCredentialView,
+  req: GeminiVeoRequest,
+  model: string
+): Promise<Record<string, unknown>> {
   const instance: Record<string, unknown> = { prompt: req.prompt };
 
   if (req.extendVideoHandle) {
     instance.video = { uri: req.extendVideoHandle };
   }
 
-  if (req.firstFrameUrl) {
+  // Veo Lite: text-to-video only — reference / first / last frames are not supported.
+  const includeImages = !model.includes("lite");
+
+  if (includeImages && req.firstFrameUrl) {
     const first = await geminiDownloadReference(provider, req.firstFrameUrl);
     instance.image = { bytesBase64Encoded: first.body.toString("base64"), mimeType: first.mimeType };
-  } else if (req.referenceImageUrl) {
+  } else if (includeImages && req.referenceImageUrl) {
     const ref = await geminiDownloadReference(provider, req.referenceImageUrl);
     instance.image = { bytesBase64Encoded: ref.body.toString("base64"), mimeType: ref.mimeType };
   }
 
-  if (req.lastFrameUrl) {
+  if (includeImages && req.lastFrameUrl) {
     const last = await geminiDownloadReference(provider, req.lastFrameUrl);
     instance.lastFrame = { bytesBase64Encoded: last.body.toString("base64"), mimeType: last.mimeType };
   }

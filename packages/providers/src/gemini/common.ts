@@ -131,6 +131,14 @@ export function checkGeminiCapabilities(provider: ProviderCredentialView | null)
           ? "Set GEMINI_LYRIA_ENABLED=1 in .env to enable Lyria music generation."
           : undefined
     },
-    video: { available: apiKeyConfigured, model: models.video, reason: missingKey }
+    video: {
+      available: apiKeyConfigured,
+      model: models.video,
+      reason: !apiKeyConfigured
+        ? missingKey
+        : models.video.includes("lite")
+          ? "Veo Lite does not support reference images in this pipeline — use veo-3.1-fast-generate-preview (auto-fallback enabled)."
+          : undefined
+    }
   };
 }

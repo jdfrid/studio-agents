@@ -354,7 +354,11 @@ function GeminiCapabilitiesPanel({ capabilities }: { capabilities: GeminiCapabil
       <strong>Gemini capabilities</strong>
       {videoTier === "standard" ? (
         <p className="cost-indicator-warning">
-          אזהרה: השרת משתמש ב-Veo Standard — ~₪1.4 לכל שניית וידאו. שנה ל-fast או lite ב-.env
+          אזהרה: השרת משתמש ב-Veo Standard — ~₪1.4 לכל שניית וידאו. שנה ל-fast ב-.env
+        </p>
+      ) : videoTier === "lite" ? (
+        <p className="cost-indicator-warning">
+          אזהרה: Veo Lite לא תומך ב-reference images — המערכת תfallback ל-Fast. מומלץ לשנות ל-veo-3.1-fast-generate-preview ב-.env
         </p>
       ) : null}
       <div className="capability-list">
