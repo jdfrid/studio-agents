@@ -12,4 +12,5 @@ export * from "./agent.js";
 export * from "./errors.js";
 export * from "./logger.js";
 export * from "./budget.js";
+export * from "./costLedger.js";
 export * from "./geminiErrors.js";

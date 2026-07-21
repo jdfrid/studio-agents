@@ -5,6 +5,7 @@ import { BriefQuickEditor, StageEditor, StageUploadControls } from "./StageEdito
 import type { ArtifactRow, GeminiCapabilityStatus, GeminiOperationRow, ProjectRunView, RunSummary, StageName } from "./types.js";
 import { STAGE_ORDER, estimateRunCost, formatCostNis, type ProductionCostConfig, type RunCostEstimate } from "@studio/shared";
 import { CostConfirmCheckbox, CostIndicator } from "./CostIndicator.js";
+import { CostLedger, type CostLedgerResponse } from "./CostLedger.js";
 
 export function App() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -15,6 +16,7 @@ export function App() {
   const [costConfig, setCostConfig] = useState<ProductionCostConfig | null>(null);
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
   const [operations, setOperations] = useState<GeminiOperationRow[]>([]);
+  const [costLedger, setCostLedger] = useState<CostLedgerResponse | null>(null);
   const [queueStats, setQueueStats] = useState<Array<{ queue: string; waiting: number; active: number }> | null>(null);
   const [error, setError] = useState<string>("");
 
@@ -35,6 +37,11 @@ export function App() {
       const a = await apiGet<ArtifactRow[]>(`/runs/${id}/artifacts`);
       setArtifacts(a);
       setOperations(await apiGet<GeminiOperationRow[]>(`/runs/${id}/gemini-operations`));
+      try {
+        setCostLedger(await apiGet<CostLedgerResponse>(`/runs/${id}/cost-events`));
+      } catch {
+        setCostLedger(null);
+      }
       try {
         const q = await apiGet<{ queues: Array<{ queue: string; waiting: number; active: number }> }>("/health/queues");
         setQueueStats(q.queues);
@@ -107,6 +114,7 @@ export function App() {
               capabilities={capabilities}
               costConfig={costConfig}
               operations={operations}
+              costLedger={costLedger}
               queueStats={queueStats}
               onAction={() => void refreshRun(run.id)}
             />
@@ -215,6 +223,7 @@ function RunDetail({
   capabilities,
   costConfig,
   operations,
+  costLedger,
   queueStats,
   onAction
 }: {
@@ -223,6 +232,7 @@ function RunDetail({
   capabilities: GeminiCapabilityStatus | null;
   costConfig: ProductionCostConfig | null;
   operations: GeminiOperationRow[];
+  costLedger: CostLedgerResponse | null;
   queueStats: Array<{ queue: string; waiting: number; active: number }> | null;
   onAction: () => void;
 }) {
@@ -251,6 +261,12 @@ function RunDetail({
         </p>
       </header>
       <CostIndicator estimate={runEstimate} compact={!renderPending && run.status === "COMPLETED"} />
+      {costLedger && costLedger.summary.totalNis > 0 ? (
+        <p className="cost-actual-total">
+          עלות בפועל (לפי תערифון): <strong>{formatCostNis(costLedger.summary.totalNis)}</strong>
+        </p>
+      ) : null}
+      <CostLedger ledger={costLedger} />
       <GeminiCapabilitiesPanel capabilities={capabilities} />
       {run.stages.some((s) => s.status === "QUEUED") && queueStats ? (
         <section className="queue-panel">

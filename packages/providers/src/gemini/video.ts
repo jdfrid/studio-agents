@@ -3,7 +3,13 @@ import { ProviderError } from "@studio/shared";
 import { httpBytes, httpJson } from "../http.js";
 import { geminiDownloadReference } from "./files.js";
 import { geminiApiKey, geminiBaseUrl, geminiModels, geminiUrl } from "./common.js";
-import { veoGenerateAudio, veoResolution } from "@studio/shared";
+import { veoGenerateAudio, veoResolution, veoSupportsNativeAudio } from "@studio/shared";
+import { notChargedFromMessage, type GeminiUsageReporter } from "./usage.js";
+
+export interface GeminiVeoHooks {
+  onPoll?: (operation: GeminiVeoOperation) => Promise<void> | void;
+  onUsage?: GeminiUsageReporter;
+}
 
 export interface GeminiInlineMedia {
   body: Buffer;
@@ -40,10 +46,12 @@ export interface GeminiVeoOperation {
 export async function geminiGenerateVeoVideo(
   provider: ProviderCredentialView,
   req: GeminiVeoRequest,
-  onPoll?: (operation: GeminiVeoOperation) => Promise<void> | void
+  hooks?: GeminiVeoHooks | ((operation: GeminiVeoOperation) => Promise<void> | void)
 ): Promise<GeminiVeoOperation> {
+  const normalized = normalizeVeoHooks(hooks);
   const configuredModel = geminiModels(provider).video;
   if (provider.config.mock === true || process.env.GEMINI_MOCK === "1") {
+    await reportVeoUsage(normalized.onUsage, req, configuredModel, 0, "yes");
     return {
       operationName: `mock/operations/${req.sceneId}`,
       model: configuredModel,
@@ -57,13 +65,18 @@ export async function geminiGenerateVeoVideo(
   let lastError: unknown;
   for (const model of modelsToTry) {
     try {
-      return await runVeoGeneration(provider, req, model, onPoll);
+      return await runVeoGeneration(provider, req, model, normalized);
     } catch (error) {
       lastError = error;
       if (!isRetriableVeoModelError(error) || model === modelsToTry[modelsToTry.length - 1]) {
         break;
       }
     }
+  }
+  if (lastError) {
+    const message = lastError instanceof Error ? lastError.message : String(lastError);
+    const failedModel = modelsToTry[modelsToTry.length - 1] ?? configuredModel;
+    await reportVeoUsage(normalized.onUsage, req, failedModel, 0, notChargedFromMessage(message));
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
@@ -89,8 +102,9 @@ async function runVeoGeneration(
   provider: ProviderCredentialView,
   req: GeminiVeoRequest,
   model: string,
-  onPoll?: (operation: GeminiVeoOperation) => Promise<void> | void
+  hooks: GeminiVeoHooks
 ): Promise<GeminiVeoOperation> {
+  const wallStarted = Date.now();
   const instance = await buildVeoInstance(provider, req, model);
   const queued = await httpJson<{ name?: string; operationName?: string }>(
     geminiUrl(provider, `models/${model}:predictLongRunning`),
@@ -109,7 +123,7 @@ async function runVeoGeneration(
     throw new ProviderError("Gemini Veo did not return an operation name", { provider: "gemini", metadata: { model } });
   }
 
-  await onPoll?.({ operationName, model, status: "queued" });
+  await hooks.onPoll?.({ operationName, model, status: "queued" });
   const timeoutMs = Number(provider.config.videoTimeoutSeconds ?? 900) * 1000;
   const startedAt = Date.now();
   let lastStatus: GeminiVeoOperation = { operationName, model, status: "polling" };
@@ -117,7 +131,7 @@ async function runVeoGeneration(
     await new Promise((resolve) => setTimeout(resolve, Number(provider.config.videoPollIntervalMs ?? 8000)));
     const status = await httpJson<unknown>(operationPollUrl(provider, operationName), { timeoutMs: 30_000 });
     lastStatus = normalizeOperation(operationName, model, status);
-    await onPoll?.(lastStatus);
+    await hooks.onPoll?.(lastStatus);
     if (lastStatus.status === "failed") {
       throw new ProviderError(`Gemini Veo operation failed: ${lastStatus.error ?? "unknown"}`, {
         provider: "gemini",
@@ -125,9 +139,14 @@ async function runVeoGeneration(
       });
     }
     if (lastStatus.status === "completed") {
-      if (lastStatus.videoBytes) return lastStatus;
+      const durationMs = Date.now() - wallStarted;
+      if (lastStatus.videoBytes) {
+        await reportVeoUsage(hooks.onUsage, req, model, durationMs, "yes", operationName);
+        return lastStatus;
+      }
       const downloaded = await downloadVeoResult(provider, lastStatus);
       if (downloaded) {
+        await reportVeoUsage(hooks.onUsage, req, model, durationMs, "yes", operationName);
         return { ...lastStatus, videoBytes: downloaded.body, mimeType: downloaded.mimeType };
       }
       throw new ProviderError(
@@ -151,6 +170,33 @@ async function runVeoGeneration(
   });
 }
 
+function normalizeVeoHooks(hooks?: GeminiVeoHooks | ((operation: GeminiVeoOperation) => Promise<void> | void)): GeminiVeoHooks {
+  if (typeof hooks === "function") return { onPoll: hooks };
+  return hooks ?? {};
+}
+
+async function reportVeoUsage(
+  onUsage: GeminiUsageReporter | undefined,
+  req: GeminiVeoRequest,
+  model: string,
+  durationMs: number,
+  charged: "yes" | "no" | "unknown",
+  operationName?: string
+): Promise<void> {
+  if (!onUsage) return;
+  await onUsage({
+    activityType: "veo_video",
+    sceneId: req.sceneId,
+    model,
+    durationMs: durationMs > 0 ? durationMs : null,
+    billedUnits: Number(req.durationBucket),
+    unit: "veo_seconds",
+    generateAudio: req.generateAudio ?? false,
+    charged,
+    metadata: operationName ? { operationName } : undefined
+  });
+}
+
 function buildVeoParameters(req: GeminiVeoRequest, model: string): Record<string, unknown> {
   const params: Record<string, unknown> = {
     aspectRatio: req.aspectRatio,
@@ -158,7 +204,7 @@ function buildVeoParameters(req: GeminiVeoRequest, model: string): Record<string
     sampleCount: 1,
     resolution: veoResolution()
   };
-  if (!model.includes("lite")) {
+  if (veoSupportsNativeAudio(model)) {
     params.generateAudio = req.generateAudio ?? veoGenerateAudio();
   }
   return params;
@@ -175,8 +221,9 @@ async function buildVeoInstance(
     instance.video = { uri: req.extendVideoHandle };
   }
 
-  // Veo Lite: text-to-video only — reference / first / last frames are not supported.
-  const includeImages = !model.includes("lite");
+  // Reference / first / last frames: Standard Veo only. Fast & Lite = text-to-video (prompt only).
+  const includeImages =
+    model.includes("generate-preview") && !model.includes("fast") && !model.includes("lite");
 
   if (includeImages && req.firstFrame) {
     instance.image = {

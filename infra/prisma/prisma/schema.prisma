@@ -82,6 +82,56 @@ enum ArtifactKind {
   gemini_operation
 }
 
+enum CostActivityType {
+  veo_video
+  gemini_tts
+  gemini_image
+  gemini_text
+  gemini_music
+  gcs_upload
+  gcs_storage
+}
+
+enum CostChargedStatus {
+  yes
+  no
+  unknown
+}
+
+enum CostBilledUnit {
+  veo_seconds
+  image_call
+  text_call
+  tts_call
+  music_seconds
+  bytes
+}
+
+model CostEvent {
+  id                String            @id @default(cuid())
+  tenantId          String
+  runId             String
+  stageExecutionId  String?
+  attempt           Int               @default(1)
+  stage             StageName
+  activityType      CostActivityType
+  sceneId           String?
+  model             String?
+  startedAt         DateTime          @default(now())
+  durationMs        Int?
+  billedUnits       Float
+  unit              CostBilledUnit
+  costUsd           Float
+  costNis           Float
+  charged           CostChargedStatus @default(yes)
+  metadata          Json              @default("{}")
+
+  run ProjectRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, startedAt])
+  @@index([tenantId, startedAt])
+}
+
 model ProjectRun {
   id            String     @id @default(cuid())
   tenantId      String
@@ -94,6 +144,7 @@ model ProjectRun {
   tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   stages     StageExecution[]
   artifacts  Artifact[]
+  costEvents CostEvent[]
 
   @@index([tenantId, status])
 }

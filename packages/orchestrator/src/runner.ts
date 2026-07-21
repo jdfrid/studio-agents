@@ -8,6 +8,7 @@ import {
   type StageName
 } from "@studio/shared";
 import { enqueueStage } from "./queue.js";
+import { createCostRecorder } from "./costRecorder.js";
 import { getAgent } from "./registry.js";
 import { createArtifactsRepo, createProvidersRepo } from "./repos.js";
 import { gcsClient } from "@studio/providers";
@@ -31,15 +32,26 @@ export async function runStage(runId: string, stage: StageName): Promise<void> {
   if (!stageRow) throw new Error(`StageExecution missing for run ${runId} stage ${stage}`);
 
   await recordStageStart(stageRow.id);
+  const stageExec = await prisma.stageExecution.findUniqueOrThrow({ where: { id: stageRow.id } });
   const logger = createConsoleLogger({ runId, stage });
+  const cost = createCostRecorder({
+    tenantId: run.tenantId,
+    runId,
+    stage,
+    stageExecutionId: stageRow.id,
+    attempt: stageExec.attempts
+  });
   const ctx: AgentContext = {
     runId,
     tenantId: run.tenantId,
     stage,
-    artifacts: createArtifactsRepo(),
+    stageExecutionId: stageRow.id,
+    attempt: stageExec.attempts,
+    artifacts: createArtifactsRepo(cost),
     providers: createProvidersRepo(run.tenantId),
     storage: gcsClient(),
-    log: logger
+    log: logger,
+    cost
   };
 
   const input = await collectStageInput(runId, stage, run.brief);

@@ -54,12 +54,20 @@ export const seriesAgent: Agent<SeriesInput, SeriesOutput> = {
       const localPaths: string[] = [];
       const gemini = await ctx.providers.primary("GEMINI");
       if (gemini && input.introText) {
-        const intro = await geminiGenerateVeoVideo(gemini, {
-          sceneId: "series-intro",
-          prompt: input.introText,
-          aspectRatio: "16:9",
-          durationBucket: "4"
-        });
+        const intro = await geminiGenerateVeoVideo(
+          gemini,
+          {
+            sceneId: "series-intro",
+            prompt: input.introText,
+            aspectRatio: "16:9",
+            durationBucket: "4"
+          },
+          {
+            onUsage: async (event) => {
+              await ctx.cost.record({ ...event, sceneId: "series-intro" });
+            }
+          }
+        );
         if (intro.videoBytes) {
           const local = path.join(dir, `intro-${nanoid(6)}.mp4`);
           await writeFile(local, intro.videoBytes);
@@ -83,12 +91,20 @@ export const seriesAgent: Agent<SeriesInput, SeriesOutput> = {
         localPaths.push(local);
       }
       if (gemini && input.outroText) {
-        const outro = await geminiGenerateVeoVideo(gemini, {
-          sceneId: "series-outro",
-          prompt: input.outroText,
-          aspectRatio: "16:9",
-          durationBucket: "4"
-        });
+        const outro = await geminiGenerateVeoVideo(
+          gemini,
+          {
+            sceneId: "series-outro",
+            prompt: input.outroText,
+            aspectRatio: "16:9",
+            durationBucket: "4"
+          },
+          {
+            onUsage: async (event) => {
+              await ctx.cost.record({ ...event, sceneId: "series-outro" });
+            }
+          }
+        );
         if (outro.videoBytes) {
           const local = path.join(dir, `outro-${nanoid(6)}.mp4`);
           await writeFile(local, outro.videoBytes);

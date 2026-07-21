@@ -3,6 +3,7 @@ import { ProviderError } from "@studio/shared";
 import { httpJson } from "../http.js";
 import { normalizeAudioForPlayback } from "../audio/pcm.js";
 import { extractInlineData, geminiModels, geminiUrl } from "./common.js";
+import type { GeminiUsageReporter } from "./usage.js";
 
 export interface GeminiTtsRequest {
   text: string;
@@ -21,9 +22,11 @@ export interface GeminiTtsResponse {
 
 export async function geminiSynthesizeSpeech(
   provider: ProviderCredentialView,
-  req: GeminiTtsRequest
+  req: GeminiTtsRequest,
+  onUsage?: GeminiUsageReporter
 ): Promise<GeminiTtsResponse> {
   const model = geminiModels(provider).tts;
+  const started = Date.now();
   const voiceName = req.voiceName ?? String(provider.config.voiceName ?? "Kore");
   const style = req.style ? `[${req.style}] ` : "";
   const languageCode = toSpeechLanguageCode(req.language);
@@ -55,6 +58,14 @@ export async function geminiSynthesizeSpeech(
     throw new ProviderError("Gemini TTS returned no audio inline data", { provider: "gemini", metadata: { model } });
   }
   const normalized = normalizeAudioForPlayback(inline.data, inline.mimeType);
+  await onUsage?.({
+    activityType: "gemini_tts",
+    model,
+    durationMs: Date.now() - started,
+    billedUnits: req.text.length,
+    unit: "tts_call",
+    charged: "yes"
+  });
   return {
     provider: "gemini",
     model,

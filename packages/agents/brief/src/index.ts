@@ -51,13 +51,19 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     const userPayload = JSON.stringify(input, null, 2);
 
     const completeJson = provider.type === "GEMINI" ? geminiCompleteJson : llmCompleteJson;
-    const { parsed, model } = await completeJson<BriefOutput>(provider, {
-      system,
-      user: userPayload,
-      schemaName: "BriefOutput",
-      schemaHint,
-      temperature: 0.3
-    });
+    const { parsed, model } = await completeJson<BriefOutput>(
+      provider,
+      {
+        system,
+        user: userPayload,
+        schemaName: "BriefOutput",
+        schemaHint,
+        temperature: 0.3
+      },
+      async (event) => {
+        await ctx.cost.record(event);
+      }
+    );
 
     const enriched: BriefOutput = {
       title: parsed.title ?? input.title,

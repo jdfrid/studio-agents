@@ -36,7 +36,9 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
       try {
         const audio =
           tts.type === "GEMINI"
-            ? await geminiSynthesizeSpeech(tts, { text: scene.narration, language: input.language })
+            ? await geminiSynthesizeSpeech(tts, { text: scene.narration, language: input.language }, async (event) => {
+                await ctx.cost.record({ ...event, sceneId: scene.sceneId });
+              })
             : await synthesizeSpeech(tts, { text: scene.narration, language: input.language });
         const voiceExt = audio.mimeType.includes("wav") ? "wav" : audio.mimeType.includes("mpeg") ? "mp3" : "audio";
         const artifact = await ctx.artifacts.save({
@@ -99,7 +101,13 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
       try {
         const track =
           music.type === "GEMINI"
-            ? await geminiGenerateMusic(music, { prompt: input.musicPrompt, durationSeconds: input.scenes.reduce((sum, s) => sum + s.durationSeconds, 0) })
+            ? await geminiGenerateMusic(
+                music,
+                { prompt: input.musicPrompt, durationSeconds: input.scenes.reduce((sum, s) => sum + s.durationSeconds, 0) },
+                async (event) => {
+                  await ctx.cost.record(event);
+                }
+              )
             : await fetchMusic(music, { prompt: input.musicPrompt });
         const artifact = await ctx.artifacts.save({
           runId: ctx.runId,

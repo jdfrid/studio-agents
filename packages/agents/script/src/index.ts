@@ -63,14 +63,20 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       scenes: Omit<SceneSpec, "id" | "order">[];
       musicPrompt: string;
       backgroundVisualPrompt: string;
-    }>(provider, {
-      system,
-      user: userPrompt,
-      schemaName: "ScriptOutput",
-      schemaHint,
-      temperature: 0.5,
-      maxOutputTokens: 8192
-    });
+    }>(
+      provider,
+      {
+        system,
+        user: userPrompt,
+        schemaName: "ScriptOutput",
+        schemaHint,
+        temperature: 0.5,
+        maxOutputTokens: 8192
+      },
+      async (event) => {
+        await ctx.cost.record(event);
+      }
+    );
 
     const scenes: SceneSpec[] = (parsed.scenes ?? []).slice(0, 60).map((scene, index) => {
       const durationBucket = normalizeDurationBucket(scene.durationBucket, scene.durationSeconds ?? sceneTargetSeconds, budget);

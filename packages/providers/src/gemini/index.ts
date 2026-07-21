@@ -4,4 +4,5 @@ export * from "./tts.js";
 export * from "./image.js";
 export * from "./music.js";
 export * from "./files.js";
+export * from "./usage.js";
 export * from "./video.js";

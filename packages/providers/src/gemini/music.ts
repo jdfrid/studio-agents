@@ -3,6 +3,7 @@ import { ProviderError } from "@studio/shared";
 import { normalizeAudioForPlayback } from "../audio/pcm.js";
 import { httpJson } from "../http.js";
 import { extractInlineData, extractText, geminiModels, geminiUrl } from "./common.js";
+import type { GeminiUsageReporter } from "./usage.js";
 
 export interface GeminiMusicRequest {
   prompt: string;
@@ -40,7 +41,8 @@ function buildMusicPrompt(req: GeminiMusicRequest): string {
 
 export async function geminiGenerateMusic(
   provider: ProviderCredentialView,
-  req: GeminiMusicRequest
+  req: GeminiMusicRequest,
+  onUsage?: GeminiUsageReporter
 ): Promise<GeminiMusicResponse> {
   if (!isLyriaEnabled(provider)) {
     throw new ProviderError("Gemini/Lyria music generation is disabled (GEMINI_LYRIA_ENABLED=0).", {
@@ -50,6 +52,7 @@ export async function geminiGenerateMusic(
   }
 
   const model = pickMusicModel(provider, req.durationSeconds);
+  const started = Date.now();
   const response = await httpJson<unknown>(geminiUrl(provider, `models/${model}:generateContent`), {
     method: "POST",
     body: {
@@ -73,6 +76,15 @@ export async function geminiGenerateMusic(
   }
 
   const normalized = normalizeAudioForPlayback(inline.data, inline.mimeType);
+  const billedSeconds = req.durationSeconds ?? 30;
+  await onUsage?.({
+    activityType: "gemini_music",
+    model,
+    durationMs: Date.now() - started,
+    billedUnits: billedSeconds,
+    unit: "music_seconds",
+    charged: "yes"
+  });
   return {
     provider: "gemini",
     model,

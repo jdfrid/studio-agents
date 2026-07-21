@@ -5,14 +5,14 @@ describe("geminiErrors", () => {
   it("detects billing/quota exhaustion", () => {
     const raw = `HTTP 429: { "error": { "code": 429, "message": "You exceeded your current quota", "status": "RESOURCE_EXHAUSTED" } }`;
     expect(classifyGeminiError(raw, 429)).toBe("billing_quota");
-    expect(userFacingGeminiError(raw, 429)).toContain("הגעת למגבלת התקציב");
+    expect(userFacingGeminiError(raw, 429)).toContain("Google AI Studio");
   });
 
   it("formats api error and hides api key", () => {
     const msg = formatApiErrorMessage(
       '429 {"error":"HTTP 429 for https://generativelanguage.googleapis.com?key=AIzaSySecret123: quota exceeded"}'
     );
-    expect(msg).toContain("הגעת למגבלת התקציב");
+    expect(msg).toContain("Google AI Studio");
     expect(msg).not.toContain("AIzaSySecret");
   });
 

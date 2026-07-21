@@ -8,6 +8,7 @@ import {
   createRun,
   getQueueStats,
   getRun,
+  getRunCostLedger,
   rerunStage,
   updateStageOutput,
   uploadStageArtifact
@@ -73,7 +74,18 @@ export async function registerRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: "not_found" };
     }
-    return view;
+    const ledger = await getRunCostLedger(id);
+    return { ...view, actualTotalNis: ledger.summary.totalNis };
+  });
+
+  app.get("/runs/:id/cost-events", async (request, reply) => {
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    const run = await prisma.projectRun.findUnique({ where: { id } });
+    if (!run) {
+      reply.code(404);
+      return { error: "not_found" };
+    }
+    return getRunCostLedger(id);
   });
 
   app.post("/runs/:id/stages/:stage/approve", async (request, reply) => {

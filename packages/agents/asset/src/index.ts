@@ -65,7 +65,9 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
           referenceMimeType = "image/png";
           referenceModel = sharedReference.model;
         } else {
-          const reference = await geminiGenerateImage(gemini, { prompt: referencePrompt, aspectRatio: input.aspectRatio });
+          const reference = await geminiGenerateImage(gemini, { prompt: referencePrompt, aspectRatio: input.aspectRatio }, async (event) => {
+            await ctx.cost.record({ ...event, sceneId: scene.sceneId });
+          });
           const referenceArtifact = await ctx.artifacts.save({
             runId: ctx.runId,
             stage: "asset",
@@ -165,7 +167,9 @@ async function saveGeneratedFrame(
   prompt: string,
   aspectRatio: string
 ) {
-  const frame = await geminiGenerateImage(gemini, { prompt, aspectRatio });
+  const frame = await geminiGenerateImage(gemini, { prompt, aspectRatio }, async (event) => {
+    await ctx.cost.record({ ...event, sceneId });
+  });
   const artifact = await ctx.artifacts.save({
     runId: ctx.runId,
     stage: "asset",

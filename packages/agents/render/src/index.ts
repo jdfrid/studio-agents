@@ -63,14 +63,19 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
             lastFrame,
             generateAudio: scene.audioPolicy === "veo_native_audio"
           },
-          async (operation) => {
-            await ctx.log.log("gemini_veo_operation_status", "Gemini Veo operation status", {
-              sceneId: scene.sceneId,
-              operationName: operation.operationName,
-              status: operation.status,
-              model: operation.model,
-              error: operation.error ?? null
-            });
+          {
+            onPoll: async (operation) => {
+              await ctx.log.log("gemini_veo_operation_status", "Gemini Veo operation status", {
+                sceneId: scene.sceneId,
+                operationName: operation.operationName,
+                status: operation.status,
+                model: operation.model,
+                error: operation.error ?? null
+              });
+            },
+            onUsage: async (event) => {
+              await ctx.cost.record({ ...event, sceneId: event.sceneId ?? scene.sceneId });
+            }
           }
         );
         if (!result.videoBytes) {

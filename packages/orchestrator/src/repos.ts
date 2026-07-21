@@ -2,6 +2,7 @@ import type {
   ArtifactKind,
   ArtifactRecord,
   ArtifactsRepository,
+  CostRecorder,
   ProviderCredentialView,
   ProvidersRepository,
   SaveArtifactInput,
@@ -11,7 +12,7 @@ import { decryptSecret, gcsClient } from "@studio/providers";
 import { prisma } from "@studio/infra-prisma";
 import { fromPrismaStage, toPrismaStage } from "./stageMap.js";
 
-export function createArtifactsRepo(): ArtifactsRepository {
+export function createArtifactsRepo(cost?: CostRecorder): ArtifactsRepository {
   const storage = gcsClient();
   return {
     async list(runId, stage) {
@@ -26,6 +27,22 @@ export function createArtifactsRepo(): ArtifactsRepository {
       const dir = `runs/${input.runId}/${input.stage}`;
       const gcsPath = `${dir}/${Date.now()}-${sanitize(input.filename)}`;
       const { sizeBytes } = await storage.upload({ gcsPath, body, mimeType: input.mimeType });
+      if (cost) {
+        await cost.record({
+          activityType: "gcs_upload",
+          billedUnits: sizeBytes,
+          unit: "bytes",
+          charged: "yes",
+          metadata: { kind: input.kind, filename: input.filename, gcsPath }
+        });
+        await cost.record({
+          activityType: "gcs_storage",
+          billedUnits: sizeBytes,
+          unit: "bytes",
+          charged: "yes",
+          metadata: { kind: input.kind, filename: input.filename, gcsPath, prorated: "daily" }
+        });
+      }
       const row = await prisma.artifact.create({
         data: {
           runId: input.runId,

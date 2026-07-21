@@ -28,6 +28,9 @@ export function CostIndicator({
             <strong>תמונות:</strong> {estimate.imageCalls} קריאות (~${estimate.imageUsd.toFixed(2)})
           </li>
           <li>
+            <strong>TTS + text:</strong> ~${(estimate.ttsUsd + estimate.textUsd).toFixed(2)}
+          </li>
+          <li>
             <strong>מודל בשרת:</strong> <code>{estimate.videoModel}</code>
           </li>
           <li>

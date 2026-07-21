@@ -54,14 +54,34 @@ export interface GcsClient {
   bucket(): string;
 }
 
+export type CostUsageRecord = {
+  activityType: import("./costLedger.js").CostActivityType;
+  sceneId?: string | null;
+  model?: string | null;
+  startedAt?: Date;
+  durationMs?: number | null;
+  billedUnits: number;
+  unit: import("./costLedger.js").CostBilledUnit;
+  charged?: import("./costLedger.js").CostChargedStatus;
+  metadata?: Record<string, unknown>;
+  generateAudio?: boolean;
+};
+
+export interface CostRecorder {
+  record(event: CostUsageRecord): Promise<void>;
+}
+
 export interface AgentContext {
   runId: string;
   tenantId: string;
   stage: StageName;
+  stageExecutionId: string;
+  attempt: number;
   artifacts: ArtifactsRepository;
   providers: ProvidersRepository;
   storage: GcsClient;
   log: Logger;
+  cost: CostRecorder;
 }
 
 export interface Agent<I, O> {

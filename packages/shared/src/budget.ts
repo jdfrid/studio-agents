@@ -66,6 +66,10 @@ export function veoModelLabel(tier: VeoModelTier): string {
   }
 }
 
+export function veoSupportsNativeAudio(model: string): boolean {
+  return veoModelTier(model) === "standard";
+}
+
 export function veoPerSecondUsd(model: string, generateAudio = true): number {
   const tier = veoModelTier(model);
   if (tier === "lite") return 0.05;
@@ -110,6 +114,8 @@ export type RunCostEstimate = {
   veoUsd: number;
   imageUsd: number;
   imageCalls: number;
+  ttsUsd: number;
+  textUsd: number;
   perSecondUsd: number;
   isExpensive: boolean;
   warning?: string;
@@ -153,7 +159,9 @@ export function estimateRunCost(
   const imageCalls = mode === "shared_reference" ? 1 : mode === "reference_only" ? sceneCount : sceneCount * 3;
   const veoUsd = veoSeconds * perSecond;
   const imageUsd = imageCalls * 0.04;
-  const usd = veoUsd + imageUsd;
+  const ttsUsd = sceneCount * 0.015;
+  const textUsd = 2 * 0.002;
+  const usd = veoUsd + imageUsd + ttsUsd + textUsd;
   const nis = usd * usdToIls;
   const isExpensive = tier === "standard" || nis >= EXPENSIVE_RUN_NIS;
 
@@ -179,6 +187,8 @@ export function estimateRunCost(
     veoUsd,
     imageUsd,
     imageCalls,
+    ttsUsd,
+    textUsd,
     perSecondUsd: perSecond,
     isExpensive,
     warning

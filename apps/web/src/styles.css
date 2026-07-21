@@ -133,3 +133,23 @@ pre { background: #0c0f15; padding: 8px; border-radius: 6px; overflow: auto; max
 .capabilities-danger { border-color: #8a2020; }
 button.danger { background: #8a2020; border-color: #b03030; }
 button.danger:hover { background: #a02828; }
+.cost-ledger {
+  border: 1px solid #232733;
+  border-radius: 10px;
+  padding: 12px;
+  background: #10141d;
+  display: grid;
+  gap: 10px;
+}
+.cost-ledger-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cost-ledger-head h3 { margin: 0; font-size: 1rem; }
+.cost-ledger-total { margin: 0; }
+.cost-ledger-note { margin: 0; font-size: 0.8rem; line-height: 1.4; }
+.cost-ledger-summary { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.85rem; }
+.cost-ledger-table-wrap { overflow: auto; max-height: 360px; border: 1px solid #232733; border-radius: 8px; }
+.cost-ledger-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.cost-ledger-table th, .cost-ledger-table td { border-bottom: 1px solid #232733; padding: 6px 8px; text-align: start; vertical-align: top; }
+.cost-ledger-table th { position: sticky; top: 0; background: #151a23; z-index: 1; }
+.cost-ledger-table code { font-size: 0.75rem; word-break: break-all; }
+.cost-row-free td:last-child { color: #8b94a6; }
+.cost-actual-total { margin: 0; font-size: 0.9rem; color: #7af0bf; }

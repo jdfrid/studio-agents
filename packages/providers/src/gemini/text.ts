@@ -2,6 +2,7 @@ import type { ProviderCredentialView } from "@studio/shared";
 import { ProviderError } from "@studio/shared";
 import { httpJson } from "../http.js";
 import { extractText, geminiModels, geminiUrl } from "./common.js";
+import type { GeminiUsageReporter } from "./usage.js";
 
 export interface GeminiJsonRequest {
   system: string;
@@ -21,9 +22,11 @@ export interface GeminiJsonResponse<T> {
 
 export async function geminiCompleteJson<T>(
   provider: ProviderCredentialView,
-  req: GeminiJsonRequest
+  req: GeminiJsonRequest,
+  onUsage?: GeminiUsageReporter
 ): Promise<GeminiJsonResponse<T>> {
   const model = geminiModels(provider).text;
+  const started = Date.now();
   const prompt = [
     req.system,
     "",
@@ -54,6 +57,15 @@ export async function geminiCompleteJson<T>(
     throw new ProviderError(`Gemini JSON response could not be parsed: ${(firstError as Error).message}`, {
       provider: "gemini",
       metadata: { model, rawPreview: raw.slice(0, 800) }
+    });
+  } finally {
+    await onUsage?.({
+      activityType: "gemini_text",
+      model,
+      durationMs: Date.now() - started,
+      billedUnits: 1,
+      unit: "text_call",
+      charged: "yes"
     });
   }
 }

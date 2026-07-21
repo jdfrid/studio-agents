@@ -8,6 +8,9 @@ function makeStubCtx(): AgentContext {
     runId: "run1",
     tenantId: "t1",
     stage: "package",
+    stageExecutionId: "se-package",
+    attempt: 1,
+    cost: { record: async () => undefined },
     artifacts: {
       list: async () => [],
       save: async (input) => {
