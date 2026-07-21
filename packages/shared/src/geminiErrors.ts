@@ -17,17 +17,24 @@ export type ParsedStageError = {
   quotaHint?: string | null;
 };
 
+/** Strong payment signals — not Google's generic "check your plan and billing details". */
 const BILLING_QUOTA_PATTERNS = [
   "payment required",
-  "insufficient",
-  "billing",
-  "credit",
-  "balance",
-  "spending limit",
+  "insufficient credit",
+  "insufficient balance",
+  "insufficient funds",
+  "not enough credit",
+  "no credit remaining",
   "out of funds",
   "account disabled",
   "enable billing",
-  "prepay"
+  "billing is not enabled",
+  "billing account",
+  "spending limit",
+  "purchase credits",
+  "buy credits",
+  "prepay balance",
+  "prepay ai studio"
 ];
 
 const RATE_LIMIT_PATTERNS = [
@@ -45,10 +52,15 @@ const RATE_LIMIT_PATTERNS = [
 
 export function classifyGeminiError(raw: string, httpStatus?: number): GeminiErrorKind {
   const lower = raw.toLowerCase();
-  if (httpStatus === 402) return "billing_quota";
-  if (BILLING_QUOTA_PATTERNS.some((p) => lower.includes(p))) return "billing_quota";
-  if (httpStatus === 429 || RATE_LIMIT_PATTERNS.some((p) => lower.includes(p))) return "rate_limit";
   if (httpStatus === 401 || httpStatus === 403 || lower.includes("api key not valid")) return "auth";
+  if (httpStatus === 402) return "billing_quota";
+  // 429 + "quota exceeded" is usually RPM/TPM — not Prepay balance (even if message mentions "billing details").
+  if (httpStatus === 429) {
+    if (BILLING_QUOTA_PATTERNS.some((p) => lower.includes(p))) return "billing_quota";
+    return "rate_limit";
+  }
+  if (BILLING_QUOTA_PATTERNS.some((p) => lower.includes(p))) return "billing_quota";
+  if (RATE_LIMIT_PATTERNS.some((p) => lower.includes(p))) return "rate_limit";
   return "unknown";
 }
 
@@ -74,22 +86,48 @@ export function userFacingGeminiError(raw: string, httpStatus?: number): string 
   }
 }
 
+function looksLikeApiRaw(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (t.startsWith("{") || t.includes('{"error"') || t.includes('"error":')) return true;
+  if (/^\d{3}\s/.test(t)) return true;
+  if (/generativelanguage\.googleapis\.com/i.test(t)) return true;
+  if (/RESOURCE_EXHAUSTED|PERMISSION_DENIED|INVALID_ARGUMENT/i.test(t)) return true;
+  return false;
+}
+
 /** Build JSON stored in StageExecution.error — preserves raw Google response. */
 export function buildStageErrorRecord(error: unknown): string {
   const raw = extractErrorRaw(error);
   const httpStatus = extractHttpStatus(error, raw);
   const sanitized = sanitizeApiErrorText(raw);
-  const kind = classifyGeminiError(sanitized, httpStatus);
-  const friendly = formatApiErrorMessage(sanitized) || sanitized.slice(0, 600);
+  const apiRaw = looksLikeApiRaw(sanitized) ? sanitized.slice(0, 4000) : "";
+  const classifyFrom = apiRaw || sanitized;
+  const kind = classifyGeminiError(classifyFrom, httpStatus);
+  const friendly = formatApiErrorMessage(classifyFrom) || sanitized.slice(0, 600);
   const record: StageErrorRecord = {
     v: 1,
     friendly,
-    raw: sanitized.slice(0, 4000),
+    raw: apiRaw,
     kind,
     httpStatus: httpStatus ?? null,
-    quotaHint: extractQuotaHint(sanitized)
+    quotaHint: apiRaw ? extractQuotaHint(apiRaw) : null
   };
   return JSON.stringify(record);
+}
+
+function deriveFromApiRaw(
+  raw: string,
+  httpStatus?: number | null
+): Pick<ParsedStageError, "friendly" | "kind" | "httpStatus" | "quotaHint"> {
+  const status = httpStatus ?? extractHttpStatus(null, raw) ?? undefined;
+  const classifyInput = status != null ? `${status} ${raw}` : raw;
+  return {
+    friendly: formatApiErrorMessage(classifyInput) || raw.slice(0, 600),
+    kind: classifyGeminiError(classifyInput, status),
+    httpStatus: status ?? null,
+    quotaHint: extractQuotaHint(raw)
+  };
 }
 
 export function parseStageError(stored: string | null | undefined): ParsedStageError {
@@ -99,9 +137,14 @@ export function parseStageError(stored: string | null | undefined): ParsedStageE
   try {
     const parsed = JSON.parse(stored) as Partial<StageErrorRecord>;
     if (parsed.v === 1 && typeof parsed.friendly === "string") {
+      const raw =
+        parsed.raw && looksLikeApiRaw(parsed.raw) && parsed.raw !== parsed.friendly ? parsed.raw : null;
+      if (raw) {
+        return { ...deriveFromApiRaw(raw, parsed.httpStatus), raw };
+      }
       return {
         friendly: parsed.friendly,
-        raw: parsed.raw ?? null,
+        raw: null,
         kind: parsed.kind ?? "unknown",
         httpStatus: parsed.httpStatus,
         quotaHint: parsed.quotaHint
@@ -110,9 +153,12 @@ export function parseStageError(stored: string | null | undefined): ParsedStageE
   } catch {
     /* legacy plain-text error */
   }
+  if (looksLikeApiRaw(stored)) {
+    return { ...deriveFromApiRaw(stored), raw: stored };
+  }
   return {
     friendly: formatApiErrorMessage(stored),
-    raw: stored,
+    raw: null,
     kind: classifyGeminiError(stored),
     httpStatus: extractHttpStatus(null, stored)
   };
@@ -184,15 +230,29 @@ function sanitizeApiErrorText(raw: string): string {
 
 function extractErrorRaw(error: unknown): string {
   if (error && typeof error === "object") {
-    const agentErr = error as { message?: string; metadata?: Record<string, unknown> };
+    const agentErr = error as { message?: string; metadata?: Record<string, unknown>; cause?: unknown };
     const metaRaw = agentErr.metadata?.raw;
     if (typeof metaRaw === "string" && metaRaw.trim()) {
       const status = agentErr.metadata?.status;
       if (typeof status === "number") return `${status} ${metaRaw}`;
       return metaRaw;
     }
+    if (agentErr.cause) {
+      const fromCause = extractErrorRaw(agentErr.cause);
+      if (looksLikeApiRaw(fromCause)) return fromCause;
+    }
+    if (typeof agentErr.message === "string" && looksLikeApiRaw(agentErr.message)) {
+      return agentErr.message;
+    }
+    return typeof agentErr.message === "string" ? agentErr.message : String(error);
   }
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    if (error.cause) {
+      const fromCause = extractErrorRaw(error.cause);
+      if (looksLikeApiRaw(fromCause)) return fromCause;
+    }
+    return error.message;
+  }
   return String(error);
 }
 

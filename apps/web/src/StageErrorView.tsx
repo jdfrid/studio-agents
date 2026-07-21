@@ -17,7 +17,7 @@ export function StageErrorView({ error }: { error: string | null }) {
   if (!error) return null;
   const parsed = parseStageError(error);
   const friendly = parsed.friendly || error;
-  const showRaw = parsed.raw && parsed.raw !== friendly;
+  const showRaw = Boolean(parsed.raw);
 
   return (
     <div className={`stage-error stage-error-${parsed.kind}`}>
@@ -31,10 +31,14 @@ export function StageErrorView({ error }: { error: string | null }) {
       ) : null}
       {showRaw ? (
         <details className="stage-error-raw">
-          <summary>שגיאה מקורית מ-Google (JSON / טקst)</summary>
+          <summary>שגיאה מקורית מ-Google (JSON / text)</summary>
           <pre>{parsed.raw}</pre>
         </details>
-      ) : null}
+      ) : (
+        <p className="stage-error-kind muted">
+          שגיאה מקורית מ-Google לא נשמרה בריצה זו — הרץ <strong>Rerun</strong> אחרי deploy לקבל JSON מלא.
+        </p>
+      )}
     </div>
   );
 }
