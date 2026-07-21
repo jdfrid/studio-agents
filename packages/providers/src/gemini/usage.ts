@@ -17,7 +17,11 @@ export function mapUsageToCost(event: GeminiUsageEvent): Omit<CostUsageRecord, n
     unit: event.unit,
     charged: event.charged,
     metadata: event.metadata,
-    generateAudio: event.generateAudio
+    generateAudio: event.generateAudio,
+    inputTokens: event.inputTokens,
+    outputTokens: event.outputTokens,
+    pricingSource: event.pricingSource,
+    usageMetadata: event.usageMetadata
   };
 }
 

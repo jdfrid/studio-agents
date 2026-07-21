@@ -2,6 +2,7 @@ import type { ProviderCredentialView } from "@studio/shared";
 import { ProviderError } from "@studio/shared";
 import { httpJson } from "../http.js";
 import { extractText, geminiModels, geminiUrl } from "./common.js";
+import { reportGenerateContentUsage } from "./reportUsage.js";
 import type { GeminiUsageReporter } from "./usage.js";
 
 export interface GeminiJsonRequest {
@@ -43,13 +44,17 @@ export async function geminiCompleteJson<T>(
   const response = await callGemini(provider, model, prompt, req, baseTokens);
   let raw = extractText(response);
   try {
-    return { provider: "gemini", model, raw, parsed: parseJsonObject<T>(raw) };
+    const parsed = parseJsonObject<T>(raw);
+    await reportGenerateContentUsage(response, { activityType: "gemini_text", model, startedMs: started }, onUsage);
+    return { provider: "gemini", model, raw, parsed };
   } catch (firstError) {
     if (baseTokens < 16384) {
       const retry = await callGemini(provider, model, prompt, req, Math.min(baseTokens * 2, 16384));
       raw = extractText(retry);
       try {
-        return { provider: "gemini", model, raw, parsed: parseJsonObject<T>(raw) };
+        const parsed = parseJsonObject<T>(raw);
+        await reportGenerateContentUsage(retry, { activityType: "gemini_text", model, startedMs: started }, onUsage);
+        return { provider: "gemini", model, raw, parsed };
       } catch {
         /* fall through */
       }
@@ -57,15 +62,6 @@ export async function geminiCompleteJson<T>(
     throw new ProviderError(`Gemini JSON response could not be parsed: ${(firstError as Error).message}`, {
       provider: "gemini",
       metadata: { model, rawPreview: raw.slice(0, 800) }
-    });
-  } finally {
-    await onUsage?.({
-      activityType: "gemini_text",
-      model,
-      durationMs: Date.now() - started,
-      billedUnits: 1,
-      unit: "text_call",
-      charged: "yes"
     });
   }
 }

@@ -65,6 +65,10 @@ export type CostUsageRecord = {
   charged?: import("./costLedger.js").CostChargedStatus;
   metadata?: Record<string, unknown>;
   generateAudio?: boolean;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  pricingSource?: import("./geminiPricing.js").CostPricingSource;
+  usageMetadata?: import("./geminiPricing.js").GeminiUsageMetadata | null;
 };
 
 export interface CostRecorder {

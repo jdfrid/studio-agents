@@ -6,6 +6,7 @@ import {
   summarizeRunCosts,
   type CostEventView
 } from "../costLedger.js";
+import { normalizeUsageMetadata } from "../geminiPricing.js";
 
 describe("costLedger", () => {
   it("prices Veo fast scene", () => {
@@ -22,6 +23,25 @@ describe("costLedger", () => {
     expect(costNis).toBe(0);
   });
 
+  it("prices from usageMetadata when provided", () => {
+    const usage = normalizeUsageMetadata({
+      promptTokenCount: 1_000_000,
+      candidatesTokenCount: 100_000,
+      totalTokenCount: 1_100_000
+    })!;
+    const { costUsd, costNis } = computeCostAmounts("gemini_text", usage.totalTokenCount, {
+      model: "gemini-2.5-flash",
+      usageMetadata: usage,
+      pricingSource: "usage_metadata"
+    });
+    expect(costUsd).toBeCloseTo(0.21, 2);
+    expect(costNis).toBeGreaterThan(0);
+  });
+
+  it("falls back to flat estimate without usageMetadata", () => {
+    const { costUsd } = computeCostAmounts("gemini_text", 1, { pricingSource: "estimate" });
+    expect(costUsd).toBe(0.002);
+  });
   it("summarizes run events", () => {
     const events: CostEventView[] = [
       {

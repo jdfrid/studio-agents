@@ -1,5 +1,9 @@
 import type { StageName } from "./enums.js";
 import { DEFAULT_USD_TO_ILS, veoGenerateAudio, veoPerSecondUsd } from "./budget.js";
+import type { CostPricingSource, GeminiUsageMetadata } from "./geminiPricing.js";
+import { priceFromUsageMetadata } from "./geminiPricing.js";
+
+export type { CostPricingSource } from "./geminiPricing.js";
 
 export type CostActivityType =
   | "veo_video"
@@ -18,6 +22,7 @@ export type CostBilledUnit =
   | "text_call"
   | "tts_call"
   | "music_seconds"
+  | "tokens"
   | "bytes";
 
 export interface CostEventInput {
@@ -113,11 +118,24 @@ export function computeCostAmounts(
     generateAudio?: boolean;
     charged?: CostChargedStatus;
     usdRate?: number;
+    usageMetadata?: GeminiUsageMetadata | null;
+    pricingSource?: CostPricingSource;
   } = {}
 ): { costUsd: number; costNis: number; charged: CostChargedStatus } {
   const charged = options.charged ?? "yes";
   if (charged === "no") {
     return { costUsd: 0, costNis: 0, charged };
+  }
+
+  const rate = options.usdRate ?? DEFAULT_USD_TO_ILS;
+
+  if (
+    options.usageMetadata &&
+    options.model &&
+    (options.pricingSource === "usage_metadata" || options.pricingSource === undefined)
+  ) {
+    const { usd } = priceFromUsageMetadata(options.model, options.usageMetadata);
+    return { costUsd: usd, costNis: usdToNis(usd, rate), charged };
   }
 
   let usd = 0;
@@ -145,7 +163,6 @@ export function computeCostAmounts(
       break;
   }
 
-  const rate = options.usdRate ?? DEFAULT_USD_TO_ILS;
   return { costUsd: usd, costNis: usdToNis(usd, rate), charged };
 }
 

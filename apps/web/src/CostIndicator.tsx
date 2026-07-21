@@ -5,22 +5,33 @@ export function CostIndicator({
   estimate,
   compact = false,
   showBreakdown = true,
-  briefDurationSeconds
+  briefDurationSeconds,
+  actualCostNis
 }: {
   estimate: RunCostEstimate;
   compact?: boolean;
   showBreakdown?: boolean;
   /** Brief target length — when different from veoSeconds, show both. */
   briefDurationSeconds?: number;
+  /** Sum from Cost Ledger after run (usageMetadata-based when available). */
+  actualCostNis?: number | null;
 }) {
   const level = estimate.isExpensive ? "expensive" : estimate.nis <= 5 ? "cheap" : "moderate";
   const briefDur = briefDurationSeconds ?? estimate.briefDurationSeconds;
+  const showActual = actualCostNis != null && actualCostNis > 0;
   return (
     <div className={`cost-indicator cost-${level}${compact ? " cost-compact" : ""}`} role="status" aria-live="polite">
       <div className="cost-indicator-head">
-        <span className="cost-indicator-amount">{formatCostNis(estimate.nis)}</span>
-        <span className="cost-indicator-sub">משוער לריצה מלאה</span>
+        <span className="cost-indicator-amount">{formatCostNis(showActual ? actualCostNis! : estimate.nis)}</span>
+        <span className="cost-indicator-sub">
+          {showActual ? "עלות בפועל (Cost Ledger)" : "משוער לפני ריצה (תערифון)"}
+        </span>
       </div>
+      {showActual && Math.abs(actualCostNis! - estimate.nis) > 0.5 ? (
+        <p className="cost-indicator-actual-length muted">
+          הערכה לפני ריצה: {formatCostNis(estimate.nis)}
+        </p>
+      ) : null}
       {briefDur != null ? (
         <p className="cost-indicator-actual-length">
           אורך וידאו בפועל: <strong>{estimate.veoSeconds}s</strong> ({estimate.sceneCount} סצנות × {estimate.bucket}s)

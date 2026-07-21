@@ -2,6 +2,7 @@ import type { ProviderCredentialView } from "@studio/shared";
 import { ProviderError } from "@studio/shared";
 import { httpJson } from "../http.js";
 import { extractInlineData, geminiModels, geminiUrl } from "./common.js";
+import { reportGenerateContentUsage } from "./reportUsage.js";
 import type { GeminiUsageReporter } from "./usage.js";
 
 export interface GeminiImageRequest {
@@ -53,13 +54,10 @@ export async function geminiGenerateImage(
       metadata: { model }
     });
   }
-  await onUsage?.({
-    activityType: "gemini_image",
-    model,
-    durationMs: Date.now() - started,
-    billedUnits: 1,
-    unit: "image_call",
-    charged: "yes"
-  });
+  await reportGenerateContentUsage(
+    response,
+    { activityType: "gemini_image", model, startedMs: started },
+    onUsage
+  );
   return { provider: "gemini", model, body: inline.data, mimeType: inline.mimeType };
 }

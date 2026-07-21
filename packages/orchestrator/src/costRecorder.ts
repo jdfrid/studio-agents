@@ -1,6 +1,7 @@
 import { prisma } from "@studio/infra-prisma";
 import {
   computeCostAmounts,
+  normalizeUsageMetadata,
   summarizeRunCosts,
   type CostEventSummary,
   type CostEventView,
@@ -21,11 +22,34 @@ export interface CostRecorderContext {
 export function createCostRecorder(ctx: CostRecorderContext): CostRecorder {
   return {
     async record(event: CostUsageRecord): Promise<void> {
+      const usageMetadata =
+        event.usageMetadata ??
+        (event.metadata?.usageMetadata && typeof event.metadata.usageMetadata === "object"
+          ? normalizeUsageMetadata(event.metadata.usageMetadata as Record<string, unknown>)
+          : null);
+
+      const pricingSource =
+        event.pricingSource ??
+        (typeof event.metadata?.pricingSource === "string"
+          ? (event.metadata.pricingSource as CostUsageRecord["pricingSource"])
+          : undefined);
+
       const { costUsd, costNis, charged } = computeCostAmounts(event.activityType, event.billedUnits, {
         model: event.model ?? undefined,
         generateAudio: event.generateAudio,
-        charged: event.charged
+        charged: event.charged,
+        usageMetadata,
+        pricingSource
       });
+
+      const metadata = {
+        ...(event.metadata ?? {}),
+        ...(pricingSource ? { pricingSource } : {}),
+        ...(event.inputTokens != null ? { inputTokens: event.inputTokens } : {}),
+        ...(event.outputTokens != null ? { outputTokens: event.outputTokens } : {}),
+        ...(usageMetadata?.raw ? { usageMetadata: usageMetadata.raw } : {})
+      };
+
       try {
         await prisma.costEvent.create({
           data: {
@@ -44,7 +68,7 @@ export function createCostRecorder(ctx: CostRecorderContext): CostRecorder {
             costUsd,
             costNis,
             charged: charged as never,
-            metadata: (event.metadata ?? {}) as object
+            metadata: metadata as object
           }
         });
       } catch (error) {

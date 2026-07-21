@@ -264,12 +264,8 @@ function RunDetail({
         estimate={runEstimate}
         compact={!renderPending && run.status === "COMPLETED"}
         briefDurationSeconds={run.brief.durationSeconds ?? 30}
+        actualCostNis={costLedger?.summary.totalNis ?? null}
       />
-      {costLedger && costLedger.summary.totalNis > 0 ? (
-        <p className="cost-actual-total">
-          עלות בפועל (לפי תערифון): <strong>{formatCostNis(costLedger.summary.totalNis)}</strong>
-        </p>
-      ) : null}
       <CostLedger ledger={costLedger} />
       <GeminiCapabilitiesPanel capabilities={capabilities} />
       {run.stages.some((s) => s.status === "QUEUED") && queueStats ? (

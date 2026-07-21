@@ -193,7 +193,11 @@ async function reportVeoUsage(
     unit: "veo_seconds",
     generateAudio: req.generateAudio ?? false,
     charged,
-    metadata: operationName ? { operationName } : undefined
+    pricingSource: "request_params",
+    metadata: {
+      ...(operationName ? { operationName } : {}),
+      pricingSource: "request_params"
+    }
   });
 }
 

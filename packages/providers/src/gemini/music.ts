@@ -3,6 +3,7 @@ import { ProviderError } from "@studio/shared";
 import { normalizeAudioForPlayback } from "../audio/pcm.js";
 import { httpJson } from "../http.js";
 import { extractInlineData, extractText, geminiModels, geminiUrl } from "./common.js";
+import { reportGenerateContentUsage } from "./reportUsage.js";
 import type { GeminiUsageReporter } from "./usage.js";
 
 export interface GeminiMusicRequest {
@@ -76,15 +77,11 @@ export async function geminiGenerateMusic(
   }
 
   const normalized = normalizeAudioForPlayback(inline.data, inline.mimeType);
-  const billedSeconds = req.durationSeconds ?? 30;
-  await onUsage?.({
-    activityType: "gemini_music",
-    model,
-    durationMs: Date.now() - started,
-    billedUnits: billedSeconds,
-    unit: "music_seconds",
-    charged: "yes"
-  });
+  await reportGenerateContentUsage(
+    response,
+    { activityType: "gemini_music", model, startedMs: started },
+    onUsage
+  );
   return {
     provider: "gemini",
     model,

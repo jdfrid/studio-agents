@@ -5,4 +5,6 @@ export * from "./image.js";
 export * from "./music.js";
 export * from "./files.js";
 export * from "./usage.js";
+export * from "./usageMetadata.js";
+export * from "./reportUsage.js";
 export * from "./video.js";
