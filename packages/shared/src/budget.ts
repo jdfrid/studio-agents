@@ -1,4 +1,6 @@
 import type { VeoDurationBucket } from "./schemas/script.js";
+import type { RenderProfileId } from "./renderProfiles.js";
+import { defaultRenderProfileId, getRenderProfile, profileVeoMode, profileVideoPerSecondUsd } from "./renderProfiles.js";
 
 export const DEFAULT_USD_TO_ILS = 3.6;
 /** Runs above this NIS show a blocking confirmation. */
@@ -23,6 +25,19 @@ export function forcedVeoDurationBucket(): VeoDurationBucket | null {
   return null;
 }
 
+export type GeminiVeoMode = "extend" | "multiclip";
+
+/** extend: one Veo chain (initial clip + extensions) per run; multiclip: independent clip per scene. */
+export function geminiVeoMode(override?: GeminiVeoMode): GeminiVeoMode {
+  if (override === "extend" || override === "multiclip") return override;
+  const value = process.env.GEMINI_VEO_MODE?.trim().toLowerCase();
+  if (value === "extend") return "extend";
+  return "multiclip";
+}
+
+/** Target beat length for script/narration when GEMINI_VEO_MODE=extend. */
+export { VEO_EXTEND_BEAT_SECONDS } from "./renderProfiles.js";
+
 /** Veo clip length in seconds (one scene = one Veo generation). */
 export function veoClipSeconds(budget: boolean, forcedBucket?: VeoDurationBucket | null): number {
   const bucket = forcedBucket ?? forcedVeoDurationBucket();
@@ -35,10 +50,37 @@ export function planSceneLayout(
   durationSeconds: number,
   budget: boolean,
   config?: Partial<ProductionCostConfig>
-): { sceneCount: number; clipSeconds: number; totalVideoSeconds: number } {
+): { sceneCount: number; clipSeconds: number; totalVideoSeconds: number; veoMode: GeminiVeoMode } {
+  const profile = getRenderProfile(config?.renderProfileId ?? defaultRenderProfileId());
+  const mode = profileVeoMode(profile);
+
+  if (profile.strategy === "extend") {
+    const beatSeconds = profile.capabilities.beatSeconds;
+    const sceneCount = Math.max(1, Math.round(durationSeconds / beatSeconds));
+    const bucket = Number(config?.forcedVeoBucket ?? forcedVeoDurationBucket() ?? "8") as number;
+    return {
+      sceneCount,
+      clipSeconds: beatSeconds,
+      totalVideoSeconds: sceneCount * bucket,
+      veoMode: mode
+    };
+  }
+
+  if (profile.provider === "kling") {
+    const beatSeconds = profile.capabilities.beatSeconds;
+    const sceneCount = Math.max(1, Math.round(durationSeconds / beatSeconds));
+    const clipSeconds = profile.capabilities.maxClipSeconds;
+    return {
+      sceneCount,
+      clipSeconds: beatSeconds,
+      totalVideoSeconds: sceneCount * clipSeconds,
+      veoMode: mode
+    };
+  }
+
   const clipSeconds = veoClipSeconds(budget, config?.forcedVeoBucket ?? forcedVeoDurationBucket());
   const sceneCount = Math.max(1, Math.round(durationSeconds / clipSeconds));
-  return { sceneCount, clipSeconds, totalVideoSeconds: sceneCount * clipSeconds };
+  return { sceneCount, clipSeconds, totalVideoSeconds: sceneCount * clipSeconds, veoMode: mode };
 }
 
 /** Max narration length so TTS fits a single Veo clip without mid-sentence cuts. */
@@ -118,6 +160,8 @@ export type ProductionCostConfig = {
   forcedVeoBucket?: VeoDurationBucket | null;
   assetMode?: AssetGenerationMode;
   veoGenerateAudio: boolean;
+  veoMode?: GeminiVeoMode;
+  renderProfileId?: RenderProfileId;
 };
 
 export function buildProductionCostConfig(videoModel: string): ProductionCostConfig {
@@ -130,7 +174,9 @@ export function buildProductionCostConfig(videoModel: string): ProductionCostCon
     forcedVeoBucket: forcedVeoDurationBucket(),
     assetMode:
       asset === "shared_reference" || asset === "reference_only" || asset === "full" ? asset : undefined,
-    veoGenerateAudio: veoGenerateAudio()
+    veoGenerateAudio: veoGenerateAudio(),
+    veoMode: profileVeoMode(getRenderProfile(defaultRenderProfileId())),
+    renderProfileId: defaultRenderProfileId()
   };
 }
 
@@ -168,7 +214,8 @@ export function estimateRunCost(
   const videoModel = config?.videoModel ?? process.env.GEMINI_VIDEO_MODEL ?? "veo-3.1-fast-generate-preview";
   const usdToIls = config?.usdToIls ?? DEFAULT_USD_TO_ILS;
   const generateAudio = config?.veoGenerateAudio ?? veoGenerateAudio();
-  const perSecond = veoPerSecondUsd(videoModel, generateAudio);
+  const profile = getRenderProfile(config?.renderProfileId ?? defaultRenderProfileId());
+  const perSecond = profileVideoPerSecondUsd(profile, veoPerSecondUsd(videoModel, generateAudio));
   const tier = veoModelTier(videoModel);
 
   let sceneCount: number;

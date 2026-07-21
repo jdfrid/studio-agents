@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { SceneTimelineEntrySchema } from "./package.js";
+import { RenderProfileIdSchema } from "../renderProfiles.js";
 
 export const RenderInputSchema = z.object({
   aspectRatio: z.string(),
-  timeline: z.array(SceneTimelineEntrySchema)
+  timeline: z.array(SceneTimelineEntrySchema),
+  renderProfile: RenderProfileIdSchema
 });
 export type RenderInput = z.infer<typeof RenderInputSchema>;
 

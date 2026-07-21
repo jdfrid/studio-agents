@@ -4,6 +4,7 @@ import {
   buildStageErrorRecord,
   createConsoleLogger,
   nextStage,
+  resolveRenderProfile,
   type AgentContext,
   type StageName
 } from "@studio/shared";
@@ -169,10 +170,16 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       };
     case "render": {
       const pkg = byName.get("package") as { timeline: unknown[] } | undefined;
-      const briefData = (byName.get("brief") ?? brief) as { aspectRatio?: string };
+      const briefOut = byName.get("brief") as { aspectRatio?: string; renderProfile?: string } | undefined;
+      const briefData = (byName.get("brief") ?? brief) as {
+        aspectRatio?: string;
+        renderProfile?: string;
+      };
+      const renderProfile = resolveRenderProfile(briefOut ?? briefData).id;
       return {
         aspectRatio: briefData.aspectRatio ?? "9:16",
-        timeline: pkg?.timeline ?? []
+        timeline: pkg?.timeline ?? [],
+        renderProfile
       };
     }
     case "series":

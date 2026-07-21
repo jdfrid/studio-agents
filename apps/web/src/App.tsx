@@ -4,7 +4,7 @@ import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
 import { StageErrorView } from "./StageErrorView.js";
 import { BriefQuickEditor, StageEditor, StageUploadControls } from "./StageEditor.js";
 import type { ArtifactRow, GeminiCapabilityStatus, GeminiOperationRow, ProjectRunView, RunSummary, StageName } from "./types.js";
-import { STAGE_ORDER, estimateRunCost, formatCostNis, type ProductionCostConfig, type RunCostEstimate } from "@studio/shared";
+import { STAGE_ORDER, estimateRunCost, formatCostNis, getRenderProfile, profileToProductionCostConfig, type ProductionCostConfig, type RenderProfileId, type RunCostEstimate } from "@studio/shared";
 import { CostConfirmCheckbox, CostIndicator } from "./CostIndicator.js";
 import { CostLedger, type CostLedgerResponse } from "./CostLedger.js";
 
@@ -15,6 +15,8 @@ export function App() {
   const [artifacts, setArtifacts] = useState<ArtifactRow[]>([]);
   const [capabilities, setCapabilities] = useState<GeminiCapabilityStatus | null>(null);
   const [costConfig, setCostConfig] = useState<ProductionCostConfig | null>(null);
+  const [renderProfiles, setRenderProfiles] = useState<Array<{ id: RenderProfileId; label: string }>>([]);
+  const [defaultRenderProfileId, setDefaultRenderProfileId] = useState<RenderProfileId>("veo-multiclip");
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
   const [operations, setOperations] = useState<GeminiOperationRow[]>([]);
   const [costLedger, setCostLedger] = useState<CostLedgerResponse | null>(null);
@@ -63,6 +65,12 @@ export function App() {
       setError((err as Error).message);
     });
     void apiGet<{ config: ProductionCostConfig }>("/config/cost").then((r) => setCostConfig(r.config)).catch(() => setCostConfig(null));
+    void apiGet<{ defaultProfileId: RenderProfileId; profiles: Array<{ id: RenderProfileId; label: string }> }>("/config/render-profiles")
+      .then((r) => {
+        setRenderProfiles(r.profiles.map((p) => ({ id: p.id, label: p.label })));
+        setDefaultRenderProfileId(r.defaultProfileId);
+      })
+      .catch(() => setRenderProfiles([]));
   }, []);
   useEffect(() => {
     if (selectedId) void refreshRun(selectedId);
@@ -93,6 +101,8 @@ export function App() {
             apiOnline={apiOnline}
             costConfig={costConfig}
             capabilities={capabilities}
+            renderProfiles={renderProfiles}
+            defaultRenderProfileId={defaultRenderProfileId}
             onError={setError}
             onCreated={(view) => { setSelectedId(view.id); void refreshRuns(); }}
           />
@@ -100,6 +110,7 @@ export function App() {
             {runs.map((r) => (
               <li key={r.id} className={r.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(r.id)}>
                 <strong>{r.title}</strong>
+                {r.renderProfile ? <span className="render-profile-badge">{renderProfileLabel(r.renderProfile)}</span> : null}
                 <span>{r.status} · {r.currentStage ?? "—"}</span>
                 <small>{new Date(r.updatedAt).toLocaleString()}</small>
               </li>
@@ -131,17 +142,29 @@ export function App() {
   );
 }
 
+function renderProfileLabel(id: string): string {
+  try {
+    return getRenderProfile(id as RenderProfileId).label;
+  } catch {
+    return id;
+  }
+}
+
 function NewRunForm({
   onCreated,
   onError,
   costConfig,
   capabilities,
+  renderProfiles,
+  defaultRenderProfileId,
   apiOnline
 }: {
   onCreated: (view: ProjectRunView) => void;
   onError: (message: string) => void;
   costConfig: ProductionCostConfig | null;
   capabilities: GeminiCapabilityStatus | null;
+  renderProfiles: Array<{ id: RenderProfileId; label: string }>;
+  defaultRenderProfileId: RenderProfileId;
   apiOnline: boolean | null;
 }) {
   const [title, setTitle] = useState("");
@@ -149,10 +172,17 @@ function NewRunForm({
   const [language, setLanguage] = useState("he");
   const [durationSeconds, setDurationSeconds] = useState(30);
   const [budgetMode, setBudgetMode] = useState(true);
+  const [renderProfileId, setRenderProfileId] = useState<RenderProfileId>(defaultRenderProfileId);
   const [costConfirmed, setCostConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const config: Partial<ProductionCostConfig> = costConfig ?? (capabilities?.video.model ? { videoModel: capabilities.video.model, veoGenerateAudio: true, usdToIls: 3.6 } : {});
-  const estimate = estimateRunCost({ budgetMode, durationSeconds }, config);
+  useEffect(() => {
+    setRenderProfileId(defaultRenderProfileId);
+  }, [defaultRenderProfileId]);
+  const baseConfig: Partial<ProductionCostConfig> = costConfig ?? (capabilities?.video.model ? { videoModel: capabilities.video.model, veoGenerateAudio: true, usdToIls: 3.6 } : {});
+  const estimate = estimateRunCost(
+    { budgetMode, durationSeconds },
+    profileToProductionCostConfig(getRenderProfile(renderProfileId), baseConfig)
+  );
   const estimateFromServer = apiOnline === true && Boolean(costConfig ?? capabilities?.video.model);
   const canSubmit = Boolean(title.trim() && sourceText.trim() && apiOnline === true && (!estimate.isExpensive || costConfirmed));
   async function submit() {
@@ -161,7 +191,7 @@ function NewRunForm({
     try {
       const view = await apiPost<ProjectRunView>("/runs", {
         tenantSlug: "demo",
-        brief: { title, sourceText, language, durationSeconds, aspectRatio: "9:16", budgetMode }
+        brief: { title, sourceText, language, durationSeconds, aspectRatio: "9:16", budgetMode, renderProfile: renderProfileId }
       });
       setTitle("");
       setSourceText("");
@@ -188,6 +218,24 @@ function NewRunForm({
         <option value="he">עברית</option>
         <option value="en">English</option>
       </select>
+      <label className="budget-row">
+        פרופיל רינדור
+        <select
+          value={renderProfileId}
+          onChange={(e) => {
+            setRenderProfileId(e.target.value as RenderProfileId);
+            setCostConfirmed(false);
+          }}
+        >
+          {(renderProfiles.length ? renderProfiles : [
+            { id: "veo-multiclip" as RenderProfileId, label: "Veo Fast — multiclip" },
+            { id: "veo-extend" as RenderProfileId, label: "Veo Fast — extend chain" },
+            { id: "kling-i2v" as RenderProfileId, label: "Kling 2.1 — image-to-video" }
+          ]).map((p) => (
+            <option key={p.id} value={p.id}>{p.label}</option>
+          ))}
+        </select>
+      </label>
       <label className="budget-row">
         משך (שניות)
         <input
@@ -244,6 +292,7 @@ function RunDetail({
     | null
     | undefined;
   const budgetMode = run.brief.budgetMode ?? false;
+  const renderProfileId = (run.brief as { renderProfile?: RenderProfileId }).renderProfile ?? null;
   const config: Partial<ProductionCostConfig> =
     costConfig ?? (capabilities?.video.model ? { videoModel: capabilities.video.model, veoGenerateAudio: true, usdToIls: 3.6 } : {});
   const runEstimate = estimateRunCost(
@@ -252,13 +301,14 @@ function RunDetail({
       durationSeconds: run.brief.durationSeconds ?? 30,
       scenes: scriptOutput?.scenes ?? null
     },
-    config
+    renderProfileId ? profileToProductionCostConfig(getRenderProfile(renderProfileId), config) : config
   );
   const renderPending = run.stages.some((s) => s.stage === "render" && (s.status === "PENDING" || s.status === "QUEUED" || s.status === "RUNNING"));
   return (
     <>
       <header className="run-header">
         <h2>{run.brief.title}</h2>
+        {renderProfileId ? <span className="render-profile-badge">{renderProfileLabel(renderProfileId)}</span> : null}
         <p>
           <strong>סטטוס:</strong> {run.status} · <strong>שלב:</strong> {run.currentStage ? (STAGE_LABELS[run.currentStage] ?? run.currentStage) : "—"}
         </p>

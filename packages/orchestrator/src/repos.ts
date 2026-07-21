@@ -87,17 +87,33 @@ export function createProvidersRepo(tenantId: string): ProvidersRepository {
 
 function envProvider(type: string): ProviderCredentialView | null {
   const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
-  if (!key) return null;
   const geminiTypes = new Set(["GEMINI", "LLM", "TTS", "MUSIC", "MEDIA_SEARCH"]);
-  if (!geminiTypes.has(type)) return null;
-  return {
-    id: "env-gemini",
-    type: type === "LLM" || type === "TTS" || type === "MUSIC" || type === "MEDIA_SEARCH" ? type : "GEMINI",
-    provider: "google-gemini",
-    priority: 0,
-    config: {},
-    secret: key
-  };
+  if (key && geminiTypes.has(type)) {
+    return {
+      id: "env-gemini",
+      type: type === "LLM" || type === "TTS" || type === "MUSIC" || type === "MEDIA_SEARCH" ? type : "GEMINI",
+      provider: "google-gemini",
+      priority: 0,
+      config: {},
+      secret: key
+    };
+  }
+
+  if (type === "VIDEO") {
+    const falKey = process.env.FAL_API_KEY;
+    if (falKey) {
+      return {
+        id: "env-fal",
+        type: "VIDEO",
+        provider: "fal-kling",
+        priority: 0,
+        config: {},
+        secret: falKey
+      };
+    }
+  }
+
+  return null;
 }
 
 function rowToArtifact(row: {

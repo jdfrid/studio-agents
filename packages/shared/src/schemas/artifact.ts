@@ -19,6 +19,7 @@ export const ArtifactKindSchema = z.enum([
   "package_instructions",
   "package_timeline",
   "package_gemini_render_plan",
+  "render_profile_snapshot",
   "gemini_operation"
 ]);
 export type ArtifactKind = z.infer<typeof ArtifactKindSchema>;

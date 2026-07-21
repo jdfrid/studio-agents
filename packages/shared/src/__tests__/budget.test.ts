@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   estimateRunCost,
+  geminiVeoMode,
   isProductAdBrief,
   planSceneLayout,
   veoGenerateAudio,
@@ -14,8 +15,24 @@ describe("planSceneLayout", () => {
     expect(layout.sceneCount).toBe(8);
     expect(layout.clipSeconds).toBe(4);
     expect(layout.totalVideoSeconds).toBe(32);
+    expect(layout.veoMode).toBe("multiclip");
     // Old bug: TARGET_SCENE_SECONDS=10 → 3 scenes × 4s = 12s total
     expect(layout.totalVideoSeconds).not.toBe(12);
+  });
+
+  it("uses 3 beats × 8s Veo bucket in extend mode for 30s brief", () => {
+    const layout = planSceneLayout(30, true, { veoMode: "extend", renderProfileId: "veo-extend" });
+    expect(layout.veoMode).toBe("extend");
+    expect(layout.sceneCount).toBe(3);
+    expect(layout.clipSeconds).toBe(10);
+    expect(layout.totalVideoSeconds).toBe(24);
+  });
+
+  it("uses 3×10s beats for kling-i2v profile", () => {
+    const layout = planSceneLayout(30, true, { renderProfileId: "kling-i2v" });
+    expect(layout.sceneCount).toBe(3);
+    expect(layout.clipSeconds).toBe(10);
+    expect(layout.totalVideoSeconds).toBe(30);
   });
 });
 
@@ -53,6 +70,20 @@ describe("estimateRunCost", () => {
     expect(est.isExpensive).toBe(false);
   });
 
+  it("estimates extend mode with 3 Veo calls for 30s brief", () => {
+    const est = estimateRunCost(
+      { budgetMode: true, durationSeconds: 30 },
+      {
+        videoModel: "veo-3.1-fast-generate-preview",
+        veoGenerateAudio: false,
+        usdToIls: 3.6,
+        renderProfileId: "veo-extend"
+      }
+    );
+    expect(est.sceneCount).toBe(3);
+    expect(est.veoSeconds).toBe(24);
+  });
+
   it("uses actual script scenes when provided", () => {
     const est = estimateRunCost(
       { budgetMode: true, durationSeconds: 30, scenes: [{ durationBucket: "4" }, { durationBucket: "4" }, { durationBucket: "4" }] },
@@ -87,5 +118,17 @@ describe("veoGenerateAudio", () => {
     expect(veoGenerateAudio()).toBe(true);
     if (prev === undefined) delete process.env.GEMINI_VEO_AUDIO;
     else process.env.GEMINI_VEO_AUDIO = prev;
+  });
+});
+
+describe("geminiVeoMode", () => {
+  it("defaults to multiclip unless GEMINI_VEO_MODE=extend", () => {
+    const prev = process.env.GEMINI_VEO_MODE;
+    delete process.env.GEMINI_VEO_MODE;
+    expect(geminiVeoMode()).toBe("multiclip");
+    process.env.GEMINI_VEO_MODE = "extend";
+    expect(geminiVeoMode()).toBe("extend");
+    if (prev === undefined) delete process.env.GEMINI_VEO_MODE;
+    else process.env.GEMINI_VEO_MODE = prev;
   });
 });

@@ -3,6 +3,7 @@ import {
   BriefInputSchema,
   BriefOutputSchema,
   NoProviderConfiguredError,
+  resolveRenderProfile,
   type Agent,
   type BriefInput,
   type BriefOutput
@@ -79,6 +80,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       musicDirection: parsed.musicDirection ?? "",
       callToAction: parsed.callToAction,
       budgetMode: input.budgetMode ?? false,
+      renderProfile: resolveRenderProfile(input).id,
       references:
         parsed.references ??
         input.referenceLinks.map((link) => ({ kind: "link" as const, ref: link, note: undefined }))

@@ -1,6 +1,8 @@
 import {
   PackageInputSchema,
   PackageOutputSchema,
+  buildRenderProfileSnapshot,
+  resolveRenderProfile,
   type Agent,
   type AssetOutput,
   type AudioOutput,
@@ -115,26 +117,44 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
 
     const geminiProvider = await ctx.providers.primary("GEMINI");
     const models = geminiModels(geminiProvider);
+    const renderProfile = resolveRenderProfile(brief);
+    const profileSnapshot = buildRenderProfileSnapshot(brief);
     const geminiRenderPlan = {
       runId: ctx.runId,
       generatedAt: new Date().toISOString(),
       models,
+      renderProfile: renderProfile.id,
       renderPolicy: {
-        provider: "gemini-veo",
+        provider: renderProfile.provider,
+        strategy: renderProfile.strategy,
+        profileId: renderProfile.id,
+        profileLabel: renderProfile.label,
         noPlaceholderFallback: true,
-        audioPolicy: "Use Gemini TTS/Lyria artifacts and FFmpeg mix; do not rely on Veo native audio for exact narration."
+        audioPolicy:
+          renderProfile.strategy === "extend"
+            ? "Veo extend chain: one continuous clip; mix TTS at timeline offsets via FFmpeg."
+            : renderProfile.provider === "kling"
+              ? "Kling I2V multiclip: per-beat clips from reference frames; FFmpeg concat + TTS mix."
+              : "Use Gemini TTS/Lyria artifacts and FFmpeg mix; do not rely on Veo native audio for exact narration."
       },
-      scenes: timeline.map((scene) => ({
+      scenes: timeline.map((scene, index) => ({
         sceneId: scene.sceneId,
         order: scene.order,
         veoPrompt: scene.veoPrompt,
         durationBucket: scene.durationBucket,
         aspectRatio: brief.aspectRatio,
-        mode: scene.firstFrame?.signedUrl && scene.lastFrame?.signedUrl
-          ? "first-last-frame"
-          : scene.referenceFrame?.signedUrl
-            ? "image-to-video"
-            : "text-to-video",
+        renderProfile: renderProfile.id,
+        extendFromPrevious: renderProfile.strategy === "extend" && index > 0,
+        mode:
+          renderProfile.strategy === "extend" && index > 0
+            ? "video-extend"
+            : renderProfile.provider === "kling" && scene.referenceFrame?.signedUrl
+              ? "image-to-video"
+              : scene.firstFrame?.signedUrl && scene.lastFrame?.signedUrl
+                ? "first-last-frame"
+                : scene.referenceFrame?.signedUrl
+                  ? "image-to-video"
+                  : "text-to-video",
         referenceImageUrl: scene.referenceFrame?.signedUrl ?? scene.background.signedUrl,
         firstFrameUrl: scene.firstFrame?.signedUrl ?? null,
         lastFrameUrl: scene.lastFrame?.signedUrl ?? null,
@@ -178,10 +198,27 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
       mimeType: "application/json",
       filename: "gemini-render-plan.json"
     });
+    const profileSnapshotArt = await ctx.artifacts.save({
+      runId: ctx.runId,
+      stage: "package",
+      kind: "render_profile_snapshot",
+      body: JSON.stringify(profileSnapshot, null, 2),
+      mimeType: "application/json",
+      filename: "render-profile-snapshot.json",
+      metadata: {
+        renderProfileId: renderProfile.id,
+        provider: renderProfile.provider,
+        strategy: renderProfile.strategy
+      }
+    });
 
     const manifestSignedUrl = await ctx.storage.signedUrl(manifestArt.gcsPath);
 
-    await ctx.log.log("package_done", "Package Agent finished", { scenes: timeline.length });
+    await ctx.log.log("package_done", "Package Agent finished", {
+      scenes: timeline.length,
+      renderProfile: renderProfile.id,
+      profileSnapshotArtifactId: profileSnapshotArt.id
+    });
     return {
       manifestArtifactId: manifestArt.id,
       manifestGcsPath: manifestArt.gcsPath,

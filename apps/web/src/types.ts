@@ -5,6 +5,7 @@ export type RunSummary = {
   status: string;
   currentStage: string | null;
   title: string;
+  renderProfile?: string | null;
   updatedAt: string;
 };
 

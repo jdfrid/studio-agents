@@ -6,4 +6,5 @@ export * from "./music/index.js";
 export * from "./mediaSearch/index.js";
 export * from "./videoRender/index.js";
 export * from "./gemini/index.js";
+export * from "./video/index.js";
 export * from "./http.js";

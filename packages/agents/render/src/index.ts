@@ -1,12 +1,22 @@
-import { geminiGenerateVeoVideo, stablePromptHash } from "@studio/providers";
+import {
+  getVideoBeatGenerator,
+  stablePromptHash,
+  type VideoBeatGenerator,
+  type VideoBeatHooks,
+  type VideoBeatResult
+} from "@studio/providers";
 import {
   NoProviderConfiguredError,
   RenderInputSchema,
   RenderOutputSchema,
+  getRenderProfile,
   type Agent,
+  type AgentContext,
   type GcsClient,
+  type ProviderCredentialView,
   type RenderInput,
   type RenderOutput,
+  type RenderProfile,
   type RenderSceneResult,
   type SceneTimelineEntry
 } from "@studio/shared";
@@ -22,15 +32,24 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
   inputSchema: RenderInputSchema,
   outputSchema: RenderOutputSchema,
   async run(ctx, input) {
-    await ctx.log.log("render_start", "Render Agent started", { sceneCount: input.timeline.length });
+    const renderProfile = getRenderProfile(input.renderProfile);
+    await ctx.log.log("render_start", "Render Agent started", {
+      sceneCount: input.timeline.length,
+      renderProfile: renderProfile.id
+    });
 
-    const provider = await ctx.providers.primary("GEMINI");
+    const credentialType = renderProfile.provider === "kling" ? "VIDEO" : "GEMINI";
+    const provider = await ctx.providers.primary(credentialType);
     if (!provider) {
-      throw new NoProviderConfiguredError("GEMINI");
+      throw new NoProviderConfiguredError(credentialType);
     }
-    await ctx.log.log("render_provider_selected", "Gemini/Veo provider selected", {
+    const beatGenerator = getVideoBeatGenerator(renderProfile, provider);
+    await ctx.log.log("render_provider_selected", "Video provider selected", {
       provider: provider.provider,
-      priority: provider.priority
+      priority: provider.priority,
+      renderProfile: renderProfile.id,
+      videoProvider: renderProfile.provider,
+      strategy: renderProfile.strategy
     });
 
     const dir = path.join(tmpdir(), `studio-agents-${ctx.runId}-${nanoid(6)}`);
@@ -41,9 +60,17 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
     const geminiOperations: RenderOutput["geminiOperations"] = [];
 
     try {
+      if (renderProfile.strategy === "extend") {
+        return await renderExtendChain(ctx, input, beatGenerator, provider, dir, renderProfile);
+      }
+
       for (const scene of input.timeline) {
         const promptHash = stablePromptHash(scene.veoPrompt);
-        await ctx.log.log("render_scene_start", "Rendering scene", { sceneId: scene.sceneId, order: scene.order });
+        await ctx.log.log("render_scene_start", "Rendering scene", {
+          sceneId: scene.sceneId,
+          order: scene.order,
+          renderProfile: renderProfile.id
+        });
         const referenceSource =
           scene.referenceFrame?.gcsPath || scene.referenceFrame?.signedUrl ? scene.referenceFrame : scene.background;
         const [referenceImage, firstFrame, lastFrame] = await Promise.all([
@@ -51,35 +78,22 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           loadMediaBytes(ctx.storage, scene.firstFrame),
           loadMediaBytes(ctx.storage, scene.lastFrame)
         ]);
-        const result = await geminiGenerateVeoVideo(
-          provider,
+        const result = await beatGenerator.generateBeat(
           {
             sceneId: scene.sceneId,
             prompt: scene.veoPrompt,
             aspectRatio: input.aspectRatio === "16:9" ? "16:9" : "9:16",
             durationBucket: scene.durationBucket,
+            durationSeconds: scene.durationSeconds,
             referenceImage,
             firstFrame,
             lastFrame,
             generateAudio: scene.audioPolicy === "veo_native_audio"
           },
-          {
-            onPoll: async (operation) => {
-              await ctx.log.log("gemini_veo_operation_status", "Gemini Veo operation status", {
-                sceneId: scene.sceneId,
-                operationName: operation.operationName,
-                status: operation.status,
-                model: operation.model,
-                error: operation.error ?? null
-              });
-            },
-            onUsage: async (event) => {
-              await ctx.cost.record({ ...event, sceneId: event.sceneId ?? scene.sceneId });
-            }
-          }
+          buildBeatHooks(ctx, scene)
         );
         if (!result.videoBytes) {
-          throw new Error(`Gemini Veo completed without bytes for scene ${scene.sceneId}`);
+          throw new Error(`Video generation completed without bytes for scene ${scene.sceneId}`);
         }
         geminiOperations.push({
           sceneId: scene.sceneId,
@@ -88,30 +102,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           model: result.model,
           error: result.error ?? null
         });
-        const { videoBytes, ...operationSummary } = result;
-        await ctx.artifacts.save({
-          runId: ctx.runId,
-          stage: "render",
-          kind: "gemini_operation",
-          body: JSON.stringify(
-            {
-              sceneId: scene.sceneId,
-              promptHash,
-              operation: { ...operationSummary, videoBytesLength: videoBytes.length }
-            },
-            null,
-            2
-          ),
-          mimeType: "application/json",
-          filename: `scene-${scene.order}-veo-operation.json`,
-          metadata: {
-            sceneId: scene.sceneId,
-            operationName: result.operationName,
-            model: result.model,
-            promptHash,
-            sourceStage: "render"
-          }
-        });
+        await saveBeatOperationArtifact(ctx, scene, promptHash, result, renderProfile, { extendsPrevious: false });
 
         const rawPath = path.join(dir, `scene-${scene.order}-raw.mp4`);
         await writeFile(rawPath, result.videoBytes);
@@ -129,11 +120,12 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           filename: `scene-${scene.order}.mp4`,
           metadata: {
             sceneId: scene.sceneId,
-            provider: "gemini-veo",
+            provider: result.provider,
             model: result.model,
             order: scene.order,
             geminiOperationName: result.operationName,
-            promptHash
+            promptHash,
+            renderProfileId: renderProfile.id
           }
         });
 
@@ -142,7 +134,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           artifactId: clipArtifact.id,
           gcsPath: clipArtifact.gcsPath,
           durationSeconds: finalized.durationSeconds,
-          provider: "gemini-veo",
+          provider: result.provider,
           model: result.model,
           geminiOperationName: result.operationName,
           promptHash
@@ -178,11 +170,20 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         kind: "final_video",
         body: await readFile(finalPath),
         mimeType: "video/mp4",
-        filename: `final-${ctx.runId}.mp4`
+        filename: `final-${ctx.runId}.mp4`,
+        metadata: {
+          renderProfileId: renderProfile.id,
+          provider: renderProfile.provider,
+          strategy: renderProfile.strategy
+        }
       });
       const finalSignedUrl = await ctx.storage.signedUrl(finalArtifact.gcsPath);
 
-      await ctx.log.log("render_done", "Render Agent finished", { scenes: perScene.length, totalDurationSeconds });
+      await ctx.log.log("render_done", "Render Agent finished", {
+        scenes: perScene.length,
+        totalDurationSeconds,
+        renderProfile: renderProfile.id
+      });
       return {
         provider: provider.provider,
         perScene,
@@ -197,6 +198,311 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
     }
   }
 };
+
+async function renderExtendChain(
+  ctx: AgentContext,
+  input: RenderInput,
+  beatGenerator: VideoBeatGenerator,
+  provider: ProviderCredentialView,
+  dir: string,
+  renderProfile: RenderProfile
+): Promise<RenderOutput> {
+  const sortedTimeline = [...input.timeline].sort((a, b) => a.order - b.order);
+  if (sortedTimeline.length === 0) {
+    throw new Error("Cannot render extend chain: timeline is empty");
+  }
+
+  await ctx.log.log("render_extend_start", "Video extend chain started", {
+    beatCount: sortedTimeline.length,
+    renderProfile: renderProfile.id
+  });
+
+  const perScene: RenderSceneResult[] = [];
+  const geminiOperations: RenderOutput["geminiOperations"] = [];
+  let extendHandle: string | null = null;
+  let lastResult: VideoBeatResult | null = null;
+  let lastModel = "";
+
+  for (let index = 0; index < sortedTimeline.length; index++) {
+    const scene = sortedTimeline[index]!;
+    const isFirst = index === 0;
+    const promptHash = stablePromptHash(scene.veoPrompt);
+    await ctx.log.log("render_extend_step", "Extend chain step", {
+      sceneId: scene.sceneId,
+      order: scene.order,
+      step: index + 1,
+      totalSteps: sortedTimeline.length,
+      extendsPrevious: !isFirst,
+      renderProfile: renderProfile.id
+    });
+
+    const referenceSource =
+      isFirst && (scene.referenceFrame?.gcsPath || scene.referenceFrame?.signedUrl)
+        ? scene.referenceFrame
+        : isFirst
+          ? scene.background
+          : null;
+    const [referenceImage, firstFrame, lastFrame] = await Promise.all([
+      isFirst ? loadMediaBytes(ctx.storage, referenceSource) : Promise.resolve(null),
+      isFirst ? loadMediaBytes(ctx.storage, scene.firstFrame) : Promise.resolve(null),
+      isFirst ? loadMediaBytes(ctx.storage, scene.lastFrame) : Promise.resolve(null)
+    ]);
+
+    const result = await beatGenerator.generateBeat(
+      {
+        sceneId: scene.sceneId,
+        prompt: scene.veoPrompt,
+        aspectRatio: input.aspectRatio === "16:9" ? "16:9" : "9:16",
+        durationBucket: scene.durationBucket,
+        durationSeconds: scene.durationSeconds,
+        referenceImage,
+        firstFrame,
+        lastFrame,
+        extendVideoHandle: extendHandle,
+        generateAudio: scene.audioPolicy === "veo_native_audio"
+      },
+      buildBeatHooks(ctx, scene, renderProfile.id)
+    );
+
+    if (!result.videoBytes) {
+      throw new Error(`Video extend completed without bytes for scene ${scene.sceneId}`);
+    }
+
+    geminiOperations.push({
+      sceneId: scene.sceneId,
+      operationName: result.operationName,
+      status: result.status === "completed" ? "completed" : "failed",
+      model: result.model,
+      error: result.error ?? null
+    });
+
+    await saveBeatOperationArtifact(ctx, scene, promptHash, result, renderProfile, { extendsPrevious: !isFirst });
+
+    extendHandle = result.extendHandle ?? result.operationName;
+    lastResult = result;
+    lastModel = result.model;
+
+    perScene.push({
+      sceneId: scene.sceneId,
+      artifactId: "pending",
+      gcsPath: "pending",
+      durationSeconds: scene.durationSeconds,
+      provider: result.provider,
+      model: result.model,
+      geminiOperationName: result.operationName,
+      promptHash
+    });
+  }
+
+  if (!lastResult?.videoBytes) {
+    throw new Error("Extend chain produced no final video bytes");
+  }
+
+  const rawPath = path.join(dir, `extend-chain-${nanoid(6)}-raw.mp4`);
+  await writeFile(rawPath, lastResult.videoBytes);
+  const mixedPath = await mixExtendTimelineAudio(rawPath, sortedTimeline, dir, ctx.storage);
+  const finalized = await finalizeSceneClip(mixedPath, dir, "extend-chain");
+  const totalDurationSeconds = finalized.durationSeconds;
+
+  const clipArtifact = await ctx.artifacts.save({
+    runId: ctx.runId,
+    stage: "render",
+    kind: "scene_rendered_clip",
+    body: await readFile(finalized.path),
+    mimeType: lastResult.mimeType ?? "video/mp4",
+    filename: "extend-chain.mp4",
+    metadata: {
+      sceneId: sortedTimeline.map((s) => s.sceneId).join(","),
+      provider: lastResult.provider,
+      model: lastModel,
+      renderProfileId: renderProfile.id,
+      strategy: renderProfile.strategy,
+      beatCount: sortedTimeline.length
+    }
+  });
+
+  for (const row of perScene) {
+    row.artifactId = clipArtifact.id;
+    row.gcsPath = clipArtifact.gcsPath;
+  }
+
+  let finalPath = finalized.path;
+  const musicScene = input.timeline.find((s) => s.music.gcsPath || s.music.signedUrl);
+  const musicGcsPath = musicScene ? resolveGcsPath(ctx.storage, musicScene.music) : null;
+  if (musicGcsPath) {
+    const musicLocal = path.join(dir, `music-${nanoid(4)}${musicExtension(musicGcsPath)}`);
+    await downloadMediaToFile(ctx.storage, musicGcsPath, musicLocal);
+    finalPath = await muxMusicTrack(finalPath, musicLocal, dir);
+  }
+
+  const outputScale = Number(process.env.RENDER_OUTPUT_SCALE ?? 0);
+  if (outputScale > 0) {
+    finalPath = await downscaleVideo(finalPath, outputScale, dir);
+  }
+
+  const finalArtifact = await ctx.artifacts.save({
+    runId: ctx.runId,
+    stage: "render",
+    kind: "final_video",
+    body: await readFile(finalPath),
+    mimeType: "video/mp4",
+    filename: `final-${ctx.runId}.mp4`,
+    metadata: {
+      renderProfileId: renderProfile.id,
+      provider: renderProfile.provider,
+      strategy: renderProfile.strategy
+    }
+  });
+  const finalSignedUrl = await ctx.storage.signedUrl(finalArtifact.gcsPath);
+
+  await ctx.log.log("render_done", "Render Agent finished (extend chain)", {
+    scenes: perScene.length,
+    totalDurationSeconds,
+    renderProfile: renderProfile.id
+  });
+
+  return {
+    provider: provider.provider,
+    perScene,
+    finalArtifactId: finalArtifact.id,
+    finalGcsPath: finalArtifact.gcsPath,
+    finalSignedUrl,
+    totalDurationSeconds,
+    geminiOperations
+  };
+}
+
+function buildBeatHooks(ctx: AgentContext, scene: SceneTimelineEntry, renderProfileId?: string): VideoBeatHooks {
+  return {
+    onPoll: async (operation) => {
+      await ctx.log.log("video_operation_status", "Video operation status", {
+        sceneId: scene.sceneId,
+        operationName: operation.operationName,
+        status: operation.status,
+        model: operation.model,
+        error: operation.error ?? null,
+        renderProfile: renderProfileId ?? null
+      });
+    },
+    onUsage: async (event) => {
+      await ctx.cost.record({
+        activityType: event.activityType as "veo_video",
+        sceneId: event.sceneId ?? scene.sceneId,
+        model: event.model,
+        durationMs: event.durationMs,
+        billedUnits: event.billedUnits,
+        unit: event.unit as "veo_seconds",
+        charged: event.charged,
+        metadata: event.metadata
+      });
+    }
+  };
+}
+
+async function saveBeatOperationArtifact(
+  ctx: AgentContext,
+  scene: SceneTimelineEntry,
+  promptHash: string,
+  result: VideoBeatResult,
+  renderProfile: RenderProfile,
+  extra: { extendsPrevious: boolean }
+): Promise<void> {
+  const videoBytesLength = result.videoBytes?.length ?? 0;
+  await ctx.artifacts.save({
+    runId: ctx.runId,
+    stage: "render",
+    kind: "gemini_operation",
+    body: JSON.stringify(
+      {
+        sceneId: scene.sceneId,
+        promptHash,
+        renderProfile: renderProfile.id,
+        extendsPrevious: extra.extendsPrevious,
+        operation: {
+          provider: result.provider,
+          operationName: result.operationName,
+          model: result.model,
+          status: result.status,
+          error: result.error ?? null,
+          videoBytesLength
+        }
+      },
+      null,
+      2
+    ),
+    mimeType: "application/json",
+    filename: `scene-${scene.order}-veo-operation.json`,
+    metadata: {
+      sceneId: scene.sceneId,
+      operationName: result.operationName,
+      model: result.model,
+      promptHash,
+      sourceStage: "render",
+      renderProfileId: renderProfile.id
+    }
+  });
+}
+
+async function mixExtendTimelineAudio(
+  videoPath: string,
+  timeline: SceneTimelineEntry[],
+  dir: string,
+  storage: GcsClient
+): Promise<string> {
+  if (timeline.every((scene) => scene.audioPolicy === "veo_native_audio")) {
+    return videoPath;
+  }
+
+  const voiceTracks: Array<{ path: string; delayMs: number }> = [];
+  for (const scene of timeline) {
+    if (!shouldUseVoice(scene)) continue;
+    const voiceGcsPath = resolveGcsPath(storage, scene.voice);
+    if (!voiceGcsPath) continue;
+    const voiceLocal = path.join(dir, `voice-${scene.sceneId}-${nanoid(4)}.audio`);
+    await downloadMediaToFile(storage, voiceGcsPath, voiceLocal);
+    voiceTracks.push({ path: voiceLocal, delayMs: Math.round(scene.startSecond * 1000) });
+  }
+
+  if (voiceTracks.length === 0) {
+    return stripAudio(videoPath, dir);
+  }
+
+  const videoDur = await probeDuration(videoPath);
+  const out = path.join(dir, `extend-voice-${nanoid(4)}.mp4`);
+  const inputs: string[] = ["-i", videoPath];
+  const filterParts: string[] = [];
+
+  for (let i = 0; i < voiceTracks.length; i++) {
+    const track = voiceTracks[i]!;
+    inputs.push("-i", track.path);
+    const delay = track.delayMs;
+    filterParts.push(`[${i + 1}:a]adelay=${delay}|${delay},apad=whole_dur=${videoDur}[v${i}]`);
+  }
+
+  const mixInputs = voiceTracks.map((_, i) => `[v${i}]`).join("");
+  filterParts.push(`${mixInputs}amix=inputs=${voiceTracks.length}:duration=longest:dropout_transition=0[aout]`);
+
+  await runFfmpeg([
+    ...inputs,
+    "-filter_complex",
+    filterParts.join(";"),
+    "-map",
+    "0:v:0",
+    "-map",
+    "[aout]",
+    "-c:v",
+    "copy",
+    "-c:a",
+    "aac",
+    "-t",
+    String(videoDur),
+    "-movflags",
+    "+faststart",
+    "-y",
+    out
+  ]);
+  return out;
+}
 
 function shouldUseVoice(scene: SceneTimelineEntry): boolean {
   const policy = scene.audioPolicy ?? "gemini_tts_plus_music";

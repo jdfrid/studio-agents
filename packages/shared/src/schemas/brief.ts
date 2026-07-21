@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AspectRatioSchema } from "../enums.js";
+import { RenderProfileIdSchema } from "../renderProfiles.js";
 
 /** Free-form user input that kicks off a run. */
 export const BriefInputSchema = z.object({
@@ -25,9 +26,10 @@ export const BriefInputSchema = z.object({
     .max(20)
     .default([]),
   /** Fewer scenes, 4s Veo buckets, reference-only assets, TTS without Lyria. */
-  budgetMode: z.boolean().default(false)
-});
-export type BriefInput = z.infer<typeof BriefInputSchema>;
+  budgetMode: z.boolean().default(false),
+  /** Video render profile (provider + strategy). Falls back to RENDER_PROFILE env. */
+  renderProfile: RenderProfileIdSchema.optional()
+});export type BriefInput = z.infer<typeof BriefInputSchema>;
 
 /** Structured requirements emitted by the Brief agent for downstream stages. */
 export const BriefOutputSchema = z.object({
@@ -44,6 +46,7 @@ export const BriefOutputSchema = z.object({
   musicDirection: z.string(),
   callToAction: z.string().optional(),
   budgetMode: z.boolean().default(false),
+  renderProfile: RenderProfileIdSchema,
   references: z
     .array(
       z.object({

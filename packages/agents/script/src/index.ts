@@ -9,6 +9,8 @@ import {
   isProductAdBrief,
   narrationCharLimitForBucket,
   planSceneLayout,
+  profileToProductionCostConfig,
+  resolveRenderProfile,
   type Agent,
   type ScriptInput,
   type ScriptOutput,
@@ -28,9 +30,13 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     if (!provider) throw new NoProviderConfiguredError("GEMINI");
 
     const budget = isBudgetMode(brief);
-    const { sceneCount, clipSeconds, totalVideoSeconds } = planSceneLayout(brief.durationSeconds, budget);
+    const renderProfile = resolveRenderProfile(brief);
+    const costConfig = profileToProductionCostConfig(renderProfile);
+    const { sceneCount, clipSeconds, totalVideoSeconds } = planSceneLayout(brief.durationSeconds, budget, costConfig);
     const narrationLimit = narrationCharLimitForBucket(clipSeconds);
     const productAd = isProductAdBrief(brief);
+    const extendMode = renderProfile.strategy === "extend";
+    const klingMode = renderProfile.provider === "kling";
 
     const systemParts = [
       "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline.",
@@ -40,11 +46,25 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "Each veoPrompt must explicitly continue from the previous scene without changing setting.",
       "NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt or visualPrompt — use generic fictional people only (Veo blocks real-person likenesses)."
     ];
+    if (extendMode) {
+      systemParts.push(
+        "VEO EXTEND MODE: produce story beats (not independent clips). Beat 1 is the opening Veo generation; beats 2+ extend the same continuous shot — veoPrompt must describe what happens next in the same scene, same camera, no hard cut.",
+        `Each beat targets ${clipSeconds}s of story time; Veo renders an 8s bucket per API call in a single extend chain.`
+      );
+    }
+    if (klingMode) {
+      systemParts.push(
+        "KLING I2V MODE: each beat is an independent 10s clip generated from its reference still frame. Keep visual continuity via referenceImagePrompt; veoPrompt describes motion and camera for image-to-video.",
+        `Each beat targets ${clipSeconds}s of story time.`
+      );
+    }
     if (productAd) {
       systemParts.push(
         "PRODUCT AD: use a clear arc — hook (attention) → product hero (show packaging clearly, hold up product) → kids/audience reaction and CTA.",
         "The product or brand name from the brief MUST appear in narration and veoPrompt wherever the product or packaging is visible.",
-        "Narration must be ultra-short punchy lines (~12 words max for 4s clips)."
+        extendMode
+          ? "Narration must be short punchy lines that fit each 10s beat."
+          : "Narration must be ultra-short punchy lines (~12 words max for 4s clips)."
       );
     }
     const system = systemParts.join(" ");
@@ -76,7 +96,12 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const adHint = productAd
       ? " Product-ad brief: include brand/product name, packaging hero shot, and excited reaction."
       : "";
-    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (Veo clip length). Total video length will be ~${totalVideoSeconds}s (brief asks for ${brief.durationSeconds}s).${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}`;
+    const extendHint = extendMode
+      ? ` Veo extend mode: ${sceneCount} beats in one continuous chain (~${totalVideoSeconds}s billed Veo time).`
+      : klingMode
+        ? ` Kling I2V mode: ${sceneCount} beats × ~10s each (reference frame per beat).`
+        : "";
+    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Total video length will be ~${totalVideoSeconds}s (brief asks for ${brief.durationSeconds}s).${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}`;
 
     const completeJson = provider.type === "GEMINI" ? geminiCompleteJson : llmCompleteJson;
     const { parsed, model } = await completeJson<{
@@ -107,9 +132,12 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     }
 
     const scenes: SceneSpec[] = rawScenes.slice(0, sceneCount).map((scene, index) => {
-      const durationBucket = normalizeDurationBucket(scene.durationBucket, clipSeconds, budget);
-      const includeExtraFrames = !budget;
-      const narration = trimNarration(scene.narration ?? "", narrationCharLimitForBucket(Number(durationBucket)));
+      const durationBucket = normalizeDurationBucket(scene.durationBucket, clipSeconds, budget, extendMode, klingMode);
+      const includeExtraFrames = !budget && !extendMode && !klingMode;
+      const narration = trimNarration(
+        scene.narration ?? "",
+        narrationCharLimitForBucket(extendMode ? clipSeconds : Number(durationBucket))
+      );
       return {
         id: nanoid(10),
         order: index,
@@ -122,7 +150,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         lastFramePrompt: includeExtraFrames ? (scene.lastFramePrompt ?? scene.visualPrompt ?? undefined) : scene.lastFramePrompt,
         durationBucket,
         audioPolicy: budget ? "gemini_tts_only" : (scene.audioPolicy ?? "gemini_tts_plus_music"),
-        durationSeconds: Number(durationBucket),
+        durationSeconds: extendMode || klingMode ? clipSeconds : Number(durationBucket),
         requiredAssets: scene.requiredAssets?.length ? scene.requiredAssets : ["voice", "music", "video"]
       };
     });
@@ -153,7 +181,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         sceneCount: scenes.length,
         clipSeconds,
         briefDurationSeconds: brief.durationSeconds,
-        productAd
+        productAd,
+        renderProfile: renderProfile.id
       }
     });
     await ctx.log.log("script_done", "Script Agent finished", {
@@ -174,9 +203,16 @@ function trimNarration(text: string, maxChars: number): string {
   return (lastSpace > maxChars * 0.6 ? cut.slice(0, lastSpace) : cut).trim();
 }
 
-function normalizeDurationBucket(value: unknown, clipSeconds: number, budget: boolean): "4" | "6" | "8" {
+function normalizeDurationBucket(
+  value: unknown,
+  clipSeconds: number,
+  budget: boolean,
+  extendMode: boolean,
+  klingMode: boolean
+): "4" | "6" | "8" {
   const forced = forcedVeoDurationBucket();
   if (forced) return forced;
+  if (extendMode || klingMode) return "8";
   if (value === "4" || value === "6" || value === "8") return budget ? "4" : value;
   if (budget || clipSeconds <= 4) return "4";
   if (clipSeconds <= 6) return "6";

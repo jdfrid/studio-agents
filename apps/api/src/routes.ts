@@ -15,7 +15,7 @@ import {
 } from "@studio/orchestrator";
 import { prisma } from "@studio/infra-prisma";
 import { checkGeminiCapabilities, geminiModels } from "@studio/providers";
-import { buildProductionCostConfig, estimateRunCost } from "@studio/shared";
+import { buildProductionCostConfig, estimateRunCost, listRenderProfiles, profileToProductionCostConfig, resolveRenderProfile } from "@studio/shared";
 
 export async function registerRoutes(app: FastifyInstance) {
   app.get("/health", async () => ({ ok: true }));
@@ -29,6 +29,28 @@ export async function registerRoutes(app: FastifyInstance) {
     const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
     const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
     return checkGeminiCapabilities(provider);
+  });
+
+  app.get("/config/render-profiles", async () => {
+    const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
+    const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
+    const videoModel = geminiModels(provider).video;
+    const baseConfig = buildProductionCostConfig(videoModel);
+    const defaultProfile = resolveRenderProfile();
+    return {
+      defaultProfileId: defaultProfile.id,
+      profiles: listRenderProfiles().map((profile) => ({
+        id: profile.id,
+        label: profile.label,
+        provider: profile.provider,
+        strategy: profile.strategy,
+        capabilities: profile.capabilities,
+        estimate30sBudget: estimateRunCost(
+          { budgetMode: true, durationSeconds: 30 },
+          profileToProductionCostConfig(profile, baseConfig)
+        )
+      }))
+    };
   });
 
   app.get("/config/cost", async () => {
@@ -63,6 +85,7 @@ export async function registerRoutes(app: FastifyInstance) {
       status: r.status,
       currentStage: r.currentStage,
       title: (r.brief as { title?: string })?.title ?? "(untitled)",
+      renderProfile: (r.brief as { renderProfile?: string })?.renderProfile ?? null,
       updatedAt: r.updatedAt.toISOString()
     }));
   });
