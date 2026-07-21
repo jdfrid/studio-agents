@@ -26,26 +26,36 @@ export function createCostRecorder(ctx: CostRecorderContext): CostRecorder {
         generateAudio: event.generateAudio,
         charged: event.charged
       });
-      await prisma.costEvent.create({
-        data: {
-          tenantId: ctx.tenantId,
+      try {
+        await prisma.costEvent.create({
+          data: {
+            tenantId: ctx.tenantId,
+            runId: ctx.runId,
+            stageExecutionId: ctx.stageExecutionId,
+            attempt: ctx.attempt,
+            stage: ctx.stage as never,
+            activityType: event.activityType as never,
+            sceneId: event.sceneId ?? null,
+            model: event.model ?? null,
+            startedAt: event.startedAt ?? new Date(),
+            durationMs: event.durationMs ?? null,
+            billedUnits: event.billedUnits,
+            unit: event.unit as never,
+            costUsd,
+            costNis,
+            charged: charged as never,
+            metadata: (event.metadata ?? {}) as object
+          }
+        });
+      } catch (error) {
+        // Never fail a pipeline stage because cost logging failed (e.g. migration pending).
+        console.error("[cost-recorder] failed to persist CostEvent", {
           runId: ctx.runId,
-          stageExecutionId: ctx.stageExecutionId,
-          attempt: ctx.attempt,
-          stage: ctx.stage as never,
-          activityType: event.activityType as never,
-          sceneId: event.sceneId ?? null,
-          model: event.model ?? null,
-          startedAt: event.startedAt ?? new Date(),
-          durationMs: event.durationMs ?? null,
-          billedUnits: event.billedUnits,
-          unit: event.unit as never,
-          costUsd,
-          costNis,
-          charged: charged as never,
-          metadata: (event.metadata ?? {}) as object
-        }
-      });
+          stage: ctx.stage,
+          activityType: event.activityType,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
     }
   };
 }
