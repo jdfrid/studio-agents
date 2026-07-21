@@ -154,6 +154,19 @@ button.danger:hover { background: #a02828; }
 .cost-source { font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
 .cost-source-usage_metadata { background: #1a3d2a; color: #8fd4a8; }
 .cost-source-estimate { background: #3d351a; color: #d4c88f; }
-.cost-source-request_params { background: #1a2a3d; color: #8fb8d4; }
+.stage-error-raw pre {
+  margin: 8px 0 0;
+  padding: 8px;
+  background: #0a0c10;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  overflow: auto;
+  max-height: 200px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.stage-error-kind { margin: 6px 0 0; font-size: 0.78rem; }
+.stage-error-rate_limit .stage-error-friendly { border-left: 3px solid #ffb347; padding-left: 8px; }
+.stage-error-billing_quota .stage-error-friendly { border-left: 3px solid #ff6b6b; padding-left: 8px; }
 .cost-row-free td:last-child { color: #8b94a6; }
 .cost-actual-total { margin: 0; font-size: 0.9rem; color: #7af0bf; }

@@ -1,4 +1,4 @@
-import { formatApiErrorMessage } from "@studio/shared";
+import { formatApiErrorMessage, parseStageError, stageErrorFriendly } from "@studio/shared";
 
 const apiBase = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
@@ -74,8 +74,10 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export { formatApiErrorMessage };
+export { formatApiErrorMessage, stageErrorFriendly };
 
 export function isQuotaErrorMessage(message: string): boolean {
-  return message.includes("הגעת למגבלת התקציב");
+  if (message.includes("הגעת למגבלת התקציב")) return true;
+  const parsed = parseStageError(message);
+  return parsed.kind === "billing_quota";
 }

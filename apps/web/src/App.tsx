@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost, formatApiErrorMessage, isQuotaErrorMessage } from "./api.js";
 import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
+import { StageErrorView } from "./StageErrorView.js";
 import { BriefQuickEditor, StageEditor, StageUploadControls } from "./StageEditor.js";
 import type { ArtifactRow, GeminiCapabilityStatus, GeminiOperationRow, ProjectRunView, RunSummary, StageName } from "./types.js";
 import { STAGE_ORDER, estimateRunCost, formatCostNis, type ProductionCostConfig, type RunCostEstimate } from "@studio/shared";
@@ -122,7 +123,9 @@ export function App() {
         </section>
       </main>
       {error ? (
-        <div className={`error-banner${isQuotaErrorMessage(error) ? " error-banner-quota" : ""}`}>{formatApiErrorMessage(error)}</div>
+        <div className={`error-banner${isQuotaErrorMessage(error) ? " error-banner-quota" : ""}`}>
+          <StageErrorView error={error} />
+        </div>
       ) : null}
     </div>
   );
@@ -474,7 +477,9 @@ function StagePanel({
       </header>
       {status === "QUEUED" && <p className="muted">ממתין ל-worker…</p>}
       {error ? (
-        <p className={isQuotaErrorMessage(error) ? "error error-quota" : "error"}>{formatApiErrorMessage(error)}</p>
+        <div className={isQuotaErrorMessage(error) ? "error error-quota" : "error"}>
+          <StageErrorView error={error} />
+        </div>
       ) : null}
       {showOutput ? (
         <>

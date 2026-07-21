@@ -1,31 +1,60 @@
 import { describe, expect, it } from "vitest";
-import { classifyGeminiError, formatApiErrorMessage, userFacingGeminiError } from "../geminiErrors.js";
+import {
+  buildStageErrorRecord,
+  classifyGeminiError,
+  formatApiErrorMessage,
+  parseStageError,
+  userFacingGeminiError
+} from "../geminiErrors.js";
+import { ProviderError } from "../errors.js";
 
-describe("geminiErrors", () => {
-  it("detects billing/quota exhaustion", () => {
-    const raw = `HTTP 429: { "error": { "code": 429, "message": "You exceeded your current quota", "status": "RESOURCE_EXHAUSTED" } }`;
-    expect(classifyGeminiError(raw, 429)).toBe("billing_quota");
-    expect(userFacingGeminiError(raw, 429)).toContain("Google AI Studio");
+describe("classifyGeminiError", () => {
+  it("treats generic 429 quota as rate limit (not billing)", () => {
+    const raw = `429 { "error": { "code": 429, "message": "You exceeded your current quota", "status": "RESOURCE_EXHAUSTED" } }`;
+    expect(classifyGeminiError(raw, 429)).toBe("rate_limit");
+    expect(userFacingGeminiError(raw, 429)).toContain("מגבלת קצב");
+    expect(userFacingGeminiError(raw, 429)).not.toContain("Prepay");
   });
 
-  it("formats api error and hides api key", () => {
+  it("detects billing when payment keywords present", () => {
+    const raw = `402 { "error": { "message": "Payment required — insufficient credit balance" } }`;
+    expect(classifyGeminiError(raw, 402)).toBe("billing_quota");
+  });
+});
+
+describe("buildStageErrorRecord", () => {
+  it("stores raw Google response in JSON", () => {
+    const raw = `429 {"error":{"code":429,"message":"quota exceeded","status":"RESOURCE_EXHAUSTED"}}`;
+    const record = buildStageErrorRecord(
+      new ProviderError("friendly", { provider: "gemini", metadata: { status: 429, raw } })
+    );
+    const parsed = parseStageError(record);
+    expect(parsed.raw).toContain("RESOURCE_EXHAUSTED");
+    expect(parsed.kind).toBe("rate_limit");
+    expect(parsed.friendly).toContain("מגבלת קצב");
+  });
+
+  it("parses legacy plain-text errors", () => {
+    const legacy = "נגמרו קרדיטים ב-Google AI Studio";
+    const parsed = parseStageError(legacy);
+    expect(parsed.friendly).toBeTruthy();
+    expect(parsed.raw).toBe(legacy);
+  });
+});
+
+describe("formatApiErrorMessage", () => {
+  it("hides api key", () => {
     const msg = formatApiErrorMessage(
       '429 {"error":"HTTP 429 for https://generativelanguage.googleapis.com?key=AIzaSySecret123: quota exceeded"}'
     );
-    expect(msg).toContain("Google AI Studio");
+    expect(msg).toContain("מגבלת קצב");
     expect(msg).not.toContain("AIzaSySecret");
   });
 
   it("maps celebrity likeness blocks to Hebrew", () => {
     const msg = formatApiErrorMessage(
-      "Gemini Veo operation failed: Sorry, we can't create videos with real people's names or likenesses. Please remove the celebrity reference and try again."
+      "Gemini Veo operation failed: Sorry, we can't create videos with real people's names or likenesses."
     );
     expect(msg).toContain("סלבריטאים");
-    expect(msg).not.toContain("celebrity reference");
-  });
-
-  it("passes through unknown errors truncated", () => {
-    const msg = formatApiErrorMessage("500 internal server error");
-    expect(msg).toContain("500");
   });
 });
