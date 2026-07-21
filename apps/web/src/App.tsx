@@ -178,7 +178,7 @@ function NewRunForm({
       {!estimateFromServer ? (
         <p className="cost-indicator-warning">הערכת עלות זו היא ברירת מחדל — לא מהשרver. אחרי תיקון ה-API תראה את המודל האמיתי.</p>
       ) : null}
-      <CostIndicator estimate={estimate} />
+      <CostIndicator estimate={estimate} briefDurationSeconds={durationSeconds} />
       <input placeholder="כותרת" value={title} onChange={(e) => setTitle(e.target.value)} />
       <textarea placeholder="brief חופשי" rows={4} value={sourceText} onChange={(e) => setSourceText(e.target.value)} />
       <select value={language} onChange={(e) => setLanguage(e.target.value)}>
@@ -260,7 +260,11 @@ function RunDetail({
           <strong>סטטוס:</strong> {run.status} · <strong>שלב:</strong> {run.currentStage ? (STAGE_LABELS[run.currentStage] ?? run.currentStage) : "—"}
         </p>
       </header>
-      <CostIndicator estimate={runEstimate} compact={!renderPending && run.status === "COMPLETED"} />
+      <CostIndicator
+        estimate={runEstimate}
+        compact={!renderPending && run.status === "COMPLETED"}
+        briefDurationSeconds={run.brief.durationSeconds ?? 30}
+      />
       {costLedger && costLedger.summary.totalNis > 0 ? (
         <p className="cost-actual-total">
           עלות בפועל (לפי תערифון): <strong>{formatCostNis(costLedger.summary.totalNis)}</strong>
@@ -299,7 +303,7 @@ function RunDetail({
               <div className="stage-actions">
                 <button onClick={() => void regenerateScene(run.id, scene.id, "visual", onAction)}>Regenerate visual</button>
                 <button
-                  title={`עלות משוערת: ${formatCostNis(estimateSceneVeoCost(scene, config))}`}
+                  title={`עלות משוערת: ${formatCostNis(estimateSceneVeoCost(scene, config).nis)}`}
                   onClick={() => {
                     const cost = estimateSceneVeoCost(scene, config);
                     if (cost.isExpensive && !window.confirm(`Regenerate video עלול לעלות ${formatCostNis(cost.nis)}. להמשיך?`)) return;

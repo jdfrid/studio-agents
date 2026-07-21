@@ -150,7 +150,12 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       }
 
       const concatPath = path.join(dir, `concat-${nanoid(8)}.mp4`);
-      await concatClips(clipFiles, concatPath, dir);
+      await concatClips(
+        clipFiles,
+        concatPath,
+        dir,
+        perScene.map((s) => s.durationSeconds)
+      );
 
       const musicScene = input.timeline.find((s) => s.music.gcsPath || s.music.signedUrl);
       const musicGcsPath = musicScene ? resolveGcsPath(ctx.storage, musicScene.music) : null;
@@ -394,7 +399,12 @@ async function downscaleVideo(videoPath: string, width: number, dir: string): Pr
   return out;
 }
 
-async function concatClips(clipPaths: string[], outputPath: string, dir: string): Promise<void> {
+async function concatClips(
+  clipPaths: string[],
+  outputPath: string,
+  dir: string,
+  clipDurations?: number[]
+): Promise<void> {
   if (clipPaths.length === 0) {
     throw new Error("Cannot concat: no clips rendered");
   }
@@ -402,6 +412,17 @@ async function concatClips(clipPaths: string[], outputPath: string, dir: string)
     await runFfmpeg(["-i", clipPaths[0]!, "-c", "copy", "-movflags", "+faststart", "-y", outputPath]);
     return;
   }
+
+  const xfadeSeconds = sceneXfadeSeconds();
+  if (xfadeSeconds > 0) {
+    const durations =
+      clipDurations?.length === clipPaths.length
+        ? clipDurations
+        : await Promise.all(clipPaths.map((p) => probeDuration(p)));
+    await concatClipsWithXfade(clipPaths, outputPath, durations, xfadeSeconds);
+    return;
+  }
+
   const listPath = path.join(dir, `concat-${nanoid(6)}.txt`);
   await writeFile(
     listPath,
@@ -416,6 +437,78 @@ async function concatClips(clipPaths: string[], outputPath: string, dir: string)
     "0",
     "-i",
     listPath,
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-pix_fmt",
+    "yuv420p",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
+    "-movflags",
+    "+faststart",
+    "-y",
+    outputPath
+  ]);
+}
+
+function sceneXfadeSeconds(): number {
+  const value = Number(process.env.RENDER_SCENE_XFADE_SECONDS ?? 0);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.min(value, 1.5);
+}
+
+async function concatClipsWithXfade(
+  clipPaths: string[],
+  outputPath: string,
+  durations: number[],
+  xfadeSeconds: number
+): Promise<void> {
+  const inputs: string[] = [];
+  for (const clip of clipPaths) {
+    inputs.push("-i", clip);
+  }
+
+  const minDur = Math.min(...durations);
+  const fade = Math.min(xfadeSeconds, Math.max(0.1, minDur * 0.25));
+
+  const videoParts: string[] = [];
+  const audioParts: string[] = [];
+  let vIn = "0:v";
+  let aIn = "0:a";
+  let offset = durations[0]! - fade;
+
+  for (let i = 1; i < clipPaths.length; i++) {
+    const vOut = i === clipPaths.length - 1 ? "vout" : `v${i}`;
+    const aOut = i === clipPaths.length - 1 ? "aout" : `a${i}`;
+    videoParts.push(
+      `[${vIn}][${i}:v]xfade=transition=fade:duration=${fade}:offset=${Math.max(0, offset).toFixed(3)}[${vOut}]`
+    );
+    audioParts.push(`[${aIn}][${i}:a]acrossfade=d=${fade}:c1=tri:c2=tri[${aOut}]`);
+    vIn = vOut;
+    aIn = aOut;
+    if (i < clipPaths.length - 1) {
+      offset += durations[i]! - fade;
+    }
+  }
+
+  const filter = [...videoParts, ...audioParts].join(";");
+  await runFfmpeg([
+    ...inputs,
+    "-filter_complex",
+    filter,
+    "-map",
+    "[vout]",
+    "-map",
+    "[aout]",
     "-c:v",
     "libx264",
     "-preset",

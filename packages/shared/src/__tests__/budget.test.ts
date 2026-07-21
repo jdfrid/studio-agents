@@ -1,5 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { estimateRunCost, veoGenerateAudio, veoModelTier, veoSupportsNativeAudio } from "../budget.js";
+import {
+  estimateRunCost,
+  isProductAdBrief,
+  planSceneLayout,
+  veoGenerateAudio,
+  veoModelTier,
+  veoSupportsNativeAudio
+} from "../budget.js";
+
+describe("planSceneLayout", () => {
+  it("aligns 30s budget brief with 4s Veo bucket (popcorn ad fix)", () => {
+    const layout = planSceneLayout(30, true, { forcedVeoBucket: "4" });
+    expect(layout.sceneCount).toBe(8);
+    expect(layout.clipSeconds).toBe(4);
+    expect(layout.totalVideoSeconds).toBe(32);
+    // Old bug: TARGET_SCENE_SECONDS=10 → 3 scenes × 4s = 12s total
+    expect(layout.totalVideoSeconds).not.toBe(12);
+  });
+});
+
+describe("isProductAdBrief", () => {
+  it("detects Hebrew product-ad briefs", () => {
+    expect(isProductAdBrief({ title: "פרסומת פופקומן", sourceText: "ילדים בגן" })).toBe(true);
+    expect(isProductAdBrief({ title: "Documentary", sourceText: "nature film" })).toBe(false);
+  });
+});
 
 describe("estimateRunCost", () => {
   it("flags Standard Veo as expensive (~50 NIS for 30s normal)", () => {
@@ -13,14 +38,19 @@ describe("estimateRunCost", () => {
     expect(est.warning).toContain("Standard");
   });
 
-  it("estimates budget lite run as cheap", () => {
+  it("estimates budget lite run with bucket-aligned scene count", () => {
     const est = estimateRunCost(
       { budgetMode: true, durationSeconds: 30 },
-      { videoModel: "veo-3.1-lite-generate-preview", veoGenerateAudio: false, usdToIls: 3.6 }
+      {
+        videoModel: "veo-3.1-lite-generate-preview",
+        veoGenerateAudio: false,
+        usdToIls: 3.6,
+        forcedVeoBucket: "4"
+      }
     );
-    expect(est.veoSeconds).toBe(12);
+    expect(est.sceneCount).toBe(8);
+    expect(est.veoSeconds).toBe(32);
     expect(est.isExpensive).toBe(false);
-    expect(est.nis).toBeLessThan(5);
   });
 
   it("uses actual script scenes when provided", () => {
@@ -32,7 +62,6 @@ describe("estimateRunCost", () => {
     expect(est.veoSeconds).toBe(12);
   });
 });
-
 describe("veoModelTier", () => {
   it("detects tiers", () => {
     expect(veoModelTier("veo-3.1-lite-generate-preview")).toBe("lite");

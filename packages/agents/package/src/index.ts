@@ -47,7 +47,15 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
         title: scene.title,
         narration: scene.narration,
         visualPrompt: scene.visualPrompt,
-        veoPrompt: enrichVeoPrompt(scene.veoPrompt, script.backgroundVisualPrompt, scene.order, script.scenes.length),
+        veoPrompt: enrichVeoPrompt({
+          veoPrompt: scene.veoPrompt,
+          backgroundVisualPrompt: script.backgroundVisualPrompt,
+          order: scene.order,
+          total: script.scenes.length,
+          referenceImagePrompt: scene.referenceImagePrompt ?? null,
+          referenceFramePrompt: a?.referenceFrame?.prompt ?? null,
+          textToVideoOnly: !a?.referenceFrame?.signedUrl && !a?.referenceFrame?.gcsPath
+        }),
         referenceImagePrompt: scene.referenceImagePrompt ?? null,
         firstFramePrompt: scene.firstFramePrompt ?? null,
         lastFramePrompt: scene.lastFramePrompt ?? null,
@@ -219,9 +227,22 @@ function renderInstructionsMarkdown(brief: BriefOutput, script: ScriptOutput, ti
   return lines.join("\n");
 }
 
-function enrichVeoPrompt(veoPrompt: string, backgroundVisualPrompt: string, order: number, total: number): string {
-  const bible = backgroundVisualPrompt.trim();
-  const continuity = `Same location, characters, lighting and wardrobe throughout. Scene ${order + 1} of ${total}.`;
+function enrichVeoPrompt(input: {
+  veoPrompt: string;
+  backgroundVisualPrompt: string;
+  order: number;
+  total: number;
+  referenceImagePrompt: string | null;
+  referenceFramePrompt: string | null;
+  textToVideoOnly: boolean;
+}): string {
+  const bible = input.backgroundVisualPrompt.trim();
+  const continuity = `Same location, characters, lighting and wardrobe throughout. Scene ${input.order + 1} of ${input.total}.`;
   const prefix = bible ? `${continuity} Visual bible: ${bible}. ` : `${continuity} `;
-  return `${prefix}${veoPrompt}`;
+  const refPrompt = (input.referenceFramePrompt ?? input.referenceImagePrompt ?? "").trim();
+  const refSuffix =
+    input.textToVideoOnly && refPrompt
+      ? ` Match this reference look (text-only, no image upload): ${refPrompt}.`
+      : "";
+  return `${prefix}${input.veoPrompt}${refSuffix}`;
 }

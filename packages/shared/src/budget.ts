@@ -23,6 +23,39 @@ export function forcedVeoDurationBucket(): VeoDurationBucket | null {
   return null;
 }
 
+/** Veo clip length in seconds (one scene = one Veo generation). */
+export function veoClipSeconds(budget: boolean, forcedBucket?: VeoDurationBucket | null): number {
+  const bucket = forcedBucket ?? forcedVeoDurationBucket();
+  if (bucket) return Number(bucket);
+  return budget ? 4 : 6;
+}
+
+/** Scene count aligned with Veo bucket so total video length matches the brief. */
+export function planSceneLayout(
+  durationSeconds: number,
+  budget: boolean,
+  config?: Partial<ProductionCostConfig>
+): { sceneCount: number; clipSeconds: number; totalVideoSeconds: number } {
+  const clipSeconds = veoClipSeconds(budget, config?.forcedVeoBucket ?? forcedVeoDurationBucket());
+  const sceneCount = Math.max(1, Math.round(durationSeconds / clipSeconds));
+  return { sceneCount, clipSeconds, totalVideoSeconds: sceneCount * clipSeconds };
+}
+
+/** Max narration length so TTS fits a single Veo clip without mid-sentence cuts. */
+export function narrationCharLimitForBucket(bucketSeconds: number): number {
+  if (bucketSeconds <= 4) return 55;
+  if (bucketSeconds <= 6) return 85;
+  return 120;
+}
+
+const PRODUCT_AD_KEYWORDS =
+  /פרסומ|commercial|advert|promo|מוצר|product|cta|קנה|buy now|brand|מותג|חטיף|snack|package|אריזה|popcorn|פופקור/i;
+
+export function isProductAdBrief(brief: { title?: string; sourceText?: string; summary?: string }): boolean {
+  const text = `${brief.title ?? ""} ${brief.sourceText ?? ""} ${brief.summary ?? ""}`;
+  return PRODUCT_AD_KEYWORDS.test(text);
+}
+
 export type AssetGenerationMode = "full" | "reference_only" | "shared_reference";
 
 export function assetGenerationMode(budget: boolean, override?: AssetGenerationMode): AssetGenerationMode {
@@ -119,6 +152,8 @@ export type RunCostEstimate = {
   perSecondUsd: number;
   isExpensive: boolean;
   warning?: string;
+  /** Brief target duration when passed to estimateRunCost. */
+  briefDurationSeconds?: number;
 };
 
 export function estimateRunCost(
@@ -149,10 +184,10 @@ export function estimateRunCost(
     }, 0);
     bucket = sceneCount > 0 ? Math.round(veoSeconds / sceneCount) : 6;
   } else {
-    const target = targetSceneSeconds(budget, config?.targetSceneSeconds);
-    sceneCount = Math.max(1, Math.round(input.durationSeconds / target));
-    bucket = Number(config?.forcedVeoBucket ?? forcedVeoDurationBucket() ?? (budget ? 4 : 6));
-    veoSeconds = sceneCount * bucket;
+    const layout = planSceneLayout(input.durationSeconds, budget, config);
+    sceneCount = layout.sceneCount;
+    bucket = layout.clipSeconds;
+    veoSeconds = layout.totalVideoSeconds;
   }
 
   const mode = assetGenerationMode(budget, config?.assetMode);
@@ -191,7 +226,8 @@ export function estimateRunCost(
     textUsd,
     perSecondUsd: perSecond,
     isExpensive,
-    warning
+    warning,
+    briefDurationSeconds: input.durationSeconds
   };
 }
 

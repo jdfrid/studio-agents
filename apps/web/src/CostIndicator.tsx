@@ -4,19 +4,29 @@ import { formatCostNis } from "@studio/shared";
 export function CostIndicator({
   estimate,
   compact = false,
-  showBreakdown = true
+  showBreakdown = true,
+  briefDurationSeconds
 }: {
   estimate: RunCostEstimate;
   compact?: boolean;
   showBreakdown?: boolean;
+  /** Brief target length — when different from veoSeconds, show both. */
+  briefDurationSeconds?: number;
 }) {
   const level = estimate.isExpensive ? "expensive" : estimate.nis <= 5 ? "cheap" : "moderate";
+  const briefDur = briefDurationSeconds ?? estimate.briefDurationSeconds;
   return (
     <div className={`cost-indicator cost-${level}${compact ? " cost-compact" : ""}`} role="status" aria-live="polite">
       <div className="cost-indicator-head">
         <span className="cost-indicator-amount">{formatCostNis(estimate.nis)}</span>
         <span className="cost-indicator-sub">משוער לריצה מלאה</span>
       </div>
+      {briefDur != null ? (
+        <p className="cost-indicator-actual-length">
+          אורך וידאו בפועל: <strong>{estimate.veoSeconds}s</strong> ({estimate.sceneCount} סצנות × {estimate.bucket}s)
+          {briefDur !== estimate.veoSeconds ? <> · brief: {briefDur}s</> : null}
+        </p>
+      ) : null}
       {estimate.warning ? <p className="cost-indicator-warning">{estimate.warning}</p> : null}
       {showBreakdown ? (
         <ul className="cost-indicator-breakdown">
