@@ -268,6 +268,7 @@ function RunDetail({
         compact={!renderPending && run.status === "COMPLETED"}
         briefDurationSeconds={run.brief.durationSeconds ?? 30}
         actualCostNis={costLedger?.summary.totalNis ?? null}
+        ledgerSummary={costLedger?.summary ?? null}
       />
       <CostLedger ledger={costLedger} />
       <GeminiCapabilitiesPanel capabilities={capabilities} />
