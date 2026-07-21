@@ -8,7 +8,7 @@ import {
   type CostUsageRecord,
   type StageName
 } from "@studio/shared";
-import { fromPrismaStage } from "./stageMap.js";
+import { fromPrismaStage, toPrismaStage } from "./stageMap.js";
 
 export interface CostRecorderContext {
   tenantId: string;
@@ -33,7 +33,7 @@ export function createCostRecorder(ctx: CostRecorderContext): CostRecorder {
             runId: ctx.runId,
             stageExecutionId: ctx.stageExecutionId,
             attempt: ctx.attempt,
-            stage: ctx.stage as never,
+            stage: toPrismaStage(ctx.stage),
             activityType: event.activityType as never,
             sceneId: event.sceneId ?? null,
             model: event.model ?? null,
