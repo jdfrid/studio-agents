@@ -94,6 +94,34 @@ export function extractText(response: unknown): string {
   return candidates.flatMap((c) => c.content?.parts?.map((p) => p.text ?? "") ?? []).join("").trim();
 }
 
+/** Summarize why generateContent returned no usable inline payload (common with image-only modality). */
+export function describeGenerateContentFailure(response: unknown): string {
+  const root = response as {
+    promptFeedback?: { blockReason?: string; block_reason?: string };
+    candidates?: Array<{
+      finishReason?: string;
+      finish_reason?: string;
+      content?: { parts?: Array<{ text?: string }> };
+    }>;
+  };
+  const parts: string[] = [];
+  const blockReason = root.promptFeedback?.blockReason ?? root.promptFeedback?.block_reason;
+  if (blockReason) parts.push(`blockReason=${blockReason}`);
+  const candidate = root.candidates?.[0];
+  const finishReason = candidate?.finishReason ?? candidate?.finish_reason;
+  if (finishReason) parts.push(`finishReason=${finishReason}`);
+  const text = extractText(response);
+  if (text) parts.push(`text=${text.slice(0, 240)}`);
+  if (parts.length === 0) return "empty candidates/parts";
+  return parts.join("; ");
+}
+
+export function normalizeGeminiImageAspectRatio(aspectRatio: string): string {
+  const normalized = aspectRatio.trim();
+  const supported = new Set(["1:1", "3:2", "2:3", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]);
+  return supported.has(normalized) ? normalized : "9:16";
+}
+
 export function stablePromptHash(value: string): string {
   let hash = 0;
   for (let i = 0; i < value.length; i += 1) {
