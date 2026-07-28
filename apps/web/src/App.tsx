@@ -4,7 +4,7 @@ import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
 import { StageErrorView } from "./StageErrorView.js";
 import { BriefQuickEditor, StageEditor, StageUploadControls } from "./StageEditor.js";
 import type { ArtifactRow, GeminiCapabilityStatus, GeminiOperationRow, ProjectRunView, RunSummary, StageName } from "./types.js";
-import { STAGE_ORDER, estimateRunCost, formatCostNis, getRenderProfile, profileToProductionCostConfig, type ProductionCostConfig, type RenderProfileId, type RunCostEstimate } from "@studio/shared";
+import { STAGE_ORDER, budgetModeCheckboxLabel, estimateRunCost, formatCostNis, getRenderProfile, profileToProductionCostConfig, videoPromptLabel, videoProviderShortLabel, type ProductionCostConfig, type RenderProfileId, type RunCostEstimate } from "@studio/shared";
 import { CostConfirmCheckbox, CostIndicator } from "./CostIndicator.js";
 import { CostLedger, type CostLedgerResponse } from "./CostLedger.js";
 
@@ -211,7 +211,7 @@ function NewRunForm({
       {!estimateFromServer ? (
         <p className="cost-indicator-warning">הערכת עלות זו היא ברירת מחדל — לא מהשרver. אחרי תיקון ה-API תראה את המודל האמיתי.</p>
       ) : null}
-      <CostIndicator estimate={estimate} briefDurationSeconds={durationSeconds} />
+      <CostIndicator estimate={estimate} briefDurationSeconds={durationSeconds} renderProfileId={renderProfileId} />
       <input placeholder="כותרת" value={title} onChange={(e) => setTitle(e.target.value)} />
       <textarea placeholder="brief חופשי" rows={4} value={sourceText} onChange={(e) => setSourceText(e.target.value)} />
       <select value={language} onChange={(e) => setLanguage(e.target.value)}>
@@ -258,7 +258,7 @@ function NewRunForm({
             setCostConfirmed(false);
           }}
         />
-        מצב חסכון (פחות סצנות, Veo 4s, בלי first/last frames)
+        {budgetModeCheckboxLabel(renderProfileId)}
       </label>
       <CostConfirmCheckbox checked={costConfirmed} onChange={setCostConfirmed} estimate={estimate} />
       <button className={estimate.isExpensive ? "danger" : "primary"} disabled={busy || !canSubmit} onClick={() => void submit()}>
@@ -319,9 +319,10 @@ function RunDetail({
         briefDurationSeconds={run.brief.durationSeconds ?? 30}
         actualCostNis={costLedger?.summary.totalNis ?? null}
         ledgerSummary={costLedger?.summary ?? null}
+        renderProfileId={renderProfileId}
       />
-      <CostLedger ledger={costLedger} />
-      <GeminiCapabilitiesPanel capabilities={capabilities} />
+      <CostLedger ledger={costLedger} renderProfileId={renderProfileId} />
+      <GeminiCapabilitiesPanel capabilities={capabilities} renderProfileId={renderProfileId} />
       {run.stages.some((s) => s.status === "QUEUED") && queueStats ? (
         <section className="queue-panel">
           <strong>תור Redis (worker)</strong>
@@ -345,7 +346,7 @@ function RunDetail({
               <strong>
                 Scene {scene.order + 1}: {scene.title}
               </strong>
-              <p><b>Veo:</b> {scene.veoPrompt ?? "(missing)"}</p>
+              <p><b>{videoPromptLabel(renderProfileId ?? "veo-multiclip")}:</b> {scene.veoPrompt ?? "(missing)"}</p>
               <p><b>Reference:</b> {scene.referenceImagePrompt ?? "(none)"}</p>
               <small>
                 duration: {scene.durationBucket ?? "?"}s · audio: {scene.audioPolicy ?? "?"}
@@ -353,14 +354,14 @@ function RunDetail({
               <div className="stage-actions">
                 <button onClick={() => void regenerateScene(run.id, scene.id, "visual", onAction)}>Regenerate visual</button>
                 <button
-                  title={`עלות משוערת: ${formatCostNis(estimateSceneVeoCost(scene, config).nis)}`}
+                  title={`עלות משוערת: ${formatCostNis(estimateSceneVideoCost(scene, renderProfileId, config).nis)}`}
                   onClick={() => {
-                    const cost = estimateSceneVeoCost(scene, config);
+                    const cost = estimateSceneVideoCost(scene, renderProfileId, config);
                     if (cost.isExpensive && !window.confirm(`Regenerate video עלול לעלות ${formatCostNis(cost.nis)}. להמשיך?`)) return;
                     void regenerateScene(run.id, scene.id, "video", onAction);
                   }}
                 >
-                  Regenerate video ({formatCostNis(estimateSceneVeoCost(scene, config).nis)})
+                  Regenerate video ({formatCostNis(estimateSceneVideoCost(scene, renderProfileId, config).nis)})
                 </button>
               </div>
             </article>
@@ -369,7 +370,7 @@ function RunDetail({
       ) : null}
       {operations.length > 0 && (
         <details className="operations-panel" open>
-          <summary>Gemini / Veo operations</summary>
+          <summary>Pipeline operations{renderProfileId ? ` · ${videoProviderShortLabel(renderProfileId)}` : ""}</summary>
           <ul>
             {operations.map((op) => (
               <li key={op.id}>
@@ -396,6 +397,7 @@ function RunDetail({
               scriptScenes={scriptOutput?.scenes ?? null}
               costConfig={costConfig}
               capabilities={capabilities}
+              renderProfileId={renderProfileId}
               onAction={onAction}
             />
           );
@@ -405,8 +407,15 @@ function RunDetail({
   );
 }
 
-function GeminiCapabilitiesPanel({ capabilities }: { capabilities: GeminiCapabilityStatus | null }) {
+function GeminiCapabilitiesPanel({
+  capabilities,
+  renderProfileId
+}: {
+  capabilities: GeminiCapabilityStatus | null;
+  renderProfileId?: RenderProfileId | null;
+}) {
   if (!capabilities) return null;
+  const klingRun = renderProfileId ? getRenderProfile(renderProfileId).provider === "kling" : false;
   const videoTier = capabilities.video.model.includes("lite")
     ? "lite"
     : capabilities.video.model.includes("fast")
@@ -418,17 +427,22 @@ function GeminiCapabilitiesPanel({ capabilities }: { capabilities: GeminiCapabil
     ["Text", capabilities.text],
     ["TTS", capabilities.tts],
     ["Image", capabilities.image],
-    ["Music", capabilities.music],
-    ["Veo", capabilities.video]
+    ["Music (Lyria)", capabilities.music],
+    ["Veo (Gemini)", capabilities.video]
   ] as const;
   return (
-    <section className={`capabilities-panel${videoTier === "standard" ? " capabilities-danger" : ""}`}>
-      <strong>Gemini capabilities</strong>
-      {videoTier === "standard" ? (
+    <section className={`capabilities-panel${!klingRun && videoTier === "standard" ? " capabilities-danger" : ""}`}>
+      <strong>שרת — Gemini + {klingRun ? "Kling" : "Veo"}</strong>
+      {klingRun ? (
+        <p className="muted">
+          רינדור וידאו: <strong>Kling</strong> (fal.ai). תסריט, TTS, תמונות ומוזיקה: Gemini.
+        </p>
+      ) : null}
+      {!klingRun && videoTier === "standard" ? (
         <p className="cost-indicator-warning">
           אזהרה: השרת משתמש ב-Veo Standard — ~₪1.4 לכל שניית וידאו. שנה ל-fast ב-.env
         </p>
-      ) : videoTier === "lite" ? (
+      ) : !klingRun && videoTier === "lite" ? (
         <p className="cost-indicator-warning">
           אזהרה: Veo Lite לא תומך ב-reference images — המערכת תfallback ל-Fast. מומלץ לשנות ל-veo-3.1-fast-generate-preview ב-.env
         </p>
@@ -449,11 +463,15 @@ async function regenerateScene(runId: string, sceneId: string, kind: "visual" | 
   onDone();
 }
 
-function estimateSceneVeoCost(
+function estimateSceneVideoCost(
   scene: { durationBucket?: string },
+  renderProfileId: RenderProfileId | null,
   config: Partial<ProductionCostConfig>
 ): RunCostEstimate {
-  return estimateRunCost({ budgetMode: true, durationSeconds: 4, scenes: [{ durationBucket: scene.durationBucket ?? "4" }] }, config);
+  const costConfig = renderProfileId
+    ? profileToProductionCostConfig(getRenderProfile(renderProfileId), config)
+    : config;
+  return estimateRunCost({ budgetMode: true, durationSeconds: 4, scenes: [{ durationBucket: scene.durationBucket ?? "4" }] }, costConfig);
 }
 
 function StagePanel({
@@ -468,6 +486,7 @@ function StagePanel({
   scriptScenes,
   costConfig,
   capabilities,
+  renderProfileId,
   onAction
 }: {
   stage: StageName;
@@ -481,13 +500,17 @@ function StagePanel({
   scriptScenes: Array<{ durationBucket?: string }> | null;
   costConfig: ProductionCostConfig | null;
   capabilities: GeminiCapabilityStatus | null;
+  renderProfileId: RenderProfileId | null;
   onAction: () => void;
 }) {
   const showOutput = output && (status === "COMPLETED" || status === "AWAITING_APPROVAL" || status === "RUNNING" || status === "FAILED");
   const [busy, setBusy] = useState(false);
   const [approveConfirmed, setApproveConfirmed] = useState(false);
-  const config: Partial<ProductionCostConfig> =
+  const baseConfig: Partial<ProductionCostConfig> =
     costConfig ?? (capabilities?.video.model ? { videoModel: capabilities.video.model, veoGenerateAudio: true, usdToIls: 3.6 } : {});
+  const config = renderProfileId
+    ? profileToProductionCostConfig(getRenderProfile(renderProfileId), baseConfig)
+    : baseConfig;
   const renderCost =
     stage === "package" && status === "AWAITING_APPROVAL"
       ? estimateRunCost(
@@ -495,6 +518,7 @@ function StagePanel({
           config
         )
       : null;
+  const approveTarget = renderProfileId ? videoProviderShortLabel(renderProfileId) : "render";
   async function approve() {
     if (renderCost?.isExpensive && !approveConfirmed) return;
     setBusy(true);
@@ -534,7 +558,7 @@ function StagePanel({
       ) : null}
       {showOutput ? (
         <>
-          <StageOutputView stage={stage} output={output} artifacts={artifacts} onOpenArtifact={openArtifact} />
+          <StageOutputView stage={stage} output={output} artifacts={artifacts} onOpenArtifact={openArtifact} renderProfileId={renderProfileId} />
           {stage === "brief" ? <BriefQuickEditor runId={runId} output={output} onSaved={onAction} /> : null}
           <StageUploadControls runId={runId} stage={stage} output={output} onSaved={onAction} />
           <StageEditor runId={runId} stage={stage} output={output} onSaved={onAction} />
@@ -561,7 +585,7 @@ function StagePanel({
       <div className="stage-actions">
         {renderCost ? (
           <>
-            <CostIndicator estimate={renderCost} compact showBreakdown={false} />
+            <CostIndicator estimate={renderCost} compact showBreakdown={false} renderProfileId={renderProfileId} />
             {renderCost.isExpensive ? (
               <CostConfirmCheckbox checked={approveConfirmed} onChange={setApproveConfirmed} estimate={renderCost} />
             ) : null}
@@ -573,7 +597,7 @@ function StagePanel({
             disabled={busy || Boolean(renderCost?.isExpensive && !approveConfirmed)}
             onClick={() => void approve()}
           >
-            {renderCost ? `אשר והמשך ל-Veo (${formatCostNis(renderCost.nis)})` : "אשר והמשך"}
+            {renderCost ? `אשר והמשך ל-${approveTarget} (${formatCostNis(renderCost.nis)})` : "אשר והמשך"}
           </button>
         )}
         {(status === "COMPLETED" || status === "FAILED" || status === "AWAITING_APPROVAL" || status === "QUEUED") && (

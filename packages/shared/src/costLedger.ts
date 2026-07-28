@@ -2,6 +2,8 @@ import type { StageName } from "./enums.js";
 import { DEFAULT_USD_TO_ILS, veoGenerateAudio, veoPerSecondUsd } from "./budget.js";
 import type { CostPricingSource, GeminiUsageMetadata } from "./geminiPricing.js";
 import { priceFromUsageMetadata } from "./geminiPricing.js";
+import type { RenderProfileId } from "./renderProfiles.js";
+import { getRenderProfile } from "./renderProfiles.js";
 
 export type { CostPricingSource } from "./geminiPricing.js";
 
@@ -166,9 +168,16 @@ export function computeCostAmounts(
   return { costUsd: usd, costNis: usdToNis(usd, rate), charged };
 }
 
-export function activityTypeLabel(type: CostActivityType): string {
+export function activityTypeLabel(type: CostActivityType, renderProfileId?: RenderProfileId | null): string {
   switch (type) {
     case "veo_video":
+      if (renderProfileId) {
+        try {
+          if (getRenderProfile(renderProfileId).provider === "kling") return "Kling וידאו";
+        } catch {
+          /* ignore invalid profile id */
+        }
+      }
       return "Veo וידאו";
     case "gemini_tts":
       return "Gemini TTS";

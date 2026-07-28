@@ -1,7 +1,7 @@
-import type { RunCostEstimate, CostEventSummary, CostActivityType } from "@studio/shared";
-import { activityTypeLabel, formatCostNis } from "@studio/shared";
+import type { RunCostEstimate, CostEventSummary, CostActivityType, RenderProfileId } from "@studio/shared";
+import { activityTypeLabel, formatCostNis, videoSecondsUnitLabel } from "@studio/shared";
 
-function ledgerBreakdownRows(summary: CostEventSummary): Array<{ label: string; nis: number; usd: number; count: number }> {
+function ledgerBreakdownRows(summary: CostEventSummary, renderProfileId?: RenderProfileId | null): Array<{ label: string; nis: number; usd: number; count: number }> {
   const order: CostActivityType[] = [
     "veo_video",
     "gemini_image",
@@ -15,7 +15,7 @@ function ledgerBreakdownRows(summary: CostEventSummary): Array<{ label: string; 
     .map((type) => {
       const row = summary.byActivity[type];
       if (!row || row.count === 0) return null;
-      return { label: activityTypeLabel(type), nis: row.nis, usd: row.usd, count: row.count };
+      return { label: activityTypeLabel(type, renderProfileId), nis: row.nis, usd: row.usd, count: row.count };
     })
     .filter((row): row is { label: string; nis: number; usd: number; count: number } => row != null);
 }
@@ -26,7 +26,8 @@ export function CostIndicator({
   showBreakdown = true,
   briefDurationSeconds,
   actualCostNis,
-  ledgerSummary
+  ledgerSummary,
+  renderProfileId
 }: {
   estimate: RunCostEstimate;
   compact?: boolean;
@@ -37,11 +38,14 @@ export function CostIndicator({
   actualCostNis?: number | null;
   /** Actual breakdown from Cost Ledger — shown instead of pre-run estimate when available. */
   ledgerSummary?: CostEventSummary | null;
+  renderProfileId?: RenderProfileId | null;
 }) {
   const level = estimate.isExpensive ? "expensive" : estimate.nis <= 5 ? "cheap" : "moderate";
   const briefDur = briefDurationSeconds ?? estimate.briefDurationSeconds;
   const showActual = actualCostNis != null && actualCostNis > 0;
-  const ledgerRows = ledgerSummary ? ledgerBreakdownRows(ledgerSummary) : [];
+  const ledgerRows = ledgerSummary ? ledgerBreakdownRows(ledgerSummary, renderProfileId ?? estimate.renderProfileId) : [];
+  const videoUnit = videoSecondsUnitLabel(renderProfileId ?? estimate.renderProfileId);
+  const modelDisplay = estimate.videoModelDisplay ?? estimate.videoModel;
   const showLedgerBreakdown = showActual && ledgerRows.length > 0;
   const attemptKeys = ledgerSummary
     ? Object.keys(ledgerSummary.byAttempt)
@@ -66,7 +70,7 @@ export function CostIndicator({
       ) : null}
       {briefDur != null ? (
         <p className="cost-indicator-actual-length">
-          אורך וידאו בפועל: <strong>{estimate.veoSeconds}s</strong> ({estimate.sceneCount} סצנות × {estimate.bucket}s)
+          אורך וידאו בפועל: <strong>{estimate.veoSeconds}s</strong> ({estimate.sceneCount} סצנות × {estimate.bucket}s · {videoUnit})
           {briefDur !== estimate.veoSeconds ? <> · brief: {briefDur}s</> : null}
         </p>
       ) : null}
@@ -83,7 +87,7 @@ export function CostIndicator({
               </li>
             ))}
             <li>
-              <strong>מודל בשרת:</strong> <code>{estimate.videoModel}</code>
+              <strong>מודל:</strong> <code>{modelDisplay}</code>
             </li>
           </ul>
         ) : (
@@ -92,7 +96,7 @@ export function CostIndicator({
               <strong>הערכה לריצה אחת (לפני ריצה):</strong>
             </li>
             <li>
-              <strong>Veo:</strong> {estimate.veoTierLabel} · {estimate.sceneCount} סצנות × {estimate.bucket}s ={" "}
+              <strong>{estimate.videoProviderLabel}:</strong> {estimate.veoTierLabel} · {estimate.sceneCount} סצנות × {estimate.bucket}s ={" "}
               <strong>{estimate.veoSeconds}s</strong> (~${estimate.veoUsd.toFixed(2)})
             </li>
             <li>
@@ -102,7 +106,7 @@ export function CostIndicator({
               <strong>TTS + text:</strong> ~${(estimate.ttsUsd + estimate.textUsd).toFixed(2)}
             </li>
             <li>
-              <strong>מודל בשרת:</strong> <code>{estimate.videoModel}</code>
+              <strong>מודל:</strong> <code>{modelDisplay}</code>
             </li>
             <li>
               <strong>מצב:</strong> {estimate.label}

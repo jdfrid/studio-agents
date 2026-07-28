@@ -1,6 +1,6 @@
 import type { VeoDurationBucket } from "./schemas/script.js";
 import type { RenderProfileId } from "./renderProfiles.js";
-import { defaultRenderProfileId, getRenderProfile, profileVeoMode, profileVideoPerSecondUsd } from "./renderProfiles.js";
+import { defaultRenderProfileId, getRenderProfile, profileVeoMode, profileVideoPerSecondUsd, videoModelDisplay as renderProfileVideoModelDisplay, videoProviderShortLabel } from "./renderProfiles.js";
 
 export const DEFAULT_USD_TO_ILS = 3.6;
 /** Runs above this NIS show a blocking confirmation. */
@@ -200,6 +200,9 @@ export type RunCostEstimate = {
   warning?: string;
   /** Brief target duration when passed to estimateRunCost. */
   briefDurationSeconds?: number;
+  renderProfileId: import("./renderProfiles.js").RenderProfileId;
+  videoProviderLabel: string;
+  videoModelDisplay: string;
 };
 
 export function estimateRunCost(
@@ -253,8 +256,14 @@ export function estimateRunCost(
   } else if (!budget && nis >= EXPENSIVE_RUN_NIS) {
     warning = "מצב רגיל — יותר סצנות ויותר תמונות. הפעל מצב חסכון להוזלה.";
   } else if (budget && nis >= EXPENSIVE_RUN_NIS) {
-    warning = "עלות גבוהה מהצפוי — בדוק את מודל Veo בשרת.";
+    warning =
+      profile.provider === "kling"
+        ? "עלות גבוהה מהצפוי — בדוק פרופיל Kling ומספר הסצנות."
+        : "עלות גבוהה מהצפוי — בדוק את מודל Veo בשרת.";
   }
+
+  const videoProviderLabel = videoProviderShortLabel(profile);
+  const videoModelDisplay = renderProfileVideoModelDisplay(profile, videoModel);
 
   return {
     usd,
@@ -265,7 +274,7 @@ export function estimateRunCost(
     label: budget ? "מצב חסכון" : "מצב רגיל",
     videoModel,
     veoTier: tier,
-    veoTierLabel: veoModelLabel(tier),
+    veoTierLabel: profile.provider === "kling" ? "Kling 2.1" : veoModelLabel(tier),
     veoUsd,
     imageUsd,
     imageCalls,
@@ -274,7 +283,10 @@ export function estimateRunCost(
     perSecondUsd: perSecond,
     isExpensive,
     warning,
-    briefDurationSeconds: input.durationSeconds
+    briefDurationSeconds: input.durationSeconds,
+    renderProfileId: profile.id,
+    videoProviderLabel,
+    videoModelDisplay
   };
 }
 

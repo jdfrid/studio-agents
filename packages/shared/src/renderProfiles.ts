@@ -140,3 +140,44 @@ export function profileVideoPerSecondUsd(profile: RenderProfile, veoModelPerSeco
   if (profile.provider === "kling") return 0.09;
   return veoModelPerSecond;
 }
+
+const KLING_VIDEO_MODEL = "fal-ai/kling-video/v2.1/standard/image-to-video";
+
+export function resolveRenderProfileId(id?: RenderProfileId | string | null): RenderProfileId {
+  if (typeof id === "string" && isRenderProfileId(id)) return id;
+  return defaultRenderProfileId();
+}
+
+/** UI label for the veoPrompt field (reused for Kling motion prompts). */
+export function videoPromptLabel(profile: RenderProfile | RenderProfileId): string {
+  const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  return p.provider === "kling" ? "Kling motion" : "Veo";
+}
+
+/** Short provider name for cost / approve buttons. */
+export function videoProviderShortLabel(profile: RenderProfile | RenderProfileId): string {
+  const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  if (p.provider === "kling") return "Kling";
+  if (p.strategy === "extend") return "Veo extend";
+  return "Veo";
+}
+
+/** Model id shown in cost UI — Gemini video model or fal Kling endpoint. */
+export function videoModelDisplay(profile: RenderProfile | RenderProfileId, geminiVideoModel?: string): string {
+  const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  if (p.provider === "kling") return KLING_VIDEO_MODEL;
+  return geminiVideoModel ?? process.env.GEMINI_VIDEO_MODEL ?? "veo-3.1-fast-generate-preview";
+}
+
+export function budgetModeCheckboxLabel(profile: RenderProfile | RenderProfileId): string {
+  const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  const clip = p.capabilities.beatSeconds;
+  if (p.provider === "kling") {
+    return `מצב חסכון (פחות סצנות, ${clip}s לסצנה, reference frame)`;
+  }
+  return `מצב חסכון (פחות סצנות, Veo ${clip}s, בלי first/last frames)`;
+}
+
+export function videoSecondsUnitLabel(profile: RenderProfile | RenderProfileId): string {
+  return videoProviderShortLabel(profile);
+}

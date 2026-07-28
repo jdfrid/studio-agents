@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "./api.js";
 import type { ArtifactRow, StageName } from "./types.js";
+import { videoPromptLabel, type RenderProfileId } from "@studio/shared";
 
 const STAGE_LABELS: Record<StageName, string> = {
   brief: "בריף",
@@ -20,12 +21,14 @@ export function StageOutputView({
   stage,
   output,
   artifacts,
-  onOpenArtifact
+  onOpenArtifact,
+  renderProfileId
 }: {
   stage: StageName;
   output: unknown;
   artifacts: ArtifactRow[];
   onOpenArtifact: OpenArtifact;
+  renderProfileId?: RenderProfileId | null;
 }) {
   if (!output || typeof output !== "object") return null;
   const data = output as Record<string, unknown>;
@@ -34,7 +37,7 @@ export function StageOutputView({
     case "brief":
       return <BriefOutputView data={data} />;
     case "script":
-      return <ScriptOutputView data={data} />;
+      return <ScriptOutputView data={data} renderProfileId={renderProfileId} />;
     case "audio":
       return <AudioOutputView data={data} artifacts={artifacts} onOpenArtifact={onOpenArtifact} />;
     case "asset":
@@ -68,8 +71,9 @@ function BriefOutputView({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function ScriptOutputView({ data }: { data: Record<string, unknown> }) {
+function ScriptOutputView({ data, renderProfileId }: { data: Record<string, unknown>; renderProfileId?: RenderProfileId | null }) {
   const scenes = Array.isArray(data.scenes) ? (data.scenes as Array<Record<string, unknown>>) : [];
+  const promptLabel = videoPromptLabel(renderProfileId ?? "veo-multiclip");
   return (
     <div className="stage-output">
       <Field label="מוזיקת רקע" value={data.backgroundVisualPrompt} />
@@ -81,7 +85,7 @@ function ScriptOutputView({ data }: { data: Record<string, unknown> }) {
               סצנה {(Number(scene.order) ?? 0) + 1}: {String(scene.title ?? "")}
             </strong>
             <p>{String(scene.narration ?? "")}</p>
-            <small className="muted">Veo: {String(scene.veoPrompt ?? "—")}</small>
+            <small className="muted">{promptLabel}: {String(scene.veoPrompt ?? "—")}</small>
           </article>
         ))}
       </div>
