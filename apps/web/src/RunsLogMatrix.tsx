@@ -42,6 +42,10 @@ function activityCost(entry: RunLogEntry, type: CostActivityType): number {
   return entry.costsByActivity[type]?.nis ?? 0;
 }
 
+function stageCell(run: RunLogEntry, stageName: (typeof STAGE_ORDER)[number]) {
+  return run.stages.find((s) => s.stage === stageName);
+}
+
 export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) => void }) {
   const [data, setData] = useState<RunLogMatrixResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,6 +86,8 @@ export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) =>
           <h2>לוג ריצות ועלויות</h2>
           <p className="muted">
             {runs.length} ריצות · סה״כ {formatCostNis(data?.totals.nis ?? 0)} · ${(data?.totals.usd ?? 0).toFixed(2)}
+            {" · "}
+            <span className="runs-log-hint">גלול ימינה לפירוט כל השלבים · עמודות רינדור מודגשות</span>
           </p>
         </div>
         <button type="button" onClick={() => void refresh()} disabled={loading}>
@@ -102,8 +108,10 @@ export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) =>
                 <th rowSpan={2}>פרופיל</th>
                 <th rowSpan={2}>סה״כ זמן</th>
                 <th rowSpan={2}>סה״כ ₪</th>
+                <th rowSpan={2} className="render-highlight-head">רינדור · זמן</th>
+                <th rowSpan={2} className="render-highlight-head">רינדור · ₪</th>
                 {STAGE_ORDER.map((stage) => (
-                  <th key={stage} colSpan={2} className="group-head">
+                  <th key={stage} colSpan={2} className={`group-head${stage === "render" ? " render-stage-group" : ""}`}>
                     {STAGE_LABELS[stage]}
                   </th>
                 ))}
@@ -135,17 +143,32 @@ export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) =>
                   <td className="profile-cell">{renderProfileLabel(run.renderProfile)}</td>
                   <td className="mono">{formatDurationMs(run.totalDurationMs)}</td>
                   <td className="cost-cell">{costCell(run.totalNis)}</td>
+                  {(() => {
+                    const render = stageCell(run, "render");
+                    return (
+                      <>
+                        <td
+                          className="mono render-highlight-cell"
+                          title={render?.startedAt ? `${render.startedAt} → ${render.completedAt ?? "…"}` : undefined}
+                        >
+                          {formatDurationMs(render?.durationMs ?? null)}
+                        </td>
+                        <td className="cost-cell render-highlight-cell">{costCell(render?.costNis ?? 0)}</td>
+                      </>
+                    );
+                  })()}
                   {STAGE_ORDER.flatMap((stageName) => {
-                    const cell = run.stages.find((s) => s.stage === stageName);
+                    const cell = stageCell(run, stageName);
+                    const highlight = stageName === "render" ? " render-stage-cell" : "";
                     return [
                       <td
                         key={`${run.id}-${stageName}-t`}
-                        className="mono stage-time"
+                        className={`mono stage-time${highlight}`}
                         title={cell?.startedAt ? `${cell.startedAt} → ${cell.completedAt ?? "…"}` : undefined}
                       >
                         {formatDurationMs(cell?.durationMs ?? null)}
                       </td>,
-                      <td key={`${run.id}-${stageName}-c`} className="cost-cell">
+                      <td key={`${run.id}-${stageName}-c`} className={`cost-cell${highlight}`}>
                         {costCell(cell?.costNis ?? 0)}
                       </td>
                     ];

@@ -14,6 +14,10 @@ describe("runsLog helpers", () => {
     expect(formatDurationMs(125_000)).toBe("2m 5s");
   });
 
+  it("formats durations without 60s rollover bug", () => {
+    expect(formatDurationMs(659_999)).toBe("11m");
+  });
+
   it("computes run total duration to latest stage completion", () => {
     const created = new Date("2026-01-01T10:00:00Z");
     const updated = new Date("2026-01-01T10:30:00Z");

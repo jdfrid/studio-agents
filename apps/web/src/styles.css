@@ -197,4 +197,10 @@ main.layout-log { grid-template-columns: 1fr; }
 .runs-log-table .stage-time { color: #ccd4e4; }
 .runs-log-row { cursor: pointer; }
 .runs-log-row:hover td { background: #1c2333; }
-.runs-log-row:hover .sticky-col, .runs-log-row:hover .sticky-col-2 { background: #1c2333; }
+.runs-log-hint { color: #7ab5ff; }
+.runs-log-table .render-highlight-head { background: #2a2540; color: #ffd48a; min-width: 72px; }
+.runs-log-table .render-highlight-cell { background: #1f1a2e; font-weight: 600; }
+.runs-log-table .render-stage-group { background: #2a2540; color: #ffd48a; }
+.runs-log-table .render-stage-cell { background: #1a1828; }
+.runs-log-row:hover .render-highlight-cell,
+.runs-log-row:hover .render-stage-cell { background: #2a2340; }

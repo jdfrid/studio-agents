@@ -69,8 +69,12 @@ export function formatDurationMs(ms: number | null | undefined): string {
   if (ms < 1000) return `${Math.round(ms)}ms`;
   const seconds = ms / 1000;
   if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const restSec = Math.round(seconds % 60);
+  let minutes = Math.floor(seconds / 60);
+  let restSec = Math.round(seconds % 60);
+  if (restSec === 60) {
+    minutes += 1;
+    restSec = 0;
+  }
   if (minutes < 60) return restSec > 0 ? `${minutes}m ${restSec}s` : `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   const restMin = minutes % 60;
