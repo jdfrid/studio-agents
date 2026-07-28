@@ -9,6 +9,7 @@ import {
   getQueueStats,
   getRun,
   getRunCostLedger,
+  getRunsLogMatrix,
   rerunStage,
   updateStageOutput,
   uploadStageArtifact
@@ -72,6 +73,10 @@ export async function registerRoutes(app: FastifyInstance) {
     const view = await createRun(body);
     reply.code(201);
     return view;
+  });
+
+  app.get("/runs/log-matrix", async () => {
+    return getRunsLogMatrix(100);
   });
 
   app.get("/runs", async () => {

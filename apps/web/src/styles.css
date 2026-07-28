@@ -171,3 +171,30 @@ button.danger:hover { background: #a02828; }
 .stage-error-billing_quota .stage-error-friendly { border-left: 3px solid #ff6b6b; padding-left: 8px; }
 .cost-row-free td:last-child { color: #8b94a6; }
 .cost-actual-total { margin: 0; font-size: 0.9rem; color: #7af0bf; }
+.app-nav { display: flex; gap: 6px; margin-inline-start: 16px; }
+.app-nav button { font-size: 0.85rem; padding: 4px 12px; background: #1a2030; }
+.app-nav button.nav-active { background: #3b6ef0; border-color: #3b6ef0; }
+main.layout-log { grid-template-columns: 1fr; }
+.runs-log-full { min-height: calc(100vh - 120px); }
+.runs-log-panel { display: grid; gap: 12px; }
+.runs-log-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.runs-log-head h2 { margin: 0; font-size: 1.1rem; }
+.runs-log-table-wrap { overflow: auto; max-height: calc(100vh - 180px); border: 1px solid #232733; border-radius: 10px; }
+.runs-log-table { border-collapse: separate; border-spacing: 0; font-size: 0.78rem; min-width: max-content; width: 100%; }
+.runs-log-table th, .runs-log-table td { border-bottom: 1px solid #232733; border-right: 1px solid #232733; padding: 6px 8px; text-align: start; white-space: nowrap; vertical-align: middle; }
+.runs-log-table thead th { position: sticky; top: 0; background: #1a2030; z-index: 2; }
+.runs-log-table thead tr:nth-child(2) th { top: 32px; }
+.runs-log-table .group-head { text-align: center; background: #151c2a; color: #a8c4ff; }
+.runs-log-table .subhead { font-weight: 500; color: #8b94a6; font-size: 0.72rem; }
+.runs-log-table .activity-head { writing-mode: vertical-rl; transform: rotate(180deg); max-height: 120px; font-size: 0.72rem; color: #9eb0d0; }
+.runs-log-table .sticky-col { position: sticky; left: 0; background: #151a23; z-index: 3; min-width: 110px; }
+.runs-log-table .sticky-col-2 { position: sticky; left: 110px; background: #151a23; z-index: 3; min-width: 160px; max-width: 220px; }
+.runs-log-table thead .sticky-col, .runs-log-table thead .sticky-col-2 { z-index: 4; background: #1a2030; }
+.runs-log-table .title-cell { white-space: normal; word-break: break-word; }
+.runs-log-table .profile-cell { max-width: 140px; white-space: normal; font-size: 0.72rem; color: #9eb0d0; }
+.runs-log-table .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, monospace; }
+.runs-log-table .cost-cell { text-align: end; color: #7af0bf; }
+.runs-log-table .stage-time { color: #ccd4e4; }
+.runs-log-row { cursor: pointer; }
+.runs-log-row:hover td { background: #1c2333; }
+.runs-log-row:hover .sticky-col, .runs-log-row:hover .sticky-col-2 { background: #1c2333; }

@@ -7,6 +7,9 @@ import type { ArtifactRow, GeminiCapabilityStatus, GeminiOperationRow, ProjectRu
 import { STAGE_ORDER, budgetModeCheckboxLabel, estimateRunCost, formatCostNis, getRenderProfile, profileToProductionCostConfig, videoPromptLabel, videoProviderShortLabel, type ProductionCostConfig, type RenderProfileId, type RunCostEstimate } from "@studio/shared";
 import { CostConfirmCheckbox, CostIndicator } from "./CostIndicator.js";
 import { CostLedger, type CostLedgerResponse } from "./CostLedger.js";
+import { RunsLogMatrix } from "./RunsLogMatrix.js";
+
+type AppView = "run" | "log";
 
 export function App() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -22,6 +25,7 @@ export function App() {
   const [costLedger, setCostLedger] = useState<CostLedgerResponse | null>(null);
   const [queueStats, setQueueStats] = useState<Array<{ queue: string; waiting: number; active: number }> | null>(null);
   const [error, setError] = useState<string>("");
+  const [view, setView] = useState<AppView>("run");
 
   async function refreshRuns() {
     try {
@@ -85,13 +89,32 @@ export function App() {
       <header>
         <h1>Studio Agents</h1>
         <small>7-stage video production pipeline</small>
+        <nav className="app-nav">
+          <button type="button" className={view === "run" ? "nav-active" : ""} onClick={() => setView("run")}>
+            ריצה
+          </button>
+          <button type="button" className={view === "log" ? "nav-active" : ""} onClick={() => setView("log")}>
+            לוג עלויות
+          </button>
+        </nav>
         {apiOnline === false ? (
           <span className="api-offline-badge">API לא זמין — בדוק שה-containers רצים</span>
         ) : apiOnline === true ? (
           <span className="api-online-badge">API מחובר</span>
         ) : null}
       </header>
-      <main>
+      <main className={view === "log" ? "layout-log" : undefined}>
+        {view === "log" ? (
+          <section className="panel runs-log-full">
+            <RunsLogMatrix
+              onSelectRun={(id) => {
+                setSelectedId(id);
+                setView("run");
+              }}
+            />
+          </section>
+        ) : (
+          <>
         <section className="panel runs-panel">
           <div className="panel-header">
             <h2>ריצות</h2>
@@ -132,6 +155,8 @@ export function App() {
             />
           )}
         </section>
+          </>
+        )}
       </main>
       {error ? (
         <div className={`error-banner${isQuotaErrorMessage(error) ? " error-banner-quota" : ""}`}>
