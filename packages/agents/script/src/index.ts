@@ -46,7 +46,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette.",
       "Output characterBible: a fixed English description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes.",
       "Each veoPrompt must explicitly continue from the previous scene without changing setting or cast.",
-      "NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt or visualPrompt — use generic fictional people only (Veo blocks real-person likenesses)."
+      "NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt or visualPrompt — use generic fictional people only (Veo blocks real-person likenesses).",
+      "Return strictly valid JSON only — escape quotes inside strings, no trailing commas, no markdown."
     ];
     if (extendMode) {
       systemParts.push(
@@ -71,27 +72,31 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     }
     const system = systemParts.join(" ");
 
+    const includeExtraFrames = !budget && !extendMode && !klingMode;
+    const sceneSchema: Record<string, unknown> = {
+      title: "short Hebrew title",
+      narration: `${brief.language} narration, 1 short sentence (max ${narrationLimit} chars)`,
+      visualPrompt: "English visual directive (max 200 chars)",
+      veoPrompt: "English Veo/Kling motion prompt (max 200 chars)",
+      durationBucket: "4 | 6 | 8",
+      audioPolicy: "gemini_tts_plus_music | gemini_tts_only | veo_native_audio | muted",
+      durationSeconds: clipSeconds,
+      requiredAssets: ["voice", "music", "video"]
+    };
+    if (includeExtraFrames) {
+      sceneSchema.referenceImagePrompt = "optional reference still prompt";
+      sceneSchema.firstFramePrompt = "optional";
+      sceneSchema.lastFramePrompt = "optional";
+    } else if (klingMode) {
+      sceneSchema.referenceImagePrompt = "optional reference still prompt";
+    }
+
     const schemaHint = JSON.stringify(
       {
-        scenes: [
-          {
-            title: "short Hebrew title",
-            narration: `${brief.language} narration, 1 short sentence (max ${narrationLimit} chars)`,
-            visualPrompt: "English directive for the visual: subject, action, framing, mood, lighting",
-            veoPrompt: "Concise English prompt for Veo video generation (subject, camera movement, action, mood)",
-            referenceImagePrompt: "Prompt for a still reference frame (optional but recommended)",
-            firstFramePrompt: "Prompt for first frame when continuity matters (optional)",
-            lastFramePrompt: "Prompt for last frame when continuity matters (optional)",
-            durationBucket: "4 | 6 | 8",
-            audioPolicy: "gemini_tts_plus_music | gemini_tts_only | veo_native_audio | muted",
-            durationSeconds: `integer; each scene is ${clipSeconds}s (Veo clip length)`,
-            requiredAssets: ["voice", "music", "video"]
-          }
-        ],
-        musicPrompt: "English directive for the music feel and tempo",
-        backgroundVisualPrompt: "English overall visual direction (single location)",
-        characterBible:
-          "English locked cast bible: each character gender/age/hair/wardrobe + one fixed location (never changes)"
+        scenes: [sceneSchema],
+        musicPrompt: "English music feel",
+        backgroundVisualPrompt: "English single location visual direction",
+        characterBible: "English locked cast + location (never changes)"
       },
       null,
       2
