@@ -730,113 +730,75 @@ async function concatClips(
     return;
   }
 
-  const xfadeSeconds = sceneXfadeSeconds();
   const durations =
     clipDurations?.length === prepared.length
       ? clipDurations
       : await Promise.all(prepared.map((p) => probeDuration(p)));
-  for (const dur of durations) {
+  for (const [index, dur] of durations.entries()) {
     if (!Number.isFinite(dur) || dur <= 0.05) {
-      throw new Error(`Invalid clip duration (${dur}) — cannot concat`);
+      throw new Error(`Invalid clip duration (${dur}) for clip ${index + 1} — cannot concat`);
     }
   }
 
+  const xfadeSeconds = sceneXfadeSeconds(prepared.length);
   if (xfadeSeconds > 0) {
-    await concatClipsWithXfade(prepared, outputPath, durations, xfadeSeconds);
-    return;
+    try {
+      await concatClipsWithXfade(prepared, outputPath, durations, xfadeSeconds, dir);
+      return;
+    } catch {
+      // Pairwise / filter xfade can fail on long timelines — fall back to hard cuts.
+    }
   }
 
-  const listPath = path.join(dir, `concat-${nanoid(6)}.txt`);
-  await writeFile(
-    listPath,
-    prepared.map((p) => `file '${p.replace(/\\/g, "/")}'`).join("\n"),
-    "utf8"
-  );
-
-  try {
-    await runFfmpeg([
-      "-f",
-      "concat",
-      "-safe",
-      "0",
-      "-i",
-      listPath,
-      "-c:v",
-      "libx264",
-      "-preset",
-      "fast",
-      "-crf",
-      "23",
-      "-pix_fmt",
-      "yuv420p",
-      "-c:a",
-      "aac",
-      "-b:a",
-      "128k",
-      "-ar",
-      "44100",
-      "-ac",
-      "2",
-      "-movflags",
-      "+faststart",
-      "-y",
-      outputPath
-    ]);
-  } catch (error) {
-    const videoOnlyPath = path.join(dir, `concat-video-${nanoid(4)}.mp4`);
-    await runFfmpeg([
-      "-f",
-      "concat",
-      "-safe",
-      "0",
-      "-i",
-      listPath,
-      "-c:v",
-      "libx264",
-      "-preset",
-      "fast",
-      "-crf",
-      "23",
-      "-pix_fmt",
-      "yuv420p",
-      "-an",
-      "-movflags",
-      "+faststart",
-      "-y",
-      videoOnlyPath
-    ]);
-    const dur = durations.reduce((sum, d) => sum + d, 0);
-    await runFfmpeg([
-      "-i",
-      videoOnlyPath,
-      "-f",
-      "lavfi",
-      "-i",
-      "anullsrc=r=44100:cl=stereo",
-      "-map",
-      "0:v:0",
-      "-map",
-      "1:a:0",
-      "-c:v",
-      "copy",
-      "-c:a",
-      "aac",
-      "-b:a",
-      "128k",
-      "-t",
-      String(Math.max(0.1, dur)),
-      "-shortest",
-      "-movflags",
-      "+faststart",
-      "-y",
-      outputPath
-    ]);
-  }
+  await concatClipsHardCut(prepared, outputPath);
 }
 
-function sceneXfadeSeconds(): number {
+/** Join normalized clips with the concat filter (hard cuts, single encode pass). */
+async function concatClipsHardCut(prepared: string[], outputPath: string): Promise<void> {
+  const inputs: string[] = [];
+  for (const clip of prepared) {
+    inputs.push("-i", clip);
+  }
+  const n = prepared.length;
+  const vInputs = Array.from({ length: n }, (_, i) => `[${i}:v:0]`).join("");
+  const aInputs = Array.from({ length: n }, (_, i) => `[${i}:a:0]`).join("");
+  const filter = `${vInputs}${aInputs}concat=n=${n}:v=1:a=1[vout][aout]`;
+  await runFfmpeg([
+    ...inputs,
+    "-filter_complex",
+    filter,
+    "-map",
+    "[vout]",
+    "-map",
+    "[aout]",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-pix_fmt",
+    "yuv420p",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
+    "-movflags",
+    "+faststart",
+    "-y",
+    outputPath
+  ]);
+}
+
+function sceneXfadeSeconds(clipCount: number): number {
   const value = Number(process.env.RENDER_SCENE_XFADE_SECONDS ?? 0);
   if (!Number.isFinite(value) || value <= 0) return 0;
+  // Chained xfade is unreliable beyond a handful of clips.
+  if (clipCount > 6) return 0;
   return Math.min(value, 1.5);
 }
 
@@ -844,7 +806,8 @@ async function concatClipsWithXfade(
   clipPaths: string[],
   outputPath: string,
   durations: number[],
-  xfadeSeconds: number
+  xfadeSeconds: number,
+  dir: string
 ): Promise<void> {
   const normalized = await Promise.all(
     clipPaths.map(async (clipPath, index) => {
@@ -853,39 +816,48 @@ async function concatClipsWithXfade(
     })
   );
 
-  const inputs: string[] = [];
-  for (const clip of normalized) {
-    inputs.push("-i", clip);
-  }
-
   const minDur = Math.min(...durations);
   const fade = Math.min(xfadeSeconds, Math.max(0.1, minDur * 0.25));
 
-  const videoParts: string[] = [];
-  const audioParts: string[] = [];
-  let vIn = "0:v";
-  let aIn = "0:a";
-  let offset = durations[0]! - fade;
+  let currentPath = normalized[0]!;
+  let currentDur = durations[0]!;
 
-  for (let i = 1; i < normalized.length; i++) {
-    const vOut = i === normalized.length - 1 ? "vout" : `v${i}`;
-    const aOut = i === normalized.length - 1 ? "aout" : `a${i}`;
-    videoParts.push(
-      `[${vIn}][${i}:v]xfade=transition=fade:duration=${fade}:offset=${Math.max(0, offset).toFixed(3)}[${vOut}]`
+  for (let i = 1; i < normalized.length; i += 1) {
+    const stepOut = path.join(dir, `xfade-merge-${i}-${nanoid(4)}.mp4`);
+    await mergeTwoClipsWithXfade(
+      currentPath,
+      normalized[i]!,
+      currentDur,
+      durations[i]!,
+      fade,
+      stepOut
     );
-    audioParts.push(`[${aIn}][${i}:a]acrossfade=d=${fade}:c1=tri:c2=tri[${aOut}]`);
-    vIn = vOut;
-    aIn = aOut;
-    if (i < normalized.length - 1) {
-      offset += durations[i]! - fade;
-    }
+    currentPath = stepOut;
+    currentDur = currentDur + durations[i]! - fade;
   }
 
-  const filter = [...videoParts, ...audioParts].join(";");
+  if (currentPath === outputPath) return;
+  await runFfmpeg(["-i", currentPath, "-c", "copy", "-movflags", "+faststart", "-y", outputPath]);
+}
+
+async function mergeTwoClipsWithXfade(
+  leftPath: string,
+  rightPath: string,
+  leftDur: number,
+  rightDur: number,
+  fade: number,
+  outputPath: string
+): Promise<void> {
+  void rightDur;
+  const offset = Math.max(0, leftDur - fade);
   await runFfmpeg([
-    ...inputs,
+    "-i",
+    leftPath,
+    "-i",
+    rightPath,
     "-filter_complex",
-    filter,
+    `[0:v:0][1:v:0]xfade=transition=fade:duration=${fade.toFixed(3)}:offset=${offset.toFixed(3)}[vout];` +
+      `[0:a:0][1:a:0]acrossfade=d=${fade.toFixed(3)}:c1=tri:c2=tri[aout]`,
     "-map",
     "[vout]",
     "-map",
