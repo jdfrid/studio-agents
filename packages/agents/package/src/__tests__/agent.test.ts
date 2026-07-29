@@ -98,7 +98,8 @@ describe("packageAgent", () => {
         ],
         totalDurationSeconds: 10,
         musicPrompt: "music",
-        backgroundVisualPrompt: "bg"
+        backgroundVisualPrompt: "bg",
+        characterBible: "Woman, 30s, beige coat"
       },
       audio: {
         perScene: [

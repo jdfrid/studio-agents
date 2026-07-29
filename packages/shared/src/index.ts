@@ -17,3 +17,4 @@ export * from "./costLedger.js";
 export * from "./runsLog.js";
 export * from "./geminiErrors.js";
 export * from "./geminiPricing.js";
+export * from "./continuity.js";

@@ -140,6 +140,8 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           firstFramePrompt?: string;
           lastFramePrompt?: string;
         }>;
+        backgroundVisualPrompt?: string;
+        characterBible?: string;
       } | undefined;
       const briefData = (byName.get("brief") ?? brief) as {
         aspectRatio?: string;
@@ -149,6 +151,8 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       return {
         aspectRatio: briefData.aspectRatio ?? "9:16",
         budgetMode: briefData.budgetMode ?? false,
+        backgroundVisualPrompt: script?.backgroundVisualPrompt,
+        characterBible: script?.characterBible,
         scenes: (script?.scenes ?? []).map((scene, index) => ({
           sceneId: scene.id,
           visualPrompt: scene.visualPrompt,

@@ -4,6 +4,7 @@ import {
   NoProviderConfiguredError,
   ScriptInputSchema,
   ScriptOutputSchema,
+  applyContinuityToScript,
   forcedVeoDurationBucket,
   isBudgetMode,
   isProductAdBrief,
@@ -43,7 +44,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       `Keep each narration under ${narrationLimit} characters (must fit ${clipSeconds}s of spoken audio).`,
       "Keep visualPrompt and veoPrompt under 200 characters each.",
       "CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette.",
-      "Each veoPrompt must explicitly continue from the previous scene without changing setting.",
+      "Output characterBible: a fixed English description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes.",
+      "Each veoPrompt must explicitly continue from the previous scene without changing setting or cast.",
       "NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt or visualPrompt — use generic fictional people only (Veo blocks real-person likenesses)."
     ];
     if (extendMode) {
@@ -87,7 +89,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
           }
         ],
         musicPrompt: "English directive for the music feel and tempo",
-        backgroundVisualPrompt: "English overall visual direction"
+        backgroundVisualPrompt: "English overall visual direction (single location)",
+        characterBible:
+          "English locked cast bible: each character gender/age/hair/wardrobe + one fixed location (never changes)"
       },
       null,
       2
@@ -108,6 +112,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       scenes: Omit<SceneSpec, "id" | "order">[];
       musicPrompt: string;
       backgroundVisualPrompt: string;
+      characterBible?: string;
     }>(
       provider,
       {
@@ -160,13 +165,17 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     }
 
     const totalDurationSeconds = scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0);
-    const output: ScriptOutput = {
-      scenes,
-      totalDurationSeconds,
-      musicPrompt: parsed.musicPrompt ?? brief.musicDirection ?? "",
-      backgroundVisualPrompt: parsed.backgroundVisualPrompt ?? brief.visualDirection ?? "",
-      geminiModel: provider.type === "GEMINI" ? model : undefined
-    };
+    const output: ScriptOutput = applyContinuityToScript(
+      {
+        scenes,
+        totalDurationSeconds,
+        musicPrompt: parsed.musicPrompt ?? brief.musicDirection ?? "",
+        backgroundVisualPrompt: parsed.backgroundVisualPrompt ?? brief.visualDirection ?? "",
+        characterBible: parsed.characterBible ?? "",
+        geminiModel: provider.type === "GEMINI" ? model : undefined
+      },
+      parsed.characterBible
+    );
 
     await ctx.artifacts.save({
       runId: ctx.runId,

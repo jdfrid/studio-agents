@@ -1,0 +1,97 @@
+import type { SceneSpec, ScriptOutput } from "./schemas/script.js";
+
+/** Core system rule: every scene must share cast, wardrobe, and location. */
+export const CONTINUITY_LOCK =
+  "CRITICAL: Use the EXACT same fictional characters (same gender, age, face, hair, skin tone, wardrobe) and the EXACT same location in every scene. Only action, pose, and camera may change.";
+
+export type ContinuityContext = {
+  characterBible: string;
+  backgroundVisualPrompt: string;
+  order: number;
+  total: number;
+};
+
+export function deriveCharacterBible(backgroundVisualPrompt: string, explicit?: string | null): string {
+  const fromLlm = explicit?.trim();
+  if (fromLlm && fromLlm.length >= 16) return fromLlm.slice(0, 800);
+  const bg = backgroundVisualPrompt.trim();
+  if (bg.length >= 16) {
+    return `Fixed cast and setting (never change between shots): ${bg}`.slice(0, 800);
+  }
+  return "Fixed cast: one consistent fictional protagonist; same wardrobe and location throughout.";
+}
+
+export function buildReferenceImagePrompt(
+  ctx: ContinuityContext & { sceneAction: string }
+): string {
+  const action = stripContinuityPrefix(ctx.sceneAction).trim();
+  return [
+    CONTINUITY_LOCK,
+    `Scene ${ctx.order + 1} of ${ctx.total}.`,
+    `Characters (locked): ${ctx.characterBible.trim()}.`,
+    `Location (locked): ${ctx.backgroundVisualPrompt.trim()}.`,
+    `Action for this frame only: ${action}.`,
+    "Same people, same clothes, same place — only pose and micro-action change."
+  ].join(" ");
+}
+
+export function buildVeoContinuityPrefix(ctx: ContinuityContext): string {
+  return [
+    CONTINUITY_LOCK,
+    `Scene ${ctx.order + 1} of ${ctx.total}.`,
+    `Character lock: ${ctx.characterBible.trim()}.`,
+    `Location lock: ${ctx.backgroundVisualPrompt.trim()}.`
+  ].join(" ");
+}
+
+function stripContinuityPrefix(text: string): string {
+  if (!text.includes(CONTINUITY_LOCK)) return text;
+  const idx = text.lastIndexOf("Action for this frame only:");
+  if (idx >= 0) return text.slice(idx + "Action for this frame only:".length).trim();
+  return text.replace(CONTINUITY_LOCK, "").trim();
+}
+
+function prefixScenePrompt(existing: string, ctx: ContinuityContext): string {
+  const core = stripContinuityPrefix(existing).trim();
+  const prefix = `Same cast & location. ${ctx.characterBible.trim()}. `;
+  const combined = `${prefix}${core}`;
+  return combined.length <= 1200 ? combined : combined.slice(0, 1200);
+}
+
+/** Post-process script output so every scene carries locked cast/location tokens. */
+export function applyContinuityToScript(
+  output: ScriptOutput,
+  explicitCharacterBible?: string | null
+): ScriptOutput {
+  const characterBible = deriveCharacterBible(output.backgroundVisualPrompt, explicitCharacterBible ?? output.characterBible);
+  const total = output.scenes.length;
+
+  const scenes: SceneSpec[] = output.scenes.map((scene, index) => {
+    const ctx: ContinuityContext = {
+      characterBible,
+      backgroundVisualPrompt: output.backgroundVisualPrompt,
+      order: index,
+      total
+    };
+    const actionSource = scene.referenceImagePrompt ?? scene.visualPrompt ?? scene.veoPrompt;
+    return {
+      ...scene,
+      visualPrompt: prefixScenePrompt(scene.visualPrompt, ctx),
+      veoPrompt: prefixScenePrompt(scene.veoPrompt, ctx),
+      referenceImagePrompt: buildReferenceImagePrompt({ ...ctx, sceneAction: actionSource }),
+      firstFramePrompt: scene.firstFramePrompt
+        ? buildReferenceImagePrompt({ ...ctx, sceneAction: scene.firstFramePrompt })
+        : scene.firstFramePrompt,
+      lastFramePrompt: scene.lastFramePrompt
+        ? buildReferenceImagePrompt({ ...ctx, sceneAction: scene.lastFramePrompt })
+        : scene.lastFramePrompt
+    };
+  });
+
+  return { ...output, characterBible, scenes };
+}
+
+export type ReferenceImageBytes = { data: Buffer; mimeType: string };
+
+export const REFERENCE_IMAGE_INSTRUCTION =
+  "The attached reference image shows the EXACT characters and location. Generate the next frame with IDENTICAL people, faces, wardrobe, and setting; only change pose/action as described.";

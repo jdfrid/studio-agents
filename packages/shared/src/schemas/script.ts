@@ -42,6 +42,8 @@ export const ScriptOutputSchema = z.object({
   totalDurationSeconds: z.number().int().min(1),
   musicPrompt: z.string().min(1),
   backgroundVisualPrompt: z.string().min(1),
+  /** Locked cast appearance tokens — same in every scene (system-enforced). */
+  characterBible: z.string().min(1).max(800),
   geminiModel: z.string().optional()
 });
 export type ScriptOutput = z.infer<typeof ScriptOutputSchema>;

@@ -52,6 +52,7 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
         veoPrompt: enrichVeoPrompt({
           veoPrompt: scene.veoPrompt,
           backgroundVisualPrompt: script.backgroundVisualPrompt,
+          characterBible: script.characterBible,
           order: scene.order,
           total: script.scenes.length,
           referenceImagePrompt: scene.referenceImagePrompt ?? null,
@@ -267,6 +268,7 @@ function renderInstructionsMarkdown(brief: BriefOutput, script: ScriptOutput, ti
 function enrichVeoPrompt(input: {
   veoPrompt: string;
   backgroundVisualPrompt: string;
+  characterBible: string;
   order: number;
   total: number;
   referenceImagePrompt: string | null;
@@ -274,7 +276,8 @@ function enrichVeoPrompt(input: {
   textToVideoOnly: boolean;
 }): string {
   const bible = input.backgroundVisualPrompt.trim();
-  const continuity = `Same location, characters, lighting and wardrobe throughout. Scene ${input.order + 1} of ${input.total}.`;
+  const cast = input.characterBible.trim();
+  const continuity = `Same exact characters (${cast}). Same location throughout. Scene ${input.order + 1} of ${input.total}.`;
   const prefix = bible ? `${continuity} Visual bible: ${bible}. ` : `${continuity} `;
   const refPrompt = (input.referenceFramePrompt ?? input.referenceImagePrompt ?? "").trim();
   const refSuffix =

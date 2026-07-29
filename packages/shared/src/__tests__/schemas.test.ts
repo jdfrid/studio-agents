@@ -36,6 +36,27 @@ describe("Script schemas", () => {
         scenes: [],
         totalDurationSeconds: 1,
         musicPrompt: "m",
+        backgroundVisualPrompt: "b",
+        characterBible: "Fixed cast"
+      })
+    ).toThrow();
+  });
+  it("script output requires character bible", () => {
+    expect(() =>
+      ScriptOutputSchema.parse({
+        scenes: [
+          {
+            id: "a",
+            order: 0,
+            title: "T",
+            narration: "N",
+            visualPrompt: "V",
+            veoPrompt: "Veo",
+            durationSeconds: 8
+          }
+        ],
+        totalDurationSeconds: 8,
+        musicPrompt: "m",
         backgroundVisualPrompt: "b"
       })
     ).toThrow();

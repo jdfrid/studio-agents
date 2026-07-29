@@ -28,7 +28,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     if (!provider) throw new NoProviderConfiguredError("GEMINI");
 
     const system =
-      "You are a senior creative producer. Convert free-form briefs into a single strict JSON object describing the production requirements for a short promotional video.";
+      "You are a senior creative producer. Convert free-form briefs into a single strict JSON object describing the production requirements for a short promotional video. visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots.";
     const schemaHint = JSON.stringify(
       {
         title: "string",

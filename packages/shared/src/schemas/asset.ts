@@ -3,6 +3,8 @@ import { z } from "zod";
 export const AssetInputSchema = z.object({
   aspectRatio: z.string(),
   budgetMode: z.boolean().default(false),
+  backgroundVisualPrompt: z.string().optional(),
+  characterBible: z.string().optional(),
   scenes: z.array(
     z.object({
       sceneId: z.string(),

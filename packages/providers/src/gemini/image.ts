@@ -15,6 +15,8 @@ export interface GeminiImageRequest {
   prompt: string;
   aspectRatio: string;
   referenceImageUrls?: string[];
+  /** Prior frame bytes for visual continuity (inline conditioning). */
+  referenceImages?: Array<{ data: Buffer; mimeType: string }>;
 }
 
 export interface GeminiImageResponse {
@@ -44,7 +46,23 @@ function buildImageGenerationBody(prompt: string, req: GeminiImageRequest) {
   const referenceNote = req.referenceImageUrls?.length
     ? `\nUse these references for style/product consistency: ${req.referenceImageUrls.join(", ")}`
     : "";
+  const hasInlineRefs = (req.referenceImages?.length ?? 0) > 0;
+  const inlineRefNote = hasInlineRefs
+    ? `\n${REFERENCE_IMAGE_INSTRUCTION}`
+    : "";
   const aspectRatio = normalizeGeminiImageAspectRatio(req.aspectRatio);
+  const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+  for (const ref of req.referenceImages ?? []) {
+    parts.push({
+      inlineData: {
+        mimeType: ref.mimeType,
+        data: ref.data.toString("base64")
+      }
+    });
+  }
+  parts.push({
+    text: `${prompt}\nAspect ratio: ${aspectRatio}.${referenceNote}${inlineRefNote}\nReturn a single production-ready reference frame.`
+  });
   return {
     generationConfig: {
       // IMAGE-only modality often returns HTTP 200 with empty parts — both are required.
@@ -57,15 +75,14 @@ function buildImageGenerationBody(prompt: string, req: GeminiImageRequest) {
     contents: [
       {
         role: "user",
-        parts: [
-          {
-            text: `${prompt}\nAspect ratio: ${aspectRatio}.${referenceNote}\nReturn a single production-ready reference frame.`
-          }
-        ]
+        parts
       }
     ]
   };
 }
+
+const REFERENCE_IMAGE_INSTRUCTION =
+  "The attached reference image shows the EXACT characters and location. Generate the next frame with IDENTICAL people, faces, wardrobe, and setting; only change pose/action as described.";
 
 export async function geminiGenerateImage(
   provider: ProviderCredentialView,
