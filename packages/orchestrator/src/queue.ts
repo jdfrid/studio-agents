@@ -46,7 +46,9 @@ export async function enqueueStage(stage: StageName, data: StageJobData): Promis
   const jobId = `${data.runId}-${stage}`;
   const existing = await queue.getJob(jobId);
   if (existing) await existing.remove();
-  await queue.add(`run-${data.runId}`, data, { jobId });
+  // Paid API stages must not auto-retry — a concat failure would re-bill every scene clip.
+  const attempts = stage === "render" || stage === "asset" ? 1 : 3;
+  await queue.add(`run-${data.runId}`, data, { jobId, attempts });
 }
 
 export async function getQueueStats(): Promise<

@@ -3,7 +3,7 @@ import { DEFAULT_USD_TO_ILS, veoGenerateAudio, veoPerSecondUsd } from "./budget.
 import type { CostPricingSource, GeminiUsageMetadata } from "./geminiPricing.js";
 import { priceFromUsageMetadata } from "./geminiPricing.js";
 import type { RenderProfileId } from "./renderProfiles.js";
-import { getRenderProfile } from "./renderProfiles.js";
+import { getRenderProfile, profileVideoPerSecondUsd } from "./renderProfiles.js";
 
 export type { CostPricingSource } from "./geminiPricing.js";
 
@@ -77,12 +77,21 @@ export function priceVeoScene(
   durationSeconds: number,
   generateAudio = veoGenerateAudio()
 ): { usd: number; billedUnits: number; unit: CostBilledUnit } {
-  const perSecond = veoPerSecondUsd(model, generateAudio);
+  const perSecond = videoPerSecondUsd(model, generateAudio);
   return {
     usd: durationSeconds * perSecond,
     billedUnits: durationSeconds,
     unit: "veo_seconds"
   };
+}
+
+/** USD per second for ledger estimates (Veo or Kling/fal). */
+export function videoPerSecondUsd(model: string, generateAudio = veoGenerateAudio()): number {
+  const m = model.toLowerCase();
+  if (m.includes("kling") || m.includes("fal-ai/kling")) {
+    return profileVideoPerSecondUsd(getRenderProfile("kling-i2v"));
+  }
+  return veoPerSecondUsd(model, generateAudio);
 }
 
 export function priceGeminiImage(): { usd: number; billedUnits: number; unit: CostBilledUnit } {

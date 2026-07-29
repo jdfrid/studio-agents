@@ -62,6 +62,11 @@ export function CostIndicator({
           {showActual ? "עלות בפועל (Cost Ledger)" : "משוער לפני ריצה (תערифון)"}
         </span>
       </div>
+      {multiAttempt && showActual ? (
+        <p className="cost-indicator-warning">
+          יותר מניסיון אחד בריצה — ייתכן חיוב כפול על Kling/Veo (למשל כשל concat או retry). Rerun על render משתמש מחדש בקליפים קיימים.
+        </p>
+      ) : null}
       {showActual && Math.abs(actualCostNis! - estimate.nis) > 0.5 ? (
         <p className="cost-indicator-actual-length muted">
           הערכה לפני ריצה (ריצה אחת): {formatCostNis(estimate.nis)}

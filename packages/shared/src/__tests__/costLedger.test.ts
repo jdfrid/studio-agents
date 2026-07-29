@@ -14,6 +14,11 @@ describe("costLedger", () => {
     expect(usd).toBeCloseTo(0.32, 2);
   });
 
+  it("prices Kling/fal model at kling rate not Veo unknown tier", () => {
+    const { usd } = priceVeoScene("fal-ai/kling-video/v2.1/standard/image-to-video", 10, false);
+    expect(usd).toBeCloseTo(0.9, 2);
+  });
+
   it("prices image call", () => {
     expect(priceGeminiImage().usd).toBe(0.04);
   });

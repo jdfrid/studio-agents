@@ -12,6 +12,7 @@ import {
   getRenderProfile,
   type Agent,
   type AgentContext,
+  type ArtifactRecord,
   type GcsClient,
   type ProviderCredentialView,
   type RenderInput,
@@ -58,6 +59,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
     const perScene: RenderSceneResult[] = [];
     const clipFiles: string[] = [];
     const geminiOperations: RenderOutput["geminiOperations"] = [];
+    const existingClips = await loadExistingSceneClips(ctx);
 
     try {
       if (renderProfile.strategy === "extend") {
@@ -71,6 +73,33 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           order: scene.order,
           renderProfile: renderProfile.id
         });
+
+        const cached = existingClips.get(scene.sceneId);
+        const cachedHash = cached?.promptHash ?? "";
+        if (cached && (!cachedHash || cachedHash === promptHash)) {
+          await ctx.log.log("render_reuse_clip", "Reusing existing rendered clip (no re-bill)", {
+            sceneId: scene.sceneId,
+            artifactId: cached.artifact.id,
+            promptHash
+          });
+          const downloaded = await ctx.storage.download(cached.artifact.gcsPath);
+          const scenePath = path.join(dir, `scene-${scene.order}-reused.mp4`);
+          await writeFile(scenePath, downloaded.body);
+          clipFiles.push(scenePath);
+          const durationSeconds = await probeDuration(scenePath);
+          perScene.push({
+            sceneId: scene.sceneId,
+            artifactId: cached.artifact.id,
+            gcsPath: cached.artifact.gcsPath,
+            durationSeconds,
+            provider: String(cached.artifact.metadata.provider ?? "cached"),
+            model: String(cached.artifact.metadata.model ?? ""),
+            geminiOperationName: String(cached.artifact.metadata.geminiOperationName ?? ""),
+            promptHash
+          });
+          continue;
+        }
+
         const referenceSource =
           scene.referenceFrame?.gcsPath || scene.referenceFrame?.signedUrl ? scene.referenceFrame : scene.background;
         const [referenceImage, firstFrame, lastFrame] = await Promise.all([
@@ -1008,4 +1037,21 @@ async function runFfmpeg(args: string[]): Promise<void> {
       reject(new Error(`ffmpeg exited ${code}: ${stderr.slice(-800)}`));
     });
   });
+}
+
+async function loadExistingSceneClips(
+  ctx: AgentContext
+): Promise<Map<string, { artifact: ArtifactRecord; promptHash?: string }>> {
+  const rows = await ctx.artifacts.list(ctx.runId, "render");
+  const map = new Map<string, { artifact: ArtifactRecord; promptHash?: string }>();
+  for (const row of rows) {
+    if (row.kind !== "scene_rendered_clip") continue;
+    const sceneId = row.metadata.sceneId;
+    if (typeof sceneId !== "string" || !sceneId) continue;
+    map.set(sceneId, {
+      artifact: row,
+      promptHash: typeof row.metadata.promptHash === "string" ? row.metadata.promptHash : undefined
+    });
+  }
+  return map;
 }
