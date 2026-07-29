@@ -55,11 +55,16 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
 
     const dir = path.join(tmpdir(), `studio-agents-${ctx.runId}-${nanoid(6)}`);
     await mkdir(dir, { recursive: true });
+    const dimensions = targetVideoDimensions(input.aspectRatio);
 
     const perScene: RenderSceneResult[] = [];
     const clipFiles: string[] = [];
     const geminiOperations: RenderOutput["geminiOperations"] = [];
     const existingClips = await loadExistingSceneClips(ctx);
+    await ctx.log.log("render_clip_cache", "Existing rendered clips for reuse", {
+      cachedScenes: existingClips.size,
+      timelineScenes: input.timeline.length
+    });
 
     try {
       if (renderProfile.strategy === "extend") {
@@ -83,15 +88,15 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
             promptHash
           });
           const downloaded = await ctx.storage.download(cached.artifact.gcsPath);
-          const scenePath = path.join(dir, `scene-${scene.order}-reused.mp4`);
-          await writeFile(scenePath, downloaded.body);
-          clipFiles.push(scenePath);
-          const durationSeconds = await probeDuration(scenePath);
+          const rawReuse = path.join(dir, `scene-${scene.order}-reused-raw.mp4`);
+          await writeFile(rawReuse, downloaded.body);
+          const finalizedReuse = await finalizeSceneClip(rawReuse, dir, scene.sceneId, dimensions);
+          clipFiles.push(finalizedReuse.path);
           perScene.push({
             sceneId: scene.sceneId,
             artifactId: cached.artifact.id,
             gcsPath: cached.artifact.gcsPath,
-            durationSeconds,
+            durationSeconds: finalizedReuse.durationSeconds,
             provider: String(cached.artifact.metadata.provider ?? "cached"),
             model: String(cached.artifact.metadata.model ?? ""),
             geminiOperationName: String(cached.artifact.metadata.geminiOperationName ?? ""),
@@ -136,7 +141,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         const rawPath = path.join(dir, `scene-${scene.order}-raw.mp4`);
         await writeFile(rawPath, result.videoBytes);
         const mixedPath = await mixSceneAudio(rawPath, scene, dir, ctx.storage);
-        const finalized = await finalizeSceneClip(mixedPath, dir, scene.sceneId);
+        const finalized = await finalizeSceneClip(mixedPath, dir, scene.sceneId, dimensions);
         const scenePath = finalized.path;
         clipFiles.push(scenePath);
 
@@ -175,7 +180,8 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         clipFiles,
         concatPath,
         dir,
-        perScene.map((s) => s.durationSeconds)
+        perScene.map((s) => s.durationSeconds),
+        dimensions
       );
 
       const musicScene = input.timeline.find((s) => s.music.gcsPath || s.music.signedUrl);
@@ -330,7 +336,12 @@ async function renderExtendChain(
   const rawPath = path.join(dir, `extend-chain-${nanoid(6)}-raw.mp4`);
   await writeFile(rawPath, lastResult.videoBytes);
   const mixedPath = await mixExtendTimelineAudio(rawPath, sortedTimeline, dir, ctx.storage);
-  const finalized = await finalizeSceneClip(mixedPath, dir, "extend-chain");
+  const finalized = await finalizeSceneClip(
+    mixedPath,
+    dir,
+    "extend-chain",
+    targetVideoDimensions(input.aspectRatio)
+  );
   const totalDurationSeconds = finalized.durationSeconds;
 
   const clipArtifact = await ctx.artifacts.save({
@@ -738,7 +749,8 @@ async function concatClips(
   clipPaths: string[],
   outputPath: string,
   dir: string,
-  clipDurations?: number[]
+  clipDurations: number[] | undefined,
+  dimensions: VideoDimensions
 ): Promise<void> {
   if (clipPaths.length === 0) {
     throw new Error("Cannot concat: no clips rendered");
@@ -750,7 +762,7 @@ async function concatClips(
       if (!info || info.size < 512) {
         throw new Error(`Rendered clip ${index + 1} is empty or missing (${clipPath})`);
       }
-      return (await finalizeSceneClip(clipPath, dir, `concat-prep-${index}`)).path;
+      return (await finalizeSceneClip(clipPath, dir, `concat-prep-${index}`, dimensions)).path;
     })
   );
 
@@ -772,55 +784,106 @@ async function concatClips(
   const xfadeSeconds = sceneXfadeSeconds(prepared.length);
   if (xfadeSeconds > 0) {
     try {
-      await concatClipsWithXfade(prepared, outputPath, durations, xfadeSeconds, dir);
+      await concatClipsWithXfade(prepared, outputPath, durations, xfadeSeconds, dir, dimensions);
       return;
     } catch {
       // Pairwise / filter xfade can fail on long timelines — fall back to hard cuts.
     }
   }
 
-  await concatClipsHardCut(prepared, outputPath);
+  await concatClipsHardCut(prepared, outputPath, dimensions);
 }
 
-/** Join normalized clips with the concat filter (hard cuts, single encode pass). */
-async function concatClipsHardCut(prepared: string[], outputPath: string): Promise<void> {
+type VideoDimensions = { width: number; height: number };
+
+function targetVideoDimensions(aspectRatio: string): VideoDimensions {
+  if (aspectRatio === "16:9") return { width: 1280, height: 720 };
+  if (aspectRatio === "1:1") return { width: 1080, height: 1080 };
+  return { width: 720, height: 1280 };
+}
+
+function normalizeVideoFilter(width: number, height: number): string {
+  return `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`;
+}
+
+/** Join normalized clips — scales each input so Kling/Veo dimension mismatches cannot break concat. */
+async function concatClipsHardCut(prepared: string[], outputPath: string, dimensions: VideoDimensions): Promise<void> {
+  const n = prepared.length;
+  const vf = normalizeVideoFilter(dimensions.width, dimensions.height);
+  const parts: string[] = [];
+  for (let i = 0; i < n; i += 1) {
+    parts.push(`[${i}:v:0]${vf},setpts=PTS-STARTPTS[v${i}]`);
+    parts.push(`[${i}:a:0]aformat=sample_rates=44100:channel_layouts=stereo,asetpts=PTS-STARTPTS[a${i}]`);
+  }
+  const vCat = Array.from({ length: n }, (_, i) => `[v${i}]`).join("");
+  const aCat = Array.from({ length: n }, (_, i) => `[a${i}]`).join("");
+  const filter = `${parts.join(";")};${vCat}${aCat}concat=n=${n}:v=1:a=1[vout][aout]`;
   const inputs: string[] = [];
   for (const clip of prepared) {
     inputs.push("-i", clip);
   }
-  const n = prepared.length;
-  const vInputs = Array.from({ length: n }, (_, i) => `[${i}:v:0]`).join("");
-  const aInputs = Array.from({ length: n }, (_, i) => `[${i}:a:0]`).join("");
-  const filter = `${vInputs}${aInputs}concat=n=${n}:v=1:a=1[vout][aout]`;
-  await runFfmpeg([
-    ...inputs,
-    "-filter_complex",
-    filter,
-    "-map",
-    "[vout]",
-    "-map",
-    "[aout]",
-    "-c:v",
-    "libx264",
-    "-preset",
-    "fast",
-    "-crf",
-    "23",
-    "-pix_fmt",
-    "yuv420p",
-    "-c:a",
-    "aac",
-    "-b:a",
-    "128k",
-    "-ar",
-    "44100",
-    "-ac",
-    "2",
-    "-movflags",
-    "+faststart",
-    "-y",
-    outputPath
-  ]);
+  try {
+    await runFfmpeg([
+      ...inputs,
+      "-filter_complex",
+      filter,
+      "-map",
+      "[vout]",
+      "-map",
+      "[aout]",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      "-movflags",
+      "+faststart",
+      "-y",
+      outputPath
+    ]);
+  } catch (error) {
+    const listPath = path.join(path.dirname(outputPath), `concat-fallback-${nanoid(4)}.txt`);
+    await writeFile(
+      listPath,
+      prepared.map((p) => `file '${p.replace(/\\/g, "/")}'`).join("\n"),
+      "utf8"
+    );
+    await runFfmpeg([
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      listPath,
+      "-c:v",
+      "libx264",
+      "-vf",
+      vf,
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      "-movflags",
+      "+faststart",
+      "-y",
+      outputPath
+    ]);
+  }
 }
 
 function sceneXfadeSeconds(clipCount: number): number {
@@ -836,12 +899,13 @@ async function concatClipsWithXfade(
   outputPath: string,
   durations: number[],
   xfadeSeconds: number,
-  dir: string
+  dir: string,
+  dimensions: VideoDimensions
 ): Promise<void> {
   const normalized = await Promise.all(
     clipPaths.map(async (clipPath, index) => {
       if (await probeHasAudio(clipPath)) return clipPath;
-      return (await finalizeSceneClip(clipPath, path.dirname(clipPath), `xfade-audio-${index}`)).path;
+      return (await finalizeSceneClip(clipPath, path.dirname(clipPath), `xfade-audio-${index}`, dimensions)).path;
     })
   );
 
@@ -914,20 +978,24 @@ async function mergeTwoClipsWithXfade(
   ]);
 }
 
-/** Normalize each scene clip to the same codec and ensure an audio track exists. */
+/** Normalize each scene clip to the same codec, resolution, fps, and ensure an audio track exists. */
 async function finalizeSceneClip(
   inputPath: string,
   dir: string,
-  sceneId: string
+  sceneId: string,
+  dimensions: VideoDimensions
 ): Promise<{ path: string; durationSeconds: number }> {
   const rawDur = await probeDuration(inputPath);
   const dur = Math.max(0.1, rawDur);
   const hasAudio = await probeHasAudio(inputPath);
   const out = path.join(dir, `scene-final-${sceneId}-${nanoid(4)}.mp4`);
+  const vf = normalizeVideoFilter(dimensions.width, dimensions.height);
   if (hasAudio) {
     await runFfmpeg([
       "-i",
       inputPath,
+      "-vf",
+      vf,
       "-c:v",
       "libx264",
       "-preset",
@@ -959,6 +1027,8 @@ async function finalizeSceneClip(
       "lavfi",
       "-i",
       "anullsrc=r=44100:cl=stereo",
+      "-vf",
+      vf,
       "-map",
       "0:v:0",
       "-map",
