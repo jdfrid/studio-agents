@@ -20,7 +20,7 @@ import {
   type RenderSceneResult,
   type SceneTimelineEntry
 } from "@studio/shared";
-import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdir, writeFile, readFile, rm, stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -714,56 +714,124 @@ async function concatClips(
   if (clipPaths.length === 0) {
     throw new Error("Cannot concat: no clips rendered");
   }
-  if (clipPaths.length === 1) {
-    await runFfmpeg(["-i", clipPaths[0]!, "-c", "copy", "-movflags", "+faststart", "-y", outputPath]);
+
+  const prepared = await Promise.all(
+    clipPaths.map(async (clipPath, index) => {
+      const info = await stat(clipPath).catch(() => null);
+      if (!info || info.size < 512) {
+        throw new Error(`Rendered clip ${index + 1} is empty or missing (${clipPath})`);
+      }
+      return (await finalizeSceneClip(clipPath, dir, `concat-prep-${index}`)).path;
+    })
+  );
+
+  if (prepared.length === 1) {
+    await runFfmpeg(["-i", prepared[0]!, "-c", "copy", "-movflags", "+faststart", "-y", outputPath]);
     return;
   }
 
   const xfadeSeconds = sceneXfadeSeconds();
+  const durations =
+    clipDurations?.length === prepared.length
+      ? clipDurations
+      : await Promise.all(prepared.map((p) => probeDuration(p)));
+  for (const dur of durations) {
+    if (!Number.isFinite(dur) || dur <= 0.05) {
+      throw new Error(`Invalid clip duration (${dur}) — cannot concat`);
+    }
+  }
+
   if (xfadeSeconds > 0) {
-    const durations =
-      clipDurations?.length === clipPaths.length
-        ? clipDurations
-        : await Promise.all(clipPaths.map((p) => probeDuration(p)));
-    await concatClipsWithXfade(clipPaths, outputPath, durations, xfadeSeconds);
+    await concatClipsWithXfade(prepared, outputPath, durations, xfadeSeconds);
     return;
   }
 
   const listPath = path.join(dir, `concat-${nanoid(6)}.txt`);
   await writeFile(
     listPath,
-    clipPaths.map((p) => `file '${p.replace(/\\/g, "/")}'`).join("\n"),
+    prepared.map((p) => `file '${p.replace(/\\/g, "/")}'`).join("\n"),
     "utf8"
   );
-  // Re-encode for seamless joins (copy concat glitches when clip codecs differ).
-  await runFfmpeg([
-    "-f",
-    "concat",
-    "-safe",
-    "0",
-    "-i",
-    listPath,
-    "-c:v",
-    "libx264",
-    "-preset",
-    "fast",
-    "-crf",
-    "23",
-    "-pix_fmt",
-    "yuv420p",
-    "-c:a",
-    "aac",
-    "-b:a",
-    "128k",
-    "-ar",
-    "44100",
-    "-ac",
-    "2",
-    "-movflags",
-    "+faststart",
-    "-y",
-    outputPath
-  ]);
+
+  try {
+    await runFfmpeg([
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      listPath,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      "-movflags",
+      "+faststart",
+      "-y",
+      outputPath
+    ]);
+  } catch (error) {
+    const videoOnlyPath = path.join(dir, `concat-video-${nanoid(4)}.mp4`);
+    await runFfmpeg([
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      listPath,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-pix_fmt",
+      "yuv420p",
+      "-an",
+      "-movflags",
+      "+faststart",
+      "-y",
+      videoOnlyPath
+    ]);
+    const dur = durations.reduce((sum, d) => sum + d, 0);
+    await runFfmpeg([
+      "-i",
+      videoOnlyPath,
+      "-f",
+      "lavfi",
+      "-i",
+      "anullsrc=r=44100:cl=stereo",
+      "-map",
+      "0:v:0",
+      "-map",
+      "1:a:0",
+      "-c:v",
+      "copy",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-t",
+      String(Math.max(0.1, dur)),
+      "-shortest",
+      "-movflags",
+      "+faststart",
+      "-y",
+      outputPath
+    ]);
+  }
 }
 
 function sceneXfadeSeconds(): number {
@@ -778,8 +846,15 @@ async function concatClipsWithXfade(
   durations: number[],
   xfadeSeconds: number
 ): Promise<void> {
+  const normalized = await Promise.all(
+    clipPaths.map(async (clipPath, index) => {
+      if (await probeHasAudio(clipPath)) return clipPath;
+      return (await finalizeSceneClip(clipPath, path.dirname(clipPath), `xfade-audio-${index}`)).path;
+    })
+  );
+
   const inputs: string[] = [];
-  for (const clip of clipPaths) {
+  for (const clip of normalized) {
     inputs.push("-i", clip);
   }
 
@@ -792,16 +867,16 @@ async function concatClipsWithXfade(
   let aIn = "0:a";
   let offset = durations[0]! - fade;
 
-  for (let i = 1; i < clipPaths.length; i++) {
-    const vOut = i === clipPaths.length - 1 ? "vout" : `v${i}`;
-    const aOut = i === clipPaths.length - 1 ? "aout" : `a${i}`;
+  for (let i = 1; i < normalized.length; i++) {
+    const vOut = i === normalized.length - 1 ? "vout" : `v${i}`;
+    const aOut = i === normalized.length - 1 ? "aout" : `a${i}`;
     videoParts.push(
       `[${vIn}][${i}:v]xfade=transition=fade:duration=${fade}:offset=${Math.max(0, offset).toFixed(3)}[${vOut}]`
     );
     audioParts.push(`[${aIn}][${i}:a]acrossfade=d=${fade}:c1=tri:c2=tri[${aOut}]`);
     vIn = vOut;
     aIn = aOut;
-    if (i < clipPaths.length - 1) {
+    if (i < normalized.length - 1) {
       offset += durations[i]! - fade;
     }
   }
@@ -844,7 +919,8 @@ async function finalizeSceneClip(
   dir: string,
   sceneId: string
 ): Promise<{ path: string; durationSeconds: number }> {
-  const dur = await probeDuration(inputPath);
+  const rawDur = await probeDuration(inputPath);
+  const dur = Math.max(0.1, rawDur);
   const hasAudio = await probeHasAudio(inputPath);
   const out = path.join(dir, `scene-final-${sceneId}-${nanoid(4)}.mp4`);
   if (hasAudio) {

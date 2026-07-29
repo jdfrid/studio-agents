@@ -64,6 +64,22 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
     let anchorReference: ReferenceImageBytes | null = null;
 
+    if (input.visualAnchorGcsPath) {
+
+      const anchor = await ctx.storage.download(input.visualAnchorGcsPath);
+
+      chainReference = { data: anchor.body, mimeType: anchor.mimeType };
+
+      anchorReference = chainReference;
+
+      await ctx.log.log("asset_visual_anchor", "Using brief visual anchor for continuity", {
+
+        gcsPath: input.visualAnchorGcsPath
+
+      });
+
+    }
+
     const existingReferences = await loadExistingReferenceFrames(ctx);
 
 
@@ -72,45 +88,69 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
       if (scene.uploadedAssetGcsPath) {
 
-        // Trust the upload from the brief stage; create an artifact record pointing at it.
+        const uploaded = await ctx.storage.download(scene.uploadedAssetGcsPath);
 
-        const artifact = await ctx.artifacts.save({
+        const uploadedMime = uploaded.mimeType.startsWith("video/") ? uploaded.mimeType : "image/png";
+
+        const referenceArtifact = await ctx.artifacts.save({
 
           runId: ctx.runId,
 
           stage: "asset",
 
-          kind: scene.preferredKind === "image" ? "scene_image_source" : "scene_video_source",
+          kind: "scene_reference_frame",
 
-          body: Buffer.from(""),
+          body: uploaded.body,
 
-          mimeType: scene.preferredKind === "image" ? "image/jpeg" : "video/mp4",
+          mimeType: uploadedMime,
 
-          filename: `scene-${scene.sceneId}-ref.bin`,
+          filename: `scene-${scene.sceneId}-uploaded-reference.png`,
 
           metadata: { sceneId: scene.sceneId, viaUpload: true, originalGcsPath: scene.uploadedAssetGcsPath }
 
         });
 
+        const referenceSignedUrl = await ctx.storage.signedUrl(referenceArtifact.gcsPath);
+
+        const frameRef: ReferenceImageBytes = { data: uploaded.body, mimeType: uploadedMime };
+
+        if (!anchorReference) anchorReference = frameRef;
+
+        chainReference = frameRef;
+
         perScene.push({
 
           sceneId: scene.sceneId,
 
-          kind: scene.preferredKind,
+          kind: scene.preferredKind === "video" ? "video" : "image",
 
           sourceProvider: "user-upload",
 
           sourceUrl: null,
 
-          artifactId: artifact.id,
+          artifactId: referenceArtifact.id,
 
-          gcsPath: scene.uploadedAssetGcsPath,
+          gcsPath: referenceArtifact.gcsPath,
 
-          mimeType: scene.preferredKind === "image" ? "image/jpeg" : "video/mp4",
+          mimeType: uploadedMime,
 
           width: null,
 
-          height: null
+          height: null,
+
+          referenceFrame: {
+
+            artifactId: referenceArtifact.id,
+
+            gcsPath: referenceArtifact.gcsPath,
+
+            signedUrl: referenceSignedUrl,
+
+            prompt: "user upload",
+
+            model: "manual"
+
+          }
 
         });
 
@@ -410,7 +450,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
     await ctx.log.log("asset_done", "Asset Agent finished", { collected: perScene.length });
 
-    return { perScene };
+    return { perScene, visualAnchorGcsPath: input.visualAnchorGcsPath };
 
   }
 

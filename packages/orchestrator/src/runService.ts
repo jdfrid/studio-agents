@@ -132,12 +132,18 @@ export interface StageArtifactAttachFinal {
   type: "final";
 }
 
+export interface StageArtifactAttachVisualAnchor {
+  type: "visualAnchor";
+  sceneId?: string;
+}
+
 export type StageArtifactAttach =
   | StageArtifactAttachVoice
   | StageArtifactAttachMusic
   | StageArtifactAttachFrame
   | StageArtifactAttachSceneClip
-  | StageArtifactAttachFinal;
+  | StageArtifactAttachFinal
+  | StageArtifactAttachVisualAnchor;
 
 export async function uploadStageArtifact(
   runId: string,
@@ -179,6 +185,8 @@ export async function uploadStageArtifact(
 
 function resolveArtifactKind(attach: StageArtifactAttach, mimeType: string): ArtifactKind {
   switch (attach.type) {
+    case "visualAnchor":
+      return mimeType.startsWith("video/") ? "scene_video_source" : "scene_image_source";
     case "voice":
       return "voice_clip";
     case "music":
@@ -207,6 +215,44 @@ function applyArtifactAttach(
   signedUrl: string | null = null
 ): unknown {
   const output = structuredClone(rawOutput) as Record<string, unknown>;
+
+  if (attach.type === "visualAnchor") {
+    if (attach.sceneId && Array.isArray(output.perScene)) {
+      const perScene = output.perScene as Array<Record<string, unknown>>;
+      let row = perScene.find((s) => s.sceneId === attach.sceneId);
+      if (!row) {
+        row = { sceneId: attach.sceneId, kind: "image", sourceProvider: "manual" };
+        perScene.push(row);
+      }
+      row.referenceFrame = {
+        artifactId: artifact.id,
+        gcsPath: artifact.gcsPath,
+        signedUrl,
+        prompt: "manual upload",
+        model: "manual"
+      };
+      row.artifactId = artifact.id;
+      row.gcsPath = artifact.gcsPath;
+      row.mimeType = artifact.mimeType;
+      output.perScene = perScene;
+      return output;
+    }
+    if (typeof output.summary === "string") {
+      const anchors = Array.isArray(output.visualAnchors)
+        ? (output.visualAnchors as Array<Record<string, unknown>>)
+        : [];
+      anchors.push({
+        name: artifact.gcsPath.split("/").pop() ?? "visual-anchor",
+        gcsPath: artifact.gcsPath,
+        mimeType: artifact.mimeType,
+        role: "anchor"
+      });
+      output.visualAnchors = anchors;
+      return output;
+    }
+    output.visualAnchorGcsPath = artifact.gcsPath;
+    return output;
+  }
 
   if (attach.type === "music") {
     const music = (output.music ?? {}) as Record<string, unknown>;

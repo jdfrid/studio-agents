@@ -166,6 +166,7 @@ export async function registerRoutes(app: FastifyInstance) {
             type: z.enum(["referenceFrame", "firstFrame", "lastFrame", "background"]),
             sceneId: z.string()
           }),
+          z.object({ type: z.literal("visualAnchor"), sceneId: z.string().optional() }),
           z.object({ type: z.literal("sceneClip"), sceneId: z.string() }),
           z.object({ type: z.literal("final") })
         ])

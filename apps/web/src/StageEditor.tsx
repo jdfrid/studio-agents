@@ -4,6 +4,61 @@ import type { ProjectRunView, StageName } from "./types.js";
 
 const EDITABLE_STAGES = new Set<StageName>(["brief", "script", "audio", "asset", "package", "render", "series"]);
 
+type UploadAttach =
+  | { type: "voice"; sceneId: string }
+  | { type: "music" }
+  | { type: "referenceFrame" | "firstFrame" | "lastFrame" | "background"; sceneId: string }
+  | { type: "sceneClip"; sceneId: string }
+  | { type: "final" }
+  | { type: "visualAnchor"; sceneId?: string };
+
+function FileUploadField({
+  label,
+  accept,
+  disabled,
+  busy,
+  onPick
+}: {
+  label: string;
+  accept: string;
+  disabled?: boolean;
+  busy?: boolean;
+  onPick: (file: File) => Promise<void>;
+}) {
+  const [status, setStatus] = useState<string>("");
+
+  async function handleChange(file: File | undefined) {
+    if (!file) return;
+    setStatus(`מעלה: ${file.name}…`);
+    try {
+      await onPick(file);
+      setStatus(`✓ הועלה: ${file.name}`);
+    } catch (err) {
+      setStatus(`שגיאה: ${(err as Error).message}`);
+    }
+  }
+
+  return (
+    <div className="upload-row">
+      <span>{label}</span>
+      <label className="file-picker-btn">
+        {busy ? "מעלה…" : "בחר קובץ"}
+        <input
+          type="file"
+          accept={accept}
+          disabled={disabled || busy}
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            void handleChange(file);
+          }}
+        />
+      </label>
+      {status ? <small className="upload-status">{status}</small> : null}
+    </div>
+  );
+}
+
 export function StageEditor({
   runId,
   stage,
@@ -87,15 +142,7 @@ export function StageUploadControls({
   if (!output || typeof output !== "object") return null;
   const data = output as Record<string, unknown>;
 
-  async function onFile(
-    file: File,
-    attach:
-      | { type: "voice"; sceneId: string }
-      | { type: "music" }
-      | { type: "referenceFrame" | "firstFrame" | "lastFrame" | "background"; sceneId: string }
-      | { type: "sceneClip"; sceneId: string }
-      | { type: "final" }
-  ) {
+  async function onFile(file: File, attach: UploadAttach) {
     setBusy(true);
     setError("");
     try {
@@ -104,9 +151,39 @@ export function StageUploadControls({
       onSaved();
     } catch (err) {
       setError((err as Error).message);
+      throw err;
     } finally {
       setBusy(false);
     }
+  }
+
+  if (stage === "brief") {
+    const anchors = Array.isArray(data.visualAnchors) ? data.visualAnchors : [];
+    return (
+      <div className="upload-controls">
+        <strong>תמונות בסיס (cast / look)</strong>
+        <p className="muted upload-hint">תמונת עוגן אחת לכל הסרטון — לא חייבת להיות משויכת לסצנה.</p>
+        <FileUploadField
+          label="תמונת בסיס / דמויות"
+          accept="image/*,video/*"
+          busy={busy}
+          onPick={(file) => onFile(file, { type: "visualAnchor" })}
+        />
+        {anchors.length > 0 ? (
+          <ul className="anchor-list">
+            {anchors.map((a, i) => {
+              const row = a as Record<string, unknown>;
+              return (
+                <li key={i}>
+                  {String(row.name ?? row.gcsPath ?? "anchor")} ({String(row.role ?? "anchor")})
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+        {error ? <p className="error-inline">{error}</p> : null}
+      </div>
+    );
   }
 
   if (stage === "audio") {
@@ -115,33 +192,15 @@ export function StageUploadControls({
       <div className="upload-controls">
         <strong>העלאה ידנית</strong>
         {perScene.map((row) => (
-          <label className="upload-row" key={String(row.sceneId)}>
-            קול · סצנה {String(row.sceneId)}
-            <input
-              type="file"
-              accept="audio/*"
-              disabled={busy}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void onFile(file, { type: "voice", sceneId: String(row.sceneId) });
-                e.target.value = "";
-              }}
-            />
-          </label>
-        ))}
-        <label className="upload-row">
-          מוזיקה
-          <input
-            type="file"
+          <FileUploadField
+            key={String(row.sceneId)}
+            label={`קול · סצנה ${String(row.sceneId)}`}
             accept="audio/*"
-            disabled={busy}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void onFile(file, { type: "music" });
-              e.target.value = "";
-            }}
+            busy={busy}
+            onPick={(file) => onFile(file, { type: "voice", sceneId: String(row.sceneId) })}
           />
-        </label>
+        ))}
+        <FileUploadField label="מוזיקה" accept="audio/*" busy={busy} onPick={(file) => onFile(file, { type: "music" })} />
         {error ? <p className="error-inline">{error}</p> : null}
       </div>
     );
@@ -152,23 +211,23 @@ export function StageUploadControls({
     return (
       <div className="upload-controls">
         <strong>הוספת ויזואל ידנית</strong>
+        <FileUploadField
+          label="תמונת בסיס לכל הסרטון"
+          accept="image/*,video/*"
+          busy={busy}
+          onPick={(file) => onFile(file, { type: "visualAnchor" })}
+        />
         {perScene.map((row) => (
           <div className="upload-scene" key={String(row.sceneId)}>
-            <span>סצנה {String(row.sceneId)}</span>
+            <span>סצנה {String(row.sceneId)} (אופציונלי)</span>
             {(["referenceFrame", "firstFrame", "lastFrame", "background"] as const).map((frameType) => (
-              <label className="upload-row" key={frameType}>
-                {frameType}
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  disabled={busy}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void onFile(file, { type: frameType, sceneId: String(row.sceneId) });
-                    e.target.value = "";
-                  }}
-                />
-              </label>
+              <FileUploadField
+                key={frameType}
+                label={frameType}
+                accept="image/*,video/*"
+                busy={busy}
+                onPick={(file) => onFile(file, { type: frameType, sceneId: String(row.sceneId) })}
+              />
             ))}
           </div>
         ))}
@@ -181,35 +240,17 @@ export function StageUploadControls({
     const perScene = Array.isArray(data.perScene) ? (data.perScene as Array<Record<string, unknown>>) : [];
     return (
       <div className="upload-controls">
-        <strong>החלפת קlip ידנית</strong>
+        <strong>החלפת clip ידנית</strong>
         {perScene.map((row) => (
-          <label className="upload-row" key={String(row.sceneId)}>
-            סצנה {String(row.sceneId)}
-            <input
-              type="file"
-              accept="video/*"
-              disabled={busy}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void onFile(file, { type: "sceneClip", sceneId: String(row.sceneId) });
-                e.target.value = "";
-              }}
-            />
-          </label>
-        ))}
-        <label className="upload-row">
-          סרטון סופי
-          <input
-            type="file"
+          <FileUploadField
+            key={String(row.sceneId)}
+            label={`סצנה ${String(row.sceneId)}`}
             accept="video/*"
-            disabled={busy}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void onFile(file, { type: "final" });
-              e.target.value = "";
-            }}
+            busy={busy}
+            onPick={(file) => onFile(file, { type: "sceneClip", sceneId: String(row.sceneId) })}
           />
-        </label>
+        ))}
+        <FileUploadField label="סרטון סופי" accept="video/*" busy={busy} onPick={(file) => onFile(file, { type: "final" })} />
         {error ? <p className="error-inline">{error}</p> : null}
       </div>
     );
@@ -218,15 +259,7 @@ export function StageUploadControls({
   return null;
 }
 
-function artifactKindForUpload(
-  attach:
-    | { type: "voice" }
-    | { type: "music" }
-    | { type: "referenceFrame" | "firstFrame" | "lastFrame" | "background" }
-    | { type: "sceneClip" }
-    | { type: "final" },
-  mimeType: string
-): string {
+function artifactKindForUpload(attach: UploadAttach, mimeType: string): string {
   switch (attach.type) {
     case "voice":
       return "voice_clip";
@@ -236,6 +269,8 @@ function artifactKindForUpload(
       return "scene_rendered_clip";
     case "final":
       return "final_video";
+    case "visualAnchor":
+      return mimeType.startsWith("video/") ? "scene_video_source" : "scene_image_source";
     case "referenceFrame":
       return "scene_reference_frame";
     case "firstFrame":

@@ -20,7 +20,10 @@ export const BriefInputSchema = z.object({
         /** Either a GCS path uploaded prior, or a data URL for inline ingestion. */
         gcsPath: z.string().optional(),
         dataUrl: z.string().optional(),
-        kind: z.enum(["image", "video", "audio", "text", "other"]).default("other")
+        kind: z.enum(["image", "video", "audio", "text", "other"]).default("other"),
+        /** anchor = global cast/look reference; scene = override one scene only */
+        role: z.enum(["anchor", "scene"]).default("anchor"),
+        sceneIndex: z.number().int().min(0).optional()
       })
     )
     .max(20)
@@ -53,6 +56,18 @@ export const BriefOutputSchema = z.object({
         kind: z.enum(["link", "image", "video", "audio", "text", "other"]),
         ref: z.string(),
         note: z.string().optional()
+      })
+    )
+    .default([]),
+  /** User-uploaded look references (global anchor and optional per-scene overrides). */
+  visualAnchors: z
+    .array(
+      z.object({
+        name: z.string(),
+        gcsPath: z.string(),
+        mimeType: z.string(),
+        role: z.enum(["anchor", "scene"]).default("anchor"),
+        sceneId: z.string().optional()
       })
     )
     .default([])

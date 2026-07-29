@@ -200,6 +200,8 @@ function NewRunForm({
   const [renderProfileId, setRenderProfileId] = useState<RenderProfileId>(defaultRenderProfileId);
   const [costConfirmed, setCostConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [visualFiles, setVisualFiles] = useState<File[]>([]);
+  const [visualUploadLabel, setVisualUploadLabel] = useState("");
   useEffect(() => {
     setRenderProfileId(defaultRenderProfileId);
   }, [defaultRenderProfileId]);
@@ -214,12 +216,23 @@ function NewRunForm({
     if (!canSubmit) return;
     setBusy(true);
     try {
+      const attachments = await Promise.all(
+        visualFiles.map(async (file) => ({
+          name: file.name,
+          mimeType: file.type || "image/png",
+          kind: file.type.startsWith("video/") ? ("video" as const) : ("image" as const),
+          role: "anchor" as const,
+          dataUrl: await fileToDataUrl(file)
+        }))
+      );
       const view = await apiPost<ProjectRunView>("/runs", {
         tenantSlug: "demo",
-        brief: { title, sourceText, language, durationSeconds, aspectRatio: "9:16", budgetMode, renderProfile: renderProfileId }
+        brief: { title, sourceText, language, durationSeconds, aspectRatio: "9:16", budgetMode, renderProfile: renderProfileId, attachments }
       });
       setTitle("");
       setSourceText("");
+      setVisualFiles([]);
+      setVisualUploadLabel("");
       setCostConfirmed(false);
       onCreated(view);
     } catch (err) {
@@ -239,6 +252,24 @@ function NewRunForm({
       <CostIndicator estimate={estimate} briefDurationSeconds={durationSeconds} renderProfileId={renderProfileId} />
       <input placeholder="כותרת" value={title} onChange={(e) => setTitle(e.target.value)} />
       <textarea placeholder="brief חופשי" rows={4} value={sourceText} onChange={(e) => setSourceText(e.target.value)} />
+      <label className="budget-row visual-upload-row">
+        תמונות בסיס (אופציונלי)
+        <span className="file-picker-btn">
+          בחר תמונות
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              setVisualFiles(files);
+              setVisualUploadLabel(files.length ? files.map((f) => f.name).join(", ") : "");
+            }}
+          />
+        </span>
+        {visualUploadLabel ? <small className="upload-status">{visualUploadLabel}</small> : <small className="muted">תמונת cast / look לכל הסרטון</small>}
+      </label>
       <select value={language} onChange={(e) => setLanguage(e.target.value)}>
         <option value="he">עברית</option>
         <option value="en">English</option>
@@ -639,4 +670,13 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("read failed"));
+    reader.readAsDataURL(file);
+  });
 }

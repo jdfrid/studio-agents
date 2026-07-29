@@ -146,14 +146,24 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       const briefData = (byName.get("brief") ?? brief) as {
         aspectRatio?: string;
         budgetMode?: boolean;
-        attachments?: Array<{ gcsPath?: string }>;
+        visualAnchors?: Array<{ gcsPath: string; role?: string; sceneId?: string }>;
       };
+      const sceneOverride = new Map<string, string>();
+      let visualAnchorGcsPath: string | undefined;
+      for (const anchor of briefData.visualAnchors ?? []) {
+        if (anchor.role === "scene" && anchor.sceneId) {
+          sceneOverride.set(anchor.sceneId, anchor.gcsPath);
+        } else if (!visualAnchorGcsPath) {
+          visualAnchorGcsPath = anchor.gcsPath;
+        }
+      }
       return {
         aspectRatio: briefData.aspectRatio ?? "9:16",
         budgetMode: briefData.budgetMode ?? false,
         backgroundVisualPrompt: script?.backgroundVisualPrompt,
         characterBible: script?.characterBible,
-        scenes: (script?.scenes ?? []).map((scene, index) => ({
+        visualAnchorGcsPath,
+        scenes: (script?.scenes ?? []).map((scene) => ({
           sceneId: scene.id,
           visualPrompt: scene.visualPrompt,
           veoPrompt: scene.veoPrompt,
@@ -161,7 +171,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           firstFramePrompt: scene.firstFramePrompt,
           lastFramePrompt: scene.lastFramePrompt,
           preferredKind: "image" as const,
-          uploadedAssetGcsPath: briefData.attachments?.[index]?.gcsPath
+          uploadedAssetGcsPath: sceneOverride.get(scene.id)
         }))
       };
     }

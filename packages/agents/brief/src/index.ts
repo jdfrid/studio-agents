@@ -66,6 +66,41 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       }
     );
 
+    const visualAnchors: BriefOutput["visualAnchors"] = [];
+
+    for (const att of input.attachments ?? []) {
+      if (att.gcsPath) {
+        visualAnchors.push({
+          name: att.name,
+          gcsPath: att.gcsPath,
+          mimeType: att.mimeType,
+          role: att.role ?? "anchor"
+        });
+        continue;
+      }
+      const dataUrl = att.dataUrl?.trim();
+      if (!dataUrl?.startsWith("data:")) continue;
+      const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) continue;
+      const mimeType = match[1] || att.mimeType || "image/png";
+      const body = Buffer.from(match[2]!, "base64");
+      const saved = await ctx.artifacts.save({
+        runId: ctx.runId,
+        stage: "brief",
+        kind: att.kind === "video" ? "scene_video_source" : "scene_image_source",
+        body,
+        mimeType,
+        filename: att.name || "visual-anchor.png",
+        metadata: { role: att.role ?? "anchor", source: "brief_input_attachment" }
+      });
+      visualAnchors.push({
+        name: att.name,
+        gcsPath: saved.gcsPath,
+        mimeType,
+        role: att.role ?? "anchor"
+      });
+    }
+
     const enriched: BriefOutput = {
       title: parsed.title ?? input.title,
       summary: parsed.summary ?? "",
@@ -83,7 +118,8 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       renderProfile: resolveRenderProfile(input).id,
       references:
         parsed.references ??
-        input.referenceLinks.map((link) => ({ kind: "link" as const, ref: link, note: undefined }))
+        input.referenceLinks.map((link) => ({ kind: "link" as const, ref: link, note: undefined })),
+      visualAnchors
     };
 
     await ctx.artifacts.save({

@@ -5,6 +5,8 @@ export const AssetInputSchema = z.object({
   budgetMode: z.boolean().default(false),
   backgroundVisualPrompt: z.string().optional(),
   characterBible: z.string().optional(),
+  /** Global visual anchor from brief (cast / look reference for all scenes). */
+  visualAnchorGcsPath: z.string().optional(),
   scenes: z.array(
     z.object({
       sceneId: z.string(),
@@ -22,6 +24,7 @@ export const AssetInputSchema = z.object({
 export type AssetInput = z.infer<typeof AssetInputSchema>;
 
 export const AssetOutputSchema = z.object({
+  visualAnchorGcsPath: z.string().optional(),
   perScene: z.array(
     z.object({
       sceneId: z.string(),
