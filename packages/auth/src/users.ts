@@ -16,6 +16,15 @@ export async function findOrCreateUser(profile: GoogleProfile): Promise<UserView
     include: { subscription: true }
   });
   if (existing) {
+    const shouldBeAdmin = adminEmails().has(profile.email.toLowerCase());
+    if (shouldBeAdmin && existing.role !== "ADMIN") {
+      const updated = await prisma.user.update({
+        where: { id: existing.id },
+        data: { role: "ADMIN" },
+        include: { subscription: true }
+      });
+      return toUserView(updated);
+    }
     return toUserView(existing);
   }
 
