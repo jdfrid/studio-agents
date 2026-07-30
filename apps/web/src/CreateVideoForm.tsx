@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { apiPost } from "./api.js";
+import { useAuth } from "./AuthContext.js";
 import type { ProjectRunView } from "./types.js";
 import type { ApprovalMode } from "@studio/shared";
 
 export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: ProjectRunView) => void; onCancel: () => void }) {
+  const { user } = useAuth();
+  const canCreate = user?.canCreateVideo ?? false;
+  const freeLeft = user?.freeVideosRemaining ?? 0;
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
   const [durationSeconds, setDurationSeconds] = useState(30);
@@ -13,6 +17,10 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const [error, setError] = useState("");
 
   async function submit() {
+    if (!canCreate) {
+      setError("אין מספיק קרדיטים ליצירת סרטון. רכוש קרדיטים או השתמש בסרטון החינמי מהדשבורד.");
+      return;
+    }
     if (!title.trim() || !prompt.trim()) return;
     setBusy(true);
     setError("");
@@ -50,6 +58,9 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   return (
     <div className="create-form">
       <h2>סרטון חדש</h2>
+      {freeLeft > 0 ? (
+        <p className="billing-banner-free create-free-note">סרטון חינם — לא יגבה קרדיט מהיתרה שלך.</p>
+      ) : null}
       <label>
         כותרת
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="שם הסרטון" />
@@ -93,7 +104,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       </fieldset>
       {error ? <p className="error-inline">{error}</p> : null}
       <div className="stage-actions">
-        <button type="button" className="primary" disabled={busy || !title.trim() || !prompt.trim()} onClick={() => void submit()}>
+        <button type="button" className="primary" disabled={busy || !canCreate || !title.trim() || !prompt.trim()} onClick={() => void submit()}>
           {busy ? "יוצר…" : "התחל יצירה"}
         </button>
         <button type="button" disabled={busy} onClick={onCancel}>
