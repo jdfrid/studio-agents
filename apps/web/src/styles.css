@@ -242,7 +242,19 @@ main.layout-log { grid-template-columns: 1fr; }
 }
 
 /* SaaS user UI */
-.saas-layout { max-width: 960px; margin: 0 auto; padding: 16px; }
+.saas-layout {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 16px clamp(16px, 3vw, 32px);
+  min-height: 100vh;
+}
+.saas-layout > main {
+  display: block;
+  width: 100%;
+  padding: 0;
+  grid-template-columns: unset;
+}
 .saas-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
 .saas-header .brand { font-size: 1.25rem; color: #7ab5ff; }
 .saas-header nav button { margin-inline-end: 8px; }
@@ -278,7 +290,14 @@ main.layout-log { grid-template-columns: 1fr; }
 .step-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
 .step-COMPLETED .step-dot { background: #7af0bf; }
 .step-RUNNING .step-dot { background: #ffb347; }
-.stage-grid-user { grid-template-columns: 1fr; }
+.stage-grid-user { grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.run-view { width: 100%; }
+.run-view-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.run-view-header h2 { margin: 0; flex: 1; min-width: 200px; }
+.saas-layout .media-preview { max-width: min(100%, 960px); }
+.saas-layout .asset-grid .media-preview { max-width: min(100%, 640px); }
+.saas-layout .media-preview img,
+.saas-layout .media-preview video { max-height: min(56vh, 520px); }
 .center { text-align: center; padding: 48px; }
 .admin-kpi { margin-bottom: 20px; }
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
