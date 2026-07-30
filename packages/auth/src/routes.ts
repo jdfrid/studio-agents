@@ -7,7 +7,7 @@ import {
 } from "./google.js";
 import type { UserView } from "@studio/shared";
 import { getUserViewWithCredits, findOrCreateUser } from "./users.js";
-import { isAuthDisabled, sessionCookieName, sessionCookieOptions, signSession, verifySession, type SessionPayload } from "./jwt.js";
+import { isAuthDisabled, sessionCookieName, sessionCookieOptions, sessionCookieClearOptions, signSession, verifySession, type SessionPayload } from "./jwt.js";
 
 async function devUserView(): Promise<UserView> {
   const profile = {
@@ -39,7 +39,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       reply.code(400).send({ error: "invalid_oauth_state" });
       return;
     }
-    reply.clearCookie("oauth_state");
+    reply.clearCookie("oauth_state", sessionCookieClearOptions());
     const profile = await exchangeGoogleCode(code);
     const user = await findOrCreateUser(profile);
     const token = await signSession({ sub: user.id, email: user.email, role: user.role });
@@ -66,7 +66,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
   });
 
   app.post("/auth/logout", async (_request, reply) => {
-    reply.clearCookie(sessionCookieName(), { path: "/" });
+    reply.clearCookie(sessionCookieName(), sessionCookieClearOptions());
     return { ok: true };
   });
 }

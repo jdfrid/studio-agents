@@ -16,6 +16,23 @@ function secretKey(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+/** Shared across subdomains (e.g. admin.prompt2spot.com + prompt2spot.com) for OAuth callback. */
+export function sessionCookieDomain(): string | undefined {
+  const explicit = process.env.COOKIE_DOMAIN?.trim();
+  if (explicit) return explicit.startsWith(".") ? explicit : `.${explicit}`;
+  const app = (process.env.APP_URL ?? "").trim();
+  if (!app) return undefined;
+  try {
+    const host = new URL(app).hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".local")) return undefined;
+    const parts = host.split(".");
+    if (parts.length >= 2) return `.${parts.slice(-2).join(".")}`;
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
 export function sessionCookieName(): string {
   return COOKIE_NAME;
 }
@@ -42,13 +59,23 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
   }
 }
 
-export function sessionCookieOptions(secure: boolean) {
+export function sessionCookieOptions(secure: boolean, maxAge = MAX_AGE_SEC) {
+  const domain = sessionCookieDomain();
   return {
     httpOnly: true,
     secure,
     sameSite: "lax" as const,
     path: "/",
-    maxAge: MAX_AGE_SEC
+    maxAge,
+    ...(domain ? { domain } : {})
+  };
+}
+
+export function sessionCookieClearOptions() {
+  const domain = sessionCookieDomain();
+  return {
+    path: "/",
+    ...(domain ? { domain } : {})
   };
 }
 
