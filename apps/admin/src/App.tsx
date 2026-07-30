@@ -37,21 +37,21 @@ export function App() {
     void apiGet<UserView>("/auth/me")
       .then((u) => setAuthed(u.role === "ADMIN"))
       .catch(() => setAuthed(false));
-    void apiGet<{ config: ProductionCostConfig }>("/config/cost")
+    void apiGet<{ config: ProductionCostConfig }>("/admin/config/cost")
       .then((r) => setCostConfig(r.config))
       .catch(() => setCostConfig(null));
   }, []);
 
   async function refreshRuns() {
-    setRuns(await apiGet<RunSummary[]>("/runs"));
+    setRuns(await apiGet<RunSummary[]>("/admin/runs"));
   }
 
   async function refreshRun(id: string) {
     if (!id) return;
-    setRun(await apiGet(`/runs/${id}`));
+    setRun(await apiGet(`/admin/runs/${id}`));
     setArtifacts(await apiGet(`/runs/${id}/artifacts`));
     try {
-      setCostLedger(await apiGet(`/runs/${id}/cost-events`));
+      setCostLedger(await apiGet(`/admin/runs/${id}/cost-events`));
     } catch {
       setCostLedger(null);
     }

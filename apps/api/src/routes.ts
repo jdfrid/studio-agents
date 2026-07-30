@@ -45,9 +45,10 @@ import {
   InsufficientCreditsError
 } from "@studio/billing";
 
-async function assertRunOwner(runId: string, userId: string) {
+async function assertRunOwner(runId: string, userId: string, role?: "USER" | "ADMIN") {
   const run = await prisma.projectRun.findUnique({ where: { id: runId } });
   if (!run) return null;
+  if (role === "ADMIN") return run;
   if (run.userId && run.userId !== userId) return null;
   return run;
 }
@@ -137,7 +138,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
     userRoutes.post("/runs/:id/stages/:stage/approve", async (request, reply) => {
       const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
-      if (!(await assertRunOwner(id, request.user!.sub))) {
+      if (!(await assertRunOwner(id, request.user!.sub, request.user!.role))) {
         reply.code(404);
         return { error: "not_found" };
       }
@@ -151,7 +152,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
     userRoutes.post("/runs/:id/stages/:stage/rerun", async (request, reply) => {
       const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
-      if (!(await assertRunOwner(id, request.user!.sub))) {
+      if (!(await assertRunOwner(id, request.user!.sub, request.user!.role))) {
         reply.code(404);
         return { error: "not_found" };
       }
@@ -165,7 +166,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
     userRoutes.patch("/runs/:id/stages/:stage/output", async (request, reply) => {
       const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
-      if (!(await assertRunOwner(id, request.user!.sub))) {
+      if (!(await assertRunOwner(id, request.user!.sub, request.user!.role))) {
         reply.code(404);
         return { error: "not_found" };
       }
@@ -184,7 +185,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
     userRoutes.post("/runs/:id/stages/:stage/artifacts", async (request, reply) => {
       const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
-      if (!(await assertRunOwner(id, request.user!.sub))) {
+      if (!(await assertRunOwner(id, request.user!.sub, request.user!.role))) {
         reply.code(404);
         return { error: "not_found" };
       }
@@ -229,7 +230,7 @@ export async function registerRoutes(app: FastifyInstance) {
     userRoutes.post("/runs/:id/visual-corrections", async (request, reply) => {
       const { id } = z.object({ id: z.string() }).parse(request.params);
       const body = request.body as { rerunFrom?: "asset" | "render" | null };
-      const run = await assertRunOwner(id, request.user!.sub);
+      const run = await assertRunOwner(id, request.user!.sub, request.user!.role);
       if (!run) {
         reply.code(404);
         return { error: "not_found" };
@@ -262,7 +263,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
     userRoutes.post("/runs/:id/scenes/:sceneId/regenerate-visual", async (request, reply) => {
       const { id, sceneId } = z.object({ id: z.string(), sceneId: z.string() }).parse(request.params);
-      if (!(await assertRunOwner(id, request.user!.sub))) {
+      if (!(await assertRunOwner(id, request.user!.sub, request.user!.role))) {
         reply.code(404);
         return { error: "not_found" };
       }
@@ -276,7 +277,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
     userRoutes.post("/runs/:id/scenes/:sceneId/regenerate-video", async (request, reply) => {
       const { id, sceneId } = z.object({ id: z.string(), sceneId: z.string() }).parse(request.params);
-      if (!(await assertRunOwner(id, request.user!.sub))) {
+      if (!(await assertRunOwner(id, request.user!.sub, request.user!.role))) {
         reply.code(404);
         return { error: "not_found" };
       }
@@ -290,7 +291,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
     userRoutes.get("/runs/:id/artifacts", async (request, reply) => {
       const { id } = z.object({ id: z.string() }).parse(request.params);
-      if (!(await assertRunOwner(id, request.user!.sub))) {
+      if (!(await assertRunOwner(id, request.user!.sub, request.user!.role))) {
         reply.code(404);
         return { error: "not_found" };
       }
@@ -302,7 +303,8 @@ export async function registerRoutes(app: FastifyInstance) {
     userRoutes.get("/artifacts/:id/signed-url", async (request, reply) => {
       const { id } = z.object({ id: z.string() }).parse(request.params);
       const artifact = await prisma.artifact.findUnique({ where: { id }, include: { run: true } });
-      if (!artifact?.run.userId || artifact.run.userId !== request.user!.sub) {
+      const isAdmin = request.user!.role === "ADMIN";
+      if (!artifact || (!isAdmin && (!artifact.run.userId || artifact.run.userId !== request.user!.sub))) {
         reply.code(404);
         return { error: "not_found" };
       }
@@ -312,7 +314,8 @@ export async function registerRoutes(app: FastifyInstance) {
     });
   });
 
-  app.register(async (adminRoutes) => {
+  app.register(
+    async (adminRoutes) => {
     adminRoutes.addHook("preHandler", requireAdmin());
 
     adminRoutes.get("/health/queues", async () => {
@@ -417,9 +420,9 @@ export async function registerRoutes(app: FastifyInstance) {
       }));
     });
 
-    adminRoutes.get("/admin/dashboard", async () => getAdminDashboard());
-    adminRoutes.get("/admin/users", async () => getAdminUsers());
-    adminRoutes.get("/admin/users/:id/pnl", async (request, reply) => {
+    adminRoutes.get("/dashboard", async () => getAdminDashboard());
+    adminRoutes.get("/users", async () => getAdminUsers());
+    adminRoutes.get("/users/:id/pnl", async (request, reply) => {
       const { id } = z.object({ id: z.string() }).parse(request.params);
       const pnl = await getAdminUserPnl(id);
       if (!pnl) {
@@ -429,11 +432,13 @@ export async function registerRoutes(app: FastifyInstance) {
       return pnl;
     });
 
-    adminRoutes.post("/admin/users/:id/credits", async (request) => {
+    adminRoutes.post("/users/:id/credits", async (request) => {
       const { id } = z.object({ id: z.string() }).parse(request.params);
       const body = z.object({ delta: z.number(), note: z.string().default("") }).parse(request.body);
       const balance = await adminAdjustCredits(id, body.delta, body.note);
       return { balance };
     });
-  });
+  },
+    { prefix: "/admin" }
+  );
 }

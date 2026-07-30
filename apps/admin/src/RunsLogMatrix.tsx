@@ -54,7 +54,7 @@ export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) =>
   async function refresh() {
     setLoading(true);
     try {
-      setData(await apiGet<RunLogMatrixResponse>("/runs/log-matrix"));
+      setData(await apiGet<RunLogMatrixResponse>("/admin/runs/log-matrix"));
       setError("");
     } catch (err) {
       setError((err as Error).message);
