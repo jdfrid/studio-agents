@@ -6,6 +6,7 @@ type AdminUser = {
   email: string;
   name: string | null;
   role: string;
+  locale: string;
   credits: number;
   plan: string;
   videosCompleted: number;
@@ -13,6 +14,34 @@ type AdminUser = {
   revenueNis: number;
   costNis: number;
   marginNis: number;
+  lastLoginIp: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+};
+
+type UserPnl = {
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    role: string;
+    locale: string;
+    credits: number;
+    lastLoginIp: string | null;
+    lastLoginAt: string | null;
+    createdAt: string;
+  };
+  revenueNis: number;
+  costNis: number;
+  marginNis: number;
+  loginEvents: Array<{ id: string; ipAddress: string; userAgent: string | null; createdAt: string }>;
+  runs: Array<{ id: string; status: string; title: string; updatedAt: string }>;
+};
+
+type UserEditForm = {
+  name: string;
+  role: "USER" | "ADMIN";
+  locale: string;
 };
 
 type Dashboard = {
@@ -198,24 +227,76 @@ function listRenderProfiles() {
 export function AdminUsersPanel() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [pnl, setPnl] = useState<unknown>(null);
+  const [pnl, setPnl] = useState<UserPnl | null>(null);
+  const [edit, setEdit] = useState<UserEditForm>({ name: "", role: "USER", locale: "he" });
   const [adjust, setAdjust] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function reloadUsers() {
+    setUsers(await apiGet<AdminUser[]>("/admin/users"));
+  }
 
   useEffect(() => {
-    void apiGet<AdminUser[]>("/admin/users").then(setUsers).catch(() => setUsers([]));
+    void reloadUsers();
   }, []);
 
   useEffect(() => {
-    if (!selected) return;
-    void apiGet(`/admin/users/${selected}/pnl`).then(setPnl).catch(() => setPnl(null));
+    if (!selected) {
+      setPnl(null);
+      return;
+    }
+    void apiGet<UserPnl>(`/admin/users/${selected}/pnl`)
+      .then((data) => {
+        setPnl(data);
+        setEdit({
+          name: data.user.name ?? "",
+          role: data.user.role as "USER" | "ADMIN",
+          locale: data.user.locale
+        });
+      })
+      .catch(() => setPnl(null));
   }, [selected]);
+
+  async function saveUser() {
+    if (!selected) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await apiPatch(`/admin/users/${selected}`, {
+        name: edit.name.trim() || null,
+        role: edit.role,
+        locale: edit.locale.trim() || "he"
+      });
+      await reloadUsers();
+      setMessage("נשמר בהצלחה.");
+    } catch (err) {
+      setMessage((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function applyCredits(userId: string) {
     const delta = Number(adjust);
     if (!Number.isFinite(delta) || delta === 0) return;
-    await apiPost(`/admin/users/${userId}/credits`, { delta, note: "admin adjust" });
-    setAdjust("");
-    setUsers(await apiGet<AdminUser[]>("/admin/users"));
+    setBusy(true);
+    try {
+      await apiPost(`/admin/users/${userId}/credits`, { delta, note: "admin adjust" });
+      setAdjust("");
+      await reloadUsers();
+      if (selected === userId) {
+        const data = await apiGet<UserPnl>(`/admin/users/${userId}/pnl`);
+        setPnl(data);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function formatWhen(iso: string | null): string {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString("he-IL");
   }
 
   return (
@@ -225,11 +306,11 @@ export function AdminUsersPanel() {
         <thead>
           <tr>
             <th>אימייל</th>
+            <th>שם</th>
+            <th>תפקיד</th>
             <th>קרדיטים</th>
-            <th>תוכנית</th>
-            <th>סרטונים</th>
-            <th>הכנסות</th>
-            <th>עלות</th>
+            <th>IP אחרון</th>
+            <th>התחברות אחרונה</th>
             <th>רווח</th>
           </tr>
         </thead>
@@ -237,29 +318,93 @@ export function AdminUsersPanel() {
           {users.map((u) => (
             <tr key={u.id} className={selected === u.id ? "selected" : ""} onClick={() => setSelected(u.id)}>
               <td>{u.email}</td>
+              <td>{u.name ?? "—"}</td>
+              <td>{u.role === "ADMIN" ? "מנהל" : "משתמש"}</td>
               <td>{u.credits}</td>
-              <td>{u.plan}</td>
-              <td>
-                {u.videosCompleted} / {u.videosFailed} כשל
-              </td>
-              <td>₪{u.revenueNis.toFixed(0)}</td>
-              <td>₪{u.costNis.toFixed(0)}</td>
+              <td>{u.lastLoginIp ?? "—"}</td>
+              <td>{formatWhen(u.lastLoginAt)}</td>
               <td>₪{u.marginNis.toFixed(0)}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      {selected ? (
+      {selected && pnl ? (
         <div className="user-detail">
-          <h4>פירוט משתמש</h4>
-          <pre>{JSON.stringify(pnl, null, 2)}</pre>
+          <h4>עריכת משתמש</h4>
+          <p className="muted">אימייל (Google): {pnl.user.email}</p>
+          <div className="user-edit-grid">
+            <label>
+              שם תצוגה
+              <input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+            </label>
+            <label>
+              תפקיד
+              <select value={edit.role} onChange={(e) => setEdit({ ...edit, role: e.target.value as "USER" | "ADMIN" })}>
+                <option value="USER">משתמש</option>
+                <option value="ADMIN">מנהל</option>
+              </select>
+            </label>
+            <label>
+              שפה
+              <input value={edit.locale} onChange={(e) => setEdit({ ...edit, locale: e.target.value })} />
+            </label>
+          </div>
+          <div className="stage-actions">
+            <button type="button" className="primary" disabled={busy} onClick={() => void saveUser()}>
+              {busy ? "שומר…" : "שמור שינויים"}
+            </button>
+          </div>
+          {message ? <p className={message.includes("בהצלחה") ? "muted" : "error-inline"}>{message}</p> : null}
+
+          <h4>קרדיטים ו-P&amp;L</h4>
+          <p>
+            הכנסות ₪{pnl.revenueNis.toFixed(0)} · עלות ₪{pnl.costNis.toFixed(0)} · רווח ₪{pnl.marginNis.toFixed(0)} · קרדיטים{" "}
+            {pnl.user.credits}
+          </p>
           <label>
             התאמת קרדיטים (+/-)
             <input value={adjust} onChange={(e) => setAdjust(e.target.value)} />
           </label>
-          <button type="button" onClick={() => void applyCredits(selected)}>
-            החל
+          <button type="button" disabled={busy} onClick={() => void applyCredits(selected)}>
+            החל קרדיטים
           </button>
+
+          <h4>היסטוריית התחברות (IP)</h4>
+          <table className="admin-table login-events-table">
+            <thead>
+              <tr>
+                <th>תאריך ושעה</th>
+                <th>IP</th>
+                <th>דפדפן</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pnl.loginEvents.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="muted">
+                    אין רישומים — יופיע אחרי התחברות הבאה.
+                  </td>
+                </tr>
+              ) : (
+                pnl.loginEvents.map((e) => (
+                  <tr key={e.id}>
+                    <td>{formatWhen(e.createdAt)}</td>
+                    <td>{e.ipAddress}</td>
+                    <td className="ua-cell">{e.userAgent ?? "—"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+
+          <h4>סרטונים אחרונים</h4>
+          <ul className="user-runs-list">
+            {pnl.runs.slice(0, 10).map((r) => (
+              <li key={r.id}>
+                <strong>{r.title || "(ללא כותרת)"}</strong> — {r.status} — {formatWhen(r.updatedAt)}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
     </section>

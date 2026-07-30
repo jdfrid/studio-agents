@@ -43,11 +43,12 @@ import {
   getAdminUsers,
   getAdminUserPnl,
   adminAdjustCredits,
+  updateAdminUser,
   InsufficientCreditsError,
   getPlatformSettings,
   updatePlatformSettings
 } from "@studio/billing";
-import { PlatformSettingsPatchSchema } from "@studio/shared";
+import { PlatformSettingsPatchSchema, AdminUserUpdateSchema } from "@studio/shared";
 
 async function assertRunOwner(runId: string, userId: string, role?: "USER" | "ADMIN") {
   const run = await prisma.projectRun.findUnique({ where: { id: runId } });
@@ -450,6 +451,17 @@ export async function registerRoutes(app: FastifyInstance) {
       const body = z.object({ delta: z.number(), note: z.string().default("") }).parse(request.body);
       const balance = await adminAdjustCredits(id, body.delta, body.note);
       return { balance };
+    });
+
+    adminRoutes.patch("/users/:id", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const body = AdminUserUpdateSchema.parse(request.body);
+      try {
+        return await updateAdminUser(id, body);
+      } catch {
+        reply.code(404);
+        return { error: "not_found" };
+      }
     });
 
     adminRoutes.get("/settings", async () => getPlatformSettings());

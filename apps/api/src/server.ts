@@ -7,7 +7,8 @@ import { registerRoutes } from "./routes.js";
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? "info" },
-  bodyLimit: 32 * 1024 * 1024
+  bodyLimit: 32 * 1024 * 1024,
+  trustProxy: true
 });
 
 app.addHook("preParsing", async (request, _reply, payload) => {

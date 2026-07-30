@@ -11,6 +11,7 @@ export * from "./schemas/run.js";
 export * from "./schemas/auth.js";
 export * from "./schemas/billing.js";
 export * from "./schemas/platform.js";
+export * from "./schemas/admin.js";
 export * from "./agent.js";
 export * from "./errors.js";
 export * from "./logger.js";

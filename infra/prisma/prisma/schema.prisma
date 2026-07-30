@@ -71,6 +71,8 @@ model User {
   role      UserRole @default(USER)
   tenantId  String   @unique
   locale    String   @default("he")
+  lastLoginAt DateTime?
+  lastLoginIp String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -79,8 +81,21 @@ model User {
   creditEntries CreditLedger[]
   payments      Payment[]
   runs          ProjectRun[]
+  loginEvents   UserLoginEvent[]
 
   @@index([email])
+}
+
+model UserLoginEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  ipAddress String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model Subscription {

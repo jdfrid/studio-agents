@@ -1,4 +1,5 @@
 import { prisma } from "@studio/infra-prisma";
+import { AdminUserUpdateSchema, type AdminUserUpdate } from "@studio/shared";
 import { getCreditBalance } from "./credits.js";
 
 export async function getBillingStatus(userId: string) {
@@ -64,6 +65,7 @@ export async function getAdminUsers(limit = 100) {
       email: u.email,
       name: u.name,
       role: u.role,
+      locale: u.locale,
       credits,
       plan: u.subscription?.planType ?? "PAYG",
       subscriptionStatus: u.subscription?.status ?? null,
@@ -72,6 +74,8 @@ export async function getAdminUsers(limit = 100) {
       revenueNis: paid,
       costNis: cost,
       marginNis: paid - cost,
+      lastLoginIp: u.lastLoginIp,
+      lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
       createdAt: u.createdAt.toISOString()
     });
   }
@@ -81,7 +85,7 @@ export async function getAdminUsers(limit = 100) {
 export async function getAdminUserPnl(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId }, include: { subscription: true } });
   if (!user) return null;
-  const [payments, runs, costEvents, credits] = await Promise.all([
+  const [payments, runs, costEvents, credits, loginEvents] = await Promise.all([
     prisma.payment.findMany({ where: { userId }, orderBy: { createdAt: "desc" } }),
     prisma.projectRun.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 50 }),
     prisma.costEvent.findMany({
@@ -89,7 +93,8 @@ export async function getAdminUserPnl(userId: string) {
       orderBy: { startedAt: "desc" },
       take: 200
     }),
-    getCreditBalance(userId)
+    getCreditBalance(userId),
+    prisma.userLoginEvent.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 30 })
   ]);
   const revenue = payments.filter((p) => p.status === "paid").reduce((s, p) => s + p.amountNis, 0);
   const cost = costEvents.reduce((s, e) => s + e.costNis, 0);
@@ -98,13 +103,24 @@ export async function getAdminUserPnl(userId: string) {
       id: user.id,
       email: user.email,
       name: user.name,
+      role: user.role,
+      locale: user.locale,
       credits,
+      lastLoginIp: user.lastLoginIp,
+      lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+      createdAt: user.createdAt.toISOString(),
       subscription: user.subscription
     },
     revenueNis: revenue,
     costNis: cost,
     marginNis: revenue - cost,
     payments,
+    loginEvents: loginEvents.map((e) => ({
+      id: e.id,
+      ipAddress: e.ipAddress,
+      userAgent: e.userAgent,
+      createdAt: e.createdAt.toISOString()
+    })),
     runs: runs.map((r) => ({
       id: r.id,
       status: r.status,
@@ -120,4 +136,29 @@ export async function getAdminUserPnl(userId: string) {
 export async function adminAdjustCredits(userId: string, delta: number, note: string) {
   const { grantCredits } = await import("./credits.js");
   return grantCredits(userId, delta, "ADMIN_ADJUST", { note });
+}
+
+export async function updateAdminUser(userId: string, patch: AdminUserUpdate) {
+  const body = AdminUserUpdateSchema.parse(patch);
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.role !== undefined ? { role: body.role } : {}),
+      ...(body.locale !== undefined ? { locale: body.locale } : {})
+    },
+    include: { subscription: true }
+  });
+  const credits = await getCreditBalance(userId);
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    locale: user.locale,
+    credits,
+    lastLoginIp: user.lastLoginIp,
+    lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+    createdAt: user.createdAt.toISOString()
+  };
 }

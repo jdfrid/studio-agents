@@ -251,5 +251,12 @@ main.layout-log { grid-template-columns: 1fr; }
 .admin-settings { background: #1a1d24; border-radius: 10px; padding: 20px; margin-bottom: 20px; max-width: 640px; }
 .admin-settings label { display: block; margin-bottom: 14px; }
 .admin-settings input, .admin-settings select { width: 100%; margin-top: 4px; }
+.user-detail { margin-top: 20px; padding: 16px; background: #151a23; border-radius: 10px; border: 1px solid #232733; }
+.user-edit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 12px 0; }
+.user-edit-grid label { display: block; }
+.user-edit-grid input, .user-edit-grid select { width: 100%; margin-top: 4px; }
+.login-events-table { margin-top: 8px; }
+.login-events-table .ua-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: #9eb0d0; }
+.user-runs-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; font-size: 0.85rem; }
 .settings-models { border: 1px solid #232733; border-radius: 8px; padding: 12px; margin: 16px 0; }
 .settings-models label { margin-bottom: 10px; }
