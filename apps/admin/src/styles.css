@@ -248,3 +248,8 @@ main.layout-log { grid-template-columns: 1fr; }
 .admin-table th, .admin-table td { border: 1px solid #232733; padding: 8px; }
 .admin-login { text-align: center; padding: 64px 24px; }
 .admin-main { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+.admin-settings { background: #1a1d24; border-radius: 10px; padding: 20px; margin-bottom: 20px; max-width: 640px; }
+.admin-settings label { display: block; margin-bottom: 14px; }
+.admin-settings input, .admin-settings select { width: 100%; margin-top: 4px; }
+.settings-models { border: 1px solid #232733; border-radius: 8px; padding: 12px; margin: 16px 0; }
+.settings-models label { margin-bottom: 10px; }

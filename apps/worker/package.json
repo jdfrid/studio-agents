@@ -18,6 +18,7 @@
     "@studio/agent-render": "workspace:*",
     "@studio/agent-script": "workspace:*",
     "@studio/agent-series": "workspace:*",
+    "@studio/billing": "workspace:*",
     "@studio/infra-prisma": "workspace:*",
     "@studio/orchestrator": "workspace:*",
     "@studio/shared": "workspace:*",

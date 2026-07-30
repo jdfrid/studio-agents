@@ -1,4 +1,5 @@
 import { prisma } from "@studio/infra-prisma";
+import { getFreeVideosAllowance, getPlatformSettingsSync } from "./platformSettings.js";
 import {
   CREDIT_CORRECTION_ASSET,
   CREDIT_CORRECTION_RENDER,
@@ -44,8 +45,11 @@ async function appendLedger(
 }
 
 export function freeVideosPerUser(): number {
-  const n = Number(process.env.FREE_VIDEOS_PER_USER ?? 0);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  return getPlatformSettingsSync().freeVideosPerUser;
+}
+
+export async function getFreeVideosAllowanceAsync(): Promise<number> {
+  return getFreeVideosAllowance();
 }
 
 export function isBillingConfigured(): boolean {
@@ -58,7 +62,7 @@ export function isBillingConfigured(): boolean {
 }
 
 export async function getFreeVideosRemaining(userId: string): Promise<number> {
-  const allowance = freeVideosPerUser();
+  const allowance = await getFreeVideosAllowance();
   if (allowance <= 0) return 0;
   const used = await prisma.projectRun.count({ where: { userId } });
   return Math.max(0, allowance - used);

@@ -1,5 +1,6 @@
 import { Worker, type Job, type WorkerOptions } from "bullmq";
 import { STAGE_ORDER, type StageName } from "@studio/shared";
+import { refreshPlatformSettingsCache } from "@studio/billing";
 import { redisConnection, registerAgent, runStage, queueName } from "@studio/orchestrator";
 import { briefAgent } from "@studio/agent-brief";
 import { scriptAgent } from "@studio/agent-script";
@@ -28,38 +29,46 @@ const stageTimeouts: Record<StageName, number> = {
 };
 
 const workers: Worker[] = [];
-for (const stage of STAGE_ORDER) {
-  const w = new Worker(
-    queueName(stage),
-    async (job: Job<{ runId: string; stage: StageName }>) => {
-      const start = Date.now();
-      try {
-        await runStage(job.data.runId, job.data.stage);
-      } finally {
-        // eslint-disable-next-line no-console
-        console.log(`[worker:${stage}] job ${job.id} finished in ${Date.now() - start}ms`);
+
+async function main() {
+  await refreshPlatformSettingsCache();
+  for (const stage of STAGE_ORDER) {
+    const w = new Worker(
+      queueName(stage),
+      async (job: Job<{ runId: string; stage: StageName }>) => {
+        const start = Date.now();
+        try {
+          await runStage(job.data.runId, job.data.stage);
+        } finally {
+          // eslint-disable-next-line no-console
+          console.log(`[worker:${stage}] job ${job.id} finished in ${Date.now() - start}ms`);
+        }
+      },
+      {
+        connection: redisConnection() as WorkerOptions["connection"],
+        concurrency: stage === "render" ? 1 : 2,
+        lockDuration: stageTimeouts[stage],
+        stalledInterval: 30_000
       }
-    },
-    {
-      connection: redisConnection() as WorkerOptions["connection"],
-      concurrency: stage === "render" ? 1 : 2,
-      lockDuration: stageTimeouts[stage],
-      stalledInterval: 30_000
-    }
-  );
-  workers.push(w);
-  w.on("failed", (job, err) => {
+    );
+    workers.push(w);
+    w.on("failed", (job, err) => {
+      // eslint-disable-next-line no-console
+      console.error(`[worker:${stage}] job ${job?.id ?? "?"} failed:`, err);
+    });
+    w.on("error", (err) => {
+      // eslint-disable-next-line no-console
+      console.error(`[worker:${stage}] error:`, err);
+    });
     // eslint-disable-next-line no-console
-    console.error(`[worker:${stage}] job ${job?.id ?? "?"} failed:`, err);
-  });
-  w.on("error", (err) => {
-    // eslint-disable-next-line no-console
-    console.error(`[worker:${stage}] error:`, err);
-  });
-  // eslint-disable-next-line no-console
-  console.log(`Worker started for queue: ${queueName(stage)}`);
+    console.log(`Worker started for queue: ${queueName(stage)}`);
+  }
 }
 
+void main().catch((err) => {
+  console.error("Worker startup failed:", err);
+  process.exit(1);
+});
 async function shutdown() {
   // eslint-disable-next-line no-console
   console.log("Shutting down workers...");

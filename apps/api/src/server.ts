@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import sensible from "@fastify/sensible";
 import { ZodError } from "zod";
+import { refreshPlatformSettingsCache } from "@studio/billing";
 import { registerRoutes } from "./routes.js";
 
 const app = Fastify({
@@ -38,6 +39,7 @@ app.setErrorHandler((error, _request, reply) => {
 });
 
 await registerRoutes(app);
+await refreshPlatformSettingsCache();
 const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
 app
   .listen({ port, host: "0.0.0.0" })

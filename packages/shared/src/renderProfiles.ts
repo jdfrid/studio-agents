@@ -80,8 +80,17 @@ export function isRenderProfileId(value: string): value is RenderProfileId {
   return RenderProfileIdSchema.safeParse(value).success;
 }
 
-/** Default from RENDER_PROFILE env, with GEMINI_VEO_MODE deprecated alias. */
+let platformDefaultRenderProfile: RenderProfileId | null = null;
+
+export function setPlatformDefaultRenderProfile(id: RenderProfileId | null): void {
+  platformDefaultRenderProfile = id;
+}
+
+/** Default from platform settings (set at runtime), then RENDER_PROFILE env. */
 export function defaultRenderProfileId(): RenderProfileId {
+  if (platformDefaultRenderProfile && isRenderProfileId(platformDefaultRenderProfile)) {
+    return platformDefaultRenderProfile;
+  }
   const fromEnv = process.env.RENDER_PROFILE?.trim();
   if (fromEnv && isRenderProfileId(fromEnv)) return fromEnv;
   const veoMode = process.env.GEMINI_VEO_MODE?.trim().toLowerCase();

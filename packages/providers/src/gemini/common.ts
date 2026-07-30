@@ -1,5 +1,6 @@
 import type { ProviderCredentialView } from "@studio/shared";
 import { ProviderError } from "@studio/shared";
+import { getPlatformSettingsSync } from "@studio/billing";
 
 export interface GeminiModelConfig {
   text: string;
@@ -25,22 +26,24 @@ export function geminiBaseUrl(provider?: ProviderCredentialView | null): string 
 
 export function geminiModels(provider?: ProviderCredentialView | null): GeminiModelConfig {
   const models = (provider?.config.models ?? {}) as Partial<GeminiModelConfig>;
+  const platform = getPlatformSettingsSync();
   return {
-    text: pickModel(models.text, provider?.config.textModel, process.env.GEMINI_TEXT_MODEL, "gemini-3.5-flash"),
-    tts: pickModel(models.tts, provider?.config.ttsModel, process.env.GEMINI_TTS_MODEL, "gemini-2.5-flash-preview-tts"),
-    image: pickModel(models.image, provider?.config.imageModel, process.env.GEMINI_IMAGE_MODEL, "gemini-3.1-flash-image"),
-    music: pickModel(models.music, provider?.config.musicModel, process.env.GEMINI_MUSIC_MODEL, "lyria-3-clip-preview"),
-    video: pickModel(models.video, provider?.config.videoModel, process.env.GEMINI_VIDEO_MODEL, "veo-3.1-fast-generate-preview")
+    text: pickModel(models.text, provider?.config.textModel, platform.geminiTextModel, process.env.GEMINI_TEXT_MODEL, "gemini-3.5-flash"),
+    tts: pickModel(models.tts, provider?.config.ttsModel, platform.geminiTtsModel, process.env.GEMINI_TTS_MODEL, "gemini-2.5-flash-preview-tts"),
+    image: pickModel(models.image, provider?.config.imageModel, platform.geminiImageModel, process.env.GEMINI_IMAGE_MODEL, "gemini-3.1-flash-image"),
+    music: pickModel(models.music, provider?.config.musicModel, platform.geminiMusicModel, process.env.GEMINI_MUSIC_MODEL, "lyria-3-clip-preview"),
+    video: pickModel(models.video, provider?.config.videoModel, platform.geminiVideoModel, process.env.GEMINI_VIDEO_MODEL, "veo-3.1-fast-generate-preview")
   };
 }
 
 function pickModel(
   fromModels: string | undefined,
   fromConfig: unknown,
+  fromPlatform: string | null | undefined,
   fromEnv: string | undefined,
   fallback: string
 ): string {
-  const candidates = [fromModels, typeof fromConfig === "string" ? fromConfig : undefined, fromEnv];
+  const candidates = [fromModels, typeof fromConfig === "string" ? fromConfig : undefined, fromPlatform ?? undefined, fromEnv];
   for (const value of candidates) {
     const trimmed = value?.trim();
     if (trimmed) return trimmed;

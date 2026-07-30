@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.10.1",
+    "@studio/billing": "workspace:*",
     "@studio/shared": "workspace:*",
     "undici": "^6.13.0",
     "zod": "^3.23.8"

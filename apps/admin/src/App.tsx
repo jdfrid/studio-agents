@@ -3,7 +3,7 @@ import { apiGet, apiPost, authLoginUrl, isQuotaErrorMessage } from "./api.js";
 import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
 import { StageErrorView } from "./StageErrorView.js";
 import { BriefQuickEditor, StageEditor, StageUploadControls } from "./StageEditor.js";
-import { AdminDashboardPanel, AdminUsersPanel } from "./AdminPanels.js";
+import { AdminDashboardPanel, AdminUsersPanel, AdminSettingsPanel } from "./AdminPanels.js";
 import { CostLedger, type CostLedgerResponse } from "./CostLedger.js";
 import { CostIndicator } from "./CostIndicator.js";
 import { RunsLogMatrix } from "./RunsLogMatrix.js";
@@ -20,7 +20,7 @@ import {
   type UserView
 } from "@studio/shared";
 
-type AppView = "runs" | "users" | "log";
+type AppView = "runs" | "users" | "log" | "settings";
 
 export function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -98,10 +98,15 @@ export function App() {
           <button type="button" className={view === "log" ? "nav-active" : ""} onClick={() => setView("log")}>
             לוג עלויות
           </button>
+          <button type="button" className={view === "settings" ? "nav-active" : ""} onClick={() => setView("settings")}>
+            הגדרות
+          </button>
         </nav>
       </header>
       <AdminDashboardPanel />
-      {view === "log" ? (
+      {view === "settings" ? (
+        <AdminSettingsPanel />
+      ) : view === "log" ? (
         <RunsLogMatrix onSelectRun={(id) => { setSelectedId(id); setView("runs"); }} />
       ) : view === "users" ? (
         <AdminUsersPanel />

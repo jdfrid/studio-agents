@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost } from "./api.js";
+import { apiGet, apiPost, apiPatch } from "./api.js";
 
 type AdminUser = {
   id: string;
@@ -53,6 +53,146 @@ function Kpi({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </article>
   );
+}
+
+export function AdminSettingsPanel() {
+  const [settings, setSettings] = useState<PlatformSettingsView | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    void apiGet<PlatformSettingsView>("/admin/settings").then(setSettings).catch(() => setSettings(null));
+  }, []);
+
+  async function save() {
+    if (!settings) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const updated = await apiPatch<PlatformSettingsView>("/admin/settings", {
+        defaultRenderProfile: settings.defaultRenderProfile,
+        geminiTextModel: settings.geminiTextModel,
+        geminiTtsModel: settings.geminiTtsModel,
+        geminiImageModel: settings.geminiImageModel,
+        geminiMusicModel: settings.geminiMusicModel,
+        geminiVideoModel: settings.geminiVideoModel,
+        freeVideosPerUser: settings.freeVideosPerUser
+      });
+      setSettings(updated);
+      setMessage("נשמר בהצלחה.");
+    } catch (err) {
+      setMessage((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!settings) return <p className="muted">טוען הגדרות…</p>;
+
+  const profiles = listRenderProfiles();
+
+  return (
+    <section className="admin-settings">
+      <h3>הגדרות מערכת</h3>
+      <p className="muted">שינויים חלים על סרטונים חדשים. עדכון אחרון: {new Date(settings.updatedAt).toLocaleString("he-IL")}</p>
+
+      <label>
+        פרופיל וידאו (ברירת מחדל)
+        <select
+          value={settings.defaultRenderProfile}
+          onChange={(e) => setSettings({ ...settings, defaultRenderProfile: e.target.value as PlatformSettingsView["defaultRenderProfile"] })}
+        >
+          {profiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <fieldset className="settings-models">
+        <legend>מודלי Gemini (ריק = מ-.env)</legend>
+        <label>
+          טקסט / תסריט
+          <input
+            value={settings.geminiTextModel ?? ""}
+            placeholder="gemini-3.5-flash"
+            onChange={(e) => setSettings({ ...settings, geminiTextModel: e.target.value || null })}
+          />
+        </label>
+        <label>
+          TTS / קול
+          <input
+            value={settings.geminiTtsModel ?? ""}
+            placeholder="gemini-2.5-flash-preview-tts"
+            onChange={(e) => setSettings({ ...settings, geminiTtsModel: e.target.value || null })}
+          />
+        </label>
+        <label>
+          תמונות
+          <input
+            value={settings.geminiImageModel ?? ""}
+            placeholder="gemini-3.1-flash-image"
+            onChange={(e) => setSettings({ ...settings, geminiImageModel: e.target.value || null })}
+          />
+        </label>
+        <label>
+          מוזיקה
+          <input
+            value={settings.geminiMusicModel ?? ""}
+            placeholder="lyria-3-clip-preview"
+            onChange={(e) => setSettings({ ...settings, geminiMusicModel: e.target.value || null })}
+          />
+        </label>
+        <label>
+          וידאו (Veo)
+          <input
+            value={settings.geminiVideoModel ?? ""}
+            placeholder="veo-3.1-fast-generate-preview"
+            onChange={(e) => setSettings({ ...settings, geminiVideoModel: e.target.value || null })}
+          />
+        </label>
+      </fieldset>
+
+      <label>
+        סרטונים חינם למשתמש חדש
+        <input
+          type="number"
+          min={0}
+          max={100}
+          value={settings.freeVideosPerUser}
+          onChange={(e) => setSettings({ ...settings, freeVideosPerUser: Number(e.target.value) || 0 })}
+        />
+        <small className="muted">0 = כבוי. 1 = סרטון ראשון בחינם (ללא קרדיטים).</small>
+      </label>
+
+      <div className="stage-actions">
+        <button type="button" className="primary" disabled={busy} onClick={() => void save()}>
+          {busy ? "שומר…" : "שמור הגדרות"}
+        </button>
+      </div>
+      {message ? <p className={message.includes("בהצלחה") ? "muted" : "error-inline"}>{message}</p> : null}
+    </section>
+  );
+}
+
+type PlatformSettingsView = {
+  defaultRenderProfile: "veo-multiclip" | "veo-extend" | "kling-i2v";
+  geminiTextModel: string | null;
+  geminiTtsModel: string | null;
+  geminiImageModel: string | null;
+  geminiMusicModel: string | null;
+  geminiVideoModel: string | null;
+  freeVideosPerUser: number;
+  updatedAt: string;
+};
+
+function listRenderProfiles() {
+  return [
+    { id: "veo-multiclip" as const, label: "Veo Fast — multiclip (ברירת מחדל)" },
+    { id: "veo-extend" as const, label: "Veo Fast — extend chain" },
+    { id: "kling-i2v" as const, label: "Kling 2.1 — image-to-video" }
+  ];
 }
 
 export function AdminUsersPanel() {

@@ -1,353 +1,366 @@
-generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native"]
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-enum UserRole {
-  USER
-  ADMIN
-}
-
-enum PlanType {
-  PAYG
-  SUBSCRIPTION
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  PAST_DUE
-  CANCELLED
-  EXPIRED
-}
-
-enum CreditReason {
-  PURCHASE
-  SUBSCRIPTION_GRANT
-  RUN_RESERVE
-  RUN_COMPLETED
-  RUN_RELEASE
-  CORRECTION
-  REFUND
-  ADMIN_ADJUST
-}
-
-enum PaymentStatus {
-  paid
-  refunded
-  pending
-}
-
-enum ApprovalMode {
-  manual
-  auto
-  auto_until_render
-}
-
-model Tenant {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user      User?
-  runs      ProjectRun[]
-  providers ProviderCredential[]
-  audits    AuditLog[]
-  series    Series[]
-}
-
-model User {
-  id        String   @id @default(cuid())
-  googleId  String   @unique
-  email     String   @unique
-  name      String?
-  avatarUrl String?
-  role      UserRole @default(USER)
-  tenantId  String   @unique
-  locale    String   @default("he")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  subscription  Subscription?
-  creditEntries CreditLedger[]
-  payments      Payment[]
-  runs          ProjectRun[]
-
-  @@index([email])
-}
-
-model Subscription {
-  id                  String             @id @default(cuid())
-  userId              String             @unique
-  lemonSubscriptionId String             @unique
-  planType            PlanType           @default(SUBSCRIPTION)
-  status              SubscriptionStatus @default(ACTIVE)
-  creditsPerPeriod    Int                @default(30)
-  currentPeriodStart  DateTime
-  currentPeriodEnd    DateTime
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model CreditLedger {
-  id           String       @id @default(cuid())
-  userId       String
-  runId        String?
-  delta        Float
-  reason       CreditReason
-  balanceAfter Float
-  metadata     Json         @default("{}")
-  createdAt    DateTime     @default(now())
-
-  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  run  ProjectRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
-
-  @@index([userId, createdAt])
-  @@index([runId])
-}
-
-model Payment {
-  id             String        @id @default(cuid())
-  userId         String
-  lemonOrderId   String        @unique
-  amountNis      Float
-  planType       PlanType
-  creditsGranted Int
-  status         PaymentStatus @default(paid)
-  createdAt      DateTime      @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-}
-
-enum RunStatus {
-  DRAFT
-  RUNNING
-  AWAITING_APPROVAL
-  COMPLETED
-  FAILED
-  CANCELLED
-}
-
-enum StageName {
-  brief
-  script
-  audio
-  asset
-  package_
-  render
-  series
-}
-
-enum StageStatus {
-  PENDING
-  QUEUED
-  RUNNING
-  AWAITING_APPROVAL
-  COMPLETED
-  FAILED
-  CANCELLED
-  SKIPPED
-}
-
-enum ProviderType {
-  GEMINI
-  LLM
-  TTS
-  MUSIC
-  MEDIA_SEARCH
-  VIDEO
-  STORAGE
-}
-
-enum ArtifactKind {
-  brief_input
-  brief_output
-  script_output
-  voice_clip
-  music_track
-  scene_video_source
-  scene_image_source
-  scene_reference_frame
-  scene_first_frame
-  scene_last_frame
-  scene_rendered_clip
-  final_video
-  series_final_video
-  package_manifest
-  package_instructions
-  package_timeline
-  package_gemini_render_plan
-  render_profile_snapshot
-  gemini_operation
-}
-
-enum CostActivityType {
-  veo_video
-  gemini_tts
-  gemini_image
-  gemini_text
-  gemini_music
-  gcs_upload
-  gcs_storage
-}
-
-enum CostChargedStatus {
-  yes
-  no
-  unknown
-}
-
-enum CostBilledUnit {
-  veo_seconds
-  image_call
-  text_call
-  tts_call
-  music_seconds
-  bytes
-}
-
-model CostEvent {
-  id               String            @id @default(cuid())
-  tenantId         String
-  runId            String
-  stageExecutionId String?
-  attempt          Int               @default(1)
-  stage            StageName
-  activityType     CostActivityType
-  sceneId          String?
-  model            String?
-  startedAt        DateTime          @default(now())
-  durationMs       Int?
-  billedUnits      Float
-  unit             CostBilledUnit
-  costUsd          Float
-  costNis          Float
-  charged          CostChargedStatus @default(yes)
-  metadata         Json              @default("{}")
-
-  run ProjectRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-
-  @@index([runId, startedAt])
-  @@index([tenantId, startedAt])
-}
-
-model ProjectRun {
-  id             String       @id @default(cuid())
-  tenantId       String
-  userId         String?
-  status         RunStatus    @default(DRAFT)
-  currentStage   StageName?
-  brief          Json
-  approvalMode   ApprovalMode @default(auto)
-  isCorrectionRun Boolean     @default(false)
-  parentRunId    String?
-  creditReserved Float        @default(0)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  parentRun    ProjectRun?    @relation("RunCorrections", fields: [parentRunId], references: [id], onDelete: SetNull)
-  childRuns    ProjectRun[]   @relation("RunCorrections")
-  stages       StageExecution[]
-  artifacts    Artifact[]
-  costEvents   CostEvent[]
-  creditEntries CreditLedger[]
-
-  @@index([tenantId, status])
-  @@index([userId, status])
-}
-
-model StageExecution {
-  id          String      @id @default(cuid())
-  runId       String
-  stage       StageName
-  status      StageStatus @default(PENDING)
-  attempts    Int         @default(0)
-  input       Json?
-  output      Json?
-  error       String?
-  startedAt   DateTime?
-  completedAt DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  run ProjectRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-
-  @@unique([runId, stage])
-  @@index([status])
-}
-
-model Artifact {
-  id        String       @id @default(cuid())
-  runId     String
-  stage     StageName
-  kind      ArtifactKind
-  gcsPath   String
-  mimeType  String
-  sizeBytes Int
-  metadata  Json         @default("{}")
-  createdAt DateTime     @default(now())
-
-  run ProjectRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-
-  @@index([runId, stage])
-  @@index([runId, kind])
-}
-
-model ProviderCredential {
-  id           String       @id @default(cuid())
-  tenantId     String
-  type         ProviderType
-  provider     String
-  displayName  String
-  enabled      Boolean      @default(true)
-  priority     Int          @default(10)
-  encryptedKey String?
-  config       Json         @default("{}")
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, type, enabled, priority])
-}
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  tenantId  String
-  action    String
-  entity    String
-  entityId  String?
-  metadata  Json     @default("{}")
-  createdAt DateTime @default(now())
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, entity, entityId])
-  @@index([tenantId, createdAt])
-}
-
-model Series {
-  id           String   @id @default(cuid())
-  tenantId     String
-  runIds       String[]
-  status       String   @default("DRAFT")
-  finalGcsPath String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-}
-
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum PlanType {
+  PAYG
+  SUBSCRIPTION
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum CreditReason {
+  PURCHASE
+  SUBSCRIPTION_GRANT
+  RUN_RESERVE
+  RUN_COMPLETED
+  RUN_RELEASE
+  CORRECTION
+  REFUND
+  ADMIN_ADJUST
+}
+
+enum PaymentStatus {
+  paid
+  refunded
+  pending
+}
+
+enum ApprovalMode {
+  manual
+  auto
+  auto_until_render
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User?
+  runs      ProjectRun[]
+  providers ProviderCredential[]
+  audits    AuditLog[]
+  series    Series[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  googleId  String   @unique
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  role      UserRole @default(USER)
+  tenantId  String   @unique
+  locale    String   @default("he")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription  Subscription?
+  creditEntries CreditLedger[]
+  payments      Payment[]
+  runs          ProjectRun[]
+
+  @@index([email])
+}
+
+model Subscription {
+  id                  String             @id @default(cuid())
+  userId              String             @unique
+  lemonSubscriptionId String             @unique
+  planType            PlanType           @default(SUBSCRIPTION)
+  status              SubscriptionStatus @default(ACTIVE)
+  creditsPerPeriod    Int                @default(30)
+  currentPeriodStart  DateTime
+  currentPeriodEnd    DateTime
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CreditLedger {
+  id           String       @id @default(cuid())
+  userId       String
+  runId        String?
+  delta        Float
+  reason       CreditReason
+  balanceAfter Float
+  metadata     Json         @default("{}")
+  createdAt    DateTime     @default(now())
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  run  ProjectRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([runId])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  userId         String
+  lemonOrderId   String        @unique
+  amountNis      Float
+  planType       PlanType
+  creditsGranted Int
+  status         PaymentStatus @default(paid)
+  createdAt      DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+enum RunStatus {
+  DRAFT
+  RUNNING
+  AWAITING_APPROVAL
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum StageName {
+  brief
+  script
+  audio
+  asset
+  package_
+  render
+  series
+}
+
+enum StageStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  AWAITING_APPROVAL
+  COMPLETED
+  FAILED
+  CANCELLED
+  SKIPPED
+}
+
+enum ProviderType {
+  GEMINI
+  LLM
+  TTS
+  MUSIC
+  MEDIA_SEARCH
+  VIDEO
+  STORAGE
+}
+
+enum ArtifactKind {
+  brief_input
+  brief_output
+  script_output
+  voice_clip
+  music_track
+  scene_video_source
+  scene_image_source
+  scene_reference_frame
+  scene_first_frame
+  scene_last_frame
+  scene_rendered_clip
+  final_video
+  series_final_video
+  package_manifest
+  package_instructions
+  package_timeline
+  package_gemini_render_plan
+  render_profile_snapshot
+  gemini_operation
+}
+
+enum CostActivityType {
+  veo_video
+  gemini_tts
+  gemini_image
+  gemini_text
+  gemini_music
+  gcs_upload
+  gcs_storage
+}
+
+enum CostChargedStatus {
+  yes
+  no
+  unknown
+}
+
+enum CostBilledUnit {
+  veo_seconds
+  image_call
+  text_call
+  tts_call
+  music_seconds
+  bytes
+}
+
+model CostEvent {
+  id               String            @id @default(cuid())
+  tenantId         String
+  runId            String
+  stageExecutionId String?
+  attempt          Int               @default(1)
+  stage            StageName
+  activityType     CostActivityType
+  sceneId          String?
+  model            String?
+  startedAt        DateTime          @default(now())
+  durationMs       Int?
+  billedUnits      Float
+  unit             CostBilledUnit
+  costUsd          Float
+  costNis          Float
+  charged          CostChargedStatus @default(yes)
+  metadata         Json              @default("{}")
+
+  run ProjectRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, startedAt])
+  @@index([tenantId, startedAt])
+}
+
+model ProjectRun {
+  id             String       @id @default(cuid())
+  tenantId       String
+  userId         String?
+  status         RunStatus    @default(DRAFT)
+  currentStage   StageName?
+  brief          Json
+  approvalMode   ApprovalMode @default(auto)
+  isCorrectionRun Boolean     @default(false)
+  parentRunId    String?
+  creditReserved Float        @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  parentRun    ProjectRun?    @relation("RunCorrections", fields: [parentRunId], references: [id], onDelete: SetNull)
+  childRuns    ProjectRun[]   @relation("RunCorrections")
+  stages       StageExecution[]
+  artifacts    Artifact[]
+  costEvents   CostEvent[]
+  creditEntries CreditLedger[]
+
+  @@index([tenantId, status])
+  @@index([userId, status])
+}
+
+model StageExecution {
+  id          String      @id @default(cuid())
+  runId       String
+  stage       StageName
+  status      StageStatus @default(PENDING)
+  attempts    Int         @default(0)
+  input       Json?
+  output      Json?
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  run ProjectRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, stage])
+  @@index([status])
+}
+
+model Artifact {
+  id        String       @id @default(cuid())
+  runId     String
+  stage     StageName
+  kind      ArtifactKind
+  gcsPath   String
+  mimeType  String
+  sizeBytes Int
+  metadata  Json         @default("{}")
+  createdAt DateTime     @default(now())
+
+  run ProjectRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, stage])
+  @@index([runId, kind])
+}
+
+model ProviderCredential {
+  id           String       @id @default(cuid())
+  tenantId     String
+  type         ProviderType
+  provider     String
+  displayName  String
+  enabled      Boolean      @default(true)
+  priority     Int          @default(10)
+  encryptedKey String?
+  config       Json         @default("{}")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, type, enabled, priority])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, entity, entityId])
+  @@index([tenantId, createdAt])
+}
+
+model Series {
+  id           String   @id @default(cuid())
+  tenantId     String
+  runIds       String[]
+  status       String   @default("DRAFT")
+  finalGcsPath String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// Singleton platform-wide defaults (models, billing promos).
+model PlatformSettings {
+  id                   String   @id @default("platform")
+  defaultRenderProfile String   @default("veo-multiclip")
+  geminiTextModel      String?
+  geminiTtsModel       String?
+  geminiImageModel     String?
+  geminiMusicModel     String?
+  geminiVideoModel     String?
+  freeVideosPerUser    Int      @default(0)
+  updatedAt            DateTime @updatedAt
+}
+
