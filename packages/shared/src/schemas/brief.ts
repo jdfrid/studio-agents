@@ -31,7 +31,9 @@ export const BriefInputSchema = z.object({
   /** Fewer scenes, 4s Veo buckets, reference-only assets, TTS without Lyria. */
   budgetMode: z.boolean().default(false),
   /** Video render profile (provider + strategy). Falls back to RENDER_PROFILE env. */
-  renderProfile: RenderProfileIdSchema.optional()
+  renderProfile: RenderProfileIdSchema.optional(),
+  /** Pipeline approval: manual stops at each gate; auto runs all; auto_until_render pauses before render. */
+  approvalMode: z.enum(["manual", "auto", "auto_until_render"]).default("auto")
 });export type BriefInput = z.infer<typeof BriefInputSchema>;
 
 /** Structured requirements emitted by the Brief agent for downstream stages. */

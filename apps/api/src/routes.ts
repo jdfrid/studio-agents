@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { StageNameSchema, CreateRunRequestSchema } from "@studio/shared";
+import { StageNameSchema, CreateRunRequestSchema, CheckoutRequestSchema } from "@studio/shared";
 import {
   approveStage,
+  applyVisualCorrectionsToRun,
   createArtifactsRepo,
   createProvidersRepo,
   createRun,
@@ -16,228 +17,423 @@ import {
 } from "@studio/orchestrator";
 import { prisma } from "@studio/infra-prisma";
 import { checkGeminiCapabilities, geminiModels } from "@studio/providers";
-import { buildProductionCostConfig, estimateRunCost, listRenderProfiles, profileToProductionCostConfig, resolveRenderProfile } from "@studio/shared";
+import {
+  buildProductionCostConfig,
+  estimateRunCost,
+  listRenderProfiles,
+  profileToProductionCostConfig,
+  resolveRenderProfile,
+  correctionCreditCost
+} from "@studio/shared";
+import {
+  registerAuthRoutes,
+  requireAuth,
+  requireAdmin,
+  authPlugin,
+  resolveSession
+} from "@studio/auth";
+import {
+  assertCanStartRun,
+  createCheckout,
+  getBillingStatus,
+  handleLemonWebhook,
+  verifyWebhookSignature,
+  getAdminDashboard,
+  getAdminUsers,
+  getAdminUserPnl,
+  adminAdjustCredits,
+  InsufficientCreditsError
+} from "@studio/billing";
+
+async function assertRunOwner(runId: string, userId: string) {
+  const run = await prisma.projectRun.findUnique({ where: { id: runId } });
+  if (!run) return null;
+  if (run.userId && run.userId !== userId) return null;
+  return run;
+}
 
 export async function registerRoutes(app: FastifyInstance) {
+  await authPlugin(app);
+  await registerAuthRoutes(app);
+
   app.get("/health", async () => ({ ok: true }));
 
-  app.get("/health/queues", async () => {
-    const queues = await getQueueStats();
-    return { ok: true, queues };
+  app.post("/billing/webhooks/lemonsqueezy", { config: { rawBody: true } }, async (request, reply) => {
+    const raw = (request as { rawBody?: string }).rawBody ?? JSON.stringify(request.body);
+    const sig = request.headers["x-signature"] as string | undefined;
+    if (!verifyWebhookSignature(raw, sig)) {
+      reply.code(401);
+      return { error: "invalid_signature" };
+    }
+    const body = JSON.parse(raw) as { meta?: { event_name?: string }; data?: unknown };
+    await handleLemonWebhook(body.meta?.event_name ?? "", body as Record<string, unknown>);
+    return { ok: true };
   });
 
-  app.get("/gemini/capabilities", async () => {
-    const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
-    const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
-    return checkGeminiCapabilities(provider);
-  });
+  app.register(async (userRoutes) => {
+    userRoutes.addHook("preHandler", requireAuth());
 
-  app.get("/config/render-profiles", async () => {
-    const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
-    const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
-    const videoModel = geminiModels(provider).video;
-    const baseConfig = buildProductionCostConfig(videoModel);
-    const defaultProfile = resolveRenderProfile();
-    return {
-      defaultProfileId: defaultProfile.id,
-      profiles: listRenderProfiles().map((profile) => ({
-        id: profile.id,
-        label: profile.label,
-        provider: profile.provider,
-        strategy: profile.strategy,
-        capabilities: profile.capabilities,
-        estimate30sBudget: estimateRunCost(
-          { budgetMode: true, durationSeconds: 30 },
-          profileToProductionCostConfig(profile, baseConfig)
-        )
-      }))
-    };
-  });
-
-  app.get("/config/cost", async () => {
-    const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
-    const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
-    const videoModel = geminiModels(provider).video;
-    const config = buildProductionCostConfig(videoModel);
-    return {
-      config,
-      examples: {
-        budget30s: estimateRunCost({ budgetMode: true, durationSeconds: 30 }, config),
-        normal30s: estimateRunCost({ budgetMode: false, durationSeconds: 30 }, config)
-      }
-    };
-  });
-
-  app.post("/runs", async (request, reply) => {
-    const body = CreateRunRequestSchema.parse(request.body);
-    const view = await createRun(body);
-    reply.code(201);
-    return view;
-  });
-
-  app.get("/runs/log-matrix", async () => {
-    return getRunsLogMatrix(100);
-  });
-
-  app.get("/runs", async () => {
-    const rows = await prisma.projectRun.findMany({
-      include: { stages: true },
-      orderBy: { updatedAt: "desc" },
-      take: 100
+    userRoutes.get("/billing/status", async (request) => {
+      return getBillingStatus(request.user!.sub);
     });
-    return rows.map((r) => ({
-      id: r.id,
-      status: r.status,
-      currentStage: r.currentStage,
-      title: (r.brief as { title?: string })?.title ?? "(untitled)",
-      renderProfile: (r.brief as { renderProfile?: string })?.renderProfile ?? null,
-      updatedAt: r.updatedAt.toISOString()
-    }));
-  });
 
-  app.get("/runs/:id", async (request, reply) => {
-    const { id } = z.object({ id: z.string() }).parse(request.params);
-    const view = await getRun(id);
-    if (!view) {
-      reply.code(404);
-      return { error: "not_found" };
-    }
-    const ledger = await getRunCostLedger(id);
-    return { ...view, actualTotalNis: ledger.summary.totalNis };
-  });
-
-  app.get("/runs/:id/cost-events", async (request, reply) => {
-    const { id } = z.object({ id: z.string() }).parse(request.params);
-    const run = await prisma.projectRun.findUnique({ where: { id } });
-    if (!run) {
-      reply.code(404);
-      return { error: "not_found" };
-    }
-    return getRunCostLedger(id);
-  });
-
-  app.post("/runs/:id/stages/:stage/approve", async (request, reply) => {
-    const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
-    const view = await approveStage(id, stage);
-    if (!view) {
-      reply.code(404);
-      return { error: "not_found" };
-    }
-    return view;
-  });
-
-  app.post("/runs/:id/stages/:stage/rerun", async (request, reply) => {
-    const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
-    const view = await rerunStage(id, stage);
-    if (!view) {
-      reply.code(404);
-      return { error: "not_found" };
-    }
-    return view;
-  });
-
-  app.patch("/runs/:id/stages/:stage/output", async (request, reply) => {
-    const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
-    try {
-      const view = await updateStageOutput(id, stage, request.body);
-      if (!view) {
+    userRoutes.post("/billing/checkout", async (request, reply) => {
+      const body = CheckoutRequestSchema.parse(request.body);
+      const user = await prisma.user.findUnique({ where: { id: request.user!.sub } });
+      if (!user) {
         reply.code(404);
         return { error: "not_found" };
       }
-      return view;
-    } catch (error) {
-      reply.code(400);
-      return { error: (error as Error).message };
-    }
-  });
+      const url = await createCheckout(user.id, user.email, body.plan);
+      return { checkoutUrl: url };
+    });
 
-  app.post("/runs/:id/stages/:stage/artifacts", async (request, reply) => {
-    const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
-    const body = z
-      .object({
-        kind: z.string().min(1),
-        filename: z.string().min(1),
-        mimeType: z.string().min(1),
-        base64: z.string().min(1),
-        attach: z.discriminatedUnion("type", [
-          z.object({ type: z.literal("voice"), sceneId: z.string() }),
-          z.object({ type: z.literal("music") }),
-          z.object({
-            type: z.enum(["referenceFrame", "firstFrame", "lastFrame", "background"]),
-            sceneId: z.string()
-          }),
-          z.object({ type: z.literal("visualAnchor"), sceneId: z.string().optional() }),
-          z.object({ type: z.literal("sceneClip"), sceneId: z.string() }),
-          z.object({ type: z.literal("final") })
-        ])
-      })
-      .parse(request.body);
-    try {
-      const view = await uploadStageArtifact(id, stage, {
-        kind: body.kind,
-        filename: body.filename,
-        mimeType: body.mimeType,
-        body: Buffer.from(body.base64, "base64"),
-        attach: body.attach
+    userRoutes.post("/runs", async (request, reply) => {
+      const body = CreateRunRequestSchema.parse(request.body);
+      const userId = request.user!.sub;
+      try {
+        await assertCanStartRun(userId, 1);
+      } catch (err) {
+        if (err instanceof InsufficientCreditsError) {
+          reply.code(402);
+          return { error: err.message, code: "insufficient_credits" };
+        }
+        throw err;
+      }
+      const brief = {
+        ...body.brief,
+        budgetMode: true,
+        renderProfile: body.brief.renderProfile ?? resolveRenderProfile().id
+      };
+      const view = await createRun({ brief, userId });
+      reply.code(201);
+      return view;
+    });
+
+    userRoutes.get("/runs", async (request) => {
+      const rows = await prisma.projectRun.findMany({
+        where: { userId: request.user!.sub },
+        orderBy: { updatedAt: "desc" },
+        take: 100
       });
+      return rows.map((r) => ({
+        id: r.id,
+        status: r.status,
+        currentStage: r.currentStage,
+        title: (r.brief as { title?: string })?.title ?? "(ללא כותרת)",
+        updatedAt: r.updatedAt.toISOString()
+      }));
+    });
+
+    userRoutes.get("/runs/:id", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const view = await getRun(id, request.user!.sub);
       if (!view) {
         reply.code(404);
         return { error: "not_found" };
       }
       return view;
-    } catch (error) {
-      reply.code(400);
-      return { error: (error as Error).message };
-    }
-  });
-
-  app.post("/runs/:id/scenes/:sceneId/regenerate-visual", async (request, reply) => {
-    const { id, sceneId } = z.object({ id: z.string(), sceneId: z.string() }).parse(request.params);
-    const view = await rerunStage(id, "asset");
-    if (!view) {
-      reply.code(404);
-      return { error: "not_found" };
-    }
-    return { ...view, regeneratedSceneId: sceneId, rerunStage: "asset" };
-  });
-
-  app.post("/runs/:id/scenes/:sceneId/regenerate-video", async (request, reply) => {
-    const { id, sceneId } = z.object({ id: z.string(), sceneId: z.string() }).parse(request.params);
-    const view = await rerunStage(id, "render");
-    if (!view) {
-      reply.code(404);
-      return { error: "not_found" };
-    }
-    return { ...view, regeneratedSceneId: sceneId, rerunStage: "render" };
-  });
-
-  app.get("/runs/:id/gemini-operations", async (request) => {
-    const { id } = z.object({ id: z.string() }).parse(request.params);
-    const rows = await prisma.artifact.findMany({
-      where: { runId: id, kind: "gemini_operation" },
-      orderBy: { createdAt: "asc" }
     });
-    return rows.map((row) => ({
-      id: row.id,
-      stage: row.stage,
-      gcsPath: row.gcsPath,
-      metadata: row.metadata,
-      createdAt: row.createdAt.toISOString()
-    }));
+
+    userRoutes.post("/runs/:id/stages/:stage/approve", async (request, reply) => {
+      const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
+      if (!(await assertRunOwner(id, request.user!.sub))) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const view = await approveStage(id, stage);
+      if (!view) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return view;
+    });
+
+    userRoutes.post("/runs/:id/stages/:stage/rerun", async (request, reply) => {
+      const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
+      if (!(await assertRunOwner(id, request.user!.sub))) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const view = await rerunStage(id, stage);
+      if (!view) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return view;
+    });
+
+    userRoutes.patch("/runs/:id/stages/:stage/output", async (request, reply) => {
+      const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
+      if (!(await assertRunOwner(id, request.user!.sub))) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      try {
+        const view = await updateStageOutput(id, stage, request.body);
+        if (!view) {
+          reply.code(404);
+          return { error: "not_found" };
+        }
+        return view;
+      } catch (error) {
+        reply.code(400);
+        return { error: (error as Error).message };
+      }
+    });
+
+    userRoutes.post("/runs/:id/stages/:stage/artifacts", async (request, reply) => {
+      const { id, stage } = z.object({ id: z.string(), stage: StageNameSchema }).parse(request.params);
+      if (!(await assertRunOwner(id, request.user!.sub))) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const body = z
+        .object({
+          kind: z.string().min(1),
+          filename: z.string().min(1),
+          mimeType: z.string().min(1),
+          base64: z.string().min(1),
+          attach: z.discriminatedUnion("type", [
+            z.object({ type: z.literal("voice"), sceneId: z.string() }),
+            z.object({ type: z.literal("music") }),
+            z.object({
+              type: z.enum(["referenceFrame", "firstFrame", "lastFrame", "background"]),
+              sceneId: z.string()
+            }),
+            z.object({ type: z.literal("visualAnchor"), sceneId: z.string().optional() }),
+            z.object({ type: z.literal("sceneClip"), sceneId: z.string() }),
+            z.object({ type: z.literal("final") })
+          ])
+        })
+        .parse(request.body);
+      try {
+        const view = await uploadStageArtifact(id, stage, {
+          kind: body.kind,
+          filename: body.filename,
+          mimeType: body.mimeType,
+          body: Buffer.from(body.base64, "base64"),
+          attach: body.attach
+        });
+        if (!view) {
+          reply.code(404);
+          return { error: "not_found" };
+        }
+        return view;
+      } catch (error) {
+        reply.code(400);
+        return { error: (error as Error).message };
+      }
+    });
+
+    userRoutes.post("/runs/:id/visual-corrections", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const body = request.body as { rerunFrom?: "asset" | "render" | null };
+      const run = await assertRunOwner(id, request.user!.sub);
+      if (!run) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const cost = run.status === "COMPLETED" ? correctionCreditCost(body?.rerunFrom) : 0;
+      if (cost > 0) {
+        try {
+          const { chargeCorrectionCredits } = await import("@studio/billing");
+          await chargeCorrectionCredits(request.user!.sub, id, body?.rerunFrom);
+        } catch (err) {
+          if (err instanceof InsufficientCreditsError) {
+            reply.code(402);
+            return { error: err.message, code: "insufficient_credits", creditCost: cost };
+          }
+          throw err;
+        }
+      }
+      try {
+        const view = await applyVisualCorrectionsToRun(id, request.body, request.user!.sub);
+        if (!view) {
+          reply.code(404);
+          return { error: "not_found" };
+        }
+        return view;
+      } catch (error) {
+        reply.code(400);
+        return { error: (error as Error).message };
+      }
+    });
+
+    userRoutes.post("/runs/:id/scenes/:sceneId/regenerate-visual", async (request, reply) => {
+      const { id, sceneId } = z.object({ id: z.string(), sceneId: z.string() }).parse(request.params);
+      if (!(await assertRunOwner(id, request.user!.sub))) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const view = await rerunStage(id, "asset");
+      if (!view) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return { ...view, regeneratedSceneId: sceneId, rerunStage: "asset" };
+    });
+
+    userRoutes.post("/runs/:id/scenes/:sceneId/regenerate-video", async (request, reply) => {
+      const { id, sceneId } = z.object({ id: z.string(), sceneId: z.string() }).parse(request.params);
+      if (!(await assertRunOwner(id, request.user!.sub))) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const view = await rerunStage(id, "render");
+      if (!view) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return { ...view, regeneratedSceneId: sceneId, rerunStage: "render" };
+    });
+
+    userRoutes.get("/runs/:id/artifacts", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      if (!(await assertRunOwner(id, request.user!.sub))) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const repo = createArtifactsRepo();
+      void reply;
+      return repo.list(id);
+    });
+
+    userRoutes.get("/artifacts/:id/signed-url", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const artifact = await prisma.artifact.findUnique({ where: { id }, include: { run: true } });
+      if (!artifact?.run.userId || artifact.run.userId !== request.user!.sub) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const repo = createArtifactsRepo();
+      const url = await repo.signedUrl(id);
+      return { url };
+    });
   });
 
-  app.get("/runs/:id/artifacts", async (request, reply) => {
-    const { id } = z.object({ id: z.string() }).parse(request.params);
-    const repo = createArtifactsRepo();
-    const list = await repo.list(id);
-    void reply;
-    return list;
-  });
+  app.register(async (adminRoutes) => {
+    adminRoutes.addHook("preHandler", requireAdmin());
 
-  app.get("/artifacts/:id/signed-url", async (request) => {
-    const { id } = z.object({ id: z.string() }).parse(request.params);
-    const repo = createArtifactsRepo();
-    const url = await repo.signedUrl(id);
-    return { url };
+    adminRoutes.get("/health/queues", async () => {
+      const queues = await getQueueStats();
+      return { ok: true, queues };
+    });
+
+    adminRoutes.get("/gemini/capabilities", async () => {
+      const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
+      const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
+      return checkGeminiCapabilities(provider);
+    });
+
+    adminRoutes.get("/config/render-profiles", async () => {
+      const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
+      const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
+      const videoModel = geminiModels(provider).video;
+      const baseConfig = buildProductionCostConfig(videoModel);
+      const defaultProfile = resolveRenderProfile();
+      return {
+        defaultProfileId: defaultProfile.id,
+        profiles: listRenderProfiles().map((profile) => ({
+          id: profile.id,
+          label: profile.label,
+          provider: profile.provider,
+          strategy: profile.strategy,
+          capabilities: profile.capabilities,
+          estimate30sBudget: estimateRunCost(
+            { budgetMode: true, durationSeconds: 30 },
+            profileToProductionCostConfig(profile, baseConfig)
+          )
+        }))
+      };
+    });
+
+    adminRoutes.get("/config/cost", async () => {
+      const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
+      const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
+      const videoModel = geminiModels(provider).video;
+      const config = buildProductionCostConfig(videoModel);
+      return {
+        config,
+        examples: {
+          budget30s: estimateRunCost({ budgetMode: true, durationSeconds: 30 }, config),
+          normal30s: estimateRunCost({ budgetMode: false, durationSeconds: 30 }, config)
+        }
+      };
+    });
+
+    adminRoutes.get("/runs/log-matrix", async () => getRunsLogMatrix(100));
+
+    adminRoutes.get("/runs", async () => {
+      const rows = await prisma.projectRun.findMany({
+        include: { stages: true, user: true },
+        orderBy: { updatedAt: "desc" },
+        take: 100
+      });
+      return rows.map((r) => ({
+        id: r.id,
+        status: r.status,
+        currentStage: r.currentStage,
+        title: (r.brief as { title?: string })?.title ?? "(untitled)",
+        renderProfile: (r.brief as { renderProfile?: string })?.renderProfile ?? null,
+        userEmail: r.user?.email ?? null,
+        updatedAt: r.updatedAt.toISOString()
+      }));
+    });
+
+    adminRoutes.get("/runs/:id", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const view = await getRun(id);
+      if (!view) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const ledger = await getRunCostLedger(id);
+      return { ...view, actualTotalNis: ledger.summary.totalNis };
+    });
+
+    adminRoutes.get("/runs/:id/cost-events", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const run = await prisma.projectRun.findUnique({ where: { id } });
+      if (!run) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return getRunCostLedger(id);
+    });
+
+    adminRoutes.get("/runs/:id/gemini-operations", async (request) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const rows = await prisma.artifact.findMany({
+        where: { runId: id, kind: "gemini_operation" },
+        orderBy: { createdAt: "asc" }
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        stage: row.stage,
+        gcsPath: row.gcsPath,
+        metadata: row.metadata,
+        createdAt: row.createdAt.toISOString()
+      }));
+    });
+
+    adminRoutes.get("/admin/dashboard", async () => getAdminDashboard());
+    adminRoutes.get("/admin/users", async () => getAdminUsers());
+    adminRoutes.get("/admin/users/:id/pnl", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const pnl = await getAdminUserPnl(id);
+      if (!pnl) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return pnl;
+    });
+
+    adminRoutes.post("/admin/users/:id/credits", async (request) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const body = z.object({ delta: z.number(), note: z.string().default("") }).parse(request.body);
+      const balance = await adminAdjustCredits(id, body.delta, body.note);
+      return { balance };
+    });
   });
 }

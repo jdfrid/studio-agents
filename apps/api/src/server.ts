@@ -4,9 +4,28 @@ import sensible from "@fastify/sensible";
 import { ZodError } from "zod";
 import { registerRoutes } from "./routes.js";
 
-const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info" } });
+const app = Fastify({
+  logger: { level: process.env.LOG_LEVEL ?? "info" },
+  bodyLimit: 32 * 1024 * 1024
+});
 
-await app.register(cors, { origin: true });
+app.addHook("preParsing", async (request, _reply, payload) => {
+  const url = request.url;
+  if (url.startsWith("/billing/webhooks/")) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of payload) {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+    }
+    const rawBody = Buffer.concat(chunks).toString("utf8");
+    (request as { rawBody?: string }).rawBody = rawBody;
+    const { Readable } = await import("node:stream");
+    return Readable.from([rawBody]);
+  }
+  return payload;
+});
+
+const corsOrigin = process.env.CORS_ORIGINS?.split(",").map((s) => s.trim()) ?? true;
+await app.register(cors, { origin: corsOrigin, credentials: true });
 await app.register(sensible);
 
 app.setErrorHandler((error, _request, reply) => {

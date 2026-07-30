@@ -1,5 +1,3 @@
-import { formatApiErrorMessage, parseStageError, stageErrorFriendly } from "@studio/shared";
-
 const apiBase = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 function apiUrl(path: string): string {
@@ -10,17 +8,22 @@ function apiUrl(path: string): string {
 async function throwApiError(res: Response): Promise<never> {
   const text = await res.text();
   let message = text;
+  let code: string | undefined;
   try {
-    const json = JSON.parse(text) as { error?: string };
+    const json = JSON.parse(text) as { error?: string; code?: string };
     if (typeof json.error === "string") message = json.error;
+    code = json.code;
   } catch {
-    // keep raw body
+    // keep raw
   }
-  throw new Error(formatApiErrorMessage(`${res.status} ${message}`));
+  const err = new Error(message) as Error & { code?: string; status?: number };
+  err.code = code;
+  err.status = res.status;
+  throw err;
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(apiUrl(path));
+  const res = await fetch(apiUrl(path), { credentials: "include" });
   if (!res.ok) await throwApiError(res);
   return (await res.json()) as T;
 }
@@ -28,6 +31,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 export async function apiPost<T>(path: string, body: unknown = {}): Promise<T> {
   const res = await fetch(apiUrl(path), {
     method: "POST",
+    credentials: "include",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
@@ -38,11 +42,16 @@ export async function apiPost<T>(path: string, body: unknown = {}): Promise<T> {
 export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(apiUrl(path), {
     method: "PATCH",
+    credentials: "include",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
   if (!res.ok) await throwApiError(res);
   return (await res.json()) as T;
+}
+
+export function authLoginUrl(): string {
+  return apiUrl("/auth/google");
 }
 
 export async function uploadStageArtifact(
@@ -74,10 +83,11 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export { formatApiErrorMessage, stageErrorFriendly };
+import { formatApiErrorMessage, parseStageError, stageErrorFriendly } from "@studio/shared";
 
 export function isQuotaErrorMessage(message: string): boolean {
   if (message.includes("הגעת למגבלת התקציב")) return true;
-  const parsed = parseStageError(message);
-  return parsed.kind === "billing_quota";
+  return parseStageError(message).kind === "billing_quota";
 }
+
+export { formatApiErrorMessage, stageErrorFriendly };

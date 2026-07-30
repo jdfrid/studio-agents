@@ -19,7 +19,8 @@ import {
   recordStageOutput,
   recordStageStart,
   setRunStatus,
-  shouldWaitForApproval
+  shouldWaitForApproval,
+  maybeAutoApprove
 } from "./runService.js";
 import { fromPrismaStage, toPrismaStage } from "./stageMap.js";
 
@@ -69,7 +70,11 @@ export async function runStage(runId: string, stage: StageName): Promise<void> {
   try {
     const output = await agent.run(ctx, input);
     agent.outputSchema.parse(output);
-    const requiresApproval = shouldWaitForApproval(stage);
+    const approvalMode = (run.approvalMode ?? (run.brief as { approvalMode?: string })?.approvalMode ?? "manual") as
+      | "manual"
+      | "auto"
+      | "auto_until_render";
+    const requiresApproval = shouldWaitForApproval(stage, approvalMode);
     await recordStageOutput(stageRow.id, output, requiresApproval ? "AWAITING_APPROVAL" : "COMPLETED");
     await audit(run.tenantId, requiresApproval ? "stage_awaiting_approval" : "stage_completed", "StageExecution", stageRow.id, { stage });
 

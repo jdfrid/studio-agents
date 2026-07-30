@@ -2,7 +2,11 @@ import { prisma, Prisma } from "@studio/infra-prisma";
 import {
   BriefInputSchema,
   STAGE_ORDER,
-  STAGE_REQUIRES_APPROVAL,
+  ScriptOutputSchema,
+  VisualCorrectionsRequestSchema,
+  applyVisualCorrections,
+  stageRequiresApproval,
+  type ApprovalMode,
   nextStage,
   type BriefInput,
   type ProjectRunView,
@@ -15,19 +19,38 @@ import { fromPrismaStage, toPrismaStage } from "./stageMap.js";
 import { createArtifactsRepo } from "./repos.js";
 import { downstreamStages, parseStageOutput } from "./stageOutput.js";
 
-export async function createRun(input: { tenantSlug: string; brief: BriefInput }): Promise<ProjectRunView> {
-  const tenant = await prisma.tenant.upsert({
-    where: { slug: input.tenantSlug },
-    update: {},
-    create: { slug: input.tenantSlug, name: input.tenantSlug }
-  });
+export async function createRun(input: {
+  tenantSlug?: string;
+  brief: BriefInput;
+  userId?: string;
+  skipCreditCheck?: boolean;
+}): Promise<ProjectRunView> {
+  let tenantId: string;
+  if (input.userId) {
+    const user = await prisma.user.findUnique({ where: { id: input.userId } });
+    if (!user) throw new Error("User not found");
+    tenantId = user.tenantId;
+  } else {
+    const slug = input.tenantSlug ?? "demo";
+    const tenant = await prisma.tenant.upsert({
+      where: { slug },
+      update: {},
+      create: { slug, name: slug }
+    });
+    tenantId = tenant.id;
+  }
+
   const brief = BriefInputSchema.parse(input.brief);
+  const approvalMode = (brief.approvalMode ?? "auto") as ApprovalMode;
+
   const run = await prisma.projectRun.create({
     data: {
-      tenantId: tenant.id,
+      tenantId,
+      userId: input.userId ?? null,
       status: "RUNNING",
       currentStage: "brief",
       brief: brief as object,
+      approvalMode,
       stages: {
         create: STAGE_ORDER.map((stage) => ({
           stage: toPrismaStage(stage),
@@ -37,7 +60,13 @@ export async function createRun(input: { tenantSlug: string; brief: BriefInput }
     },
     include: { stages: true }
   });
-  await audit(tenant.id, "run_created", "ProjectRun", run.id, { brief });
+
+  if (input.userId && !input.skipCreditCheck) {
+    const { reserveCredits } = await import("@studio/billing");
+    await reserveCredits(input.userId, run.id, 1);
+  }
+
+  await audit(tenantId, "run_created", "ProjectRun", run.id, { brief, userId: input.userId });
   const briefStage = run.stages.find((s) => fromPrismaStage(s.stage) === "brief");
   try {
     await enqueueStage("brief", { runId: run.id, stage: "brief" });
@@ -45,14 +74,20 @@ export async function createRun(input: { tenantSlug: string; brief: BriefInput }
     const message = error instanceof Error ? error.message : String(error);
     if (briefStage) await recordStageError(briefStage.id, `enqueue_failed: ${message}`);
     await setRunStatus(run.id, "FAILED", "brief");
+    if (input.userId) {
+      const { releaseCredits } = await import("@studio/billing");
+      await releaseCredits(run.id).catch(() => undefined);
+    }
     throw error;
   }
-  return toView(run);
+  return getRun(run.id) as Promise<ProjectRunView>;
 }
 
-export async function getRun(runId: string): Promise<ProjectRunView | null> {
+export async function getRun(runId: string, userId?: string): Promise<ProjectRunView | null> {
   const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
-  return run ? toView(run) : null;
+  if (!run) return null;
+  if (userId && run.userId && run.userId !== userId) return null;
+  return toView(run);
 }
 
 export async function approveStage(runId: string, stage: StageName): Promise<ProjectRunView | null> {
@@ -105,12 +140,40 @@ export async function updateStageOutput(
   if (!stageRow) return toView(run);
 
   const validated = parseStageOutput(stage, output);
-  const status = shouldWaitForApproval(stage) ? "AWAITING_APPROVAL" : "COMPLETED";
+  const approvalMode = ((run.brief as { approvalMode?: ApprovalMode })?.approvalMode ??
+    run.approvalMode ??
+    "manual") as ApprovalMode;
+  const status = shouldWaitForApproval(stage, approvalMode) ? "AWAITING_APPROVAL" : "COMPLETED";
 
   await invalidateDownstreamStages(runId, stage);
   await recordStageOutput(stageRow.id, validated, status);
   await audit(run.tenantId, "stage_output_updated", "StageExecution", stageRow.id, { stage, manual: true });
   return getRun(runId);
+}
+
+export async function applyVisualCorrectionsToRun(
+  runId: string,
+  body: unknown,
+  userId?: string
+): Promise<ProjectRunView | null> {
+  const input = VisualCorrectionsRequestSchema.parse(body);
+  const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
+  if (!run) return null;
+  if (userId && run.userId && run.userId !== userId) return null;
+  const scriptRow = run.stages.find((s) => fromPrismaStage(s.stage) === "script");
+  if (!scriptRow?.output) throw new Error("שלב התסריט עדיין לא הושלם — לא ניתן להחיל תיקונים");
+
+  const script = ScriptOutputSchema.parse(scriptRow.output);
+  const patched = applyVisualCorrections(script, input);
+  const view = await updateStageOutput(runId, "script", patched);
+
+  if (input.rerunFrom === "asset") {
+    return rerunStage(runId, "asset");
+  }
+  if (input.rerunFrom === "render") {
+    return rerunStage(runId, "render");
+  }
+  return view;
 }
 
 export interface StageArtifactAttachVoice {
@@ -366,8 +429,19 @@ export async function rerunStage(runId: string, stage: StageName): Promise<Proje
   return getRun(runId);
 }
 
-export function shouldWaitForApproval(stage: StageName): boolean {
-  return STAGE_REQUIRES_APPROVAL[stage] === true;
+export function shouldWaitForApproval(stage: StageName, approvalMode: ApprovalMode = "manual"): boolean {
+  return stageRequiresApproval(stage, approvalMode);
+}
+
+export async function maybeAutoApprove(runId: string, stage: StageName): Promise<boolean> {
+  const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
+  if (!run) return false;
+  const approvalMode = (run.approvalMode ?? "manual") as ApprovalMode;
+  if (shouldWaitForApproval(stage, approvalMode)) return false;
+  const stageRow = run.stages.find((s) => fromPrismaStage(s.stage) === stage);
+  if (!stageRow || stageRow.status !== "AWAITING_APPROVAL") return false;
+  await approveStage(runId, stage);
+  return true;
 }
 
 export async function recordStageStart(stageExecutionId: string): Promise<void> {
@@ -405,6 +479,14 @@ export async function setRunStatus(runId: string, status: "RUNNING" | "AWAITING_
     where: { id: runId },
     data: { status, currentStage: currentStage ? toPrismaStage(currentStage) : null }
   });
+  if (status === "COMPLETED") {
+    const { commitCredits } = await import("@studio/billing");
+    await commitCredits(runId).catch(() => undefined);
+  }
+  if (status === "FAILED") {
+    const { releaseCredits } = await import("@studio/billing");
+    await releaseCredits(runId).catch(() => undefined);
+  }
 }
 
 export async function audit(tenantId: string, action: string, entity: string, entityId: string | null, metadata: Record<string, unknown>) {
@@ -416,9 +498,11 @@ export async function audit(tenantId: string, action: string, entity: string, en
 function toView(run: {
   id: string;
   tenantId: string;
+  userId?: string | null;
   status: string;
   currentStage: string | null;
   brief: unknown;
+  approvalMode?: string;
   createdAt: Date;
   updatedAt: Date;
   stages: Array<{
@@ -436,9 +520,11 @@ function toView(run: {
   return {
     id: run.id,
     tenantId: run.tenantId,
+    userId: run.userId ?? null,
     status: run.status as ProjectRunView["status"],
     currentStage: run.currentStage ? (fromPrismaStage(run.currentStage as any) as StageName) : null,
     brief: BriefInputSchema.parse(run.brief),
+    approvalMode: (run.approvalMode as ApprovalMode) ?? undefined,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
     stages: run.stages.map((s) => ({

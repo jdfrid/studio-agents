@@ -21,6 +21,7 @@
     "dev:api": "pnpm --filter @studio/api dev",
     "dev:worker": "pnpm --filter @studio/worker dev",
     "dev:web": "pnpm --filter @studio/web dev",
+    "dev:admin": "pnpm --filter @studio/admin dev",
     "prisma:generate": "pnpm --filter @studio/infra-prisma prisma:generate",
     "prisma:migrate": "pnpm --filter @studio/infra-prisma prisma:migrate",
     "prisma:deploy": "pnpm --filter @studio/infra-prisma prisma:deploy",

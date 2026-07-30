@@ -219,3 +219,67 @@ main.layout-log { grid-template-columns: 1fr; }
 .runs-log-table .render-stage-cell { background: #1a1828; }
 .runs-log-row:hover .render-highlight-cell,
 .runs-log-row:hover .render-stage-cell { background: #2a2340; }
+
+.visual-corrections-panel {
+  border: 1px solid #3b6ef0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: #141b2e;
+}
+.visual-corrections-panel label {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+.visual-corrections-panel textarea {
+  width: 100%;
+  margin-top: 4px;
+  font-family: inherit;
+}
+.visual-corrections-panel .scene-overrides label {
+  margin-top: 8px;
+}
+
+/* SaaS user UI */
+.saas-layout { max-width: 960px; margin: 0 auto; padding: 16px; }
+.saas-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.saas-header .brand { font-size: 1.25rem; color: #7ab5ff; }
+.saas-header nav button { margin-inline-end: 8px; }
+.header-user { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; }
+.landing { text-align: center; padding: 48px 16px; }
+.landing-hero { max-width: 520px; margin: 0 auto 32px; }
+.landing-tagline { font-size: 1.35rem; color: #a8c4ff; }
+.landing-cta { margin-top: 24px; padding: 12px 32px; font-size: 1rem; }
+.pricing-cards { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.price-card { border: 1px solid #232733; border-radius: 12px; padding: 20px 28px; min-width: 180px; }
+.price-card.featured { border-color: #3b6ef0; background: #141b2e; }
+.price-card .price { font-size: 1.8rem; margin: 8px 0; color: #7af0bf; }
+.dash-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+.credits-badge { color: #7af0bf; font-weight: 600; }
+.billing-banner { background: #2a2540; border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+.run-cards { list-style: none; padding: 0; display: grid; gap: 10px; }
+.run-card { width: 100%; text-align: start; padding: 14px; border-radius: 10px; border: 1px solid #232733; background: #151a23; cursor: pointer; }
+.run-card:hover { border-color: #3b6ef0; }
+.status-pill { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; background: #232733; }
+.create-form label { display: block; margin-bottom: 12px; }
+.create-form input, .create-form textarea { width: 100%; margin-top: 4px; }
+.approval-fieldset { border: 1px solid #232733; border-radius: 8px; padding: 12px; margin: 12px 0; }
+.approval-fieldset label { display: block; margin: 6px 0; }
+.progress-timeline { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.timeline-step { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 6px 10px; border-radius: 8px; background: #151a23; }
+.step-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+.step-COMPLETED .step-dot { background: #7af0bf; }
+.step-RUNNING .step-dot { background: #ffb347; }
+.stage-grid-user { grid-template-columns: 1fr; }
+.center { text-align: center; padding: 48px; }
+.admin-kpi { margin-bottom: 20px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.kpi-card { background: #151a23; border-radius: 8px; padding: 12px; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.admin-table th, .admin-table td { border: 1px solid #232733; padding: 8px; text-align: start; }
+.admin-table tr.selected { background: #1c2333; }
+.admin-login { text-align: center; padding: 64px 24px; }
+.admin-main { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+@media (max-width: 800px) { .admin-main { grid-template-columns: 1fr; } }

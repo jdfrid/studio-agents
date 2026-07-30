@@ -44,6 +44,8 @@ export const ScriptOutputSchema = z.object({
   backgroundVisualPrompt: z.string().min(1),
   /** Locked cast appearance tokens — same in every scene (system-enforced). */
   characterBible: z.string().min(1).max(800),
+  /** User-directed fixes (e.g. no bangs, add hat) applied after first script generation. */
+  visualCorrections: z.string().max(500).optional(),
   geminiModel: z.string().optional()
 });
 export type ScriptOutput = z.infer<typeof ScriptOutputSchema>;

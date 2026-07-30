@@ -16,7 +16,7 @@ COPY packages ./packages
 COPY infra/prisma ./infra/prisma
 
 RUN pnpm install --no-frozen-lockfile
-RUN pnpm run render:build && pnpm run render:build:web
+RUN pnpm run render:build && pnpm run render:build:web && pnpm --filter @studio/admin build
 
 FROM node:20-bookworm-slim AS runtime
 
@@ -46,3 +46,4 @@ CMD ["pnpm", "--filter", "@studio/worker", "start"]
 FROM nginx:1.27-alpine AS web
 COPY infra/hetzner/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+COPY --from=build /app/apps/admin/dist /usr/share/nginx/admin

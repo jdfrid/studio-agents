@@ -33,5 +33,6 @@ echo "Restarting web so nginx picks up api container..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" restart web
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 
-echo ""
-echo "Studio Agents is up. Open http://$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+echo "Studio Agents is up."
+echo "  User app:  http://prompt2spot.com (or http://$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'))"
+echo "  Admin app: http://admin.prompt2spot.com"
