@@ -20,6 +20,45 @@ echo "=== API container env ==="
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T api printenv FREE_VIDEOS_PER_USER 2>/dev/null || echo "(api not running)"
 
 echo ""
+echo "=== Lemon Squeezy env (api container) ==="
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T api sh -c '
+  echo "STORE=${LEMONSQUEEZY_STORE_ID:-MISSING}"
+  echo "PAYG=${LEMONSQUEEZY_VARIANT_PAYG:-MISSING}"
+  echo "SUB=${LEMONSQUEEZY_VARIANT_SUBSCRIPTION:-MISSING}"
+  test -n "${LEMONSQUEEZY_API_KEY:-}" && echo "API_KEY=set" || echo "API_KEY=MISSING"
+' 2>/dev/null || echo "(api not running)"
+
+echo ""
+echo "=== Lemon Squeezy API ping (store lookup) ==="
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T api node -e "
+const storeId = process.env.LEMONSQUEEZY_STORE_ID;
+const key = process.env.LEMONSQUEEZY_API_KEY;
+if (!storeId || !key) { console.log('skip — missing STORE or API_KEY'); process.exit(0); }
+fetch('https://api.lemonsqueezy.com/v1/stores/' + storeId, {
+  headers: { Authorization: 'Bearer ' + key, Accept: 'application/vnd.api+json' }
+}).then(async (r) => {
+  const text = await r.text();
+  console.log('HTTP', r.status, text.slice(0, 400));
+}).catch((e) => console.error(String(e)));
+" 2>/dev/null || echo "(api not running)"
+
+echo ""
+echo "=== Lemon Squeezy variants (PAYG + subscription) ==="
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T api node -e "
+async function check(id, label) {
+  const key = process.env.LEMONSQUEEZY_API_KEY;
+  if (!id || !key) { console.log(label, 'MISSING'); return; }
+  const r = await fetch('https://api.lemonsqueezy.com/v1/variants/' + id, {
+    headers: { Authorization: 'Bearer ' + key, Accept: 'application/vnd.api+json' }
+  });
+  const text = await r.text();
+  console.log(label, 'HTTP', r.status, text.slice(0, 280));
+}
+await check(process.env.LEMONSQUEEZY_VARIANT_PAYG, 'PAYG');
+await check(process.env.LEMONSQUEEZY_VARIANT_SUBSCRIPTION, 'SUB');
+" 2>/dev/null || echo "(api not running)"
+
+echo ""
 echo "=== Users and run counts ==="
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T postgres \
   psql -U "${POSTGRES_USER:-studio}" -d "${POSTGRES_DB:-studio_agents}" -c \

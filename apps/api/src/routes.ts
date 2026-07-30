@@ -37,6 +37,7 @@ import {
   creditCostForNewRun,
   createCheckout,
   getBillingStatus,
+  isBillingConfigured,
   handleLemonWebhook,
   verifyWebhookSignature,
   getAdminDashboard,
@@ -90,14 +91,23 @@ export async function registerRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
-      try {
-        const url = await createCheckout(user.id, user.email, body.plan);
-        return { checkoutUrl: url };
-      } catch (err) {
+      if (!isBillingConfigured()) {
         reply.code(503);
         return {
           error: "billing_not_configured",
           message: "מערכת התשלומים עדיין לא מוגדרת. נסה שוב מאוחר יותר או פנה לתמיכה."
+        };
+      }
+      try {
+        const url = await createCheckout(user.id, user.email, body.plan);
+        return { checkoutUrl: url };
+      } catch (err) {
+        request.log.error({ err, plan: body.plan, userId: user.id }, "checkout failed");
+        reply.code(502);
+        const detail = err instanceof Error ? err.message : "checkout failed";
+        return {
+          error: "checkout_failed",
+          message: `לא ניתן לפתוח דף תשלום: ${detail}`
         };
       }
     });
