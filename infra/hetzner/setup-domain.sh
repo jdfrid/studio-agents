@@ -19,11 +19,16 @@ if ! command -v caddy >/dev/null 2>&1; then
   apt-get update && apt-get install -y caddy
 fi
 
-# Move docker web to 8080 if still on 80
+# Move docker web to 8080 if still on 80 (exact match — avoid turning 8080 into 808080)
 ENV_FILE="${ENV_FILE:-infra/hetzner/.env}"
-if [ -f "$ENV_FILE" ] && grep -q '^HTTP_PORT=80' "$ENV_FILE"; then
-  sed -i 's/^HTTP_PORT=80/HTTP_PORT=8080/' "$ENV_FILE"
-  echo "Set HTTP_PORT=8080 in $ENV_FILE — redeploy docker stack"
+if [ -f "$ENV_FILE" ]; then
+  if grep -q '^HTTP_PORT=808080$' "$ENV_FILE"; then
+    sed -i 's/^HTTP_PORT=808080$/HTTP_PORT=8080/' "$ENV_FILE"
+    echo "Fixed typo HTTP_PORT=808080 → 8080 in $ENV_FILE"
+  elif grep -q '^HTTP_PORT=80$' "$ENV_FILE"; then
+    sed -i 's/^HTTP_PORT=80$/HTTP_PORT=8080/' "$ENV_FILE"
+    echo "Set HTTP_PORT=8080 in $ENV_FILE"
+  fi
 fi
 
 tee /etc/caddy/Caddyfile <<EOF
@@ -37,7 +42,11 @@ ${ADMIN_DOMAIN} {
 EOF
 
 systemctl enable caddy
-systemctl reload caddy || systemctl restart caddy
+if ! systemctl is-active --quiet caddy; then
+  echo "Starting Caddy (ensure Docker web is on 8080, not 80 — run deploy.sh first if needed)..."
+  systemctl start caddy || true
+fi
+systemctl reload caddy 2>/dev/null || systemctl restart caddy
 
 echo ""
 echo "Done. Caddy will obtain Let's Encrypt certificates automatically."
