@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
-import type { UserView } from "@studio/shared";
 
 type RunSummary = {
   id: string;
@@ -21,6 +20,7 @@ export function Dashboard({
   const { user, refresh } = useAuth();
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [purchaseError, setPurchaseError] = useState("");
 
   useEffect(() => {
     void apiGet<RunSummary[]>("/runs").then(setRuns).catch(() => setRuns([]));
@@ -28,37 +28,71 @@ export function Dashboard({
 
   async function buy(plan: "payg" | "subscription") {
     setBusy(plan);
+    setPurchaseError("");
     try {
       const { checkoutUrl } = await apiPost<{ checkoutUrl: string }>("/billing/checkout", { plan });
       window.location.href = checkoutUrl;
+    } catch (err) {
+      setPurchaseError((err as Error).message || "לא ניתן לפתוח דף תשלום כרגע.");
     } finally {
       setBusy(null);
     }
   }
 
   const credits = user?.credits ?? 0;
+  const freeLeft = user?.freeVideosRemaining ?? 0;
+  const canCreate = user?.canCreateVideo ?? false;
+  const billingReady = user?.billingConfigured ?? false;
+  const showPurchase = credits < 1 && freeLeft < 1;
 
   return (
     <div className="dashboard">
       <header className="dash-header">
         <div>
           <h2>שלום{user?.name ? `, ${user.name}` : ""}</h2>
-          <p className="credits-badge">{formatCredits(credits)} קרדיטים זמינים</p>
+          <p className="credits-badge">
+            {freeLeft > 0
+              ? `סרטון חינם זמין (${freeLeft} נותרו)`
+              : `${formatCredits(credits)} קרדיטים זמינים`}
+          </p>
         </div>
-        <button type="button" className="primary" onClick={onNewVideo}>
+        <button type="button" className="primary" disabled={!canCreate} onClick={onNewVideo}>
           + סרטון חדש
         </button>
       </header>
 
-      {credits < 1 ? (
+      {freeLeft > 0 ? (
+        <section className="billing-banner billing-banner-free">
+          <p>🎬 הסרטון הראשון שלך — <strong>חינם</strong>. לחץ &quot;סרטון חדש&quot; כדי להתחיל.</p>
+        </section>
+      ) : null}
+
+      {showPurchase ? (
         <section className="billing-banner">
-          <p>אין מספיק קרדיטים ליצירת סרטון.</p>
-          <div className="stage-actions">
-            <button type="button" disabled={busy !== null} onClick={() => void buy("payg")}>
+          <h3>רכישת קרדיטים</h3>
+          <p>אין מספיק קרדיטים ליצירת סרטון. בחר אחת מהאפשרויות:</p>
+          <div className="stage-actions billing-actions">
+            <button type="button" className="primary" disabled={busy !== null || !billingReady} onClick={() => void buy("payg")}>
               {busy === "payg" ? "…" : "קנה סרטון — ₪30"}
             </button>
-            <button type="button" className="primary" disabled={busy !== null} onClick={() => void buy("subscription")}>
+            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("subscription")}>
               {busy === "subscription" ? "…" : "מנוי חודשי — ₪600"}
+            </button>
+          </div>
+          {!billingReady ? (
+            <p className="muted billing-note">מערכת התשלומים בהגדרה — נסה שוב בקרוב או פנה לתמיכה.</p>
+          ) : null}
+          {purchaseError ? <p className="error-inline">{purchaseError}</p> : null}
+        </section>
+      ) : credits >= 1 ? (
+        <section className="billing-banner billing-banner-compact">
+          <p>יש לך קרדיטים — אפשר ליצור סרטון חדש.</p>
+          <div className="stage-actions">
+            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("payg")}>
+              {busy === "payg" ? "…" : "+ קנה עוד סרטון"}
+            </button>
+            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("subscription")}>
+              {busy === "subscription" ? "…" : "מנוי חודשי"}
             </button>
           </div>
         </section>

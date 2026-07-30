@@ -37,7 +37,9 @@ function AppShell() {
       <main>
         {view === "dashboard" && (
           <Dashboard
-            onNewVideo={() => setView("create")}
+            onNewVideo={() => {
+              if (user.canCreateVideo) setView("create");
+            }}
             onOpenRun={(id) => {
               setRunId(id);
               setView("run");

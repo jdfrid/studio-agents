@@ -10,8 +10,9 @@ async function throwApiError(res: Response): Promise<never> {
   let message = text;
   let code: string | undefined;
   try {
-    const json = JSON.parse(text) as { error?: string; code?: string };
-    if (typeof json.error === "string") message = json.error;
+    const json = JSON.parse(text) as { error?: string; message?: string; code?: string };
+    if (typeof json.message === "string") message = json.message;
+    else if (typeof json.error === "string") message = json.error;
     code = json.code;
   } catch {
     // keep raw

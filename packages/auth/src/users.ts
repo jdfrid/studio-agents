@@ -1,5 +1,6 @@
 import { prisma } from "@studio/infra-prisma";
 import type { UserView } from "@studio/shared";
+import { getCreateVideoEligibility } from "@studio/billing";
 import { adminEmails } from "./jwt.js";
 
 export interface GoogleProfile {
@@ -54,14 +55,6 @@ export async function getUserById(userId: string): Promise<UserView | null> {
   return user ? toUserView(user) : null;
 }
 
-export async function getCreditBalance(userId: string): Promise<number> {
-  const last = await prisma.creditLedger.findFirst({
-    where: { userId },
-    orderBy: { createdAt: "desc" }
-  });
-  return last?.balanceAfter ?? 0;
-}
-
 function toUserView(user: {
   id: string;
   email: string;
@@ -84,6 +77,9 @@ function toUserView(user: {
     role: user.role,
     locale: user.locale,
     credits: 0,
+    freeVideosRemaining: 0,
+    canCreateVideo: false,
+    billingConfigured: false,
     subscription: user.subscription
       ? {
           planType: user.subscription.planType,
@@ -98,6 +94,12 @@ function toUserView(user: {
 export async function getUserViewWithCredits(userId: string): Promise<UserView | null> {
   const user = await getUserById(userId);
   if (!user) return null;
-  user.credits = await getCreditBalance(userId);
-  return user;
+  const eligibility = await getCreateVideoEligibility(userId);
+  return {
+    ...user,
+    credits: eligibility.credits,
+    freeVideosRemaining: eligibility.freeVideosRemaining,
+    canCreateVideo: eligibility.canCreateVideo,
+    billingConfigured: eligibility.billingConfigured
+  };
 }

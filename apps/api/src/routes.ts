@@ -34,6 +34,7 @@ import {
 } from "@studio/auth";
 import {
   assertCanStartRun,
+  creditCostForNewRun,
   createCheckout,
   getBillingStatus,
   handleLemonWebhook,
@@ -85,15 +86,24 @@ export async function registerRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
-      const url = await createCheckout(user.id, user.email, body.plan);
-      return { checkoutUrl: url };
+      try {
+        const url = await createCheckout(user.id, user.email, body.plan);
+        return { checkoutUrl: url };
+      } catch (err) {
+        reply.code(503);
+        return {
+          error: "billing_not_configured",
+          message: "מערכת התשלומים עדיין לא מוגדרת. נסה שוב מאוחר יותר או פנה לתמיכה."
+        };
+      }
     });
 
     userRoutes.post("/runs", async (request, reply) => {
       const body = CreateRunRequestSchema.parse(request.body);
       const userId = request.user!.sub;
+      const cost = await creditCostForNewRun(userId);
       try {
-        await assertCanStartRun(userId, 1);
+        await assertCanStartRun(userId, cost);
       } catch (err) {
         if (err instanceof InsufficientCreditsError) {
           reply.code(402);
@@ -106,7 +116,7 @@ export async function registerRoutes(app: FastifyInstance) {
         budgetMode: true,
         renderProfile: body.brief.renderProfile ?? resolveRenderProfile().id
       };
-      const view = await createRun({ brief, userId });
+      const view = await createRun({ brief, userId, creditCost: cost });
       reply.code(201);
       return view;
     });

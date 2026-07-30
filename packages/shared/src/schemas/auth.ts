@@ -44,6 +44,9 @@ export const UserViewSchema = z.object({
   role: UserRoleSchema,
   locale: z.string(),
   credits: z.number(),
+  freeVideosRemaining: z.number(),
+  canCreateVideo: z.boolean(),
+  billingConfigured: z.boolean(),
   subscription: SubscriptionViewSchema.nullable()
 });
 export type UserView = z.infer<typeof UserViewSchema>;

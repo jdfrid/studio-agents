@@ -304,6 +304,9 @@ importers:
       '@fastify/cookie':
         specifier: ^9.4.0
         version: 9.4.0
+      '@studio/billing':
+        specifier: workspace:*
+        version: link:../billing
       '@studio/infra-prisma':
         specifier: workspace:*
         version: link:../../infra/prisma

@@ -259,6 +259,12 @@ main.layout-log { grid-template-columns: 1fr; }
 .dash-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
 .credits-badge { color: #7af0bf; font-weight: 600; }
 .billing-banner { background: #2a2540; border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+.billing-banner h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.billing-banner-free { background: #1e3a2f; border: 1px solid #3d9970; }
+.billing-banner-compact { padding: 12px 16px; }
+.billing-actions { margin-top: 12px; }
+.billing-note { margin-top: 10px; font-size: 0.9rem; }
+.dash-header button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
 .run-cards { list-style: none; padding: 0; display: grid; gap: 10px; }
 .run-card { width: 100%; text-align: start; padding: 14px; border-radius: 10px; border: 1px solid #232733; background: #151a23; cursor: pointer; }
 .run-card:hover { border-color: #3b6ef0; }

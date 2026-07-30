@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@fastify/cookie": "^9.4.0",
+    "@studio/billing": "workspace:*",
     "@studio/infra-prisma": "workspace:*",
     "@studio/shared": "workspace:*",
     "fastify": "^4.27.0",

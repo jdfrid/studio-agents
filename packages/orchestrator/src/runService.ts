@@ -24,6 +24,7 @@ export async function createRun(input: {
   brief: BriefInput;
   userId?: string;
   skipCreditCheck?: boolean;
+  creditCost?: number;
 }): Promise<ProjectRunView> {
   let tenantId: string;
   if (input.userId) {
@@ -63,7 +64,7 @@ export async function createRun(input: {
 
   if (input.userId && !input.skipCreditCheck) {
     const { reserveCredits } = await import("@studio/billing");
-    await reserveCredits(input.userId, run.id, 1);
+    await reserveCredits(input.userId, run.id, input.creditCost ?? 1);
   }
 
   await audit(tenantId, "run_created", "ProjectRun", run.id, { brief, userId: input.userId });

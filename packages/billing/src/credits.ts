@@ -43,12 +43,63 @@ async function appendLedger(
   return balanceAfter;
 }
 
-export async function assertCanStartRun(userId: string, cost = CREDIT_NEW_VIDEO): Promise<void> {
+export function freeVideosPerUser(): number {
+  const n = Number(process.env.FREE_VIDEOS_PER_USER ?? 0);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+export function isBillingConfigured(): boolean {
+  return Boolean(
+    process.env.LEMONSQUEEZY_API_KEY &&
+      process.env.LEMONSQUEEZY_STORE_ID &&
+      process.env.LEMONSQUEEZY_VARIANT_PAYG &&
+      process.env.LEMONSQUEEZY_VARIANT_SUBSCRIPTION
+  );
+}
+
+export async function getFreeVideosRemaining(userId: string): Promise<number> {
+  const allowance = freeVideosPerUser();
+  if (allowance <= 0) return 0;
+  const used = await prisma.projectRun.count({ where: { userId } });
+  return Math.max(0, allowance - used);
+}
+
+export async function creditCostForNewRun(userId: string): Promise<number> {
+  const freeRemaining = await getFreeVideosRemaining(userId);
+  return freeRemaining > 0 ? 0 : CREDIT_NEW_VIDEO;
+}
+
+export async function getCreateVideoEligibility(userId: string): Promise<{
+  credits: number;
+  freeVideosRemaining: number;
+  canCreateVideo: boolean;
+  billingConfigured: boolean;
+}> {
+  const [credits, freeVideosRemaining] = await Promise.all([
+    getCreditBalance(userId),
+    getFreeVideosRemaining(userId)
+  ]);
+  const canCreateVideo = freeVideosRemaining > 0 || credits >= CREDIT_NEW_VIDEO;
+  return {
+    credits,
+    freeVideosRemaining,
+    canCreateVideo,
+    billingConfigured: isBillingConfigured()
+  };
+}
+
+export async function assertCanStartRun(userId: string, cost?: number): Promise<void> {
+  const required = cost ?? (await creditCostForNewRun(userId));
+  if (required <= 0) return;
   const balance = await getCreditBalance(userId);
-  if (balance < cost) throw new InsufficientCreditsError(cost, balance);
+  if (balance < required) throw new InsufficientCreditsError(required, balance);
 }
 
 export async function reserveCredits(userId: string, runId: string, amount = CREDIT_NEW_VIDEO): Promise<void> {
+  if (amount <= 0) {
+    await prisma.projectRun.update({ where: { id: runId }, data: { creditReserved: 0 } });
+    return;
+  }
   await prisma.$transaction(async (tx) => {
     const last = await tx.creditLedger.findFirst({
       where: { userId },
