@@ -125,10 +125,11 @@ export async function registerRoutes(app: FastifyInstance) {
         }
         throw err;
       }
+      // Render profile is admin-controlled (platform default); ignore client override.
       const brief = {
         ...body.brief,
         budgetMode: true,
-        renderProfile: body.brief.renderProfile ?? resolveRenderProfile().id
+        renderProfile: resolveRenderProfile().id
       };
       const view = await createRun({ brief, userId, creditCost: cost });
       reply.code(201);

@@ -126,7 +126,7 @@ export function AdminSettingsPanel() {
       <p className="muted">שינויים חלים על סרטונים חדשים. עדכון אחרון: {new Date(settings.updatedAt).toLocaleString("he-IL")}</p>
 
       <label>
-        פרופיל וידאו (ברירת מחדל)
+        מודל רינדור ללקוחות
         <select
           value={settings.defaultRenderProfile}
           onChange={(e) => setSettings({ ...settings, defaultRenderProfile: e.target.value as PlatformSettingsView["defaultRenderProfile"] })}
@@ -138,6 +138,7 @@ export function AdminSettingsPanel() {
           ))}
         </select>
       </label>
+      <p className="muted">הלקוחות לא בוחרים מודל — כל סרטון חדש משתמש בפרופיל הזה.</p>
 
       <fieldset className="settings-models">
         <legend>מודלי Gemini (ריק = מ-.env)</legend>
