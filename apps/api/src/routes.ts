@@ -65,6 +65,13 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.get("/health", async () => ({ ok: true }));
 
+  // Browser / Lemon "ping" uses GET — real webhooks are POST with signature.
+  app.get("/billing/webhooks/lemonsqueezy", async () => ({
+    ok: true,
+    service: "lemonsqueezy-webhook",
+    method: "POST required for events"
+  }));
+
   app.post("/billing/webhooks/lemonsqueezy", { config: { rawBody: true } }, async (request, reply) => {
     const raw = (request as { rawBody?: string }).rawBody ?? JSON.stringify(request.body);
     const sig = request.headers["x-signature"] as string | undefined;
