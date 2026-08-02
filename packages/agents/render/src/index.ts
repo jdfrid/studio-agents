@@ -123,7 +123,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
             referenceImage,
             firstFrame,
             lastFrame,
-            generateAudio: scene.audioPolicy === "veo_native_audio"
+            generateAudio: scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1"
           },
           buildBeatHooks(ctx, scene)
         );
@@ -299,7 +299,7 @@ async function renderExtendChain(
         firstFrame,
         lastFrame,
         extendVideoHandle: extendHandle,
-        generateAudio: scene.audioPolicy === "veo_native_audio"
+        generateAudio: scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1"
       },
       buildBeatHooks(ctx, scene, renderProfile.id)
     );

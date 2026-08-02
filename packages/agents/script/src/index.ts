@@ -159,7 +159,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         firstFramePrompt: includeExtraFrames ? (scene.firstFramePrompt ?? scene.visualPrompt ?? undefined) : scene.firstFramePrompt,
         lastFramePrompt: includeExtraFrames ? (scene.lastFramePrompt ?? scene.visualPrompt ?? undefined) : scene.lastFramePrompt,
         durationBucket,
-        audioPolicy: budget ? "gemini_tts_only" : (scene.audioPolicy ?? "gemini_tts_plus_music"),
+        audioPolicy: resolveSceneAudioPolicy(scene.audioPolicy, budget),
         durationSeconds: extendMode || klingMode ? clipSeconds : Number(durationBucket),
         requiredAssets: scene.requiredAssets?.length ? scene.requiredAssets : ["voice", "music", "video"]
       };
@@ -208,6 +208,21 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     return output;
   }
 };
+
+function resolveSceneAudioPolicy(
+  policy: string | undefined,
+  budget: boolean
+): "gemini_tts_plus_music" | "gemini_tts_only" | "veo_native_audio" | "muted" {
+  if (budget) return "gemini_tts_only";
+  // Veo native audio is opt-in only — default pipeline uses Gemini TTS + FFmpeg mix.
+  if (policy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO !== "1") {
+    return "gemini_tts_plus_music";
+  }
+  if (policy === "gemini_tts_only" || policy === "veo_native_audio" || policy === "muted" || policy === "gemini_tts_plus_music") {
+    return policy;
+  }
+  return "gemini_tts_plus_music";
+}
 
 function trimNarration(text: string, maxChars: number): string {
   const trimmed = text.trim();

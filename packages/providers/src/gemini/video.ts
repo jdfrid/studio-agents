@@ -209,7 +209,9 @@ function buildVeoParameters(req: GeminiVeoRequest, model: string): Record<string
     resolution: veoResolution()
   };
   if (veoSupportsNativeAudio(model)) {
-    params.generateAudio = req.generateAudio ?? veoGenerateAudio();
+    // Never enable Veo native audio unless explicitly opted in via GEMINI_VEO_AUDIO=1.
+    // Voice is mixed from separate Gemini TTS + FFmpeg; native audio often fails safety filters.
+    params.generateAudio = veoGenerateAudio() && Boolean(req.generateAudio);
   }
   return params;
 }
