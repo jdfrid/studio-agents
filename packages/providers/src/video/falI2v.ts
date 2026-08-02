@@ -15,7 +15,8 @@ function durationForModel(profile: RenderProfile, seconds: number): string | num
     return seconds >= 9 ? "10" : "6";
   }
   if (profile.id === "wan-i2v") {
-    return Math.min(5, Math.max(3, Math.round(seconds) || 5));
+    // Wan 2.7 accepts numeric duration seconds (typically 2–15).
+    return Math.min(5, Math.max(2, Math.round(seconds) || 5));
   }
   return seconds >= 10 ? "10" : "5";
 }
@@ -39,6 +40,10 @@ function buildFalBody(
 
   if (profile.id === "hailuo-i2v") {
     body.prompt_optimizer = true;
+  }
+
+  if (profile.id === "wan-i2v") {
+    body.resolution = "720p";
   }
 
   return body;

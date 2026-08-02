@@ -138,7 +138,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       brandConstraints: [
         ...(parsed.brandConstraints ?? []),
         ...creativeLines,
-        "End card must credit Prompt@spot.com"
+        "End card must credit prompt2spot.com"
       ],
       visualDirection: `${parsed.visualDirection ?? ""}${creativeBlock}`.trim(),
       musicDirection: [
@@ -150,7 +150,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       ]
         .filter(Boolean)
         .join("; "),
-      callToAction: parsed.callToAction ?? "Prompt@spot.com",
+      callToAction: parsed.callToAction ?? "prompt2spot.com",
       budgetMode: input.budgetMode ?? false,
       renderProfile: resolveRenderProfile(input).id,
       references:

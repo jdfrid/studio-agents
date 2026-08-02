@@ -220,7 +220,7 @@ type PlatformSettingsView = {
 function listRenderProfiles() {
   return [
     { id: "veo-multiclip" as const, label: "Veo Fast — multiclip (זול, ברירת מחדל)" },
-    { id: "wan-i2v" as const, label: "Wan 2.1 — זול (מתמונה)" },
+    { id: "wan-i2v" as const, label: "Wan 2.7 — זול (מתמונה)" },
     { id: "hailuo-i2v" as const, label: "Hailuo — זול (מתמונה)" },
     { id: "kling-i2v" as const, label: "Kling 2.1 — image-to-video" },
     { id: "veo-extend" as const, label: "Veo Fast — extend chain (יקר יותר)" }

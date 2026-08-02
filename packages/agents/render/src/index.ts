@@ -22,10 +22,12 @@ import {
   type RenderSceneResult,
   type SceneTimelineEntry
 } from "@studio/shared";
+import { existsSync } from "node:fs";
 import { mkdir, writeFile, readFile, rm, stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { nanoid } from "nanoid";
 import ffmpegStatic from "ffmpeg-static";
 
@@ -753,12 +755,69 @@ async function downscaleVideo(videoPath: string, width: number, dir: string): Pr
   return out;
 }
 
-const BRANDING_END_CARD_SECONDS = 2.6;
+const BRANDING_END_CARD_SECONDS = 2.8;
 const BRANDING_END_FADE_SECONDS = 0.85;
-const BRANDING_END_TEXT = "Prompt@spot.com";
+const BRANDING_END_TEXT = "prompt2spot.com";
+
+function resolveBrandingOutroImage(): string | null {
+  const envPath = process.env.BRANDING_OUTRO_IMAGE?.trim();
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    envPath,
+    path.join(here, "..", "assets", "prompt2spot-outro.png"),
+    path.join(process.cwd(), "packages", "agents", "render", "assets", "prompt2spot-outro.png"),
+    path.join(process.cwd(), "assets", "prompt2spot-outro.png")
+  ].filter((p): p is string => Boolean(p));
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+async function createEndCardClip(dir: string, dimensions: VideoDimensions, lastFramePath: string): Promise<string> {
+  const endClip = path.join(dir, `end-card-${nanoid(4)}.mp4`);
+  const branded = resolveBrandingOutroImage();
+  const sourceImage = branded ?? lastFramePath;
+  const vf = branded
+    ? normalizeVideoFilter(dimensions.width, dimensions.height)
+    : [
+        normalizeVideoFilter(dimensions.width, dimensions.height),
+        "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.55:t=fill",
+        `drawtext=text='${BRANDING_END_TEXT}':fontsize=${Math.max(28, Math.round(Math.min(dimensions.width, dimensions.height) * 0.055))}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:alpha='if(lt(t\\,0.45)\\,t/0.45\\,1)'`
+      ].join(",");
+
+  await runFfmpeg([
+    "-loop",
+    "1",
+    "-i",
+    sourceImage,
+    "-f",
+    "lavfi",
+    "-i",
+    "anullsrc=channel_layout=stereo:sample_rate=44100",
+    "-t",
+    String(BRANDING_END_CARD_SECONDS),
+    "-vf",
+    vf,
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-c:a",
+    "aac",
+    "-shortest",
+    "-movflags",
+    "+faststart",
+    "-y",
+    endClip
+  ]);
+  return endClip;
+}
 
 /**
- * Fade from the last frame into a short end card with Prompt@spot.com.
+ * Fade from the last frame into the Prompt2Spot branded outro slide.
  * Best-effort: on failure returns the input video unchanged.
  */
 async function appendBrandingEndCard(
@@ -769,42 +828,7 @@ async function appendBrandingEndCard(
   try {
     const lastFrame = path.join(dir, `end-last-${nanoid(4)}.png`);
     await runFfmpeg(["-sseof", "-0.08", "-i", videoPath, "-frames:v", "1", "-y", lastFrame]);
-
-    const endClip = path.join(dir, `end-card-${nanoid(4)}.mp4`);
-    const fontSize = Math.max(28, Math.round(Math.min(dimensions.width, dimensions.height) * 0.06));
-    const vf = [
-      normalizeVideoFilter(dimensions.width, dimensions.height),
-      "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.5:t=fill",
-      `drawtext=text='${BRANDING_END_TEXT}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:alpha='if(lt(t\\,0.45)\\,t/0.45\\,1)'`
-    ].join(",");
-
-    await runFfmpeg([
-      "-loop",
-      "1",
-      "-i",
-      lastFrame,
-      "-f",
-      "lavfi",
-      "-i",
-      "anullsrc=channel_layout=stereo:sample_rate=44100",
-      "-t",
-      String(BRANDING_END_CARD_SECONDS),
-      "-vf",
-      vf,
-      "-c:v",
-      "libx264",
-      "-preset",
-      "fast",
-      "-crf",
-      "23",
-      "-c:a",
-      "aac",
-      "-shortest",
-      "-movflags",
-      "+faststart",
-      "-y",
-      endClip
-    ]);
+    const endClip = await createEndCardClip(dir, dimensions, lastFrame);
 
     const out = path.join(dir, `with-end-${nanoid(4)}.mp4`);
     const mainDur = await probeDuration(videoPath);
