@@ -21,18 +21,40 @@ export function deriveCharacterBible(backgroundVisualPrompt: string, explicit?: 
   return "Fixed cast: one consistent fictional protagonist; same wardrobe and location throughout.";
 }
 
+const PROMPT_MAX = 1600;
+
+function clampPrompt(text: string, max = PROMPT_MAX): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
 export function buildReferenceImagePrompt(
   ctx: ContinuityContext & { sceneAction: string }
 ): string {
   const action = stripContinuityPrefix(ctx.sceneAction).trim();
-  return [
+  // Reserve room for lock + action; trim bible/location so Zod max(1600) never fails.
+  const fixed = [
     CONTINUITY_LOCK,
     `Scene ${ctx.order + 1} of ${ctx.total}.`,
-    `Characters (locked): ${ctx.characterBible.trim()}.`,
-    `Location (locked): ${ctx.backgroundVisualPrompt.trim()}.`,
-    `Action for this frame only: ${action}.`,
     "Same people, same clothes, same place — only pose and micro-action change."
   ].join(" ");
+  const budget = PROMPT_MAX - fixed.length - 48;
+  const half = Math.max(80, Math.floor(budget / 3));
+  const characters = ctx.characterBible.trim().slice(0, half);
+  const location = ctx.backgroundVisualPrompt.trim().slice(0, half);
+  const actionBudget = Math.max(80, budget - characters.length - location.length);
+  const actionClamped = action.slice(0, actionBudget);
+  return clampPrompt(
+    [
+      CONTINUITY_LOCK,
+      `Scene ${ctx.order + 1} of ${ctx.total}.`,
+      `Characters (locked): ${characters}.`,
+      `Location (locked): ${location}.`,
+      `Action for this frame only: ${actionClamped}.`,
+      "Same people, same clothes, same place — only pose and micro-action change."
+    ].join(" ")
+  );
 }
 
 export function buildVeoContinuityPrefix(ctx: ContinuityContext): string {
@@ -76,8 +98,8 @@ export function applyContinuityToScript(
     const actionSource = scene.referenceImagePrompt ?? scene.visualPrompt ?? scene.veoPrompt;
     return {
       ...scene,
-      visualPrompt: prefixScenePrompt(scene.visualPrompt, ctx),
-      veoPrompt: prefixScenePrompt(scene.veoPrompt, ctx),
+      visualPrompt: clampPrompt(prefixScenePrompt(scene.visualPrompt, ctx)),
+      veoPrompt: clampPrompt(prefixScenePrompt(scene.veoPrompt, ctx)),
       referenceImagePrompt: buildReferenceImagePrompt({ ...ctx, sceneAction: actionSource }),
       firstFramePrompt: scene.firstFramePrompt
         ? buildReferenceImagePrompt({ ...ctx, sceneAction: scene.firstFramePrompt })
