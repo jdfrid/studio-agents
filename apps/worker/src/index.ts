@@ -47,8 +47,10 @@ async function main() {
       {
         connection: redisConnection() as WorkerOptions["connection"],
         concurrency: stage === "render" ? 1 : 2,
+        // Hailuo/Veo clips can take many minutes; renew lock so long jobs are not marked stalled.
         lockDuration: stageTimeouts[stage],
-        stalledInterval: 30_000
+        stalledInterval: Math.min(60_000, Math.max(15_000, Math.floor(stageTimeouts[stage] / 20))),
+        maxStalledCount: 2
       }
     );
     workers.push(w);

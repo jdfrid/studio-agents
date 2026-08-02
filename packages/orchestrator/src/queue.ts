@@ -41,14 +41,57 @@ export interface StageJobData {
   stage: StageName;
 }
 
+function attemptsFor(stage: StageName): number {
+  // Paid API stages must not auto-retry — a concat failure would re-bill every scene clip.
+  return stage === "render" || stage === "asset" ? 1 : 3;
+}
+
+/**
+ * Enqueue a stage job. Same jobId is reused across reruns.
+ * Never crash the run just because a previous job is still Redis-locked —
+ * skip if already in-flight, otherwise fall back to a unique jobId.
+ */
 export async function enqueueStage(stage: StageName, data: StageJobData): Promise<void> {
   const queue = queueFor(stage);
   const jobId = `${data.runId}-${stage}`;
+  const attempts = attemptsFor(stage);
+
   const existing = await queue.getJob(jobId);
-  if (existing) await existing.remove();
-  // Paid API stages must not auto-retry — a concat failure would re-bill every scene clip.
-  const attempts = stage === "render" || stage === "asset" ? 1 : 3;
-  await queue.add(`run-${data.runId}`, data, { jobId, attempts });
+  if (existing) {
+    const state = await existing.getState();
+    if (state === "active" || state === "waiting" || state === "delayed" || state === "prioritized" || state === "waiting-children") {
+      // Already queued or running — do not remove (BullMQ throws "locked by another worker").
+      return;
+    }
+    try {
+      await existing.remove();
+    } catch {
+      // Completed/failed but still briefly locked, or race with a worker — use a unique id.
+      await queue.add(`run-${data.runId}`, data, {
+        jobId: `${jobId}-${Date.now()}`,
+        attempts
+      });
+      return;
+    }
+  }
+
+  try {
+    await queue.add(`run-${data.runId}`, data, { jobId, attempts });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/already exists|JobId|job id/i.test(message)) {
+      // Another concurrent enqueue won the race — treat as success.
+      return;
+    }
+    if (/locked by another worker/i.test(message)) {
+      await queue.add(`run-${data.runId}`, data, {
+        jobId: `${jobId}-${Date.now()}`,
+        attempts
+      });
+      return;
+    }
+    throw err;
+  }
 }
 
 export async function getQueueStats(): Promise<
