@@ -26,10 +26,38 @@ declare module "fastify" {
   }
 }
 
+function adminUrl(): string {
+  return (process.env.ADMIN_URL ?? "").replace(/\/$/, "");
+}
+
+function requestWantsAdminUi(request: FastifyRequest): boolean {
+  const admin = adminUrl();
+  if (!admin) return false;
+  try {
+    const adminHost = new URL(admin).hostname.toLowerCase();
+    const host = String(request.headers["x-forwarded-host"] ?? request.headers.host ?? "")
+      .split(",")[0]
+      ?.trim()
+      .toLowerCase()
+      .replace(/:\d+$/, "");
+    if (host && host === adminHost) return true;
+    const referer = String(request.headers.referer ?? "");
+    if (referer && new URL(referer).hostname.toLowerCase() === adminHost) return true;
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
 export async function registerAuthRoutes(app: FastifyInstance) {
-  app.get("/auth/google", async (_request, reply) => {
+  app.get("/auth/google", async (request, reply) => {
     const state = randomBytes(16).toString("hex");
-    reply.setCookie("oauth_state", state, { ...sessionCookieOptions(isSecure()), maxAge: 600, httpOnly: true });
+    const cookieOpts = { ...sessionCookieOptions(isSecure()), maxAge: 600, httpOnly: true };
+    reply.setCookie("oauth_state", state, cookieOpts);
+    const returnTo = requestWantsAdminUi(request) ? adminUrl() : appUrl();
+    if (returnTo) {
+      reply.setCookie("oauth_return", returnTo, cookieOpts);
+    }
     reply.redirect(googleAuthUrl(state));
   });
 
@@ -40,13 +68,19 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       reply.code(400).send({ error: "invalid_oauth_state" });
       return;
     }
+    const oauthReturn = (request.cookies?.oauth_return ?? "").replace(/\/$/, "");
     reply.clearCookie("oauth_state", sessionCookieClearOptions());
+    reply.clearCookie("oauth_return", sessionCookieClearOptions());
     const profile = await exchangeGoogleCode(code);
     const user = await findOrCreateUser(profile);
     await recordUserLogin(user.id, request);
     const token = await signSession({ sub: user.id, email: user.email, role: user.role });
     reply.setCookie(sessionCookieName(), token, sessionCookieOptions(isSecure()));
-    const dest = user.role === "ADMIN" && (process.env.ADMIN_URL ?? "").length > 0 ? process.env.ADMIN_URL! : appUrl();
+    const admin = adminUrl();
+    const dest =
+      (oauthReturn && admin && oauthReturn === admin ? admin : null) ||
+      (user.role === "ADMIN" && admin ? admin : null) ||
+      appUrl();
     reply.redirect(dest);
   });
 

@@ -153,7 +153,10 @@ services:
       target: web
     restart: unless-stopped
     ports:
+      # User SPA (prompt2spot.com) — behind Caddy usually HTTP_PORT=8080
       - "${HTTP_PORT:-80}:80"
+      # Admin SPA (admin.prompt2spot.com) — dedicated port so Host mismatches cannot serve the user app
+      - "${ADMIN_HTTP_PORT:-8081}:81"
     depends_on:
       api:
         condition: service_healthy

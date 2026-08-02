@@ -28,11 +28,25 @@ fi
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache --progress=plain api
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache --progress=plain worker
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build web
+# Ensure admin port is published (Caddy routes admin.* → 8081)
+if ! grep -q '^ADMIN_HTTP_PORT=' "$ENV_FILE" 2>/dev/null; then
+  echo "ADMIN_HTTP_PORT=8081" >> "$ENV_FILE"
+  echo "Added ADMIN_HTTP_PORT=8081 to $ENV_FILE"
+fi
+
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --force-recreate api worker web
 echo "Restarting web so nginx picks up api container..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" restart web
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 
+# Refresh Caddy admin→8081 routing when Caddy is installed
+if command -v caddy >/dev/null 2>&1 && [ -f /etc/caddy/Caddyfile ]; then
+  if grep -q 'localhost:8080' /etc/caddy/Caddyfile && ! grep -q 'localhost:8081' /etc/caddy/Caddyfile; then
+    echo "Updating Caddyfile so admin.* proxies to port 8081..."
+    bash "$(dirname "$0")/setup-domain.sh" prompt2spot.com || true
+  fi
+fi
+
 echo "Studio Agents is up."
 echo "  User app:  http://prompt2spot.com (or http://$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'))"
-echo "  Admin app: http://admin.prompt2spot.com"
+echo "  Admin app: http://admin.prompt2spot.com (docker port ${ADMIN_HTTP_PORT:-8081})"

@@ -31,13 +31,23 @@ if [ -f "$ENV_FILE" ]; then
   fi
 fi
 
+# User app on 8080, admin SPA on 8081 (docker maps ADMIN_HTTP_PORT→81).
+# Keep Host headers so cookies / redirects stay on the correct subdomain.
 tee /etc/caddy/Caddyfile <<EOF
 ${DOMAIN}, www.${DOMAIN} {
-    reverse_proxy localhost:8080
+    reverse_proxy localhost:8080 {
+        header_up Host {host}
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-Proto {scheme}
+    }
 }
 
 ${ADMIN_DOMAIN} {
-    reverse_proxy localhost:8080
+    reverse_proxy localhost:8081 {
+        header_up Host {host}
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-Proto {scheme}
+    }
 }
 EOF
 
