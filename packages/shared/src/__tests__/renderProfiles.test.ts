@@ -23,6 +23,12 @@ describe("resolveRenderProfile", () => {
     expect(profile.provider).toBe("kling");
     expect(profile.capabilities.referenceImage).toBe(true);
   });
+
+  it("includes cheap fal i2v profiles", () => {
+    expect(getRenderProfile("wan-i2v").provider).toBe("fal");
+    expect(getRenderProfile("hailuo-i2v").provider).toBe("fal");
+    expect(getRenderProfile("wan-i2v").capabilities.referenceImage).toBe(true);
+  });
 });
 
 describe("buildRenderProfileSnapshot", () => {

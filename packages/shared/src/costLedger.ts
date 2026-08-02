@@ -91,6 +91,12 @@ export function videoPerSecondUsd(model: string, generateAudio = veoGenerateAudi
   if (m.includes("kling") || m.includes("fal-ai/kling")) {
     return profileVideoPerSecondUsd(getRenderProfile("kling-i2v"));
   }
+  if (m.includes("wan/")) {
+    return profileVideoPerSecondUsd(getRenderProfile("wan-i2v"));
+  }
+  if (m.includes("hailuo") || m.includes("minimax")) {
+    return profileVideoPerSecondUsd(getRenderProfile("hailuo-i2v"));
+  }
   return veoPerSecondUsd(model, generateAudio);
 }
 

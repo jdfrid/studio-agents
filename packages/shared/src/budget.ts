@@ -66,7 +66,7 @@ export function planSceneLayout(
     };
   }
 
-  if (profile.provider === "kling") {
+  if (profile.provider === "kling" || profile.provider === "fal") {
     const beatSeconds = profile.capabilities.beatSeconds;
     const sceneCount = Math.max(1, Math.round(durationSeconds / beatSeconds));
     const clipSeconds = profile.capabilities.maxClipSeconds;
@@ -257,8 +257,8 @@ export function estimateRunCost(
     warning = "מצב רגיל — יותר סצנות ויותר תמונות. הפעל מצב חסכון להוזלה.";
   } else if (budget && nis >= EXPENSIVE_RUN_NIS) {
     warning =
-      profile.provider === "kling"
-        ? "עלות גבוהה מהצפוי — בדוק פרופיל Kling ומספר הסצנות."
+      profile.provider === "kling" || profile.provider === "fal"
+        ? "עלות גבוהה מהצפוי — בדוק פרופיל הרינדור ומספר הסצנות."
         : "עלות גבוהה מהצפוי — בדוק את מודל Veo בשרת.";
   }
 
@@ -274,7 +274,10 @@ export function estimateRunCost(
     label: budget ? "מצב חסכון" : "מצב רגיל",
     videoModel,
     veoTier: tier,
-    veoTierLabel: profile.provider === "kling" ? "Kling 2.1" : veoModelLabel(tier),
+    veoTierLabel:
+      profile.provider === "kling" || profile.provider === "fal"
+        ? videoProviderLabel
+        : veoModelLabel(tier),
     veoUsd,
     imageUsd,
     imageCalls,

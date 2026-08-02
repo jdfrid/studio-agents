@@ -206,7 +206,7 @@ export function AdminSettingsPanel() {
 }
 
 type PlatformSettingsView = {
-  defaultRenderProfile: "veo-multiclip" | "veo-extend" | "kling-i2v";
+  defaultRenderProfile: "veo-multiclip" | "veo-extend" | "kling-i2v" | "wan-i2v" | "hailuo-i2v";
   geminiTextModel: string | null;
   geminiTtsModel: string | null;
   geminiImageModel: string | null;
@@ -218,9 +218,11 @@ type PlatformSettingsView = {
 
 function listRenderProfiles() {
   return [
-    { id: "veo-multiclip" as const, label: "Veo Fast — multiclip (ברירת מחדל)" },
-    { id: "veo-extend" as const, label: "Veo Fast — extend chain" },
-    { id: "kling-i2v" as const, label: "Kling 2.1 — image-to-video" }
+    { id: "veo-multiclip" as const, label: "Veo Fast — multiclip (זול, ברירת מחדל)" },
+    { id: "wan-i2v" as const, label: "Wan 2.1 — זול (מתמונה)" },
+    { id: "hailuo-i2v" as const, label: "Hailuo — זול (מתמונה)" },
+    { id: "kling-i2v" as const, label: "Kling 2.1 — image-to-video" },
+    { id: "veo-extend" as const, label: "Veo Fast — extend chain (יקר יותר)" }
   ];
 }
 

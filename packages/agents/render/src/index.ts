@@ -10,6 +10,7 @@ import {
   RenderInputSchema,
   RenderOutputSchema,
   getRenderProfile,
+  usesFalVideoProvider,
   type Agent,
   type AgentContext,
   type ArtifactRecord,
@@ -39,7 +40,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       renderProfile: renderProfile.id
     });
 
-    const credentialType = renderProfile.provider === "kling" ? "VIDEO" : "GEMINI";
+    const credentialType = usesFalVideoProvider(renderProfile) ? "VIDEO" : "GEMINI";
     const provider = await ctx.providers.primary(credentialType);
     if (!provider) {
       throw new NoProviderConfiguredError(credentialType);
@@ -68,7 +69,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
 
     try {
       if (renderProfile.strategy === "extend") {
-        return await renderExtendChain(ctx, input, beatGenerator, provider, dir, renderProfile);
+        return await renderExtendChain(ctx, input, beatGenerator, provider, dir, renderProfile, dimensions);
       }
 
       for (const scene of input.timeline) {
@@ -194,6 +195,8 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         finalPath = await muxMusicTrack(concatPath, musicLocal, dir);
       }
 
+      finalPath = await appendBrandingEndCard(finalPath, dir, dimensions);
+
       const outputScale = Number(process.env.RENDER_OUTPUT_SCALE ?? 0);
       if (outputScale > 0) {
         finalPath = await downscaleVideo(finalPath, outputScale, dir);
@@ -209,7 +212,8 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         metadata: {
           renderProfileId: renderProfile.id,
           provider: renderProfile.provider,
-          strategy: renderProfile.strategy
+          strategy: renderProfile.strategy,
+          endCard: "Prompt@spot.com"
         }
       });
       const finalSignedUrl = await ctx.storage.signedUrl(finalArtifact.gcsPath);
@@ -240,7 +244,8 @@ async function renderExtendChain(
   beatGenerator: VideoBeatGenerator,
   provider: ProviderCredentialView,
   dir: string,
-  renderProfile: RenderProfile
+  renderProfile: RenderProfile,
+  dimensions: VideoDimensions
 ): Promise<RenderOutput> {
   const sortedTimeline = [...input.timeline].sort((a, b) => a.order - b.order);
   if (sortedTimeline.length === 0) {
@@ -375,6 +380,8 @@ async function renderExtendChain(
     finalPath = await muxMusicTrack(finalPath, musicLocal, dir);
   }
 
+  finalPath = await appendBrandingEndCard(finalPath, dir, dimensions);
+
   const outputScale = Number(process.env.RENDER_OUTPUT_SCALE ?? 0);
   if (outputScale > 0) {
     finalPath = await downscaleVideo(finalPath, outputScale, dir);
@@ -390,7 +397,8 @@ async function renderExtendChain(
     metadata: {
       renderProfileId: renderProfile.id,
       provider: renderProfile.provider,
-      strategy: renderProfile.strategy
+      strategy: renderProfile.strategy,
+      endCard: "Prompt@spot.com"
     }
   });
   const finalSignedUrl = await ctx.storage.signedUrl(finalArtifact.gcsPath);
@@ -743,6 +751,100 @@ async function downscaleVideo(videoPath: string, width: number, dir: string): Pr
     out
   ]);
   return out;
+}
+
+const BRANDING_END_CARD_SECONDS = 2.6;
+const BRANDING_END_FADE_SECONDS = 0.85;
+const BRANDING_END_TEXT = "Prompt@spot.com";
+
+/**
+ * Fade from the last frame into a short end card with Prompt@spot.com.
+ * Best-effort: on failure returns the input video unchanged.
+ */
+async function appendBrandingEndCard(
+  videoPath: string,
+  dir: string,
+  dimensions: VideoDimensions
+): Promise<string> {
+  try {
+    const lastFrame = path.join(dir, `end-last-${nanoid(4)}.png`);
+    await runFfmpeg(["-sseof", "-0.08", "-i", videoPath, "-frames:v", "1", "-y", lastFrame]);
+
+    const endClip = path.join(dir, `end-card-${nanoid(4)}.mp4`);
+    const fontSize = Math.max(28, Math.round(Math.min(dimensions.width, dimensions.height) * 0.06));
+    const vf = [
+      normalizeVideoFilter(dimensions.width, dimensions.height),
+      "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.5:t=fill",
+      `drawtext=text='${BRANDING_END_TEXT}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:alpha='if(lt(t\\,0.45)\\,t/0.45\\,1)'`
+    ].join(",");
+
+    await runFfmpeg([
+      "-loop",
+      "1",
+      "-i",
+      lastFrame,
+      "-f",
+      "lavfi",
+      "-i",
+      "anullsrc=channel_layout=stereo:sample_rate=44100",
+      "-t",
+      String(BRANDING_END_CARD_SECONDS),
+      "-vf",
+      vf,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-c:a",
+      "aac",
+      "-shortest",
+      "-movflags",
+      "+faststart",
+      "-y",
+      endClip
+    ]);
+
+    const out = path.join(dir, `with-end-${nanoid(4)}.mp4`);
+    const mainDur = await probeDuration(videoPath);
+    const fade = Math.min(BRANDING_END_FADE_SECONDS, Math.max(0.2, mainDur / 3));
+    const offset = Math.max(0, mainDur - fade);
+
+    try {
+      const filter = `[0:v][1:v]xfade=transition=fade:duration=${fade}:offset=${offset}[vout];[0:a][1:a]acrossfade=d=${fade}[aout]`;
+      await runFfmpeg([
+        "-i",
+        videoPath,
+        "-i",
+        endClip,
+        "-filter_complex",
+        filter,
+        "-map",
+        "[vout]",
+        "-map",
+        "[aout]",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "23",
+        "-c:a",
+        "aac",
+        "-movflags",
+        "+faststart",
+        "-y",
+        out
+      ]);
+      return out;
+    } catch {
+      await concatClipsHardCut([videoPath, endClip], out, dimensions);
+      return out;
+    }
+  } catch {
+    return videoPath;
+  }
 }
 
 async function concatClips(

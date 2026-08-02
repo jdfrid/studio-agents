@@ -281,25 +281,88 @@ function FramePreview({
 }) {
   if (!frame || typeof frame !== "object") return null;
   const f = frame as Record<string, unknown>;
-  const url = typeof f.signedUrl === "string" ? f.signedUrl : null;
+  const staleUrl = typeof f.signedUrl === "string" ? f.signedUrl : null;
   const artifactId = typeof f.artifactId === "string" ? f.artifactId : null;
-  if (url) return <SignedMedia label={label} url={url} mimeType="image/png" />;
   if (artifactId) {
+    return (
+      <FreshSignedMedia
+        label={label}
+        artifactId={artifactId}
+        fallbackUrl={staleUrl}
+        mimeType="image/png"
+        onOpenArtifact={onOpenArtifact}
+      />
+    );
+  }
+  if (staleUrl) return <SignedMedia label={label} url={staleUrl} mimeType="image/png" />;
+  return null;
+}
+
+function FreshSignedMedia({
+  label,
+  artifactId,
+  fallbackUrl,
+  mimeType,
+  onOpenArtifact
+}: {
+  label: string;
+  artifactId: string;
+  fallbackUrl: string | null;
+  mimeType: string;
+  onOpenArtifact: OpenArtifact;
+}) {
+  const [url, setUrl] = useState<string | null>(fallbackUrl);
+  useEffect(() => {
+    let active = true;
+    void apiGet<{ url: string }>(`/artifacts/${artifactId}/signed-url`)
+      .then((res) => {
+        if (active) setUrl(res.url);
+      })
+      .catch(() => {
+        /* keep fallback */
+      });
+    return () => {
+      active = false;
+    };
+  }, [artifactId]);
+
+  if (!url) {
     return (
       <button type="button" className="link-btn" onClick={() => void onOpenArtifact(artifactId)}>
         {label}
       </button>
     );
   }
-  return null;
+  return (
+    <SignedMedia
+      label={label}
+      url={url}
+      mimeType={mimeType}
+      onError={() => {
+        void apiGet<{ url: string }>(`/artifacts/${artifactId}/signed-url`)
+          .then((res) => setUrl(res.url))
+          .catch(() => setUrl(null));
+      }}
+    />
+  );
 }
 
-function SignedMedia({ label, url, mimeType }: { label: string; url: string; mimeType: string }) {
+function SignedMedia({
+  label,
+  url,
+  mimeType,
+  onError
+}: {
+  label: string;
+  url: string;
+  mimeType: string;
+  onError?: () => void;
+}) {
   if (mimeType.startsWith("video/")) {
     return (
       <figure className="media-preview">
         <figcaption>{label}</figcaption>
-        <video controls src={url} />
+        <video controls src={url} onError={onError} />
       </figure>
     );
   }
@@ -307,14 +370,14 @@ function SignedMedia({ label, url, mimeType }: { label: string; url: string; mim
     return (
       <figure className="media-preview">
         <figcaption>{label}</figcaption>
-        <audio controls src={url} />
+        <audio controls src={url} onError={onError} />
       </figure>
     );
   }
   return (
     <figure className="media-preview">
       <figcaption>{label}</figcaption>
-      <img src={url} alt={label} loading="lazy" />
+      <img src={url} alt={label} loading="lazy" onError={onError} />
     </figure>
   );
 }

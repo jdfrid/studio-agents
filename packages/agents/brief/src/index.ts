@@ -3,6 +3,8 @@ import {
   BriefInputSchema,
   BriefOutputSchema,
   NoProviderConfiguredError,
+  formatCreativeConstraints,
+  languageCodeFromCreative,
   resolveRenderProfile,
   type Agent,
   type BriefInput,
@@ -49,13 +51,25 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       2
     );
 
-    const userPayload = JSON.stringify(input, null, 2);
+    const creativeLines = formatCreativeConstraints(input.creative);
+    const userPayload = JSON.stringify(
+      {
+        ...input,
+        creativeConstraints: creativeLines
+      },
+      null,
+      2
+    );
 
     const completeJson = provider.type === "GEMINI" ? geminiCompleteJson : llmCompleteJson;
     const { parsed, model } = await completeJson<BriefOutput>(
       provider,
       {
-        system,
+        system:
+          system +
+          (creativeLines.length
+            ? " Honor creativeConstraints strictly in toneOfVoice, visualDirection, musicDirection, language, targetAudience, and style."
+            : ""),
         user: userPayload,
         schemaName: "BriefOutput",
         schemaHint,
@@ -101,19 +115,42 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       });
     }
 
+    const creativeBlock = creativeLines.length ? `\nCreative constraints:\n- ${creativeLines.join("\n- ")}` : "";
+    const langFromCreative = languageCodeFromCreative(input.creative);
     const enriched: BriefOutput = {
       title: parsed.title ?? input.title,
       summary: parsed.summary ?? "",
-      targetAudience: parsed.targetAudience ?? input.targetAudience ?? "",
-      toneOfVoice: parsed.toneOfVoice ?? "",
-      style: parsed.style ?? input.style ?? "",
+      targetAudience:
+        input.creative?.targetAudience?.trim() ||
+        parsed.targetAudience ||
+        input.targetAudience ||
+        "",
+      toneOfVoice: [parsed.toneOfVoice ?? "", input.creative?.communicationStyle, input.creative?.speechStyle]
+        .filter(Boolean)
+        .join("; "),
+      style:
+        [parsed.style ?? input.style ?? "", input.creative?.designStyle, input.creative?.pace]
+          .filter(Boolean)
+          .join("; ") || "",
       durationSeconds: parsed.durationSeconds ?? input.durationSeconds,
       aspectRatio: parsed.aspectRatio ?? input.aspectRatio,
-      language: parsed.language ?? input.language,
-      brandConstraints: parsed.brandConstraints ?? [],
-      visualDirection: parsed.visualDirection ?? "",
-      musicDirection: parsed.musicDirection ?? "",
-      callToAction: parsed.callToAction,
+      language: langFromCreative ?? parsed.language ?? input.language,
+      brandConstraints: [
+        ...(parsed.brandConstraints ?? []),
+        ...creativeLines,
+        "End card must credit Prompt@spot.com"
+      ],
+      visualDirection: `${parsed.visualDirection ?? ""}${creativeBlock}`.trim(),
+      musicDirection: [
+        parsed.musicDirection ?? "",
+        input.creative?.musicTempo ? `tempo: ${input.creative.musicTempo}` : "",
+        input.creative?.musicVolumePercent != null
+          ? `music volume ~${input.creative.musicVolumePercent}% under voice`
+          : ""
+      ]
+        .filter(Boolean)
+        .join("; "),
+      callToAction: parsed.callToAction ?? "Prompt@spot.com",
       budgetMode: input.budgetMode ?? false,
       renderProfile: resolveRenderProfile(input).id,
       references:
