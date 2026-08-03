@@ -32,8 +32,24 @@ export function geminiModels(provider?: ProviderCredentialView | null): GeminiMo
     tts: pickModel(models.tts, provider?.config.ttsModel, platform.geminiTtsModel, process.env.GEMINI_TTS_MODEL, "gemini-2.5-flash-preview-tts"),
     image: pickModel(models.image, provider?.config.imageModel, platform.geminiImageModel, process.env.GEMINI_IMAGE_MODEL, "gemini-3.1-flash-image"),
     music: pickModel(models.music, provider?.config.musicModel, platform.geminiMusicModel, process.env.GEMINI_MUSIC_MODEL, "lyria-3-clip-preview"),
-    video: pickModel(models.video, provider?.config.videoModel, platform.geminiVideoModel, process.env.GEMINI_VIDEO_MODEL, "veo-3.1-fast-generate-preview")
+    video: pickModel(
+      models.video,
+      provider?.config.videoModel,
+      platform.geminiVideoModel,
+      process.env.GEMINI_VIDEO_MODEL,
+      "veo-3.1-fast-generate-preview",
+      isValidGeminiVeoModelId
+    )
   };
+}
+
+/** Reject fal/Wan/Kling labels accidentally pasted into the Gemini Veo model field. */
+export function isValidGeminiVeoModelId(model: string): boolean {
+  const m = model.trim().toLowerCase();
+  if (!m) return false;
+  if (/wan|hailuo|kling|minimax|fal-ai|runway|shotstack/.test(m)) return false;
+  if (m.includes(" ") && !m.startsWith("veo")) return false;
+  return m.includes("veo") || m.includes("generate");
 }
 
 function pickModel(
@@ -41,12 +57,15 @@ function pickModel(
   fromConfig: unknown,
   fromPlatform: string | null | undefined,
   fromEnv: string | undefined,
-  fallback: string
+  fallback: string,
+  validate?: (model: string) => boolean
 ): string {
   const candidates = [fromModels, typeof fromConfig === "string" ? fromConfig : undefined, fromPlatform ?? undefined, fromEnv];
   for (const value of candidates) {
     const trimmed = value?.trim();
-    if (trimmed) return trimmed;
+    if (!trimmed) continue;
+    if (validate && !validate(trimmed)) continue;
+    return trimmed;
   }
   return fallback;
 }

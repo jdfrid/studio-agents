@@ -175,12 +175,16 @@ export function AdminSettingsPanel() {
           />
         </label>
         <label>
-          וידאו (Veo)
+          וידאו (Veo בלבד)
           <input
             value={settings.geminiVideoModel ?? ""}
             placeholder="veo-3.1-fast-generate-preview"
             onChange={(e) => setSettings({ ...settings, geminiVideoModel: e.target.value || null })}
           />
+          <small className="muted">
+            רק מזהה Veo של Google (למשל veo-3.1-fast-generate-preview). לא לכתוב כאן Wan/Kling/Hailuo —
+            אותם בוחרים ב«מודל רינדור ללקוחות» למעלה (דורש FAL_API_KEY).
+          </small>
         </label>
       </fieldset>
 
