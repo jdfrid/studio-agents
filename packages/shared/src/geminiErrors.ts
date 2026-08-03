@@ -76,7 +76,7 @@ export function userFacingGeminiError(raw: string, httpStatus?: number): string 
     case "rate_limit":
       return [
         "מגבלת קצב או מכסה זמנית של Gemini/Veo (429) — לא בהכרח 'נגמר כסף'.",
-        "Google מחזיר 'quota exceeded' גם כשיש יתרה. המתן 5–10 דקות ולחץ Rerun.",
+        "Google מחזיר 'quota exceeded' גם כשיש יתרה. המתן 5–10 דקות ולחץ «הפעל מחדש את השלב».",
         "ריצות עם הרבה סצנות Veo עלולות לפגוע במכסה לדקה/ליום."
       ].join(" ");
     case "auth":

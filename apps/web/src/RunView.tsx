@@ -110,13 +110,23 @@ function UserStageCard({
     }
   }
 
+  async function rerun() {
+    setBusy(true);
+    try {
+      await apiPost(`/runs/${run.id}/stages/${stage}/rerun`);
+      onAction();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function openArtifact(id: string) {
     const { url } = await apiGet<{ url: string }>(`/artifacts/${id}/signed-url`);
     window.open(url, "_blank");
   }
 
   const showOutput = s?.output && status !== "PENDING";
-  const hasBody = Boolean(s?.error || showOutput || status === "AWAITING_APPROVAL");
+  const hasBody = Boolean(s?.error || showOutput || status === "AWAITING_APPROVAL" || status === "FAILED");
 
   return (
     <details
@@ -145,6 +155,11 @@ function UserStageCard({
           {status === "AWAITING_APPROVAL" ? (
             <button type="button" className="primary" disabled={busy} onClick={() => void approve()}>
               {busy ? "…" : "אשר והמשך"}
+            </button>
+          ) : null}
+          {status === "FAILED" ? (
+            <button type="button" className="primary" disabled={busy} onClick={() => void rerun()}>
+              {busy ? "מריץ…" : "הפעל מחדש את השלב"}
             </button>
           ) : null}
         </div>
