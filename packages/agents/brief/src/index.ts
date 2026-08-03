@@ -52,9 +52,21 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     );
 
     const creativeLines = formatCreativeConstraints(input.creative);
+    // Never send attachment dataUrls/base64 to the LLM — a short voice/video sample
+    // as text tokens easily exceeds the model context (1M) and fails with 400.
     const userPayload = JSON.stringify(
       {
         ...input,
+        attachments: (input.attachments ?? []).map((att) => ({
+          name: att.name,
+          mimeType: att.mimeType,
+          kind: att.kind,
+          role: att.role,
+          sceneIndex: att.sceneIndex,
+          insertAtSeconds: att.insertAtSeconds,
+          audioSource: att.audioSource,
+          hasBinary: Boolean(att.dataUrl || att.gcsPath)
+        })),
         creativeConstraints: creativeLines
       },
       null,
