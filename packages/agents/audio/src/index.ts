@@ -91,7 +91,11 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
               : defaultTts!.type === "GEMINI"
                 ? await geminiSynthesizeSpeech(
                     defaultTts!,
-                    { text: scene.narration, language: input.language },
+                    {
+                      text: scene.narration,
+                      language: input.language,
+                      ...(input.voiceName ? { voiceName: input.voiceName } : {})
+                    },
                     async (event) => {
                       await ctx.cost.record({ ...event, sceneId: scene.sceneId });
                     }

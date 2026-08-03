@@ -105,6 +105,8 @@ export const BriefOutputSchema = z.object({
       audioSource: z.enum(["clip", "narration"])
     })
     .nullable()
-    .optional()
+    .optional(),
+  /** Gemini TTS prebuilt voice chosen from creative voice gender. */
+  ttsVoiceName: z.string().max(40).nullable().optional()
 });
 export type BriefOutput = z.infer<typeof BriefOutputSchema>;

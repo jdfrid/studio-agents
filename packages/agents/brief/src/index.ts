@@ -3,7 +3,9 @@ import {
   BriefInputSchema,
   BriefOutputSchema,
   NoProviderConfiguredError,
+  aspectRatioFromCreative,
   formatCreativeConstraints,
+  geminiVoiceNameFromCreative,
   languageCodeFromCreative,
   resolveRenderProfile,
   type Agent,
@@ -222,7 +224,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
           .filter(Boolean)
           .join("; ") || "",
       durationSeconds: parsed.durationSeconds ?? input.durationSeconds,
-      aspectRatio: parsed.aspectRatio ?? input.aspectRatio,
+      aspectRatio: aspectRatioFromCreative(input.creative) ?? parsed.aspectRatio ?? input.aspectRatio,
       language: langFromCreative ?? parsed.language ?? input.language,
       brandConstraints: [
         ...(parsed.brandConstraints ?? []),
@@ -247,7 +249,8 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         input.referenceLinks.map((link) => ({ kind: "link" as const, ref: link, note: undefined })),
       visualAnchors,
       voiceCloneSample,
-      videoInsert
+      videoInsert,
+      ttsVoiceName: geminiVoiceNameFromCreative(input.creative) ?? null
     };
 
     await ctx.artifacts.save({

@@ -2,7 +2,12 @@ import { useState } from "react";
 import { apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 import type { ProjectRunView } from "./types.js";
-import { CREATIVE_FIELD_DEFS, type ApprovalMode, type CreativeOptions } from "@studio/shared";
+import {
+  CREATIVE_FIELD_DEFS,
+  aspectRatioFromCreative,
+  type ApprovalMode,
+  type CreativeOptions
+} from "@studio/shared";
 
 export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: ProjectRunView) => void; onCancel: () => void }) {
   const { user } = useAuth();
@@ -103,7 +108,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           sourceText: prompt,
           language: "he",
           durationSeconds,
-          aspectRatio: "9:16",
+          aspectRatio: aspectRatioFromCreative(creative) ?? "9:16",
           budgetMode: true,
           approvalMode,
           attachments,
@@ -123,7 +128,11 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     <div className="create-form">
       <h2>סרטון חדש</h2>
       {freeLeft > 0 ? (
-        <p className="billing-banner-free create-free-note">סרטון חינם — לא יגבה קרדיט מהיתרה שלך.</p>
+        <p className="billing-banner-free create-free-note">
+          {freeLeft === 1
+            ? "סרטון חינם — לא יגבה קרדיט מהיתרה שלך."
+            : `סרטון חינם (${freeLeft} נותרו) — לא יגבה קרדיט מהיתרה שלך.`}
+        </p>
       ) : null}
       <label>
         כותרת

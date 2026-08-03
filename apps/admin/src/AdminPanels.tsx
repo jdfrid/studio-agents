@@ -185,15 +185,21 @@ export function AdminSettingsPanel() {
       </fieldset>
 
       <label>
-        סרטונים חינם למשתמש חדש
+        מספר סרטונים חינם לכל משתמש
         <input
           type="number"
           min={0}
           max={100}
+          step={1}
           value={settings.freeVideosPerUser}
-          onChange={(e) => setSettings({ ...settings, freeVideosPerUser: Number(e.target.value) || 0 })}
+          onChange={(e) => {
+            const n = Math.floor(Number(e.target.value));
+            setSettings({ ...settings, freeVideosPerUser: Number.isFinite(n) && n > 0 ? n : 0 });
+          }}
         />
-        <small className="muted">0 = כבוי. 1 = סרטון ראשון בחינם (ללא קרדיטים).</small>
+        <small className="muted">
+          0 = בלי סרטונים חינם. כל מספר אחר (למשל 3) נותן לכל משתמש עד אותו מספר סרטונים ללא קרדיטים.
+        </small>
       </label>
 
       <div className="stage-actions">

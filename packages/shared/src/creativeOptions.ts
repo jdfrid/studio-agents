@@ -27,13 +27,17 @@ export const CreativeOptionsSchema = z
     transitionSeconds: z.number().min(0.2).max(2).optional(),
     effects: z.string().max(120).optional(),
     accent: z.string().max(80).optional(),
+    /** Narration gender for Gemini TTS (male/female). */
+    voiceGender: z.enum(["male", "female"]).optional(),
     voiceType: z.string().max(80).optional(),
     speechStyle: z.string().max(80).optional(),
     speechSpeed: z.string().max(40).optional(),
     musicTempo: z.string().max(40).optional(),
     musicVolumePercent: z.number().int().min(5).max(40).optional(),
     musicSync: z.enum(["auto", "manual"]).optional(),
-    logoPlacement: z.enum(["none", "always", "end_only", "open_and_end"]).optional()
+    logoPlacement: z.enum(["none", "always", "end_only", "open_and_end"]).optional(),
+    /** Portrait (9:16) or landscape (16:9) final video. */
+    videoOrientation: z.enum(["portrait", "landscape"]).optional()
   })
   .strict();
 
@@ -51,6 +55,24 @@ export type CreativeFieldDef = {
 };
 
 export const CREATIVE_FIELD_DEFS: CreativeFieldDef[] = [
+  {
+    key: "videoOrientation",
+    labelHe: "כיוון סרטון",
+    kind: "select",
+    options: [
+      { value: "portrait", labelHe: "לאורך (אנכי)" },
+      { value: "landscape", labelHe: "לרוחב (אופקי)" }
+    ]
+  },
+  {
+    key: "voiceGender",
+    labelHe: "קול קריינות",
+    kind: "select",
+    options: [
+      { value: "male", labelHe: "זכר" },
+      { value: "female", labelHe: "נקבה" }
+    ]
+  },
   {
     key: "language",
     labelHe: "שפה",
@@ -340,15 +362,14 @@ export const CREATIVE_FIELD_DEFS: CreativeFieldDef[] = [
   },
   {
     key: "voiceType",
-    labelHe: "סוג קול",
+    labelHe: "סגנון קול",
     kind: "select",
     options: [
-      { value: "גברי", labelHe: "גברי" },
-      { value: "צעיר", labelHe: "צעיר" },
-      { value: "מבוגר", labelHe: "מבוגר" },
       { value: "עמוק", labelHe: "עמוק" },
       { value: "סמכותי", labelHe: "סמכותי" },
-      { value: "ידידותי", labelHe: "ידידותי" }
+      { value: "ידידותי", labelHe: "ידידותי" },
+      { value: "צעיר", labelHe: "צעיר" },
+      { value: "מבוגר", labelHe: "מבוגר" }
     ]
   },
   {
@@ -444,9 +465,36 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
       lines.push(`${label}: ${map[String(value)] ?? value}`);
       continue;
     }
+    if (key === "voiceGender") {
+      lines.push(`${label}: ${value === "male" ? "זכר" : "נקבה"}`);
+      continue;
+    }
+    if (key === "videoOrientation") {
+      lines.push(`${label}: ${value === "landscape" ? "לרוחב (16:9)" : "לאורך (9:16)"}`);
+      continue;
+    }
     lines.push(`${label}: ${value}`);
   }
   return lines;
+}
+
+/** Gemini prebuilt TTS voice from creative gender (fallback Kore). */
+export function geminiVoiceNameFromCreative(creative?: CreativeOptions | null): string | undefined {
+  const gender = creative?.voiceGender;
+  if (gender === "male") return "Charon";
+  if (gender === "female") return "Kore";
+  const legacy = creative?.voiceType?.trim();
+  if (!legacy) return undefined;
+  if (/זכר|גברי|male/i.test(legacy)) return "Charon";
+  if (/נקבה|נשי|female/i.test(legacy)) return "Kore";
+  return undefined;
+}
+
+/** Map orientation control to brief aspect ratio. */
+export function aspectRatioFromCreative(creative?: CreativeOptions | null): "9:16" | "16:9" | undefined {
+  if (creative?.videoOrientation === "landscape") return "16:9";
+  if (creative?.videoOrientation === "portrait") return "9:16";
+  return undefined;
 }
 
 export function languageCodeFromCreative(creative?: CreativeOptions | null): string | undefined {

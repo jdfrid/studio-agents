@@ -3,6 +3,7 @@ import {
   STAGE_ORDER,
   buildStageErrorRecord,
   createConsoleLogger,
+  geminiVoiceNameFromCreative,
   nextStage,
   resolveRenderProfile,
   type AgentContext,
@@ -126,7 +127,10 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       const briefData = (byName.get("brief") ?? brief) as {
         language?: string;
         voiceCloneSample?: { name: string; gcsPath: string; mimeType: string } | null;
+        ttsVoiceName?: string | null;
       };
+      const briefInput = brief as { creative?: Parameters<typeof geminiVoiceNameFromCreative>[0] };
+      const voiceName = briefData.ttsVoiceName ?? geminiVoiceNameFromCreative(briefInput.creative);
       return {
         language: briefData.language ?? "he",
         scenes: (script?.scenes ?? []).map((scene) => ({
@@ -136,7 +140,8 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           audioPolicy: scene.audioPolicy
         })),
         musicPrompt: script?.musicPrompt ?? "",
-        voiceCloneSample: briefData.voiceCloneSample ?? null
+        voiceCloneSample: briefData.voiceCloneSample ?? null,
+        ...(voiceName ? { voiceName } : {})
       };
     }
     case "asset": {

@@ -52,7 +52,9 @@ export function Dashboard({
           <h2>שלום{user?.name ? `, ${user.name}` : ""}</h2>
           <p className="credits-badge">
             {freeLeft > 0
-              ? `סרטון חינם זמין (${freeLeft} נותרו)`
+              ? freeLeft === 1
+                ? "נותר סרטון חינם אחד"
+                : `נותרו ${freeLeft} סרטונים חינם`
               : `${formatCredits(credits)} קרדיטים זמינים`}
           </p>
         </div>
@@ -63,7 +65,17 @@ export function Dashboard({
 
       {freeLeft > 0 ? (
         <section className="billing-banner billing-banner-free">
-          <p>🎬 הסרטון הראשון שלך — <strong>חינם</strong>. לחץ &quot;סרטון חדש&quot; כדי להתחיל.</p>
+          <p>
+            {freeLeft === 1 ? (
+              <>
+                יש לך <strong>סרטון חינם אחד</strong>. לחץ &quot;סרטון חדש&quot; כדי להתחיל.
+              </>
+            ) : (
+              <>
+                יש לך <strong>{freeLeft} סרטונים חינם</strong>. לחץ &quot;סרטון חדש&quot; כדי להתחיל.
+              </>
+            )}
+          </p>
         </section>
       ) : null}
 
