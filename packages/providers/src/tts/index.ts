@@ -2,6 +2,8 @@ import type { ProviderCredentialView } from "@studio/shared";
 import { ProviderError } from "@studio/shared";
 import { httpBytes } from "../http.js";
 
+export { elevenLabsCloneVoice, elevenLabsDeleteVoice } from "./elevenlabsClone.js";
+
 export interface TtsRequest {
   text: string;
   language: string;

@@ -22,9 +22,18 @@ export const BriefInputSchema = z.object({
         gcsPath: z.string().optional(),
         dataUrl: z.string().optional(),
         kind: z.enum(["image", "video", "audio", "text", "other"]).default("other"),
-        /** anchor = global cast/look reference; scene = override one scene only */
-        role: z.enum(["anchor", "scene"]).default("anchor"),
-        sceneIndex: z.number().int().min(0).optional()
+        /**
+         * anchor = global cast/look reference;
+         * scene = override one scene only;
+         * voice_clone = narration voice sample;
+         * insert_clip = short external video spliced into the final cut
+         */
+        role: z.enum(["anchor", "scene", "voice_clone", "insert_clip"]).default("anchor"),
+        sceneIndex: z.number().int().min(0).optional(),
+        /** Absolute second in the finished film where insert_clip begins (before end card). */
+        insertAtSeconds: z.number().min(0).max(180).optional(),
+        /** clip = keep original insert audio; narration = mute insert (keep studio voice around it). */
+        audioSource: z.enum(["clip", "narration"]).optional()
       })
     )
     .max(20)
@@ -76,6 +85,26 @@ export const BriefOutputSchema = z.object({
         sceneId: z.string().optional()
       })
     )
-    .default([])
+    .default([]),
+  /** Optional uploaded voice sample for ElevenLabs instant voice cloning. */
+  voiceCloneSample: z
+    .object({
+      name: z.string(),
+      gcsPath: z.string(),
+      mimeType: z.string()
+    })
+    .nullable()
+    .optional(),
+  /** Optional short external clip spliced into the final film. */
+  videoInsert: z
+    .object({
+      name: z.string(),
+      gcsPath: z.string(),
+      mimeType: z.string(),
+      insertAtSeconds: z.number().min(0).max(180),
+      audioSource: z.enum(["clip", "narration"])
+    })
+    .nullable()
+    .optional()
 });
 export type BriefOutput = z.infer<typeof BriefOutputSchema>;

@@ -277,6 +277,9 @@ function SeriesOutputView({
 }
 
 function localizeProviderError(message: string): string {
+  if (/שיבוט קול לא מוגדר|ELEVENLABS/i.test(message)) {
+    return "שיבוט קול לא מוגדר בשרת — יש להגדיר ELEVENLABS_API_KEY.";
+  }
   if (/no audio inline data/i.test(message)) {
     return "יצירת הקריינות נכשלה — לא התקבל קובץ אודיו מהספק. נסה להריץ מחדש את שלב האודיו.";
   }

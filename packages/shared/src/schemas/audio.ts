@@ -10,7 +10,16 @@ export const AudioInputSchema = z.object({
       audioPolicy: z.string().optional()
     })
   ),
-  musicPrompt: z.string()
+  musicPrompt: z.string(),
+  /** When set, narrate with an ElevenLabs instant clone of this sample. */
+  voiceCloneSample: z
+    .object({
+      name: z.string(),
+      gcsPath: z.string(),
+      mimeType: z.string()
+    })
+    .nullable()
+    .optional()
 });
 export type AudioInput = z.infer<typeof AudioInputSchema>;
 

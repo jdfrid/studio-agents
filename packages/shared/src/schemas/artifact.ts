@@ -6,6 +6,7 @@ export const ArtifactKindSchema = z.enum([
   "brief_output",
   "script_output",
   "voice_clip",
+  "voice_clone_sample",
   "music_track",
   "scene_video_source",
   "scene_image_source",

@@ -123,7 +123,10 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       return { brief: byName.get("brief") };
     case "audio": {
       const script = byName.get("script") as { scenes: Array<{ id: string; narration: string; durationSeconds: number; audioPolicy?: string }>; musicPrompt: string } | undefined;
-      const briefData = (byName.get("brief") ?? brief) as { language?: string };
+      const briefData = (byName.get("brief") ?? brief) as {
+        language?: string;
+        voiceCloneSample?: { name: string; gcsPath: string; mimeType: string } | null;
+      };
       return {
         language: briefData.language ?? "he",
         scenes: (script?.scenes ?? []).map((scene) => ({
@@ -132,7 +135,8 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           durationSeconds: scene.durationSeconds,
           audioPolicy: scene.audioPolicy
         })),
-        musicPrompt: script?.musicPrompt ?? ""
+        musicPrompt: script?.musicPrompt ?? "",
+        voiceCloneSample: briefData.voiceCloneSample ?? null
       };
     }
     case "asset": {
@@ -193,12 +197,20 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       const briefData = (byName.get("brief") ?? brief) as {
         aspectRatio?: string;
         renderProfile?: string;
+        videoInsert?: {
+          name: string;
+          gcsPath: string;
+          mimeType: string;
+          insertAtSeconds: number;
+          audioSource: "clip" | "narration";
+        } | null;
       };
       const renderProfile = resolveRenderProfile(briefOut ?? briefData).id;
       return {
         aspectRatio: briefData.aspectRatio ?? "9:16",
         timeline: pkg?.timeline ?? [],
-        renderProfile
+        renderProfile,
+        videoInsert: briefData.videoInsert ?? null
       };
     }
     case "series":

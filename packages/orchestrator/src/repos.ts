@@ -86,6 +86,20 @@ export function createProvidersRepo(tenantId: string): ProvidersRepository {
 }
 
 function envProvider(type: string): ProviderCredentialView | null {
+  if (type === "TTS") {
+    const elevenKey = process.env.ELEVENLABS_API_KEY?.trim();
+    if (elevenKey) {
+      return {
+        id: "env-elevenlabs",
+        type: "TTS",
+        provider: "elevenlabs",
+        priority: 0,
+        config: { model: "eleven_multilingual_v2" },
+        secret: elevenKey
+      };
+    }
+  }
+
   const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
   const geminiTypes = new Set(["GEMINI", "LLM", "TTS", "MUSIC", "MEDIA_SEARCH"]);
   if (key && geminiTypes.has(type)) {

@@ -13,10 +13,18 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const [durationSeconds, setDurationSeconds] = useState(30);
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("auto");
   const [visualFiles, setVisualFiles] = useState<File[]>([]);
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [voiceConsent, setVoiceConsent] = useState(false);
+  const [insertFile, setInsertFile] = useState<File | null>(null);
+  const [insertAtSeconds, setInsertAtSeconds] = useState(8);
+  const [insertAudioSource, setInsertAudioSource] = useState<"clip" | "narration">("clip");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [creative, setCreative] = useState<CreativeOptions>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const MAX_VOICE_BYTES = 10 * 1024 * 1024;
+  const MAX_INSERT_BYTES = 40 * 1024 * 1024;
 
   function setCreativeField<K extends keyof CreativeOptions>(key: K, value: CreativeOptions[K] | "") {
     setCreative((prev) => {
@@ -36,10 +44,30 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       return;
     }
     if (!title.trim() || !prompt.trim()) return;
+    if (voiceFile && !voiceConsent) {
+      setError("יש לאשר שיש לך זכות להשתמש בקול לפני שיבוט.");
+      return;
+    }
+    if (voiceFile && voiceFile.size > MAX_VOICE_BYTES) {
+      setError("קובץ הקול גדול מדי (מקסימום 10MB).");
+      return;
+    }
+    if (insertFile && insertFile.size > MAX_INSERT_BYTES) {
+      setError("סרטון השילוב גדול מדי (מקסימום 40MB).");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const attachments = await Promise.all(
+      const attachments: Array<{
+        name: string;
+        mimeType: string;
+        kind: "image" | "video" | "audio";
+        role: "anchor" | "voice_clone" | "insert_clip";
+        dataUrl: string;
+        insertAtSeconds?: number;
+        audioSource?: "clip" | "narration";
+      }> = await Promise.all(
         visualFiles.map(async (file) => ({
           name: file.name,
           mimeType: file.type || "image/png",
@@ -48,6 +76,26 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           dataUrl: await fileToDataUrl(file)
         }))
       );
+      if (voiceFile) {
+        attachments.push({
+          name: voiceFile.name,
+          mimeType: voiceFile.type || "audio/mpeg",
+          kind: "audio",
+          role: "voice_clone",
+          dataUrl: await fileToDataUrl(voiceFile)
+        });
+      }
+      if (insertFile) {
+        attachments.push({
+          name: insertFile.name,
+          mimeType: insertFile.type || "video/mp4",
+          kind: "video",
+          role: "insert_clip",
+          dataUrl: await fileToDataUrl(insertFile),
+          insertAtSeconds: Math.max(0, insertAtSeconds),
+          audioSource: insertAudioSource
+        });
+      }
       const creativePayload = Object.keys(creative).length > 0 ? creative : undefined;
       const run = await apiPost<ProjectRunView>("/runs", {
         brief: {
@@ -99,6 +147,70 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           onChange={(e) => setVisualFiles(Array.from(e.target.files ?? []))}
         />
       </label>
+      <label className="file-row">
+        שיבוט קול (אופציונלי)
+        <input
+          type="file"
+          accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/mp4,audio/m4a,.mp3,.wav,.m4a"
+          onChange={(e) => {
+            const file = e.target.files?.[0] ?? null;
+            setVoiceFile(file);
+            if (!file) setVoiceConsent(false);
+          }}
+        />
+        <small className="muted">
+          דגימה ברורה של כ־30–120 שניות, בלי רעש רקע. הדיבוב בסרטון יוקרא בקול הזה.
+        </small>
+      </label>
+      {voiceFile ? (
+        <label className="consent-row">
+          <input type="checkbox" checked={voiceConsent} onChange={(e) => setVoiceConsent(e.target.checked)} />
+          יש לי זכות להשתמש בקול הזה לשיבוט
+        </label>
+      ) : null}
+      <label className="file-row">
+        שילוב סרטון קצר (אופציונלי)
+        <input
+          type="file"
+          accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm"
+          onChange={(e) => setInsertFile(e.target.files?.[0] ?? null)}
+        />
+        <small className="muted">קטע של כמה שניות שיושתל בתוך הסרטון עם מעבר חלק.</small>
+      </label>
+      {insertFile ? (
+        <div className="insert-clip-options">
+          <label>
+            מיקום פריצה (שניות מתחילת הסרטון)
+            <input
+              type="number"
+              min={0}
+              max={Math.max(0, durationSeconds - 1)}
+              step={0.5}
+              value={insertAtSeconds}
+              onChange={(e) => setInsertAtSeconds(Number(e.target.value) || 0)}
+            />
+          </label>
+          <fieldset className="approval-fieldset">
+            <legend>קול בסרטון המשולב</legend>
+            <label>
+              <input
+                type="radio"
+                checked={insertAudioSource === "clip"}
+                onChange={() => setInsertAudioSource("clip")}
+              />
+              מהסרטון המקורי
+            </label>
+            <label>
+              <input
+                type="radio"
+                checked={insertAudioSource === "narration"}
+                onChange={() => setInsertAudioSource("narration")}
+              />
+              בלי קול מהמקור (רק הקריינות שלנו סביב)
+            </label>
+          </fieldset>
+        </div>
+      ) : null}
       <label>
         משך (שניות)
         <input
@@ -188,7 +300,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         <button
           type="button"
           className="primary"
-          disabled={busy || !canCreate || !title.trim() || !prompt.trim()}
+          disabled={busy || !canCreate || !title.trim() || !prompt.trim() || (!!voiceFile && !voiceConsent)}
           onClick={() => void submit()}
         >
           {busy ? "יוצר…" : "התחל יצירה"}

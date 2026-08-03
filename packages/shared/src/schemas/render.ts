@@ -2,10 +2,21 @@ import { z } from "zod";
 import { SceneTimelineEntrySchema } from "./package.js";
 import { RenderProfileIdSchema } from "../renderProfiles.js";
 
+export const VideoInsertSchema = z.object({
+  name: z.string(),
+  gcsPath: z.string(),
+  mimeType: z.string(),
+  insertAtSeconds: z.number().min(0).max(180),
+  audioSource: z.enum(["clip", "narration"])
+});
+export type VideoInsert = z.infer<typeof VideoInsertSchema>;
+
 export const RenderInputSchema = z.object({
   aspectRatio: z.string(),
   timeline: z.array(SceneTimelineEntrySchema),
-  renderProfile: RenderProfileIdSchema
+  renderProfile: RenderProfileIdSchema,
+  /** Optional short external clip spliced into the assembled film (before music/end card). */
+  videoInsert: VideoInsertSchema.nullable().optional()
 });
 export type RenderInput = z.infer<typeof RenderInputSchema>;
 

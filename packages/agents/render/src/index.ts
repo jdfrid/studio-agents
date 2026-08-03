@@ -187,14 +187,26 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         dimensions
       );
 
+      let assembledPath = concatPath;
+      let totalDurationSeconds = perScene.reduce((sum, s) => sum + s.durationSeconds, 0);
+      if (input.videoInsert?.gcsPath) {
+        const spliced = await spliceExternalInsert(assembledPath, input.videoInsert, dir, dimensions, ctx.storage);
+        assembledPath = spliced.path;
+        totalDurationSeconds = spliced.durationSeconds;
+        await ctx.log.log("render_video_insert", "External clip spliced into film", {
+          insertAtSeconds: input.videoInsert.insertAtSeconds,
+          audioSource: input.videoInsert.audioSource,
+          totalDurationSeconds
+        });
+      }
+
       const musicScene = input.timeline.find((s) => s.music.gcsPath || s.music.signedUrl);
       const musicGcsPath = musicScene ? resolveGcsPath(ctx.storage, musicScene.music) : null;
-      const totalDurationSeconds = perScene.reduce((sum, s) => sum + s.durationSeconds, 0);
-      let finalPath = concatPath;
+      let finalPath = assembledPath;
       if (musicGcsPath) {
         const musicLocal = path.join(dir, `music-${nanoid(4)}${musicExtension(musicGcsPath)}`);
         await downloadMediaToFile(ctx.storage, musicGcsPath, musicLocal);
-        finalPath = await muxMusicTrack(concatPath, musicLocal, dir);
+        finalPath = await muxMusicTrack(assembledPath, musicLocal, dir);
       }
 
       finalPath = await appendBrandingEndCard(finalPath, dir, dimensions);
@@ -215,7 +227,14 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           renderProfileId: renderProfile.id,
           provider: renderProfile.provider,
           strategy: renderProfile.strategy,
-          endCard: "Prompt@spot.com"
+          endCard: "Prompt@spot.com",
+          videoInsert: input.videoInsert
+            ? {
+                insertAtSeconds: input.videoInsert.insertAtSeconds,
+                audioSource: input.videoInsert.audioSource,
+                name: input.videoInsert.name
+              }
+            : null
         }
       });
       const finalSignedUrl = await ctx.storage.signedUrl(finalArtifact.gcsPath);
@@ -373,7 +392,20 @@ async function renderExtendChain(
     row.gcsPath = clipArtifact.gcsPath;
   }
 
-  let finalPath = finalized.path;
+  let assembledPath = finalized.path;
+  let totalDurationSecondsOut = totalDurationSeconds;
+  if (input.videoInsert?.gcsPath) {
+    const spliced = await spliceExternalInsert(assembledPath, input.videoInsert, dir, dimensions, ctx.storage);
+    assembledPath = spliced.path;
+    totalDurationSecondsOut = spliced.durationSeconds;
+    await ctx.log.log("render_video_insert", "External clip spliced into extend film", {
+      insertAtSeconds: input.videoInsert.insertAtSeconds,
+      audioSource: input.videoInsert.audioSource,
+      totalDurationSeconds: totalDurationSecondsOut
+    });
+  }
+
+  let finalPath = assembledPath;
   const musicScene = input.timeline.find((s) => s.music.gcsPath || s.music.signedUrl);
   const musicGcsPath = musicScene ? resolveGcsPath(ctx.storage, musicScene.music) : null;
   if (musicGcsPath) {
@@ -400,14 +432,21 @@ async function renderExtendChain(
       renderProfileId: renderProfile.id,
       provider: renderProfile.provider,
       strategy: renderProfile.strategy,
-      endCard: "Prompt@spot.com"
+      endCard: "Prompt@spot.com",
+      videoInsert: input.videoInsert
+        ? {
+            insertAtSeconds: input.videoInsert.insertAtSeconds,
+            audioSource: input.videoInsert.audioSource,
+            name: input.videoInsert.name
+          }
+        : null
     }
   });
   const finalSignedUrl = await ctx.storage.signedUrl(finalArtifact.gcsPath);
 
   await ctx.log.log("render_done", "Render Agent finished (extend chain)", {
     scenes: perScene.length,
-    totalDurationSeconds,
+    totalDurationSeconds: totalDurationSecondsOut,
     renderProfile: renderProfile.id
   });
 
@@ -417,7 +456,7 @@ async function renderExtendChain(
     finalArtifactId: finalArtifact.id,
     finalGcsPath: finalArtifact.gcsPath,
     finalSignedUrl,
-    totalDurationSeconds,
+    totalDurationSeconds: totalDurationSecondsOut,
     geminiOperations
   };
 }
@@ -658,6 +697,153 @@ async function stripAudio(videoPath: string, dir: string): Promise<string> {
   const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-silent.mp4`);
   await runFfmpeg(["-i", videoPath, "-map", "0:v:0", "-c:v", "copy", "-an", "-movflags", "+faststart", "-y", out]);
   return out;
+}
+
+const INSERT_FADE_SECONDS = 0.65;
+const MAX_INSERT_CLIP_SECONDS = 20;
+
+/**
+ * Splice a short external clip into an assembled film at insertAtSeconds,
+ * with soft xfade/acrossfade in and out. audioSource=clip keeps insert audio;
+ * narration mutes the insert so studio voice around it remains the focus.
+ */
+async function spliceExternalInsert(
+  mainPath: string,
+  insert: NonNullable<RenderInput["videoInsert"]>,
+  dir: string,
+  dimensions: VideoDimensions,
+  storage: GcsClient
+): Promise<{ path: string; durationSeconds: number }> {
+  const rawInsert = path.join(dir, `insert-raw-${nanoid(4)}.mp4`);
+  await downloadMediaToFile(storage, insert.gcsPath, rawInsert);
+
+  const capped = path.join(dir, `insert-capped-${nanoid(4)}.mp4`);
+  await runFfmpeg([
+    "-i",
+    rawInsert,
+    "-t",
+    String(MAX_INSERT_CLIP_SECONDS),
+    "-c",
+    "copy",
+    "-movflags",
+    "+faststart",
+    "-y",
+    capped
+  ]).catch(async () => {
+    await runFfmpeg([
+      "-i",
+      rawInsert,
+      "-t",
+      String(MAX_INSERT_CLIP_SECONDS),
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-c:a",
+      "aac",
+      "-movflags",
+      "+faststart",
+      "-y",
+      capped
+    ]);
+  });
+
+  let insertPrepared = (await finalizeSceneClip(capped, dir, "insert-clip", dimensions)).path;
+  if (insert.audioSource === "narration") {
+    const silent = await stripAudio(insertPrepared, dir);
+    insertPrepared = (await finalizeSceneClip(silent, dir, "insert-silent", dimensions)).path;
+  }
+
+  const mainDur = await probeDuration(mainPath);
+  const insertDur = await probeDuration(insertPrepared);
+  const fade = Math.min(INSERT_FADE_SECONDS, Math.max(0.25, Math.min(mainDur, insertDur) * 0.35));
+  const minAt = fade + 0.05;
+  const maxAt = Math.max(minAt, mainDur - fade - 0.05);
+  const at = Math.min(maxAt, Math.max(minAt, Number(insert.insertAtSeconds) || 0));
+
+  const leftRaw = path.join(dir, `insert-left-${nanoid(4)}.mp4`);
+  const rightRaw = path.join(dir, `insert-right-${nanoid(4)}.mp4`);
+
+  if (at > 0.08) {
+    await runFfmpeg([
+      "-i",
+      mainPath,
+      "-t",
+      at.toFixed(3),
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-c:a",
+      "aac",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      "-movflags",
+      "+faststart",
+      "-y",
+      leftRaw
+    ]);
+  }
+  if (at < mainDur - 0.08) {
+    await runFfmpeg([
+      "-ss",
+      at.toFixed(3),
+      "-i",
+      mainPath,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-c:a",
+      "aac",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      "-movflags",
+      "+faststart",
+      "-y",
+      rightRaw
+    ]);
+  }
+
+  const leftExists = at > 0.08 && existsSync(leftRaw);
+  const rightExists = at < mainDur - 0.08 && existsSync(rightRaw);
+
+  let current = insertPrepared;
+  let currentDur = insertDur;
+
+  if (leftExists) {
+    const left = (await finalizeSceneClip(leftRaw, dir, "insert-left", dimensions)).path;
+    const leftDur = await probeDuration(left);
+    const merged = path.join(dir, `insert-merge-l-${nanoid(4)}.mp4`);
+    const stepFade = Math.min(fade, Math.max(0.2, Math.min(leftDur, currentDur) * 0.35));
+    await mergeTwoClipsWithXfade(left, current, leftDur, currentDur, stepFade, merged);
+    current = merged;
+    currentDur = leftDur + currentDur - stepFade;
+  }
+
+  if (rightExists) {
+    const right = (await finalizeSceneClip(rightRaw, dir, "insert-right", dimensions)).path;
+    const rightDur = await probeDuration(right);
+    const merged = path.join(dir, `insert-merge-r-${nanoid(4)}.mp4`);
+    const stepFade = Math.min(fade, Math.max(0.2, Math.min(currentDur, rightDur) * 0.35));
+    await mergeTwoClipsWithXfade(current, right, currentDur, rightDur, stepFade, merged);
+    current = merged;
+    currentDur = currentDur + rightDur - stepFade;
+  }
+
+  const out = path.join(dir, `with-insert-${nanoid(4)}.mp4`);
+  await runFfmpeg(["-i", current, "-c", "copy", "-movflags", "+faststart", "-y", out]);
+  return { path: out, durationSeconds: await probeDuration(out) };
 }
 
 async function muxMusicTrack(videoPath: string, musicPath: string, dir: string): Promise<string> {

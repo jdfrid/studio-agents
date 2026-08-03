@@ -81,14 +81,91 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     );
 
     const visualAnchors: BriefOutput["visualAnchors"] = [];
+    let voiceCloneSample: BriefOutput["voiceCloneSample"] = null;
+    let videoInsert: BriefOutput["videoInsert"] = null;
 
     for (const att of input.attachments ?? []) {
+      if (att.role === "insert_clip") {
+        const insertAtSeconds = Math.max(0, Number(att.insertAtSeconds ?? 0));
+        const audioSource = att.audioSource === "narration" ? "narration" : "clip";
+        if (att.gcsPath) {
+          videoInsert = {
+            name: att.name,
+            gcsPath: att.gcsPath,
+            mimeType: att.mimeType || "video/mp4",
+            insertAtSeconds,
+            audioSource
+          };
+          continue;
+        }
+        const dataUrl = att.dataUrl?.trim();
+        if (!dataUrl?.startsWith("data:")) continue;
+        const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) continue;
+        const mimeType = match[1] || att.mimeType || "video/mp4";
+        const body = Buffer.from(match[2]!, "base64");
+        const saved = await ctx.artifacts.save({
+          runId: ctx.runId,
+          stage: "brief",
+          kind: "scene_video_source",
+          body,
+          mimeType,
+          filename: att.name || "video-insert.mp4",
+          metadata: {
+            role: "insert_clip",
+            source: "brief_input_attachment",
+            insertAtSeconds,
+            audioSource
+          }
+        });
+        videoInsert = {
+          name: att.name,
+          gcsPath: saved.gcsPath,
+          mimeType,
+          insertAtSeconds,
+          audioSource
+        };
+        continue;
+      }
+
+      if (att.role === "voice_clone") {
+        if (att.gcsPath) {
+          voiceCloneSample = {
+            name: att.name,
+            gcsPath: att.gcsPath,
+            mimeType: att.mimeType || "audio/mpeg"
+          };
+          continue;
+        }
+        const dataUrl = att.dataUrl?.trim();
+        if (!dataUrl?.startsWith("data:")) continue;
+        const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) continue;
+        const mimeType = match[1] || att.mimeType || "audio/mpeg";
+        const body = Buffer.from(match[2]!, "base64");
+        const saved = await ctx.artifacts.save({
+          runId: ctx.runId,
+          stage: "brief",
+          kind: "voice_clone_sample",
+          body,
+          mimeType,
+          filename: att.name || "voice-clone-sample.mp3",
+          metadata: { role: "voice_clone", source: "brief_input_attachment" }
+        });
+        voiceCloneSample = {
+          name: att.name,
+          gcsPath: saved.gcsPath,
+          mimeType
+        };
+        continue;
+      }
+
       if (att.gcsPath) {
         visualAnchors.push({
           name: att.name,
           gcsPath: att.gcsPath,
           mimeType: att.mimeType,
-          role: att.role ?? "anchor"
+          role: att.role === "scene" ? "scene" : "anchor"
         });
         continue;
       }
@@ -111,7 +188,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         name: att.name,
         gcsPath: saved.gcsPath,
         mimeType,
-        role: att.role ?? "anchor"
+        role: att.role === "scene" ? "scene" : "anchor"
       });
     }
 
@@ -156,7 +233,9 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       references:
         parsed.references ??
         input.referenceLinks.map((link) => ({ kind: "link" as const, ref: link, note: undefined })),
-      visualAnchors
+      visualAnchors,
+      voiceCloneSample,
+      videoInsert
     };
 
     await ctx.artifacts.save({
