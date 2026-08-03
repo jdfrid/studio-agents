@@ -25,18 +25,18 @@ export function StageErrorView({ error }: { error: string | null }) {
       {parsed.kind !== "unknown" ? (
         <p className="stage-error-kind muted">
           <strong>סוג:</strong> {kindLabel(parsed.kind)}
-          {parsed.httpStatus != null ? <> · HTTP {parsed.httpStatus}</> : null}
+          {parsed.httpStatus != null ? <> · קוד HTTP {parsed.httpStatus}</> : null}
           {parsed.quotaHint ? <> · {parsed.quotaHint}</> : null}
         </p>
       ) : null}
       {showRaw ? (
         <details className="stage-error-raw">
-          <summary>שגיאה מקורית מ-Google (JSON / text)</summary>
+          <summary>פירוט טכני מהספק</summary>
           <pre>{parsed.raw}</pre>
         </details>
       ) : (
         <p className="stage-error-kind muted">
-          שגיאה מקורית מ-Google לא נשמרה בריצה זו — הרץ <strong>Rerun</strong> אחרי deploy לקבל JSON מלא.
+          פירוט טכני מלא לא נשמר בריצה זו — הרץ מחדש את השלב אחרי עדכון השרת לקבלת פרטים מלאים.
         </p>
       )}
     </div>

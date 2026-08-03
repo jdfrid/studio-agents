@@ -43,7 +43,7 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
         <span className={`status-pill status-${run.status.toLowerCase()}`}>{statusLabelHe(run.status)}</span>
       </header>
 
-      <ol className="progress-timeline">
+      <ol className="progress-timeline progress-timeline-stack">
         {STAGE_ORDER.map((stage) => {
           const s = run.stages.find((x) => x.stage === stage);
           const st = s?.status ?? "PENDING";
@@ -61,7 +61,7 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
         <VisualCorrectionsPanel runId={runId} scriptOutput={scriptOutput} runStatus={run.status} onSaved={() => void refresh()} />
       ) : null}
 
-      <div className="stage-grid stage-grid-user">
+      <div className="stage-stack">
         {STAGE_ORDER.map((stage) => (
           <UserStageCard
             key={stage}
@@ -74,6 +74,10 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
       </div>
     </div>
   );
+}
+
+function defaultStageOpen(status: string): boolean {
+  return status === "RUNNING" || status === "FAILED" || status === "AWAITING_APPROVAL" || status === "QUEUED";
 }
 
 function UserStageCard({
@@ -90,6 +94,11 @@ function UserStageCard({
   const s = run.stages.find((x) => x.stage === stage);
   const status = s?.status ?? "PENDING";
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(() => defaultStageOpen(status));
+
+  useEffect(() => {
+    if (defaultStageOpen(status)) setOpen(true);
+  }, [status]);
 
   async function approve() {
     setBusy(true);
@@ -107,28 +116,39 @@ function UserStageCard({
   }
 
   const showOutput = s?.output && status !== "PENDING";
+  const hasBody = Boolean(s?.error || showOutput || status === "AWAITING_APPROVAL");
 
   return (
-    <article className={`stage-card stage-${status.toLowerCase()}`}>
-      <header>
+    <details
+      className={`stage-card stage-collapse stage-${status.toLowerCase()}`}
+      open={open}
+      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
+    >
+      <summary className="stage-collapse-summary">
+        <span className="stage-collapse-chevron" aria-hidden>
+          ▾
+        </span>
         <strong>{STAGE_LABELS[stage]}</strong>
         <span className={`badge badge-${status.toLowerCase()}`}>{statusLabelHe(status)}</span>
-      </header>
-      {s?.error ? <StageErrorView error={s.error} /> : null}
-      {showOutput ? (
-        <>
-          <StageOutputView stage={stage} output={s.output} artifacts={artifacts} onOpenArtifact={openArtifact} />
-          <StageUploadControls runId={run.id} stage={stage} output={s.output} onSaved={onAction} />
-          <StageEditor runId={run.id} stage={stage} output={s.output} onSaved={onAction} />
-        </>
-      ) : null}
-      <div className="stage-actions">
-        {status === "AWAITING_APPROVAL" ? (
-          <button type="button" className="primary" disabled={busy} onClick={() => void approve()}>
-            {busy ? "…" : "אשר והמשך"}
-          </button>
+      </summary>
+      <div className="stage-collapse-body">
+        {!hasBody ? <p className="muted">אין תוכן להצגה בשלב זה עדיין.</p> : null}
+        {s?.error ? <StageErrorView error={s.error} /> : null}
+        {showOutput ? (
+          <>
+            <StageOutputView stage={stage} output={s.output} artifacts={artifacts} onOpenArtifact={openArtifact} />
+            <StageUploadControls runId={run.id} stage={stage} output={s.output} onSaved={onAction} />
+            <StageEditor runId={run.id} stage={stage} output={s.output} onSaved={onAction} />
+          </>
         ) : null}
+        <div className="stage-actions">
+          {status === "AWAITING_APPROVAL" ? (
+            <button type="button" className="primary" disabled={busy} onClick={() => void approve()}>
+              {busy ? "…" : "אשר והמשך"}
+            </button>
+          ) : null}
+        </div>
       </div>
-    </article>
+    </details>
   );
 }

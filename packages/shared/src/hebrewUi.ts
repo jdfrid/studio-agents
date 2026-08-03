@@ -54,22 +54,27 @@ export function runStatusLabelHe(status: string): string {
 export function videoPromptLabelHe(profile: RenderProfileId): string {
   const p = getRenderProfile(profile);
   if (p.provider === "kling" || p.provider === "fal") {
-    return `פרומפט תנועה (${videoProviderShortLabel(p)})`;
+    return `פרומפט תנועה (${videoProviderShortLabelHe(profile)})`;
   }
-  return "פרומפט וידאו (Veo)";
+  return "פרומפט וידאו";
 }
 
 export function videoProviderShortLabelHe(profile: RenderProfileId): string {
   const p = getRenderProfile(profile);
-  if (p.provider === "kling" || p.provider === "fal") return videoProviderShortLabel(p);
-  if (p.strategy === "extend") return "Veo (הארכה)";
-  return "Veo";
+  if (p.provider === "kling") return "קלינג";
+  if (p.provider === "fal") {
+    if (p.id === "wan-i2v") return "ואן";
+    if (p.id === "hailuo-i2v") return "האילואו";
+    return "פול";
+  }
+  if (p.strategy === "extend") return "ויאו (הארכה)";
+  return "ויאו";
 }
 
 export const CAPABILITY_LABELS_HE: Record<string, string> = {
   Text: "טקסט",
   TTS: "דיבור",
   Image: "תמונה",
-  "Music (Lyria)": "מוזיקה (Lyria)",
-  "Veo (Gemini)": "Veo (Gemini)"
+  "Music (Lyria)": "מוזיקה",
+  "Veo (Gemini)": "וידאו"
 };

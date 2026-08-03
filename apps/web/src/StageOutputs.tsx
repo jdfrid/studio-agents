@@ -53,6 +53,18 @@ export function StageOutputView({
   }
 }
 
+function languageLabelHe(code: unknown): string {
+  const c = String(code ?? "").toLowerCase();
+  if (c.startsWith("he")) return "עברית";
+  if (c.startsWith("en")) return "אנגלית";
+  if (c.startsWith("fr")) return "צרפתית";
+  if (c.startsWith("ar")) return "ערבית";
+  if (c.startsWith("ru")) return "רוסית";
+  if (c.startsWith("es")) return "ספרדית";
+  if (c.startsWith("yi")) return "יידיש";
+  return c || "—";
+}
+
 function BriefOutputView({ data }: { data: Record<string, unknown> }) {
   return (
     <div className="stage-output">
@@ -65,7 +77,8 @@ function BriefOutputView({ data }: { data: Record<string, unknown> }) {
       <Field label="כיוון מוזיקה" value={data.musicDirection} />
       {data.callToAction ? <Field label="קריאה לפעולה" value={data.callToAction} /> : null}
       <small className="muted">
-        {String(data.durationSeconds ?? "?")}s · {String(data.aspectRatio ?? "?")} · {String(data.language ?? "?")}
+        משך: {String(data.durationSeconds ?? "?")} שניות · יחס: {String(data.aspectRatio ?? "?")} · שפה:{" "}
+        {languageLabelHe(data.language)}
       </small>
     </div>
   );
@@ -117,15 +130,15 @@ function AudioOutputView({
   const musicArtifact = artifacts.find((a) => a.kind === "music_track");
   return (
     <div className="stage-output">
-      {perScene.map((row) => {
+      {perScene.map((row, index) => {
         const artifact = artifacts.find((a) => a.id === row.voiceArtifactId);
         return (
           <article className="scene-mini" key={String(row.sceneId)}>
-            <strong>קול · סצנה {String(row.sceneId)}</strong>
+            <strong>קול · סצנה {index + 1}</strong>
             {artifact ? (
               <ArtifactPlayer artifact={artifact} onOpenArtifact={onOpenArtifact} />
             ) : row.voiceError ? (
-              <small className="error-inline">{String(row.voiceError)}</small>
+              <small className="error-inline">{localizeProviderError(String(row.voiceError))}</small>
             ) : (
               <small className="muted">אין קובץ קול</small>
             )}
@@ -155,10 +168,10 @@ function AssetOutputView({
 }) {
   const perScene = Array.isArray(data.perScene) ? (data.perScene as Array<Record<string, unknown>>) : [];
   return (
-    <div className="stage-output asset-grid">
-      {perScene.map((row) => (
+    <div className="stage-output asset-grid asset-grid-stack">
+      {perScene.map((row, index) => (
         <article className="scene-mini" key={String(row.sceneId)}>
-          <strong>סצנה {String(row.sceneId)}</strong>
+          <strong>סצנה {index + 1}</strong>
           <FramePreview label={FRAME_TYPE_LABELS_HE.referenceFrame} frame={row.referenceFrame} onOpenArtifact={onOpenArtifact} />
           <FramePreview label={FRAME_TYPE_LABELS_HE.firstFrame} frame={row.firstFrame} onOpenArtifact={onOpenArtifact} />
           <FramePreview label={FRAME_TYPE_LABELS_HE.lastFrame} frame={row.lastFrame} onOpenArtifact={onOpenArtifact} />
@@ -198,7 +211,7 @@ function PackageOutputView({
               <td>{Number(row.order) + 1}</td>
               <td>{String(row.title ?? "")}</td>
               <td>
-                {Number(row.startSecond)}–{Number(row.endSecond)}s
+                {Number(row.startSecond)}–{Number(row.endSecond)} שנ׳
               </td>
             </tr>
           ))}
@@ -213,7 +226,7 @@ function PackageOutputView({
       })}
       {typeof data.instructionsArtifactId === "string" ? (
         <button type="button" onClick={() => void onOpenArtifact(data.instructionsArtifactId as string)}>
-          פתח הוראות (artifact)
+          פתח הוראות
         </button>
       ) : null}
     </div>
@@ -251,14 +264,29 @@ function SeriesOutputView({
   const url = typeof data.finalSignedUrl === "string" ? data.finalSignedUrl : null;
   return (
     <div className="stage-output">
-      {url ? <SignedMedia label={data.passthrough ? "סרטון סופי (מ-render)" : "סרטון סדרה"} url={url} mimeType="video/mp4" /> : null}
+      {url ? (
+        <SignedMedia label={data.passthrough ? "סרטון סופי (מרינדור)" : "סרטון סדרה"} url={url} mimeType="video/mp4" />
+      ) : null}
       {data.finalArtifactId ? (
         <button type="button" onClick={() => void onOpenArtifact(String(data.finalArtifactId))}>
-          פתח artifact
+          פתח קובץ סופי
         </button>
       ) : null}
     </div>
   );
+}
+
+function localizeProviderError(message: string): string {
+  if (/no audio inline data/i.test(message)) {
+    return "יצירת הקריינות נכשלה — לא התקבל קובץ אודיו מהספק. נסה להריץ מחדש את שלב האודיו.";
+  }
+  if (/enqueue_failed|locked by another worker/i.test(message)) {
+    return "המשימה נעולה בתור העיבוד. המתן מעט או הרץ מחדש את השלב.";
+  }
+  if (/Path .* not found|HTTP 404/i.test(message)) {
+    return "שירות הרינדור לא מצא את המודל המבוקש. בדוק את הגדרות המודל באדמין והרץ מחדש.";
+  }
+  return message;
 }
 
 function Field({ label, value }: { label: string; value: unknown }) {
