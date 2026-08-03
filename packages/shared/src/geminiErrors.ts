@@ -189,6 +189,9 @@ export function formatApiErrorMessage(raw: string): string {
   const jsonMessage = extractJsonErrorMessage(body);
   const probe = `${body} ${jsonMessage ?? ""}`;
   const lower = probe.toLowerCase();
+  if (lower.includes("input token count exceeds") || lower.includes("maximum number of tokens allowed")) {
+    return "הבקשה ל-Gemini גדולה מדי (חריגת מגבלת טוקנים). בדרך כלל בגלל קובץ קול/וידאו שצורף בטעות לפרומפט — עדכן את השרת לגרסה האחרונה והפעל מחדש את שלב הביריף.";
+  }
   if (lower.includes("failed to download")) {
     if (lower.includes("403") || lower.includes("expired")) {
       return "לא ניתן להוריד קובץ מ-Google Cloud Storage. ודא ש-GCS_CREDENTIALS_FILE תקין בשרת, ואז הרץ מחדש את שלב הרינדור.";
