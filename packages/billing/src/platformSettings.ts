@@ -113,3 +113,15 @@ export async function getFreeVideosAllowance(): Promise<number> {
   const settings = await getPlatformSettings();
   return settings.freeVideosPerUser;
 }
+
+/** Effective free-video quota for a user (per-user override or platform default). */
+export async function getFreeVideosAllowanceForUser(userId: string): Promise<number> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { freeVideosLimit: true }
+  });
+  if (user?.freeVideosLimit != null) {
+    return Math.max(0, user.freeVideosLimit);
+  }
+  return getFreeVideosAllowance();
+}

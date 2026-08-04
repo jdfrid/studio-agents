@@ -4,10 +4,15 @@ import {
   BriefOutputSchema,
   NoProviderConfiguredError,
   aspectRatioFromCreative,
+  contentLanguageEnglishName,
+  contentLanguageNativeName,
   formatCreativeConstraints,
   geminiVoiceNameFromCreative,
   languageCodeFromCreative,
+  normalizeContentLanguage,
+  resolveContentLanguage,
   resolveRenderProfile,
+  userFacingLanguageInstruction,
   type Agent,
   type BriefInput,
   type BriefOutput
@@ -31,22 +36,38 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     const provider = (await ctx.providers.primary("GEMINI")) ?? (await ctx.providers.primary("LLM"));
     if (!provider) throw new NoProviderConfiguredError("GEMINI");
 
-    const system =
-      "You are a senior creative producer. Convert free-form briefs into a single strict JSON object describing the production requirements for a short promotional video. visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots. If the user provided instructions (do/don't constraints), honor them strictly in visualDirection and brandConstraints.";
+    const contentLang = resolveContentLanguage({
+      language: languageCodeFromCreative(input.creative) ?? input.language,
+      creativeLanguage: input.creative?.language,
+      title: input.title,
+      sourceText: input.sourceText,
+      instructions: input.instructions
+    });
+    const langEn = contentLanguageEnglishName(contentLang);
+    const langNative = contentLanguageNativeName(contentLang);
+
+    const system = [
+      "You are a senior creative producer. Convert free-form briefs into a single strict JSON object describing the production requirements for a short promotional video.",
+      "visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots.",
+      "If the user provided instructions (do/don't constraints), honor them strictly in visualDirection and brandConstraints.",
+      userFacingLanguageInstruction(contentLang),
+      `Set the JSON "language" field to "${contentLang}".`
+    ].join(" ");
+
     const schemaHint = JSON.stringify(
       {
-        title: "string",
-        summary: "string",
-        targetAudience: "string",
-        toneOfVoice: "string",
-        style: "string",
+        title: `${langNative} title`,
+        summary: `${langNative} summary`,
+        targetAudience: `${langNative} target audience`,
+        toneOfVoice: `${langNative} tone`,
+        style: `${langNative} style`,
         durationSeconds: "integer 5..180",
         aspectRatio: "9:16 | 16:9 | 1:1",
-        language: "string",
-        brandConstraints: ["string"],
-        visualDirection: "string",
-        musicDirection: "string",
-        callToAction: "string (optional)",
+        language: contentLang,
+        brandConstraints: [`short ${langEn} constraint strings`],
+        visualDirection: `${langNative} visual direction (cast + location)`,
+        musicDirection: `${langNative} music direction`,
+        callToAction: `${langNative} CTA (optional)`,
         references: [{ kind: "link|image|video|audio|text|other", ref: "string", note: "optional" }]
       },
       null,
@@ -83,7 +104,8 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
           system +
           (creativeLines.length
             ? " Honor creativeConstraints strictly in toneOfVoice, visualDirection, musicDirection, language, targetAudience, and style."
-            : ""),
+            : "") +
+          ` User source text language should drive copy — prefer ${langEn}.`,
         user: userPayload,
         schemaName: "BriefOutput",
         schemaHint,
@@ -212,6 +234,15 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       ? `\nUser instructions (MUST follow — do / don't):\n${instructions}`
       : "";
     const langFromCreative = languageCodeFromCreative(input.creative);
+    const resolvedLanguage = normalizeContentLanguage(
+      langFromCreative ?? contentLang ?? parsed.language ?? input.language
+    );
+    const endCardCredit =
+      resolvedLanguage === "he"
+        ? "בכרטיס הסיום יש לציין prompt2spot.com"
+        : "End card must credit prompt2spot.com";
+    const userInstructionsPrefix =
+      resolvedLanguage === "he" ? "הוראות משתמש (חובה לכבד)" : "User instructions (MUST follow)";
     const enriched: BriefOutput = {
       title: parsed.title ?? input.title,
       summary: parsed.summary ?? "",
@@ -229,13 +260,13 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
           .join("; ") || "",
       durationSeconds: parsed.durationSeconds ?? input.durationSeconds,
       aspectRatio: aspectRatioFromCreative(input.creative) ?? parsed.aspectRatio ?? input.aspectRatio,
-      language: langFromCreative ?? parsed.language ?? input.language,
+      language: resolvedLanguage,
       ...(instructions ? { instructions } : {}),
       brandConstraints: [
         ...(parsed.brandConstraints ?? []),
-        ...(instructions ? [`הוראות משתמש (חובה לכבד): ${instructions}`] : []),
+        ...(instructions ? [`${userInstructionsPrefix}: ${instructions}`] : []),
         ...creativeLines,
-        "End card must credit prompt2spot.com"
+        endCardCredit
       ],
       visualDirection: `${parsed.visualDirection ?? ""}${creativeBlock}${instructionsBlock}`.trim(),
       musicDirection: [

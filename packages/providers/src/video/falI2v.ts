@@ -27,8 +27,10 @@ function buildFalBody(
   imageUrl: string,
   duration: string | number
 ): Record<string, unknown> {
+  // Kling rejects prompts > 2500; Wan/Hailuo are safer under the same cap.
+  const prompt = clampFalPrompt(req.prompt, 2400);
   const body: Record<string, unknown> = {
-    prompt: req.prompt,
+    prompt,
     image_url: imageUrl,
     duration
   };
@@ -47,6 +49,12 @@ function buildFalBody(
   }
 
   return body;
+}
+
+function clampFalPrompt(text: string, max: number): string {
+  const t = String(text ?? "").trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
 }
 
 export function createFalI2vBeatGenerator(profile: RenderProfile, credential: ProviderCredentialView): VideoBeatGenerator {

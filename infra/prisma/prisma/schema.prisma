@@ -71,6 +71,8 @@ model User {
   role      UserRole @default(USER)
   tenantId  String   @unique
   locale    String   @default("he")
+  /// Per-user free video quota. null = use platform freeVideosPerUser; 0 = none; N = N free runs.
+  freeVideosLimit Int?
   lastLoginAt DateTime?
   lastLoginIp String?
   createdAt DateTime @default(now())

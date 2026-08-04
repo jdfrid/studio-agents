@@ -11,6 +11,7 @@ import {
   RenderOutputSchema,
   getRenderProfile,
   usesFalVideoProvider,
+  usesHeygenVideoProvider,
   type Agent,
   type AgentContext,
   type ArtifactRecord,
@@ -42,10 +43,17 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       renderProfile: renderProfile.id
     });
 
-    const credentialType = usesFalVideoProvider(renderProfile) ? "VIDEO" : "GEMINI";
-    const provider = await ctx.providers.primary(credentialType);
+    const provider = usesHeygenVideoProvider(renderProfile)
+      ? resolveHeygenCredential()
+      : await ctx.providers.primary(usesFalVideoProvider(renderProfile) ? "VIDEO" : "GEMINI");
     if (!provider) {
-      throw new NoProviderConfiguredError(credentialType);
+      throw new NoProviderConfiguredError(
+        usesHeygenVideoProvider(renderProfile)
+          ? "HEYGEN"
+          : usesFalVideoProvider(renderProfile)
+            ? "VIDEO"
+            : "GEMINI"
+      );
     }
     const beatGenerator = getVideoBeatGenerator(renderProfile, provider);
     await ctx.log.log("render_provider_selected", "Video provider selected", {
@@ -110,10 +118,11 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
 
         const referenceSource =
           scene.referenceFrame?.gcsPath || scene.referenceFrame?.signedUrl ? scene.referenceFrame : scene.background;
-        const [referenceImage, firstFrame, lastFrame] = await Promise.all([
+        const [referenceImage, firstFrame, lastFrame, voiceAudio] = await Promise.all([
           loadMediaBytes(ctx.storage, referenceSource),
           loadMediaBytes(ctx.storage, scene.firstFrame),
-          loadMediaBytes(ctx.storage, scene.lastFrame)
+          loadMediaBytes(ctx.storage, scene.lastFrame),
+          usesHeygenVideoProvider(renderProfile) ? loadMediaBytes(ctx.storage, scene.voice) : Promise.resolve(null)
         ]);
         const result = await beatGenerator.generateBeat(
           {
@@ -125,7 +134,9 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
             referenceImage,
             firstFrame,
             lastFrame,
-            generateAudio: scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1"
+            generateAudio: scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1",
+            narrationText: scene.narration,
+            voiceAudio
           },
           buildBeatHooks(ctx, scene)
         );
@@ -143,7 +154,9 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
 
         const rawPath = path.join(dir, `scene-${scene.order}-raw.mp4`);
         await writeFile(rawPath, result.videoBytes);
-        const mixedPath = await mixSceneAudio(rawPath, scene, dir, ctx.storage);
+        const mixedPath = await mixSceneAudio(rawPath, scene, dir, ctx.storage, {
+          keepProviderAudio: renderProfile.capabilities.nativeAudio
+        });
         const finalized = await finalizeSceneClip(mixedPath, dir, scene.sceneId, dimensions);
         const scenePath = finalized.path;
         clipFiles.push(scenePath);
@@ -461,6 +474,23 @@ async function renderExtendChain(
   };
 }
 
+/** Env-only HeyGen credential (not stored as a Prisma ProviderType). */
+function resolveHeygenCredential(): ProviderCredentialView | null {
+  const secret = process.env.HEYGEN_API_KEY?.trim();
+  if (!secret) return null;
+  return {
+    id: "env-heygen",
+    type: "VIDEO",
+    provider: "heygen",
+    priority: 0,
+    config: {
+      ...(process.env.HEYGEN_VOICE_ID ? { voiceId: process.env.HEYGEN_VOICE_ID } : {}),
+      ...(process.env.HEYGEN_API_BASE ? { baseUrl: process.env.HEYGEN_API_BASE } : {})
+    },
+    secret
+  };
+}
+
 function buildBeatHooks(ctx: AgentContext, scene: SceneTimelineEntry, renderProfileId?: string): VideoBeatHooks {
   return {
     onPoll: async (operation) => {
@@ -651,9 +681,10 @@ async function mixSceneAudio(
   videoPath: string,
   scene: SceneTimelineEntry,
   dir: string,
-  storage: GcsClient
+  storage: GcsClient,
+  options?: { keepProviderAudio?: boolean }
 ): Promise<string> {
-  if (scene.audioPolicy === "veo_native_audio") {
+  if (options?.keepProviderAudio || scene.audioPolicy === "veo_native_audio") {
     return videoPath;
   }
   if (!shouldUseVoice(scene)) {

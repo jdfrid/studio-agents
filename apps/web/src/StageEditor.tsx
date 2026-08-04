@@ -308,8 +308,11 @@ export function BriefQuickEditor({
   async function save() {
     setBusy(true);
     try {
+      // Server invalidates downstream stages and enqueues the next stage (script) in auto mode.
       await apiPatch<ProjectRunView>(`/runs/${runId}/stages/brief/output`, { ...data, ...fields });
       onSaved();
+    } catch (err) {
+      window.alert((err as Error).message || "שמירת הבריף נכשלה");
     } finally {
       setBusy(false);
     }
@@ -333,8 +336,8 @@ export function BriefQuickEditor({
         טון
         <input value={fields.toneOfVoice} onChange={(e) => setFields({ ...fields, toneOfVoice: e.target.value })} />
       </label>
-      <button type="button" disabled={busy} onClick={() => void save()}>
-        {busy ? "..." : "שמור בריף"}
+      <button type="button" className="primary" disabled={busy} onClick={() => void save()}>
+        {busy ? "..." : "שמור והמשך"}
       </button>
     </div>
   );

@@ -193,10 +193,10 @@ export function formatApiErrorMessage(raw: string): string {
     return "הבקשה ל-Gemini גדולה מדי (חריגת מגבלת טוקנים). בדרך כלל בגלל קובץ קול/וידאו שצורף בטעות לפרומפט — עדכן את השרת לגרסה האחרונה והפעל מחדש את שלב הביריף.";
   }
   if (
-    (lower.includes("wan") || lower.includes("hailuo") || lower.includes("kling")) &&
+    (lower.includes("wan") || lower.includes("hailuo") || lower.includes("kling") || lower.includes("heygen")) &&
     (lower.includes("not found") || lower.includes("predictlongrunning") || lower.includes("not supported"))
   ) {
-    return "מודל Wan/Kling/Hailuo הוגדר בטעות כמודל Veo של Gemini. באדמין → הגדרות: נקה את שדה «וידאו (Veo)» (או שים veo-3.1-fast-generate-preview), ובחר Wan בפרופיל הרינדור למעלה. ודא ש-FAL_API_KEY מוגדר בשרת.";
+    return "מודל Wan/Kling/Hailuo/HeyGen הוגדר בטעות כמודל Veo של Gemini. באדמין → הגדרות: נקה את שדה «וידאו (Veo)» (או שים veo-3.1-fast-generate-preview), ובחר את הפרופיל הנכון למעלה. ל-HeyGen ודא ש-HEYGEN_API_KEY מוגדר; ל-fal ודא ש-FAL_API_KEY מוגדר.";
   }
   if (lower.includes("failed to download")) {
     if (lower.includes("403") || lower.includes("expired")) {

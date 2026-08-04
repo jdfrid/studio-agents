@@ -1,5 +1,9 @@
 import { prisma } from "@studio/infra-prisma";
-import { getFreeVideosAllowance, getPlatformSettingsSync } from "./platformSettings.js";
+import {
+  getFreeVideosAllowance,
+  getFreeVideosAllowanceForUser,
+  getPlatformSettingsSync
+} from "./platformSettings.js";
 import {
   CREDIT_CORRECTION_ASSET,
   CREDIT_CORRECTION_RENDER,
@@ -8,9 +12,13 @@ import {
 } from "@studio/shared";
 
 export class InsufficientCreditsError extends Error {
-  constructor(required: number, available: number) {
-    super(`אין מספיק קרדיטים (נדרש ${required}, זמין ${available})`);
+  readonly required: number;
+  readonly available: number;
+  constructor(required: number, available: number, detail?: string) {
+    super(detail ?? `אין מספיק קרדיטים (נדרש ${required}, זמין ${available})`);
     this.name = "InsufficientCreditsError";
+    this.required = required;
+    this.available = available;
   }
 }
 
@@ -62,7 +70,7 @@ export function isBillingConfigured(): boolean {
 }
 
 export async function getFreeVideosRemaining(userId: string): Promise<number> {
-  const allowance = await getFreeVideosAllowance();
+  const allowance = await getFreeVideosAllowanceForUser(userId);
   if (allowance <= 0) return 0;
   const used = await prisma.projectRun.count({ where: { userId } });
   return Math.max(0, allowance - used);
@@ -144,6 +152,29 @@ export async function releaseCredits(runId: string): Promise<void> {
   await prisma.projectRun.update({ where: { id: runId }, data: { creditReserved: 0 } });
 }
 
+/** True if the original run reserved paid credits (free-tier runs return false). */
+export async function wasRunChargedCredits(runId: string): Promise<boolean> {
+  const reserve = await prisma.creditLedger.findFirst({
+    where: { runId, reason: "RUN_RESERVE", delta: { lt: 0 } }
+  });
+  return Boolean(reserve);
+}
+
+/**
+ * Correction cost for a completed run. Free if the original video used free allowance
+ * (no RUN_RESERVE debit). Mid-pipeline corrections should pass completed=false → 0.
+ */
+export async function correctionCreditCostForRun(
+  runId: string,
+  runStatus: string,
+  rerunFrom: "asset" | "render" | null | undefined
+): Promise<number> {
+  if (runStatus !== "COMPLETED") return 0;
+  if (!rerunFrom) return 0;
+  if (!(await wasRunChargedCredits(runId))) return 0;
+  return correctionCreditCost(rerunFrom);
+}
+
 export async function chargeCorrectionCredits(
   userId: string,
   runId: string,
@@ -152,7 +183,13 @@ export async function chargeCorrectionCredits(
   const cost = correctionCreditCost(rerunFrom);
   if (cost <= 0) return 0;
   const balance = await getCreditBalance(userId);
-  if (balance < cost) throw new InsufficientCreditsError(cost, balance);
+  if (balance < cost) {
+    throw new InsufficientCreditsError(
+      cost,
+      balance,
+      `אין מספיק קרדיטים לתיקון (נדרש ${cost}, זמין ${balance}). ויזואל מחדש = 0.5 קרדיט, רינדור מחדש = 0.25 קרדיט. רכוש קרדיטים מהדשבורד.`
+    );
+  }
   await appendLedger(userId, -cost, "CORRECTION", runId, { rerunFrom, cost });
   return cost;
 }

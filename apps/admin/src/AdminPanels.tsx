@@ -8,6 +8,9 @@ type AdminUser = {
   role: string;
   locale: string;
   credits: number;
+  freeVideosLimit: number | null;
+  freeVideosAllowance: number;
+  freeVideosRemaining: number;
   plan: string;
   videosCompleted: number;
   videosFailed: number;
@@ -27,6 +30,9 @@ type UserPnl = {
     role: string;
     locale: string;
     credits: number;
+    freeVideosLimit: number | null;
+    freeVideosAllowance: number;
+    freeVideosRemaining: number;
     lastLoginIp: string | null;
     lastLoginAt: string | null;
     createdAt: string;
@@ -42,6 +48,8 @@ type UserEditForm = {
   name: string;
   role: "USER" | "ADMIN";
   locale: string;
+  /** empty string = platform default; otherwise integer */
+  freeVideosLimit: string;
 };
 
 type Dashboard = {
@@ -202,7 +210,7 @@ export function AdminSettingsPanel() {
           }}
         />
         <small className="muted">
-          0 = בלי סרטונים חינם. כל מספר אחר (למשל 3) נותן לכל משתמש עד אותו מספר סרטונים ללא קרדיטים.
+          0 = בלי סרטונים חינם כברירת מחדל. אפשר לדרוס לכל משתמש בנפרד במסך «משתמשים» (למשל 100 לבדיקות שלך, 2 לאחרים).
         </small>
       </label>
 
@@ -217,7 +225,7 @@ export function AdminSettingsPanel() {
 }
 
 type PlatformSettingsView = {
-  defaultRenderProfile: "veo-multiclip" | "veo-extend" | "kling-i2v" | "wan-i2v" | "hailuo-i2v";
+  defaultRenderProfile: "veo-multiclip" | "veo-extend" | "kling-i2v" | "wan-i2v" | "hailuo-i2v" | "heygen-i2v";
   geminiTextModel: string | null;
   geminiTtsModel: string | null;
   geminiImageModel: string | null;
@@ -233,6 +241,7 @@ function listRenderProfiles() {
     { id: "wan-i2v" as const, label: "Wan 2.7 — זול (מתמונה)" },
     { id: "hailuo-i2v" as const, label: "Hailuo — זול (מתמונה)" },
     { id: "kling-i2v" as const, label: "Kling 2.1 — image-to-video" },
+    { id: "heygen-i2v" as const, label: "HeyGen — סנכרון שפתיים מתמונה" },
     { id: "veo-extend" as const, label: "Veo Fast — extend chain (יקר יותר)" }
   ];
 }
@@ -241,7 +250,7 @@ export function AdminUsersPanel() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [pnl, setPnl] = useState<UserPnl | null>(null);
-  const [edit, setEdit] = useState<UserEditForm>({ name: "", role: "USER", locale: "he" });
+  const [edit, setEdit] = useState<UserEditForm>({ name: "", role: "USER", locale: "he", freeVideosLimit: "" });
   const [adjust, setAdjust] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -265,7 +274,8 @@ export function AdminUsersPanel() {
         setEdit({
           name: data.user.name ?? "",
           role: data.user.role as "USER" | "ADMIN",
-          locale: data.user.locale
+          locale: data.user.locale,
+          freeVideosLimit: data.user.freeVideosLimit == null ? "" : String(data.user.freeVideosLimit)
         });
       })
       .catch(() => setPnl(null));
@@ -276,12 +286,25 @@ export function AdminUsersPanel() {
     setBusy(true);
     setMessage("");
     try {
+      const limitRaw = edit.freeVideosLimit.trim();
+      let freeVideosLimit: number | null = null;
+      if (limitRaw !== "") {
+        const n = Math.floor(Number(limitRaw));
+        if (!Number.isFinite(n) || n < 0) {
+          setMessage("מכסת סרטונים חינם חייבת להיות מספר שלם ≥ 0, או ריק לברירת מחדל.");
+          return;
+        }
+        freeVideosLimit = n;
+      }
       await apiPatch(`/admin/users/${selected}`, {
         name: edit.name.trim() || null,
         role: edit.role,
-        locale: edit.locale.trim() || "he"
+        locale: edit.locale.trim() || "he",
+        freeVideosLimit
       });
       await reloadUsers();
+      const data = await apiGet<UserPnl>(`/admin/users/${selected}/pnl`);
+      setPnl(data);
       setMessage("נשמר בהצלחה.");
     } catch (err) {
       setMessage((err as Error).message);
@@ -322,6 +345,7 @@ export function AdminUsersPanel() {
             <th>שם</th>
             <th>תפקיד</th>
             <th>קרדיטים</th>
+            <th>סרטונים חינם</th>
             <th>IP אחרון</th>
             <th>התחברות אחרונה</th>
             <th>רווח</th>
@@ -334,6 +358,12 @@ export function AdminUsersPanel() {
               <td>{u.name ?? "—"}</td>
               <td>{u.role === "ADMIN" ? "מנהל" : "משתמש"}</td>
               <td>{u.credits}</td>
+              <td>
+                {u.freeVideosRemaining}/{u.freeVideosAllowance}
+                {u.freeVideosLimit == null ? (
+                  <small className="muted"> (ברירת מחדל)</small>
+                ) : null}
+              </td>
               <td>{u.lastLoginIp ?? "—"}</td>
               <td>{formatWhen(u.lastLoginAt)}</td>
               <td>₪{u.marginNis.toFixed(0)}</td>
@@ -360,6 +390,22 @@ export function AdminUsersPanel() {
             <label>
               שפה
               <input value={edit.locale} onChange={(e) => setEdit({ ...edit, locale: e.target.value })} />
+            </label>
+            <label>
+              מכסת סרטונים חינם
+              <input
+                type="number"
+                min={0}
+                max={10000}
+                step={1}
+                placeholder="ברירת מחדל מההגדרות"
+                value={edit.freeVideosLimit}
+                onChange={(e) => setEdit({ ...edit, freeVideosLimit: e.target.value })}
+              />
+              <small className="muted">
+                ריק = ברירת מחדל מהפלטפורמה. 0 = בלי חינם. מספר גבוה (למשל 100) לבדיקות שלך. נותרו{" "}
+                {pnl.user.freeVideosRemaining}/{pnl.user.freeVideosAllowance}.
+              </small>
             </label>
           </div>
           <div className="stage-actions">

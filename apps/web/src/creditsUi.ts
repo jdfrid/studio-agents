@@ -8,5 +8,6 @@ export function formatCredits(n: number): string {
 export function correctionLabel(rerunFrom: "asset" | "render" | null): string | null {
   const cost = correctionCreditCost(rerunFrom ?? undefined);
   if (cost <= 0) return null;
-  return `תיקון זה יעלה ${formatCredits(cost)} קרדיט${cost !== 1 ? "ים" : ""}`;
+  const kind = rerunFrom === "asset" ? "ויזואל מחדש" : "רינדור מחדש";
+  return `${kind} יעלה ${formatCredits(cost)} קרדיט (יתרת חשבון נדרשת). סרטונים מתוך מכסת החינם — ללא חיוב.`;
 }

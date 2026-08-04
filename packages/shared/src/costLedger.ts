@@ -97,6 +97,9 @@ export function videoPerSecondUsd(model: string, generateAudio = veoGenerateAudi
   if (m.includes("hailuo") || m.includes("minimax")) {
     return profileVideoPerSecondUsd(getRenderProfile("hailuo-i2v"));
   }
+  if (m.includes("heygen")) {
+    return profileVideoPerSecondUsd(getRenderProfile("heygen-i2v"));
+  }
   return veoPerSecondUsd(model, generateAudio);
 }
 

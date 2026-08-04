@@ -47,7 +47,7 @@ export function geminiModels(provider?: ProviderCredentialView | null): GeminiMo
 export function isValidGeminiVeoModelId(model: string): boolean {
   const m = model.trim().toLowerCase();
   if (!m) return false;
-  if (/wan|hailuo|kling|minimax|fal-ai|runway|shotstack/.test(m)) return false;
+  if (/wan|hailuo|kling|minimax|fal-ai|heygen|runway|shotstack/.test(m)) return false;
   if (m.includes(" ") && !m.startsWith("veo")) return false;
   return m.includes("veo") || m.includes("generate");
 }

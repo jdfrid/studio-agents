@@ -5,6 +5,7 @@ import type { ProjectRunView } from "./types.js";
 import {
   CREATIVE_FIELD_DEFS,
   aspectRatioFromCreative,
+  languageCodeFromCreative,
   type ApprovalMode,
   type CreativeOptions
 } from "@studio/shared";
@@ -108,7 +109,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           title,
           sourceText: prompt,
           ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
-          language: "he",
+          language: languageCodeFromCreative(creative) ?? "he",
           durationSeconds,
           aspectRatio: aspectRatioFromCreative(creative) ?? "9:16",
           budgetMode: true,

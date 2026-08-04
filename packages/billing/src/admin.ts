@@ -1,6 +1,7 @@
 import { prisma } from "@studio/infra-prisma";
 import { AdminUserUpdateSchema, type AdminUserUpdate } from "@studio/shared";
-import { getCreditBalance } from "./credits.js";
+import { getCreditBalance, getFreeVideosRemaining } from "./credits.js";
+import { getFreeVideosAllowanceForUser } from "./platformSettings.js";
 
 export async function getBillingStatus(userId: string) {
   const credits = await getCreditBalance(userId);
@@ -47,14 +48,16 @@ export async function getAdminUsers(limit = 100) {
   });
   const results = [];
   for (const u of users) {
-    const [credits, payments, runs, costs] = await Promise.all([
+    const [credits, payments, runs, costs, freeVideosRemaining, freeVideosAllowance] = await Promise.all([
       getCreditBalance(u.id),
       prisma.payment.aggregate({ _sum: { amountNis: true }, where: { userId: u.id, status: "paid" } }),
       prisma.projectRun.groupBy({ by: ["status"], where: { userId: u.id }, _count: true }),
       prisma.costEvent.aggregate({
         _sum: { costNis: true },
         where: { run: { userId: u.id } }
-      })
+      }),
+      getFreeVideosRemaining(u.id),
+      getFreeVideosAllowanceForUser(u.id)
     ]);
     const completed = runs.find((r) => r.status === "COMPLETED")?._count ?? 0;
     const failed = runs.find((r) => r.status === "FAILED")?._count ?? 0;
@@ -67,6 +70,9 @@ export async function getAdminUsers(limit = 100) {
       role: u.role,
       locale: u.locale,
       credits,
+      freeVideosLimit: u.freeVideosLimit,
+      freeVideosAllowance,
+      freeVideosRemaining,
       plan: u.subscription?.planType ?? "PAYG",
       subscriptionStatus: u.subscription?.status ?? null,
       videosCompleted: completed,
@@ -85,17 +91,20 @@ export async function getAdminUsers(limit = 100) {
 export async function getAdminUserPnl(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId }, include: { subscription: true } });
   if (!user) return null;
-  const [payments, runs, costEvents, credits, loginEvents] = await Promise.all([
-    prisma.payment.findMany({ where: { userId }, orderBy: { createdAt: "desc" } }),
-    prisma.projectRun.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 50 }),
-    prisma.costEvent.findMany({
-      where: { run: { userId } },
-      orderBy: { startedAt: "desc" },
-      take: 200
-    }),
-    getCreditBalance(userId),
-    prisma.userLoginEvent.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 30 })
-  ]);
+  const [payments, runs, costEvents, credits, loginEvents, freeVideosRemaining, freeVideosAllowance] =
+    await Promise.all([
+      prisma.payment.findMany({ where: { userId }, orderBy: { createdAt: "desc" } }),
+      prisma.projectRun.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 50 }),
+      prisma.costEvent.findMany({
+        where: { run: { userId } },
+        orderBy: { startedAt: "desc" },
+        take: 200
+      }),
+      getCreditBalance(userId),
+      prisma.userLoginEvent.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 30 }),
+      getFreeVideosRemaining(userId),
+      getFreeVideosAllowanceForUser(userId)
+    ]);
   const revenue = payments.filter((p) => p.status === "paid").reduce((s, p) => s + p.amountNis, 0);
   const cost = costEvents.reduce((s, e) => s + e.costNis, 0);
   return {
@@ -106,6 +115,9 @@ export async function getAdminUserPnl(userId: string) {
       role: user.role,
       locale: user.locale,
       credits,
+      freeVideosLimit: user.freeVideosLimit,
+      freeVideosAllowance,
+      freeVideosRemaining,
       lastLoginIp: user.lastLoginIp,
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),
@@ -145,17 +157,25 @@ export async function updateAdminUser(userId: string, patch: AdminUserUpdate) {
     data: {
       ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.role !== undefined ? { role: body.role } : {}),
-      ...(body.locale !== undefined ? { locale: body.locale } : {})
+      ...(body.locale !== undefined ? { locale: body.locale } : {}),
+      ...(body.freeVideosLimit !== undefined ? { freeVideosLimit: body.freeVideosLimit } : {})
     },
     include: { subscription: true }
   });
-  const credits = await getCreditBalance(userId);
+  const [credits, freeVideosRemaining, freeVideosAllowance] = await Promise.all([
+    getCreditBalance(userId),
+    getFreeVideosRemaining(userId),
+    getFreeVideosAllowanceForUser(userId)
+  ]);
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
     locale: user.locale,
+    freeVideosLimit: user.freeVideosLimit,
+    freeVideosAllowance,
+    freeVideosRemaining,
     credits,
     lastLoginIp: user.lastLoginIp,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,

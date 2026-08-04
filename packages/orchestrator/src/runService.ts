@@ -133,7 +133,8 @@ export async function approveStage(runId: string, stage: StageName): Promise<Pro
 export async function updateStageOutput(
   runId: string,
   stage: StageName,
-  output: unknown
+  output: unknown,
+  options?: { continuePipeline?: boolean }
 ): Promise<ProjectRunView | null> {
   const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
   if (!run) return null;
@@ -145,13 +146,28 @@ export async function updateStageOutput(
     run.approvalMode ??
     "manual") as ApprovalMode;
   const status = shouldWaitForApproval(stage, approvalMode) ? "AWAITING_APPROVAL" : "COMPLETED";
+  const continuePipeline = options?.continuePipeline !== false;
 
   await invalidateDownstreamStages(runId, stage);
   await recordStageOutput(stageRow.id, validated, status);
   await audit(run.tenantId, "stage_output_updated", "StageExecution", stageRow.id, { stage, manual: true });
+
+  if (status === "AWAITING_APPROVAL") {
+    await setRunStatus(runId, "AWAITING_APPROVAL", stage);
+    return getRun(runId);
+  }
+
+  if (continuePipeline) {
+    await advanceFromCompletedStage(runId, stage);
+  }
+
   return getRun(runId);
 }
 
+/**
+ * Persist visual correction notes on the script, then optionally re-run asset/render
+ * without wiping audio (previous bug: invalidating from script cleared voice clips).
+ */
 export async function applyVisualCorrectionsToRun(
   runId: string,
   body: unknown,
@@ -166,15 +182,63 @@ export async function applyVisualCorrectionsToRun(
 
   const script = ScriptOutputSchema.parse(scriptRow.output);
   const patched = applyVisualCorrections(script, input);
-  const view = await updateStageOutput(runId, "script", patched);
+  await recordStageOutput(scriptRow.id, patched, "COMPLETED");
+  await audit(run.tenantId, "visual_corrections_applied", "StageExecution", scriptRow.id, {
+    rerunFrom: input.rerunFrom ?? null
+  });
 
   if (input.rerunFrom === "asset") {
+    // Keep audio; clear asset → package → render → series, then regenerate visuals.
+    await invalidateDownstreamStages(runId, "audio");
     return rerunStage(runId, "asset");
   }
   if (input.rerunFrom === "render") {
+    // Keep package timeline + audio/assets; only re-render video.
+    await invalidateDownstreamStages(runId, "package");
     return rerunStage(runId, "render");
   }
-  return view;
+  return getRun(runId);
+}
+
+/** After a stage is manually marked COMPLETED (auto approval), enqueue the next stage. */
+async function advanceFromCompletedStage(runId: string, stage: StageName): Promise<void> {
+  const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
+  if (!run) return;
+  const next = nextStage(stage);
+  if (!next) {
+    await setRunStatus(runId, "COMPLETED", null);
+    return;
+  }
+  const nextStageRow = run.stages.find((s) => fromPrismaStage(s.stage) === next);
+  await prisma.$transaction([
+    ...(nextStageRow
+      ? [
+          prisma.stageExecution.update({
+            where: { id: nextStageRow.id },
+            data: {
+              status: "QUEUED",
+              error: null,
+              output: Prisma.DbNull,
+              attempts: 0,
+              completedAt: null,
+              startedAt: null
+            }
+          })
+        ]
+      : []),
+    prisma.projectRun.update({
+      where: { id: run.id },
+      data: { currentStage: toPrismaStage(next), status: "RUNNING" }
+    })
+  ]);
+  try {
+    await enqueueStage(next, { runId: run.id, stage: next });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (nextStageRow) await recordStageError(nextStageRow.id, `enqueue_failed: ${message}`);
+    await setRunStatus(run.id, "FAILED", next);
+    throw error;
+  }
 }
 
 export interface StageArtifactAttachVoice {

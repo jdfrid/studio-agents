@@ -275,14 +275,41 @@ function enrichVeoPrompt(input: {
   referenceFramePrompt: string | null;
   textToVideoOnly: boolean;
 }): string {
-  const bible = input.backgroundVisualPrompt.trim();
-  const cast = input.characterBible.trim();
-  const continuity = `Same exact characters (${cast}). Same location throughout. Scene ${input.order + 1} of ${input.total}.`;
-  const prefix = bible ? `${continuity} Visual bible: ${bible}. ` : `${continuity} `;
-  const refPrompt = (input.referenceFramePrompt ?? input.referenceImagePrompt ?? "").trim();
-  const refSuffix =
-    input.textToVideoOnly && refPrompt
-      ? ` Match this reference look (text-only, no image upload): ${refPrompt}.`
-      : "";
-  return `${prefix}${input.veoPrompt}${refSuffix}`;
+  // Kling / fal I2V reject prompts longer than 2500 chars — keep headroom.
+  const MAX = 2400;
+  const motion = stripDuplicatedContinuity(input.veoPrompt).trim();
+
+  // With a reference still, identity comes from the image — keep prompt motion-focused.
+  if (!input.textToVideoOnly) {
+    const compact = [
+      `Scene ${input.order + 1} of ${input.total}.`,
+      "Keep the exact same people, faces, wardrobe, and place as the reference image.",
+      motion
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return clampText(compact, MAX);
+  }
+
+  const cast = input.characterBible.trim().slice(0, 280);
+  const place = input.backgroundVisualPrompt.trim().slice(0, 220);
+  const continuity = `Same cast (${cast}). Same place (${place}). Scene ${input.order + 1}/${input.total}.`;
+  const refPrompt = (input.referenceFramePrompt ?? input.referenceImagePrompt ?? "").trim().slice(0, 400);
+  const refSuffix = refPrompt ? ` Match look: ${refPrompt}.` : "";
+  return clampText(`${continuity} ${motion}${refSuffix}`.trim(), MAX);
+}
+
+function stripDuplicatedContinuity(text: string): string {
+  let t = text.trim();
+  // Drop prior continuity prefixes so package enrichment does not stack them.
+  t = t.replace(/^Same cast & location\.\s*[^.]*\.\s*/i, "");
+  t = t.replace(/^Same exact characters[^.]*\.\s*/i, "");
+  t = t.replace(/^CRITICAL:\s*Use the EXACT same fictional characters[\s\S]*?may change\.\s*/i, "");
+  return t.trim();
+}
+
+function clampText(text: string, max: number): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
 }

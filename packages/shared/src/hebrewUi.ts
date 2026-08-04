@@ -1,5 +1,5 @@
 import type { RenderProfileId } from "./renderProfiles.js";
-import { getRenderProfile, videoProviderShortLabel } from "./renderProfiles.js";
+import { getRenderProfile } from "./renderProfiles.js";
 
 export const STATUS_LABELS_HE: Record<string, string> = {
   PENDING: "ממתין",
@@ -53,7 +53,7 @@ export function runStatusLabelHe(status: string): string {
 
 export function videoPromptLabelHe(profile: RenderProfileId): string {
   const p = getRenderProfile(profile);
-  if (p.provider === "kling" || p.provider === "fal") {
+  if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen") {
     return `פרומפט תנועה (${videoProviderShortLabelHe(profile)})`;
   }
   return "פרומפט וידאו";
@@ -62,6 +62,7 @@ export function videoPromptLabelHe(profile: RenderProfileId): string {
 export function videoProviderShortLabelHe(profile: RenderProfileId): string {
   const p = getRenderProfile(profile);
   if (p.provider === "kling") return "קלינג";
+  if (p.provider === "heygen") return "הייג׳ן";
   if (p.provider === "fal") {
     if (p.id === "wan-i2v") return "ואן";
     if (p.id === "hailuo-i2v") return "האילואו";

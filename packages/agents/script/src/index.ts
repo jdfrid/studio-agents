@@ -5,13 +5,17 @@ import {
   ScriptInputSchema,
   ScriptOutputSchema,
   applyContinuityToScript,
+  contentLanguageEnglishName,
+  contentLanguageNativeName,
   forcedVeoDurationBucket,
   isBudgetMode,
   isProductAdBrief,
   narrationCharLimitForBucket,
+  normalizeContentLanguage,
   planSceneLayout,
   profileToProductionCostConfig,
   resolveRenderProfile,
+  userFacingLanguageInstruction,
   type Agent,
   type ScriptInput,
   type ScriptOutput,
@@ -38,15 +42,25 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const productAd = isProductAdBrief(brief);
     const extendMode = renderProfile.strategy === "extend";
     const klingMode = renderProfile.provider === "kling";
+    const heygenMode = renderProfile.provider === "heygen";
+    const beatI2vMode = klingMode || heygenMode || renderProfile.provider === "fal";
+    const contentLang = normalizeContentLanguage(brief.language);
+    const langEn = contentLanguageEnglishName(contentLang);
+    const langNative = contentLanguageNativeName(contentLang);
 
     const systemParts = [
       "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline.",
-      `Keep each narration under ${narrationLimit} characters (must fit ${clipSeconds}s of spoken audio).`,
+      userFacingLanguageInstruction(contentLang),
+      `Keep each narration under ${narrationLimit} characters (must fit ${clipSeconds}s of spoken audio) in ${langEn}.`,
       "Keep visualPrompt and veoPrompt under 200 characters each.",
       "CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette.",
-      "Output characterBible: a fixed English description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes.",
+      `Output characterBible in ${langEn}: a fixed description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes.`,
       "Each veoPrompt must explicitly continue from the previous scene without changing setting or cast.",
       "NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt or visualPrompt — use generic fictional people only (Veo blocks real-person likenesses).",
+      "NARRATION–MOTION SYNC (mandatory): narration and veoPrompt are one timed beat — write them together.",
+      "In veoPrompt, mark speaking vs silent: when the line is spoken, the on-camera character faces camera / looks at product, mouths the words (subtle lip motion), natural blinks; do NOT have them turn away, walk off, or cover their mouth while speaking.",
+      "If narration is empty or muted, veoPrompt must say silent performance — closed mouth, no speaking gestures.",
+      "Pace gestures to the line: open with attention, hold product/gesture mid-line, end with a clear hold — avoid frantic action that fights the voiceover.",
       "Return strictly valid JSON only — escape quotes inside strings, no trailing commas, no markdown."
     ];
     if (extendMode) {
@@ -61,6 +75,14 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         `Each beat targets ${clipSeconds}s of story time.`
       );
     }
+    if (heygenMode) {
+      systemParts.push(
+        "HEYGEN LIP-SYNC MODE: each beat is a talking-head clip from a reference still with true lip-sync to the scene narration audio.",
+        "veoPrompt is a short motion_prompt (body/gesture only — mouth sync comes from audio). Prefer facing camera, natural head nods, hand gestures that match the spoken line.",
+        `Narration must be clear spoken lines in ${langEn} (this audio drives lip-sync). Keep visual continuity via referenceImagePrompt.`,
+        `Each beat targets ~${clipSeconds}s of story time.`
+      );
+    }
     if (productAd) {
       systemParts.push(
         "PRODUCT AD: use a clear arc — hook (attention) → product hero (show packaging clearly, hold up product) → kids/audience reaction and CTA.",
@@ -72,31 +94,35 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     }
     const system = systemParts.join(" ");
 
-    const includeExtraFrames = !budget && !extendMode && !klingMode;
+    const includeExtraFrames = !budget && !extendMode && !beatI2vMode;
     const sceneSchema: Record<string, unknown> = {
-      title: "short Hebrew title",
-      narration: `${brief.language} narration, 1 short sentence (max ${narrationLimit} chars)`,
-      visualPrompt: "English visual directive (max 200 chars)",
-      veoPrompt: "English Veo/Kling motion prompt (max 200 chars)",
+      title: `short ${langNative} title`,
+      narration: `${langNative} narration, 1 short sentence (max ${narrationLimit} chars)`,
+      visualPrompt: "English visual directive for image models (max 200 chars)",
+      veoPrompt: heygenMode
+        ? "English HeyGen motion prompt: body/gaze/gesture timed to narration (max 200 chars)"
+        : "English motion prompt timed to narration (speaking vs silent, gaze, gestures; max 200 chars)",
       durationBucket: "4 | 6 | 8",
-      audioPolicy: "gemini_tts_plus_music | gemini_tts_only | veo_native_audio | muted",
+      audioPolicy: heygenMode
+        ? "gemini_tts_only"
+        : "gemini_tts_plus_music | gemini_tts_only | veo_native_audio | muted",
       durationSeconds: clipSeconds,
       requiredAssets: ["voice", "music", "video"]
     };
     if (includeExtraFrames) {
-      sceneSchema.referenceImagePrompt = "optional reference still prompt";
-      sceneSchema.firstFramePrompt = "optional";
-      sceneSchema.lastFramePrompt = "optional";
-    } else if (klingMode) {
-      sceneSchema.referenceImagePrompt = "optional reference still prompt";
+      sceneSchema.referenceImagePrompt = "optional English reference still prompt";
+      sceneSchema.firstFramePrompt = "optional English";
+      sceneSchema.lastFramePrompt = "optional English";
+    } else if (beatI2vMode) {
+      sceneSchema.referenceImagePrompt = "optional English reference still prompt";
     }
 
     const schemaHint = JSON.stringify(
       {
         scenes: [sceneSchema],
-        musicPrompt: "English music feel",
-        backgroundVisualPrompt: "English single location visual direction",
-        characterBible: "English locked cast + location (never changes)"
+        musicPrompt: `${langNative} music feel`,
+        backgroundVisualPrompt: `${langNative} single location visual direction`,
+        characterBible: `${langNative} locked cast + location (never changes)`
       },
       null,
       2
@@ -107,10 +133,12 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       : "";
     const extendHint = extendMode
       ? ` Veo extend mode: ${sceneCount} beats in one continuous chain (~${totalVideoSeconds}s billed Veo time).`
-      : klingMode
-        ? ` Kling I2V mode: ${sceneCount} beats × ~10s each (reference frame per beat).`
-        : "";
-    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Total video length will be ~${totalVideoSeconds}s (brief asks for ${brief.durationSeconds}s).${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}`;
+      : heygenMode
+        ? ` HeyGen lip-sync mode: ${sceneCount} beats × ~${clipSeconds}s each (reference still + narration audio per beat).`
+        : klingMode
+          ? ` Kling I2V mode: ${sceneCount} beats × ~10s each (reference frame per beat).`
+          : "";
+    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Total video length will be ~${totalVideoSeconds}s (brief asks for ${brief.durationSeconds}s). User-facing text (titles, narration, characterBible, backgroundVisualPrompt, musicPrompt) MUST be in ${langEn}. For every scene, align narration wording with the motion described in veoPrompt (who speaks, when they face camera, when mouth/gestures match the line).${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}`;
 
     const completeJson = provider.type === "GEMINI" ? geminiCompleteJson : llmCompleteJson;
     const { parsed, model } = await completeJson<{
@@ -142,11 +170,17 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     }
 
     const scenes: SceneSpec[] = rawScenes.slice(0, sceneCount).map((scene, index) => {
-      const durationBucket = normalizeDurationBucket(scene.durationBucket, clipSeconds, budget, extendMode, klingMode);
-      const includeExtraFrames = !budget && !extendMode && !klingMode;
+      const durationBucket = normalizeDurationBucket(
+        scene.durationBucket,
+        clipSeconds,
+        budget,
+        extendMode,
+        beatI2vMode
+      );
+      const includeExtraFrames = !budget && !extendMode && !beatI2vMode;
       const narration = trimNarration(
         scene.narration ?? "",
-        narrationCharLimitForBucket(extendMode ? clipSeconds : Number(durationBucket))
+        narrationCharLimitForBucket(extendMode || beatI2vMode ? clipSeconds : Number(durationBucket))
       );
       return {
         id: nanoid(10),
@@ -159,8 +193,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         firstFramePrompt: includeExtraFrames ? (scene.firstFramePrompt ?? scene.visualPrompt ?? undefined) : scene.firstFramePrompt,
         lastFramePrompt: includeExtraFrames ? (scene.lastFramePrompt ?? scene.visualPrompt ?? undefined) : scene.lastFramePrompt,
         durationBucket,
-        audioPolicy: resolveSceneAudioPolicy(scene.audioPolicy, budget),
-        durationSeconds: extendMode || klingMode ? clipSeconds : Number(durationBucket),
+        audioPolicy: heygenMode ? "gemini_tts_only" : resolveSceneAudioPolicy(scene.audioPolicy, budget),
+        durationSeconds: extendMode || beatI2vMode ? clipSeconds : Number(durationBucket),
         requiredAssets: scene.requiredAssets?.length ? scene.requiredAssets : ["voice", "music", "video"]
       };
     });
@@ -237,11 +271,11 @@ function normalizeDurationBucket(
   clipSeconds: number,
   budget: boolean,
   extendMode: boolean,
-  klingMode: boolean
+  beatI2vMode: boolean
 ): "4" | "6" | "8" {
   const forced = forcedVeoDurationBucket();
   if (forced) return forced;
-  if (extendMode || klingMode) return "8";
+  if (extendMode || beatI2vMode) return "8";
   if (value === "4" || value === "6" || value === "8") return budget ? "4" : value;
   if (budget || clipSeconds <= 4) return "4";
   if (clipSeconds <= 6) return "6";

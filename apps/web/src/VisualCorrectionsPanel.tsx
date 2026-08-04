@@ -112,6 +112,13 @@ export function VisualCorrectionsPanel({
               ))}
             </details>
           ) : null}
+          {isCompleted ? (
+            <p className="muted">
+              אחרי סרטון מוכן: ויזואל מחדש = {formatCredits(correctionCreditCost("asset"))} קרדיט (תמונות),
+              רינדור מחדש = {formatCredits(correctionCreditCost("render"))} קרדיט (וידאו בלבד). סרטון חינמי —
+              תיקונים ללא עלות. שמור רק שומר הערות בלי להריץ מחדש.
+            </p>
+          ) : null}
           {error ? <p className="error-inline">{error}</p> : null}
           <div className="stage-actions">
             <button type="button" disabled={busy} onClick={() => void apply(null)}>

@@ -29,6 +29,13 @@ describe("resolveRenderProfile", () => {
     expect(getRenderProfile("hailuo-i2v").provider).toBe("fal");
     expect(getRenderProfile("wan-i2v").capabilities.referenceImage).toBe(true);
   });
+
+  it("includes heygen-i2v lip-sync profile", () => {
+    const profile = getRenderProfile("heygen-i2v");
+    expect(profile.provider).toBe("heygen");
+    expect(profile.capabilities.referenceImage).toBe(true);
+    expect(profile.capabilities.nativeAudio).toBe(true);
+  });
 });
 
 describe("buildRenderProfileSnapshot", () => {

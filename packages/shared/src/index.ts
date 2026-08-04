@@ -18,6 +18,7 @@ export * from "./logger.js";
 export * from "./budget.js";
 export * from "./renderProfiles.js";
 export * from "./creativeOptions.js";
+export * from "./contentLanguage.js";
 export * from "./costLedger.js";
 export * from "./runsLog.js";
 export * from "./geminiErrors.js";

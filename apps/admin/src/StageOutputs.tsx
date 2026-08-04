@@ -87,15 +87,18 @@ function ScriptOutputView({ data, renderProfileId }: { data: Record<string, unkn
               סצנה {(Number(scene.order) ?? 0) + 1}: {String(scene.title ?? "")}
             </strong>
             <p>{String(scene.narration ?? "")}</p>
-            <small className="muted">{promptLabel}: {String(scene.veoPrompt ?? "—")}</small>
-            {scene.referenceImagePrompt ? (
-              <small className="muted">
-                תמונת עוגן:{" "}
-                {String(scene.referenceImagePrompt).length > 200
-                  ? `${String(scene.referenceImagePrompt).slice(0, 200)}…`
-                  : String(scene.referenceImagePrompt)}
-              </small>
-            ) : null}
+            <details className="tech-prompt">
+              <summary className="muted">{promptLabel} (טכני)</summary>
+              <small className="muted">{String(scene.veoPrompt ?? "—")}</small>
+              {scene.referenceImagePrompt ? (
+                <small className="muted">
+                  תמונת עוגן:{" "}
+                  {String(scene.referenceImagePrompt).length > 200
+                    ? `${String(scene.referenceImagePrompt).slice(0, 200)}…`
+                    : String(scene.referenceImagePrompt)}
+                </small>
+              ) : null}
+            </details>
           </article>
         ))}
       </div>

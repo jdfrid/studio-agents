@@ -22,8 +22,7 @@ import {
   estimateRunCost,
   listRenderProfiles,
   profileToProductionCostConfig,
-  resolveRenderProfile,
-  correctionCreditCost
+  resolveRenderProfile
 } from "@studio/shared";
 import {
   registerAuthRoutes,
@@ -267,10 +266,11 @@ export async function registerRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
-      const cost = run.status === "COMPLETED" ? correctionCreditCost(body?.rerunFrom) : 0;
+      const { chargeCorrectionCredits, correctionCreditCostForRun } = await import("@studio/billing");
+      const cost = await correctionCreditCostForRun(id, run.status, body?.rerunFrom);
+      // Pre-check balance so we don't start a rerun the user can't pay for.
       if (cost > 0) {
         try {
-          const { chargeCorrectionCredits } = await import("@studio/billing");
           await chargeCorrectionCredits(request.user!.sub, id, body?.rerunFrom);
         } catch (err) {
           if (err instanceof InsufficientCreditsError) {
@@ -288,6 +288,15 @@ export async function registerRoutes(app: FastifyInstance) {
         }
         return view;
       } catch (error) {
+        // Best-effort refund if apply failed after charge.
+        if (cost > 0) {
+          const { grantCredits } = await import("@studio/billing");
+          await grantCredits(request.user!.sub, cost, "REFUND", {
+            runId: id,
+            reason: "visual_correction_failed",
+            error: (error as Error).message
+          }).catch(() => undefined);
+        }
         reply.code(400);
         return { error: (error as Error).message };
       }

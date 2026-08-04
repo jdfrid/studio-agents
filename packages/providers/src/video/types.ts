@@ -11,6 +11,10 @@ export type VideoBeatRequest = {
   lastFrame?: { body: Buffer; mimeType: string } | null;
   extendVideoHandle?: string | null;
   generateAudio?: boolean;
+  /** Scene narration text (HeyGen script fallback when no voice audio). */
+  narrationText?: string | null;
+  /** Pre-rendered TTS for lip-sync providers (HeyGen audio_asset_id). */
+  voiceAudio?: { body: Buffer; mimeType: string } | null;
 };
 
 export type VideoBeatResult = {
