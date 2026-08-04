@@ -7,6 +7,8 @@ import { RenderProfileIdSchema } from "../renderProfiles.js";
 export const BriefInputSchema = z.object({
   title: z.string().min(2).max(200),
   sourceText: z.string().min(1).max(20_000),
+  /** Do / don't creative instructions from the user (kept separate from the story description). */
+  instructions: z.string().max(8_000).optional(),
   targetAudience: z.string().max(500).optional(),
   style: z.string().max(500).optional(),
   durationSeconds: z.number().int().min(5).max(180).default(30),
@@ -59,6 +61,8 @@ export const BriefOutputSchema = z.object({
   durationSeconds: z.number().int().min(5).max(180),
   aspectRatio: AspectRatioSchema,
   language: z.string(),
+  /** Echo of user do/don't instructions for downstream stages. */
+  instructions: z.string().max(8_000).optional(),
   brandConstraints: z.array(z.string()).default([]),
   visualDirection: z.string(),
   musicDirection: z.string(),

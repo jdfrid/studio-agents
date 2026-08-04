@@ -15,6 +15,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const freeLeft = user?.freeVideosRemaining ?? 0;
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [instructions, setInstructions] = useState("");
   const [durationSeconds, setDurationSeconds] = useState(30);
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("auto");
   const [visualFiles, setVisualFiles] = useState<File[]>([]);
@@ -106,6 +107,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         brief: {
           title,
           sourceText: prompt,
+          ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
           language: "he",
           durationSeconds,
           aspectRatio: aspectRatioFromCreative(creative) ?? "9:16",
@@ -146,6 +148,16 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="תאר את הסרטון — דמויות, מקום, פעולה, סגנון…"
         />
+      </label>
+      <label>
+        הוראות (אופציונלי)
+        <textarea
+          rows={4}
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          placeholder="מה כן / מה לא — למשל: לא לשנות מדים רשמיים מהתמונה; כן לשנות רקע; תקריב הלוך ושוב לפנים…"
+        />
+        <small className="muted">הנחיות מחייבות ליצירה — מה לשמור, מה לשנות, תנועות מצלמה וכו׳.</small>
       </label>
       <label className="file-row">
         תמונות השראה (אופציונלי)

@@ -374,6 +374,28 @@ main.layout-log { grid-template-columns: 1fr; }
 .run-view { width: 100%; }
 .run-view-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .run-view-header h2 { margin: 0; flex: 1; min-width: 200px; }
+.run-settings-summary {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--border, #2a3140);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel, #151a22) 92%, #fff 8%);
+}
+.run-settings-summary h3 { margin: 0 0 12px; font-size: 1rem; }
+.run-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px 14px;
+  margin: 0 0 12px;
+}
+.run-settings-grid div { margin: 0; }
+.run-settings-grid dt { font-size: 0.78rem; opacity: 0.7; margin: 0 0 2px; }
+.run-settings-grid dd { margin: 0; font-weight: 600; }
+.run-settings-block { margin-top: 10px; }
+.run-settings-block strong { display: block; margin-bottom: 4px; font-size: 0.85rem; }
+.run-settings-block p { margin: 0; white-space: pre-wrap; line-height: 1.45; }
+.run-settings-block ul { margin: 4px 0 0; padding-inline-start: 1.2rem; }
+.run-settings-block li { margin: 2px 0; }
 .saas-layout .media-preview { max-width: min(100%, 960px); }
 .saas-layout .asset-grid .media-preview { max-width: min(100%, 640px); }
 .saas-layout .media-preview img,

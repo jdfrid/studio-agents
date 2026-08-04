@@ -4,7 +4,13 @@ import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
 import { VisualCorrectionsPanel } from "./VisualCorrectionsPanel.js";
 import { StageErrorView } from "./StageErrorView.js";
 import { StageEditor, StageUploadControls } from "./StageEditor.js";
-import { STAGE_ORDER, statusLabelHe } from "@studio/shared";
+import {
+  STAGE_ORDER,
+  formatCreativeConstraints,
+  getRenderProfile,
+  isRenderProfileId,
+  statusLabelHe
+} from "@studio/shared";
 import type { ArtifactRow, ProjectRunView, StageName } from "./types.js";
 
 export function RunView({ runId, onBack }: { runId: string; onBack: () => void }) {
@@ -42,6 +48,8 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
         <h2>{run.brief.title}</h2>
         <span className={`status-pill status-${run.status.toLowerCase()}`}>{statusLabelHe(run.status)}</span>
       </header>
+
+      <RunSettingsSummary run={run} />
 
       <ol className="progress-timeline progress-timeline-stack">
         {STAGE_ORDER.map((stage) => {
@@ -166,4 +174,127 @@ function UserStageCard({
       </div>
     </details>
   );
+}
+
+function RunSettingsSummary({ run }: { run: ProjectRunView }) {
+  const brief = run.brief;
+  const briefOut = run.stages.find((s) => s.stage === "brief")?.output as
+    | { renderProfile?: string; ttsVoiceName?: string | null }
+    | undefined;
+  const profileId =
+    (typeof brief.renderProfile === "string" && isRenderProfileId(brief.renderProfile)
+      ? brief.renderProfile
+      : null) ??
+    (typeof briefOut?.renderProfile === "string" && isRenderProfileId(briefOut.renderProfile)
+      ? briefOut.renderProfile
+      : null);
+  const profile = profileId ? getRenderProfile(profileId) : null;
+  const creativeLines = formatCreativeConstraints(brief.creative);
+  const startedAt = run.createdAt;
+  const endedAt = runEndedAt(run);
+  const approvalLabel =
+    brief.approvalMode === "manual"
+      ? "אישור בכל שלב"
+      : brief.approvalMode === "auto_until_render"
+        ? "עצירה לפני סרטון סופי"
+        : "אוטומטי";
+
+  const attachmentLines = (brief.attachments ?? []).map((att) => {
+    const role =
+      att.role === "voice_clone"
+        ? "שיבוט קול"
+        : att.role === "insert_clip"
+          ? `שילוב סרטון${att.insertAtSeconds != null ? ` @${att.insertAtSeconds}ש׳` : ""}`
+          : "תמונת השראה";
+    return `${role}: ${att.name}`;
+  });
+
+  return (
+    <section className="run-settings-summary">
+      <h3>סיכום ההגדרות</h3>
+      <dl className="run-settings-grid">
+        <div>
+          <dt>מודל רינדור</dt>
+          <dd>{profile ? profile.labelHe : "ברירת מחדל של המערכת"}</dd>
+        </div>
+        <div>
+          <dt>התחלה</dt>
+          <dd>{formatDateTimeHe(startedAt)}</dd>
+        </div>
+        <div>
+          <dt>סיום</dt>
+          <dd>{endedAt ? formatDateTimeHe(endedAt) : run.status === "COMPLETED" ? formatDateTimeHe(run.updatedAt) : "עדיין רץ…"}</dd>
+        </div>
+        <div>
+          <dt>משך מבוקש</dt>
+          <dd>{brief.durationSeconds} שניות</dd>
+        </div>
+        <div>
+          <dt>יחס תמונה</dt>
+          <dd>
+            {brief.aspectRatio === "16:9" ? "לרוחב (16:9)" : brief.aspectRatio === "1:1" ? "ריבוע" : "לאורך (9:16)"}
+          </dd>
+        </div>
+        <div>
+          <dt>מצב יצירה</dt>
+          <dd>{approvalLabel}</dd>
+        </div>
+        {briefOut?.ttsVoiceName ? (
+          <div>
+            <dt>קול TTS</dt>
+            <dd>{briefOut.ttsVoiceName}</dd>
+          </div>
+        ) : null}
+      </dl>
+
+      <div className="run-settings-block">
+        <strong>תיאור</strong>
+        <p>{brief.sourceText}</p>
+      </div>
+      {brief.instructions?.trim() ? (
+        <div className="run-settings-block">
+          <strong>הוראות</strong>
+          <p>{brief.instructions}</p>
+        </div>
+      ) : null}
+      {creativeLines.length ? (
+        <div className="run-settings-block">
+          <strong>מתקדם</strong>
+          <ul>
+            {creativeLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {attachmentLines.length ? (
+        <div className="run-settings-block">
+          <strong>קבצים שצורפו</strong>
+          <ul>
+            {attachmentLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function runEndedAt(run: ProjectRunView): string | null {
+  if (run.status !== "COMPLETED" && run.status !== "FAILED") return null;
+  const times = run.stages
+    .map((s) => s.completedAt)
+    .filter((t): t is string => Boolean(t))
+    .sort();
+  return times[times.length - 1] ?? run.updatedAt;
+}
+
+function formatDateTimeHe(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("he-IL", {
+    dateStyle: "short",
+    timeStyle: "medium"
+  });
 }

@@ -32,7 +32,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     if (!provider) throw new NoProviderConfiguredError("GEMINI");
 
     const system =
-      "You are a senior creative producer. Convert free-form briefs into a single strict JSON object describing the production requirements for a short promotional video. visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots.";
+      "You are a senior creative producer. Convert free-form briefs into a single strict JSON object describing the production requirements for a short promotional video. visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots. If the user provided instructions (do/don't constraints), honor them strictly in visualDirection and brandConstraints.";
     const schemaHint = JSON.stringify(
       {
         title: "string",
@@ -207,6 +207,10 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     }
 
     const creativeBlock = creativeLines.length ? `\nCreative constraints:\n- ${creativeLines.join("\n- ")}` : "";
+    const instructions = input.instructions?.trim() || "";
+    const instructionsBlock = instructions
+      ? `\nUser instructions (MUST follow — do / don't):\n${instructions}`
+      : "";
     const langFromCreative = languageCodeFromCreative(input.creative);
     const enriched: BriefOutput = {
       title: parsed.title ?? input.title,
@@ -226,12 +230,14 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       durationSeconds: parsed.durationSeconds ?? input.durationSeconds,
       aspectRatio: aspectRatioFromCreative(input.creative) ?? parsed.aspectRatio ?? input.aspectRatio,
       language: langFromCreative ?? parsed.language ?? input.language,
+      ...(instructions ? { instructions } : {}),
       brandConstraints: [
         ...(parsed.brandConstraints ?? []),
+        ...(instructions ? [`הוראות משתמש (חובה לכבד): ${instructions}`] : []),
         ...creativeLines,
         "End card must credit prompt2spot.com"
       ],
-      visualDirection: `${parsed.visualDirection ?? ""}${creativeBlock}`.trim(),
+      visualDirection: `${parsed.visualDirection ?? ""}${creativeBlock}${instructionsBlock}`.trim(),
       musicDirection: [
         parsed.musicDirection ?? "",
         input.creative?.musicTempo ? `tempo: ${input.creative.musicTempo}` : "",
