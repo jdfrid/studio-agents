@@ -77,10 +77,14 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     const token = await signSession({ sub: user.id, email: user.email, role: user.role });
     reply.setCookie(sessionCookieName(), token, sessionCookieOptions(isSecure()));
     const admin = adminUrl();
+    // Only send admins to the admin UI when they started OAuth from there (oauth_return).
+    // Forcing ADMIN→admin on every login broke browser Back from the app (history landed on admin).
     const dest =
-      (oauthReturn && admin && oauthReturn === admin ? admin : null) ||
-      (user.role === "ADMIN" && admin ? admin : null) ||
-      appUrl();
+      oauthReturn && admin && oauthReturn === admin
+        ? admin
+        : oauthReturn && oauthReturn.startsWith(appUrl())
+          ? oauthReturn
+          : appUrl();
     reply.redirect(dest);
   });
 

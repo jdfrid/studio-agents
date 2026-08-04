@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./AuthContext.js";
 import { LandingPage } from "./LandingPage.js";
 import { Dashboard } from "./Dashboard.js";
@@ -9,10 +9,65 @@ import "./styles.css";
 
 type View = "landing" | "dashboard" | "create" | "run";
 
+type AppLocation = {
+  view: View;
+  runId: string | null;
+};
+
+function parseLocation(): AppLocation {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (path.startsWith("/runs/")) {
+    const id = path.slice("/runs/".length).split("/")[0] ?? "";
+    if (id) return { view: "run", runId: id };
+  }
+  if (path === "/create") return { view: "create", runId: null };
+  return { view: "dashboard", runId: null };
+}
+
+function pathFor(loc: AppLocation): string {
+  if (loc.view === "run" && loc.runId) return `/runs/${loc.runId}`;
+  if (loc.view === "create") return "/create";
+  return "/";
+}
+
 function AppShell() {
   const { user, loading, logout } = useAuth();
-  const [view, setView] = useState<View>("dashboard");
-  const [runId, setRunId] = useState<string | null>(null);
+  const initial = parseLocation();
+  const [view, setView] = useState<View>(initial.view === "landing" ? "dashboard" : initial.view);
+  const [runId, setRunId] = useState<string | null>(initial.runId);
+
+  const navigate = useCallback((next: AppLocation, mode: "push" | "replace" = "push") => {
+    setView(next.view);
+    setRunId(next.runId);
+    const path = pathFor(next);
+    if (path !== window.location.pathname) {
+      if (mode === "replace") window.history.replaceState(next, "", path);
+      else window.history.pushState(next, "", path);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Normalize URL when logged-in user lands on /
+    if (user && window.location.pathname === "/") {
+      window.history.replaceState({ view: "dashboard", runId: null }, "", "/");
+    }
+  }, [user]);
+
+  useEffect(() => {
+    function onPopState(event: PopStateEvent) {
+      const state = event.state as AppLocation | null;
+      if (state?.view) {
+        setView(state.view);
+        setRunId(state.runId);
+        return;
+      }
+      const loc = parseLocation();
+      setView(loc.view);
+      setRunId(loc.runId);
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   if (loading) return <p className="muted center">טוען…</p>;
   if (!user) return <LandingPage />;
@@ -22,7 +77,11 @@ function AppShell() {
       <header className="saas-header">
         <strong className="brand">Prompt2Spot</strong>
         <nav>
-          <button type="button" className={view === "dashboard" ? "nav-active" : ""} onClick={() => setView("dashboard")}>
+          <button
+            type="button"
+            className={view === "dashboard" ? "nav-active" : ""}
+            onClick={() => navigate({ view: "dashboard", runId: null })}
+          >
             הסרטונים שלי
           </button>
         </nav>
@@ -38,30 +97,21 @@ function AppShell() {
         {view === "dashboard" && (
           <Dashboard
             onNewVideo={() => {
-              if (user.canCreateVideo) setView("create");
+              if (user.canCreateVideo) navigate({ view: "create", runId: null });
             }}
-            onOpenRun={(id) => {
-              setRunId(id);
-              setView("run");
-            }}
+            onOpenRun={(id) => navigate({ view: "run", runId: id })}
           />
         )}
         {view === "create" && (
           <CreateVideoForm
-            onCreated={(run: ProjectRunView) => {
-              setRunId(run.id);
-              setView("run");
-            }}
-            onCancel={() => setView("dashboard")}
+            onCreated={(run: ProjectRunView) => navigate({ view: "run", runId: run.id })}
+            onCancel={() => navigate({ view: "dashboard", runId: null })}
           />
         )}
         {view === "run" && runId ? (
           <RunView
             runId={runId}
-            onBack={() => {
-              setRunId(null);
-              setView("dashboard");
-            }}
+            onBack={() => navigate({ view: "dashboard", runId: null })}
           />
         ) : null}
       </main>
