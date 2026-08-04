@@ -209,13 +209,20 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           insertAtSeconds: number;
           audioSource: "clip" | "narration";
         } | null;
+        branding?: {
+          businessName?: string;
+          slogan?: string;
+          logo?: { name: string; gcsPath: string; mimeType: string } | null;
+          logoPlacement?: "none" | "always" | "end_only" | "open_and_end";
+        } | null;
       };
       const renderProfile = resolveRenderProfile(briefOut ?? briefData).id;
       return {
         aspectRatio: briefData.aspectRatio ?? "9:16",
         timeline: pkg?.timeline ?? [],
         renderProfile,
-        videoInsert: briefData.videoInsert ?? null
+        videoInsert: briefData.videoInsert ?? null,
+        branding: briefData.branding ?? null
       };
     }
     case "series":

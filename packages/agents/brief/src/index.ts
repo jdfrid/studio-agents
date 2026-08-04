@@ -50,6 +50,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       "You are a senior creative producer. Convert free-form briefs into a single strict JSON object describing the production requirements for a short promotional video.",
       "visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots.",
       "If the user provided instructions (do/don't constraints), honor them strictly in visualDirection and brandConstraints.",
+      "If branding.businessName is set, keep the business name consistent in summary, callToAction, and tone — do not invent a competing brand.",
       userFacingLanguageInstruction(contentLang),
       `Set the JSON "language" field to "${contentLang}".`
     ].join(" ");
@@ -119,8 +120,41 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     const visualAnchors: BriefOutput["visualAnchors"] = [];
     let voiceCloneSample: BriefOutput["voiceCloneSample"] = null;
     let videoInsert: BriefOutput["videoInsert"] = null;
+    let logoAsset: NonNullable<BriefOutput["branding"]>["logo"] = null;
 
     for (const att of input.attachments ?? []) {
+      if (att.role === "logo") {
+        if (att.gcsPath) {
+          logoAsset = {
+            name: att.name,
+            gcsPath: att.gcsPath,
+            mimeType: att.mimeType || "image/png"
+          };
+          continue;
+        }
+        const dataUrl = att.dataUrl?.trim();
+        if (!dataUrl?.startsWith("data:")) continue;
+        const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) continue;
+        const mimeType = match[1] || att.mimeType || "image/png";
+        const body = Buffer.from(match[2]!, "base64");
+        const saved = await ctx.artifacts.save({
+          runId: ctx.runId,
+          stage: "brief",
+          kind: "scene_image_source",
+          body,
+          mimeType,
+          filename: att.name || "business-logo.png",
+          metadata: { role: "logo", source: "brief_input_attachment" }
+        });
+        logoAsset = {
+          name: att.name,
+          gcsPath: saved.gcsPath,
+          mimeType
+        };
+        continue;
+      }
+
       if (att.role === "insert_clip") {
         const insertAtSeconds = Math.max(0, Number(att.insertAtSeconds ?? 0));
         const audioSource = att.audioSource === "narration" ? "narration" : "clip";
@@ -196,6 +230,8 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         continue;
       }
 
+      if (att.role !== "anchor" && att.role !== "scene") continue;
+
       if (att.gcsPath) {
         visualAnchors.push({
           name: att.name,
@@ -237,10 +273,35 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     const resolvedLanguage = normalizeContentLanguage(
       langFromCreative ?? contentLang ?? parsed.language ?? input.language
     );
+    const businessName = input.branding?.businessName?.trim() || "";
+    const slogan = input.branding?.slogan?.trim() || "";
+    const creativeLogoPlacement = input.creative?.logoPlacement;
+    const hasBusinessBrand = Boolean(businessName || slogan || logoAsset);
+    let logoPlacement: NonNullable<BriefOutput["branding"]>["logoPlacement"] | undefined;
+    if (hasBusinessBrand) {
+      if (creativeLogoPlacement === "none") logoPlacement = "none";
+      else if (creativeLogoPlacement) logoPlacement = creativeLogoPlacement;
+      else logoPlacement = "end_only";
+    }
+    const brandingOut: BriefOutput["branding"] = hasBusinessBrand
+      ? {
+          ...(businessName ? { businessName } : {}),
+          ...(slogan ? { slogan } : {}),
+          logo: logoAsset,
+          ...(logoPlacement ? { logoPlacement } : {})
+        }
+      : null;
+
     const endCardCredit =
       resolvedLanguage === "he"
         ? "בכרטיס הסיום יש לציין prompt2spot.com"
         : "End card must credit prompt2spot.com";
+    const brandNameConstraint =
+      businessName && resolvedLanguage === "he"
+        ? `שם העסק לשימוש עקבי בדיבוב וב-CTA: ${businessName}`
+        : businessName
+          ? `Use business name consistently in narration and CTA: ${businessName}`
+          : null;
     const userInstructionsPrefix =
       resolvedLanguage === "he" ? "הוראות משתמש (חובה לכבד)" : "User instructions (MUST follow)";
     const enriched: BriefOutput = {
@@ -266,6 +327,10 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         ...(parsed.brandConstraints ?? []),
         ...(instructions ? [`${userInstructionsPrefix}: ${instructions}`] : []),
         ...creativeLines,
+        ...(brandNameConstraint ? [brandNameConstraint] : []),
+        ...(slogan
+          ? [resolvedLanguage === "he" ? `סלוגן העסק: ${slogan}` : `Business slogan: ${slogan}`]
+          : []),
         endCardCredit
       ],
       visualDirection: `${parsed.visualDirection ?? ""}${creativeBlock}${instructionsBlock}`.trim(),
@@ -278,7 +343,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       ]
         .filter(Boolean)
         .join("; "),
-      callToAction: parsed.callToAction ?? "prompt2spot.com",
+      callToAction: parsed.callToAction ?? businessName ?? "prompt2spot.com",
       budgetMode: input.budgetMode ?? false,
       renderProfile: resolveRenderProfile(input).id,
       references:
@@ -287,6 +352,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       visualAnchors,
       voiceCloneSample,
       videoInsert,
+      branding: brandingOut,
       ttsVoiceName: geminiVoiceNameFromCreative(input.creative) ?? null
     };
 

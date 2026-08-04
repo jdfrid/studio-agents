@@ -49,7 +49,7 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
         <span className={`status-pill status-${run.status.toLowerCase()}`}>{statusLabelHe(run.status)}</span>
       </header>
 
-      <RunSettingsSummary run={run} />
+      <RunSettingsSummary run={run} artifacts={artifacts} />
 
       <ol className="progress-timeline progress-timeline-stack">
         {STAGE_ORDER.map((stage) => {
@@ -176,10 +176,18 @@ function UserStageCard({
   );
 }
 
-function RunSettingsSummary({ run }: { run: ProjectRunView }) {
+function RunSettingsSummary({ run, artifacts }: { run: ProjectRunView; artifacts: ArtifactRow[] }) {
   const brief = run.brief;
   const briefOut = run.stages.find((s) => s.stage === "brief")?.output as
-    | { renderProfile?: string; ttsVoiceName?: string | null }
+    | {
+        renderProfile?: string;
+        ttsVoiceName?: string | null;
+        branding?: {
+          businessName?: string;
+          slogan?: string;
+          logo?: { name: string; gcsPath: string; mimeType: string } | null;
+        } | null;
+      }
     | undefined;
   const profileId =
     (typeof brief.renderProfile === "string" && isRenderProfileId(brief.renderProfile)
@@ -199,13 +207,24 @@ function RunSettingsSummary({ run }: { run: ProjectRunView }) {
         ? "עצירה לפני סרטון סופי"
         : "אוטומטי";
 
+  const inputBranding = brief.branding ?? null;
+  const outputBranding = briefOut?.branding ?? null;
+  const businessName = (outputBranding?.businessName ?? inputBranding?.businessName)?.trim() || "";
+  const slogan = (outputBranding?.slogan ?? inputBranding?.slogan)?.trim() || "";
+  const logoGcs = outputBranding?.logo?.gcsPath ?? null;
+  const logoArtifact =
+    artifacts.find((a) => a.metadata?.role === "logo") ??
+    (logoGcs ? artifacts.find((a) => a.gcsPath === logoGcs) : undefined);
+
   const attachmentLines = (brief.attachments ?? []).map((att) => {
     const role =
       att.role === "voice_clone"
         ? "שיבוט קול"
         : att.role === "insert_clip"
           ? `שילוב סרטון${att.insertAtSeconds != null ? ` @${att.insertAtSeconds}ש׳` : ""}`
-          : "תמונת השראה";
+          : att.role === "logo"
+            ? "לוגו"
+            : "תמונת השראה";
     return `${role}: ${att.name}`;
   });
 
@@ -257,6 +276,18 @@ function RunSettingsSummary({ run }: { run: ProjectRunView }) {
           <p>{brief.instructions}</p>
         </div>
       ) : null}
+      {businessName || slogan || logoArtifact ? (
+        <div className="run-settings-block run-branding-block">
+          <strong>מיתוג העסק</strong>
+          <div className="run-branding-row">
+            {logoArtifact ? <RunLogoThumb artifactId={logoArtifact.id} /> : null}
+            <div>
+              {businessName ? <p className="run-branding-name">{businessName}</p> : null}
+              {slogan ? <p className="muted">{slogan}</p> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
       {creativeLines.length ? (
         <div className="run-settings-block">
           <strong>מתקדם</strong>
@@ -279,6 +310,25 @@ function RunSettingsSummary({ run }: { run: ProjectRunView }) {
       ) : null}
     </section>
   );
+}
+
+function RunLogoThumb({ artifactId }: { artifactId: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void apiGet<{ url: string }>(`/artifacts/${artifactId}/signed-url`)
+      .then((res) => {
+        if (!cancelled) setUrl(res.url);
+      })
+      .catch(() => {
+        if (!cancelled) setUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [artifactId]);
+  if (!url) return <div className="run-branding-logo-placeholder" aria-hidden />;
+  return <img src={url} alt="" className="run-branding-logo" />;
 }
 
 function runEndedAt(run: ProjectRunView): string | null {

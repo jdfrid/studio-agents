@@ -312,6 +312,73 @@ main.layout-log { grid-template-columns: 1fr; }
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 10px 14px;
 }
+.branding-section {
+  margin: 16px 0 8px;
+  padding: 14px 0 4px;
+  border-top: 1px solid #232733;
+}
+.branding-section-title {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.branding-hint { margin: 0 0 12px; font-size: 0.9rem; }
+.branding-preview {
+  margin: 12px 0 4px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(160deg, #0d1117 0%, #1a2233 55%, #121722 100%);
+  border: 1px solid #2a3344;
+  max-width: 280px;
+}
+.branding-preview-portrait { aspect-ratio: 9 / 16; }
+.branding-preview-landscape { aspect-ratio: 16 / 9; max-width: 420px; }
+.branding-preview-square { aspect-ratio: 1 / 1; max-width: 280px; }
+.branding-preview-inner {
+  height: 100%;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px 16px 28px;
+  text-align: center;
+  position: relative;
+}
+.branding-preview-logo {
+  max-width: 42%;
+  max-height: 28%;
+  object-fit: contain;
+}
+.branding-preview-logo-placeholder {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: #232a3a;
+  border: 1px dashed #3a455c;
+}
+.branding-preview-name {
+  margin: 0;
+  color: #f2f5fb;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.branding-preview-slogan {
+  margin: 0;
+  color: rgba(242, 245, 251, 0.82);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+.branding-preview-credit {
+  position: absolute;
+  bottom: 10px;
+  margin: 0;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.02em;
+}
 .progress-timeline { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
 .progress-timeline-stack {
   display: flex;
@@ -396,6 +463,26 @@ main.layout-log { grid-template-columns: 1fr; }
 .run-settings-block p { margin: 0; white-space: pre-wrap; line-height: 1.45; }
 .run-settings-block ul { margin: 4px 0 0; padding-inline-start: 1.2rem; }
 .run-settings-block li { margin: 2px 0; }
+.run-branding-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+.run-branding-logo,
+.run-branding-logo-placeholder {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #121722;
+  border: 1px solid #2a3344;
+  flex-shrink: 0;
+}
+.run-branding-name {
+  margin: 0;
+  font-weight: 600;
+}
 .saas-layout .media-preview { max-width: min(100%, 960px); }
 .saas-layout .asset-grid .media-preview { max-width: min(100%, 640px); }
 .saas-layout .media-preview img,

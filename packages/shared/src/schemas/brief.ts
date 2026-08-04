@@ -3,6 +3,32 @@ import { CreativeOptionsSchema } from "../creativeOptions.js";
 import { AspectRatioSchema } from "../enums.js";
 import { RenderProfileIdSchema } from "../renderProfiles.js";
 
+export const BriefBrandingInputSchema = z
+  .object({
+    businessName: z.string().trim().max(120).optional(),
+    slogan: z.string().trim().max(200).optional()
+  })
+  .strict();
+export type BriefBrandingInput = z.infer<typeof BriefBrandingInputSchema>;
+
+export const BriefBrandingOutputSchema = z
+  .object({
+    businessName: z.string().trim().max(120).optional(),
+    slogan: z.string().trim().max(200).optional(),
+    logo: z
+      .object({
+        name: z.string(),
+        gcsPath: z.string(),
+        mimeType: z.string()
+      })
+      .nullable()
+      .optional(),
+    /** Effective placement for end-card branding (always/open_and_end treated as end_only for now). */
+    logoPlacement: z.enum(["none", "always", "end_only", "open_and_end"]).optional()
+  })
+  .strict();
+export type BriefBrandingOutput = z.infer<typeof BriefBrandingOutputSchema>;
+
 /** Free-form user input that kicks off a run. */
 export const BriefInputSchema = z.object({
   title: z.string().min(2).max(200),
@@ -28,9 +54,10 @@ export const BriefInputSchema = z.object({
          * anchor = global cast/look reference;
          * scene = override one scene only;
          * voice_clone = narration voice sample;
-         * insert_clip = short external video spliced into the final cut
+         * insert_clip = short external video spliced into the final cut;
+         * logo = business branding logo for end card / preview
          */
-        role: z.enum(["anchor", "scene", "voice_clone", "insert_clip"]).default("anchor"),
+        role: z.enum(["anchor", "scene", "voice_clone", "insert_clip", "logo"]).default("anchor"),
         sceneIndex: z.number().int().min(0).optional(),
         /** Absolute second in the finished film where insert_clip begins (before end card). */
         insertAtSeconds: z.number().min(0).max(180).optional(),
@@ -47,7 +74,9 @@ export const BriefInputSchema = z.object({
   /** Pipeline approval: manual stops at each gate; auto runs all; auto_until_render pauses before render. */
   approvalMode: z.enum(["manual", "auto", "auto_until_render"]).default("auto"),
   /** Optional advanced creative controls from the user form. */
-  creative: CreativeOptionsSchema.optional()
+  creative: CreativeOptionsSchema.optional(),
+  /** Optional business branding (name + slogan; logo via attachments role=logo). */
+  branding: BriefBrandingInputSchema.optional()
 });
 export type BriefInput = z.infer<typeof BriefInputSchema>;
 
@@ -110,6 +139,8 @@ export const BriefOutputSchema = z.object({
     })
     .nullable()
     .optional(),
+  /** Business branding for end card and UI preview. */
+  branding: BriefBrandingOutputSchema.nullable().optional(),
   /** Gemini TTS prebuilt voice chosen from creative voice gender. */
   ttsVoiceName: z.string().max(40).nullable().optional()
 });

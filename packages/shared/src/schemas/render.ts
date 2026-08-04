@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SceneTimelineEntrySchema } from "./package.js";
 import { RenderProfileIdSchema } from "../renderProfiles.js";
+import { BriefBrandingOutputSchema } from "./brief.js";
 
 export const VideoInsertSchema = z.object({
   name: z.string(),
@@ -16,7 +17,9 @@ export const RenderInputSchema = z.object({
   timeline: z.array(SceneTimelineEntrySchema),
   renderProfile: RenderProfileIdSchema,
   /** Optional short external clip spliced into the assembled film (before music/end card). */
-  videoInsert: VideoInsertSchema.nullable().optional()
+  videoInsert: VideoInsertSchema.nullable().optional(),
+  /** Optional business branding for the end card. */
+  branding: BriefBrandingOutputSchema.nullable().optional()
 });
 export type RenderInput = z.infer<typeof RenderInputSchema>;
 
