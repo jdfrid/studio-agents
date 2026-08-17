@@ -64,7 +64,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
     let anchorReference: ReferenceImageBytes | null = null;
 
-    const MAX_INLINE_ANCHORS = 4;
+    const MAX_INLINE_ANCHORS = 2;
 
     const resolvedAnchorPaths = Array.from(
       new Set(

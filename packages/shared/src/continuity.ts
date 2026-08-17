@@ -116,4 +116,4 @@ export function applyContinuityToScript(
 export type ReferenceImageBytes = { data: Buffer; mimeType: string };
 
 export const REFERENCE_IMAGE_INSTRUCTION =
-  "The attached reference image shows the EXACT characters and location. Generate the next frame with IDENTICAL people, faces, wardrobe, and setting; only change pose/action as described.";
+  "Use the attached reference image(s) for wardrobe, setting, and overall look continuity. Keep the same fictional characters and environment; change pose/action as described. Do not copy real celebrity likenesses or brand logos.";

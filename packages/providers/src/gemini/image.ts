@@ -26,7 +26,9 @@ export interface GeminiImageResponse {
   mimeType: string;
 }
 
-const IMAGE_ATTEMPTS = 5;
+const IMAGE_ATTEMPTS = 4;
+/** Too many / too-literal face refs often trigger promptFeedback blockReason=OTHER. */
+const MAX_INLINE_REFS = 2;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -42,17 +44,19 @@ export function softenImagePrompt(prompt: string): string {
   return `${generic}\nGeneric fictional people only. No visible logos, trademarks, or celebrity likenesses. Unbranded product.`;
 }
 
-function buildImageGenerationBody(prompt: string, req: GeminiImageRequest) {
+function buildImageGenerationBody(
+  prompt: string,
+  req: GeminiImageRequest,
+  referenceImages: Array<{ data: Buffer; mimeType: string }>
+) {
   const referenceNote = req.referenceImageUrls?.length
     ? `\nUse these references for style/product consistency: ${req.referenceImageUrls.join(", ")}`
     : "";
-  const hasInlineRefs = (req.referenceImages?.length ?? 0) > 0;
-  const inlineRefNote = hasInlineRefs
-    ? `\n${REFERENCE_IMAGE_INSTRUCTION}`
-    : "";
+  const hasInlineRefs = referenceImages.length > 0;
+  const inlineRefNote = hasInlineRefs ? `\n${REFERENCE_IMAGE_INSTRUCTION}` : "";
   const aspectRatio = normalizeGeminiImageAspectRatio(req.aspectRatio);
   const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
-  for (const ref of req.referenceImages ?? []) {
+  for (const ref of referenceImages) {
     parts.push({
       inlineData: {
         mimeType: ref.mimeType,
@@ -82,7 +86,20 @@ function buildImageGenerationBody(prompt: string, req: GeminiImageRequest) {
 }
 
 const REFERENCE_IMAGE_INSTRUCTION =
-  "The attached reference image shows the EXACT characters and location. Generate the next frame with IDENTICAL people, faces, wardrobe, and setting; only change pose/action as described.";
+  "Use the attached reference image(s) for wardrobe, setting, and overall look continuity. Keep the same fictional characters and environment; change pose/action as described. Do not copy real celebrity likenesses or brand logos.";
+
+function isRetryableImageFailure(detail: string): boolean {
+  const d = detail.toUpperCase();
+  return (
+    d.includes("IMAGE_OTHER") ||
+    d.includes("IMAGE_SAFETY") ||
+    d.includes("BLOCKREASON") ||
+    d.includes("NO_IMAGE") ||
+    d.includes("EMPTY") ||
+    d.includes("SAFETY") ||
+    d.includes("OTHER")
+  );
+}
 
 export async function geminiGenerateImage(
   provider: ProviderCredentialView,
@@ -92,14 +109,24 @@ export async function geminiGenerateImage(
   const model = geminiModels(provider).image;
   const started = Date.now();
   let lastDetail = "empty candidates/parts";
-  const promptVariants = [req.prompt, softenImagePrompt(req.prompt)];
 
-  for (let variant = 0; variant < promptVariants.length; variant += 1) {
-    const prompt = promptVariants[variant]!;
+  const allRefs = (req.referenceImages ?? []).slice(0, MAX_INLINE_REFS);
+  const strategies: Array<{ prompt: string; refs: Array<{ data: Buffer; mimeType: string }>; label: string }> = [
+    { prompt: req.prompt, refs: allRefs, label: "primary" },
+    { prompt: softenImagePrompt(req.prompt), refs: allRefs, label: "softened" }
+  ];
+  if (allRefs.length > 1) {
+    strategies.push({ prompt: softenImagePrompt(req.prompt), refs: allRefs.slice(0, 1), label: "single-ref" });
+  }
+  if (allRefs.length > 0) {
+    strategies.push({ prompt: softenImagePrompt(req.prompt), refs: [], label: "no-ref" });
+  }
+
+  for (const strategy of strategies) {
     for (let attempt = 1; attempt <= IMAGE_ATTEMPTS; attempt += 1) {
       const response = await httpJson<unknown>(geminiUrl(provider, `models/${model}:generateContent`), {
         method: "POST",
-        body: buildImageGenerationBody(prompt, req),
+        body: buildImageGenerationBody(strategy.prompt, req, strategy.refs),
         timeoutMs: 120_000
       });
       const inline = extractInlineData(response, "image/");
@@ -113,22 +140,19 @@ export async function geminiGenerateImage(
       }
 
       lastDetail = describeGenerateContentFailure(response);
-      const retryable = lastDetail.includes("IMAGE_OTHER") || lastDetail.includes("NO_IMAGE") || lastDetail.includes("empty");
-      if (attempt < IMAGE_ATTEMPTS && retryable) {
-        await sleep(2000 * attempt);
-        continue;
-      }
-      if (!retryable && variant === 0) break;
-      if (attempt < IMAGE_ATTEMPTS) await sleep(2000 * attempt);
+      if (!isRetryableImageFailure(lastDetail)) break;
+      if (attempt < IMAGE_ATTEMPTS) await sleep(1500 * attempt);
     }
   }
 
   const hint =
-    lastDetail.includes("IMAGE_OTHER") || lastDetail.includes("IMAGE_SAFETY")
-      ? " Gemini may have blocked brand or policy content; try a generic prompt or rerun."
+    lastDetail.toUpperCase().includes("OTHER") ||
+    lastDetail.toUpperCase().includes("SAFETY") ||
+    lastDetail.includes("IMAGE_OTHER")
+      ? " Gemini blocked the image (policy/faces/logos). Soften the prompt, use fewer inspiration photos, or rerun."
       : "";
   throw new ProviderError(`Gemini image generation returned no image inline data (${lastDetail})${hint}`, {
     provider: "gemini",
-    metadata: { model, attempts: IMAGE_ATTEMPTS, detail: lastDetail }
+    metadata: { model, attempts: IMAGE_ATTEMPTS, detail: lastDetail, strategies: strategies.map((s) => s.label) }
   });
 }
