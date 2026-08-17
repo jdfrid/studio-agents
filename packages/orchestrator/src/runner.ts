@@ -163,12 +163,14 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         visualAnchors?: Array<{ gcsPath: string; role?: string; sceneId?: string }>;
       };
       const sceneOverride = new Map<string, string>();
+      const visualAnchorGcsPaths: string[] = [];
       let visualAnchorGcsPath: string | undefined;
       for (const anchor of briefData.visualAnchors ?? []) {
         if (anchor.role === "scene" && anchor.sceneId) {
           sceneOverride.set(anchor.sceneId, anchor.gcsPath);
-        } else if (!visualAnchorGcsPath) {
-          visualAnchorGcsPath = anchor.gcsPath;
+        } else if (anchor.gcsPath) {
+          visualAnchorGcsPaths.push(anchor.gcsPath);
+          if (!visualAnchorGcsPath) visualAnchorGcsPath = anchor.gcsPath;
         }
       }
       return {
@@ -177,6 +179,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         backgroundVisualPrompt: script?.backgroundVisualPrompt,
         characterBible: script?.characterBible,
         visualAnchorGcsPath,
+        visualAnchorGcsPaths,
         scenes: (script?.scenes ?? []).map((scene) => ({
           sceneId: scene.id,
           visualPrompt: scene.visualPrompt,

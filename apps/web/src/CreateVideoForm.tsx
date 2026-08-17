@@ -36,6 +36,8 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const MAX_VOICE_BYTES = 10 * 1024 * 1024;
   const MAX_INSERT_BYTES = 40 * 1024 * 1024;
   const MAX_LOGO_BYTES = 5 * 1024 * 1024;
+  const MAX_VISUAL_FILES = 8;
+  const MAX_VISUAL_BYTES = 5 * 1024 * 1024;
 
   const logoPreviewUrl = useMemo(() => (logoFile ? URL.createObjectURL(logoFile) : null), [logoFile]);
   useEffect(() => {
@@ -44,8 +46,42 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     };
   }, [logoPreviewUrl]);
 
+  const visualPreviewUrls = useMemo(
+    () => visualFiles.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
+    [visualFiles]
+  );
+  useEffect(() => {
+    return () => {
+      for (const item of visualPreviewUrls) URL.revokeObjectURL(item.url);
+    };
+  }, [visualPreviewUrls]);
+
   const previewAspect = aspectRatioFromCreative(creative) ?? "9:16";
   const showBrandingPreview = Boolean(businessName.trim() || slogan.trim() || logoFile);
+
+  function addVisualFiles(incoming: FileList | File[]) {
+    const next = [...visualFiles];
+    for (const file of Array.from(incoming)) {
+      if (!file.type.startsWith("image/")) continue;
+      if (file.size > MAX_VISUAL_BYTES) {
+        setError(`תמונת השראה גדולה מדי (מקסימום 5MB): ${file.name}`);
+        continue;
+      }
+      if (next.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
+        continue;
+      }
+      if (next.length >= MAX_VISUAL_FILES) {
+        setError(`ניתן להעלות עד ${MAX_VISUAL_FILES} תמונות השראה.`);
+        break;
+      }
+      next.push(file);
+    }
+    setVisualFiles(next);
+  }
+
+  function removeVisualFile(index: number) {
+    setVisualFiles((prev) => prev.filter((_, i) => i !== index));
+  }
 
   function setCreativeField<K extends keyof CreativeOptions>(key: K, value: CreativeOptions[K] | "") {
     setCreative((prev) => {
@@ -79,6 +115,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     }
     if (logoFile && logoFile.size > MAX_LOGO_BYTES) {
       setError("קובץ הלוגו גדול מדי (מקסימום 5MB).");
+      return;
+    }
+    if (visualFiles.length > MAX_VISUAL_FILES) {
+      setError(`ניתן להעלות עד ${MAX_VISUAL_FILES} תמונות השראה.`);
+      return;
+    }
+    if (visualFiles.some((f) => f.size > MAX_VISUAL_BYTES)) {
+      setError("אחת מתמונות ההשראה גדולה מדי (מקסימום 5MB לקובץ).");
       return;
     }
     setBusy(true);
@@ -201,9 +245,30 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           type="file"
           accept="image/*"
           multiple
-          onChange={(e) => setVisualFiles(Array.from(e.target.files ?? []))}
+          onChange={(e) => {
+            if (e.target.files?.length) addVisualFiles(e.target.files);
+            e.target.value = "";
+          }}
         />
+        <small className="muted">
+          אפשר לבחור כמה תמונות (עד {MAX_VISUAL_FILES}) — דמויות, מקום, סגנון. בחירה נוספת מוסיפה לרשימה.
+        </small>
       </label>
+      {visualFiles.length ? (
+        <ul className="visual-files-list">
+          {visualPreviewUrls.map((item, index) => (
+            <li key={`${item.name}-${index}`} className="visual-file-item">
+              <img src={item.url} alt="" className="visual-file-thumb" />
+              <span className="visual-file-name" title={item.name}>
+                {item.name}
+              </span>
+              <button type="button" className="link-btn" onClick={() => removeVisualFile(index)}>
+                הסר
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <label className="file-row">
         שיבוט קול (אופציונלי)
         <input

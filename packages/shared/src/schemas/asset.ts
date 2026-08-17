@@ -7,6 +7,8 @@ export const AssetInputSchema = z.object({
   characterBible: z.string().optional(),
   /** Global visual anchor from brief (cast / look reference for all scenes). */
   visualAnchorGcsPath: z.string().optional(),
+  /** All brief inspiration images (anchors); first also mirrored in visualAnchorGcsPath. */
+  visualAnchorGcsPaths: z.array(z.string()).max(12).default([]),
   scenes: z.array(
     z.object({
       sceneId: z.string(),
@@ -25,6 +27,7 @@ export type AssetInput = z.infer<typeof AssetInputSchema>;
 
 export const AssetOutputSchema = z.object({
   visualAnchorGcsPath: z.string().optional(),
+  visualAnchorGcsPaths: z.array(z.string()).default([]),
   perScene: z.array(
     z.object({
       sceneId: z.string(),

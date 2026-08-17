@@ -64,17 +64,46 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
     let anchorReference: ReferenceImageBytes | null = null;
 
-    if (input.visualAnchorGcsPath) {
+    const MAX_INLINE_ANCHORS = 4;
 
-      const anchor = await ctx.storage.download(input.visualAnchorGcsPath);
+    const resolvedAnchorPaths = Array.from(
+      new Set(
+        [
+          ...(input.visualAnchorGcsPaths ?? []),
+          ...(input.visualAnchorGcsPath ? [input.visualAnchorGcsPath] : [])
+        ].filter(Boolean)
+      )
+    );
 
-      chainReference = { data: anchor.body, mimeType: anchor.mimeType };
+    const anchorReferences: ReferenceImageBytes[] = [];
 
-      anchorReference = chainReference;
+    for (const gcsPath of resolvedAnchorPaths.slice(0, MAX_INLINE_ANCHORS)) {
 
-      await ctx.log.log("asset_visual_anchor", "Using brief visual anchor for continuity", {
+      const anchor = await ctx.storage.download(gcsPath);
 
-        gcsPath: input.visualAnchorGcsPath
+      const ref: ReferenceImageBytes = { data: anchor.body, mimeType: anchor.mimeType };
+
+      anchorReferences.push(ref);
+
+      if (!anchorReference) {
+
+        chainReference = ref;
+
+        anchorReference = ref;
+
+      }
+
+    }
+
+    if (resolvedAnchorPaths.length) {
+
+      await ctx.log.log("asset_visual_anchor", "Using brief visual anchors for continuity", {
+
+        count: resolvedAnchorPaths.length,
+
+        usedInline: anchorReferences.length,
+
+        gcsPaths: resolvedAnchorPaths
 
       });
 
@@ -216,7 +245,11 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
           const continuityRefs: ReferenceImageBytes[] = [];
 
-          if (assetMode === "shared_reference" && anchorReference) {
+          if (assetMode === "shared_reference" && anchorReferences.length) {
+
+            continuityRefs.push(...anchorReferences);
+
+          } else if (assetMode === "shared_reference" && anchorReference) {
 
             continuityRefs.push(anchorReference);
 
@@ -450,7 +483,11 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
     await ctx.log.log("asset_done", "Asset Agent finished", { collected: perScene.length });
 
-    return { perScene, visualAnchorGcsPath: input.visualAnchorGcsPath };
+    return {
+      perScene,
+      visualAnchorGcsPath: input.visualAnchorGcsPath ?? resolvedAnchorPaths[0],
+      visualAnchorGcsPaths: resolvedAnchorPaths
+    };
 
   }
 
