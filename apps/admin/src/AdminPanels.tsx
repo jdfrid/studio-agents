@@ -225,7 +225,17 @@ export function AdminSettingsPanel() {
 }
 
 type PlatformSettingsView = {
-  defaultRenderProfile: "veo-multiclip" | "veo-extend" | "kling-i2v" | "wan-i2v" | "hailuo-i2v" | "heygen-i2v";
+  defaultRenderProfile:
+    | "veo-multiclip"
+    | "veo-extend"
+    | "kling-i2v"
+    | "wan-i2v"
+    | "hailuo-i2v"
+    | "heygen-i2v"
+    | "seedance-mini-i2v"
+    | "seedance-fast-i2v"
+    | "seedance-i2v"
+    | "luma-ray-i2v";
   geminiTextModel: string | null;
   geminiTtsModel: string | null;
   geminiImageModel: string | null;
@@ -240,6 +250,10 @@ function listRenderProfiles() {
     { id: "veo-multiclip" as const, label: "Veo Fast — multiclip (זול, ברירת מחדל)" },
     { id: "wan-i2v" as const, label: "Wan 2.7 — זול (מתמונה)" },
     { id: "hailuo-i2v" as const, label: "Hailuo — זול (מתמונה)" },
+    { id: "seedance-mini-i2v" as const, label: "Seedance 2 Mini — זול בכמויות (~$0.16/ש׳)" },
+    { id: "luma-ray-i2v" as const, label: "Luma Ray 3.2 — מתמונה (~$0.30/5ש׳)" },
+    { id: "seedance-fast-i2v" as const, label: "Seedance 2 Fast (~$0.29/ש׳)" },
+    { id: "seedance-i2v" as const, label: "Seedance 2 — איכות מלאה (~$0.36/ש׳)" },
     { id: "kling-i2v" as const, label: "Kling 2.1 — image-to-video" },
     { id: "heygen-i2v" as const, label: "HeyGen — סנכרון שפתיים מתמונה" },
     { id: "veo-extend" as const, label: "Veo Fast — extend chain (יקר יותר)" }

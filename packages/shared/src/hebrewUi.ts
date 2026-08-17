@@ -66,6 +66,10 @@ export function videoProviderShortLabelHe(profile: RenderProfileId): string {
   if (p.provider === "fal") {
     if (p.id === "wan-i2v") return "ואן";
     if (p.id === "hailuo-i2v") return "האילואו";
+    if (p.id === "seedance-mini-i2v") return "סידנס מיני";
+    if (p.id === "seedance-fast-i2v") return "סידנס פאסט";
+    if (p.id === "seedance-i2v") return "סידנס";
+    if (p.id === "luma-ray-i2v") return "לומה ריי";
     return "פול";
   }
   if (p.strategy === "extend") return "ויאו (הארכה)";

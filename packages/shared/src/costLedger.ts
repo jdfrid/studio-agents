@@ -3,7 +3,7 @@ import { DEFAULT_USD_TO_ILS, veoGenerateAudio, veoPerSecondUsd } from "./budget.
 import type { CostPricingSource, GeminiUsageMetadata } from "./geminiPricing.js";
 import { priceFromUsageMetadata } from "./geminiPricing.js";
 import type { RenderProfileId } from "./renderProfiles.js";
-import { getRenderProfile, profileVideoPerSecondUsd } from "./renderProfiles.js";
+import { getRenderProfile, profileVideoPerSecondUsd, videoProviderShortLabel } from "./renderProfiles.js";
 
 export type { CostPricingSource } from "./geminiPricing.js";
 
@@ -96,6 +96,18 @@ export function videoPerSecondUsd(model: string, generateAudio = veoGenerateAudi
   }
   if (m.includes("hailuo") || m.includes("minimax")) {
     return profileVideoPerSecondUsd(getRenderProfile("hailuo-i2v"));
+  }
+  if (m.includes("seedance-2.0/mini") || m.includes("seedance-mini")) {
+    return profileVideoPerSecondUsd(getRenderProfile("seedance-mini-i2v"));
+  }
+  if (m.includes("seedance-2.0/fast") || m.includes("seedance-fast")) {
+    return profileVideoPerSecondUsd(getRenderProfile("seedance-fast-i2v"));
+  }
+  if (m.includes("seedance")) {
+    return profileVideoPerSecondUsd(getRenderProfile("seedance-i2v"));
+  }
+  if (m.includes("luma") || m.includes("ray/v3")) {
+    return profileVideoPerSecondUsd(getRenderProfile("luma-ray-i2v"));
   }
   if (m.includes("heygen")) {
     return profileVideoPerSecondUsd(getRenderProfile("heygen-i2v"));
@@ -191,7 +203,10 @@ export function activityTypeLabel(type: CostActivityType, renderProfileId?: Rend
     case "veo_video":
       if (renderProfileId) {
         try {
-          if (getRenderProfile(renderProfileId).provider === "kling") return "Kling וידאו";
+          const profile = getRenderProfile(renderProfileId);
+          if (profile.provider === "kling") return "Kling וידאו";
+          if (profile.provider === "heygen") return "HeyGen וידאו";
+          if (profile.provider === "fal") return `${videoProviderShortLabel(profile)} וידאו`;
         } catch {
           /* ignore invalid profile id */
         }

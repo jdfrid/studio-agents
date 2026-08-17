@@ -18,7 +18,27 @@ function durationForModel(profile: RenderProfile, seconds: number): string | num
     // Wan 2.7 accepts numeric duration seconds (typically 2–15).
     return Math.min(5, Math.max(2, Math.round(seconds) || 5));
   }
+  if (
+    profile.id === "seedance-mini-i2v" ||
+    profile.id === "seedance-fast-i2v" ||
+    profile.id === "seedance-i2v"
+  ) {
+    const clamped = Math.min(15, Math.max(4, Math.round(seconds) || 5));
+    return String(clamped);
+  }
+  if (profile.id === "luma-ray-i2v") {
+    // Single-image i2v supports 5s only; 10s needs multi-keyframe.
+    return "5s";
+  }
   return seconds >= 10 ? "10" : "5";
+}
+
+function isSeedanceProfile(profile: RenderProfile): boolean {
+  return (
+    profile.id === "seedance-mini-i2v" ||
+    profile.id === "seedance-fast-i2v" ||
+    profile.id === "seedance-i2v"
+  );
 }
 
 function buildFalBody(
@@ -27,7 +47,7 @@ function buildFalBody(
   imageUrl: string,
   duration: string | number
 ): Record<string, unknown> {
-  // Kling rejects prompts > 2500; Wan/Hailuo are safer under the same cap.
+  // Kling rejects prompts > 2500; Wan/Hailuo/Seedance/Luma are safer under the same cap.
   const prompt = clampFalPrompt(req.prompt, 2400);
   const body: Record<string, unknown> = {
     prompt,
@@ -44,8 +64,13 @@ function buildFalBody(
     body.prompt_optimizer = true;
   }
 
-  if (profile.id === "wan-i2v") {
+  if (profile.id === "wan-i2v" || isSeedanceProfile(profile) || profile.id === "luma-ray-i2v") {
     body.resolution = "720p";
+  }
+
+  if (isSeedanceProfile(profile)) {
+    // Studio narration is muxed later — skip model-native audio to avoid double track.
+    body.generate_audio = false;
   }
 
   return body;
@@ -55,6 +80,12 @@ function clampFalPrompt(text: string, max: number): string {
   const t = String(text ?? "").trim();
   if (t.length <= max) return t;
   return `${t.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
+function billedSecondsFromDuration(duration: string | number): number {
+  if (typeof duration === "number") return duration;
+  const matched = String(duration).match(/^(\d+)/);
+  return matched ? Number(matched[1]) : Number(duration) || 5;
 }
 
 export function createFalI2vBeatGenerator(profile: RenderProfile, credential: ProviderCredentialView): VideoBeatGenerator {
@@ -171,7 +202,7 @@ export function createFalI2vBeatGenerator(profile: RenderProfile, credential: Pr
           }
           const downloaded = await httpBytes(videoUrl, { timeoutMs: 240_000 });
           const durationMs = Date.now() - wallStarted;
-          const billed = typeof duration === "string" ? Number(duration) : duration;
+          const billed = billedSecondsFromDuration(duration);
           await hooks?.onUsage?.({
             activityType: "veo_video",
             sceneId: req.sceneId,

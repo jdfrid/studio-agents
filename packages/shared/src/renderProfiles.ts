@@ -5,7 +5,11 @@ export const RenderProfileIdSchema = z.enum([
   "kling-i2v",
   "wan-i2v",
   "hailuo-i2v",
-  "heygen-i2v"
+  "heygen-i2v",
+  "seedance-mini-i2v",
+  "seedance-fast-i2v",
+  "seedance-i2v",
+  "luma-ray-i2v"
 ]);
 export type RenderProfileId = z.infer<typeof RenderProfileIdSchema>;
 export type VideoProviderName = "veo" | "kling" | "fal" | "heygen" | "runway" | "shotstack";
@@ -14,6 +18,10 @@ export type RenderStrategy = "multiclip" | "extend";
 export const VEO_EXTEND_BEAT_SECONDS = 10;
 /** HeyGen image→talking-head beat length (driven by narration audio). */
 export const HEYGEN_BEAT_SECONDS = 8;
+/** Luma Ray 3.2 single-image i2v is capped at 5s (10s needs multi-keyframe). */
+export const LUMA_RAY_BEAT_SECONDS = 5;
+/** Seedance 2 beat length — short clips for volume / cost control. */
+export const SEEDANCE_BEAT_SECONDS = 5;
 export type RenderProfileCapabilities = {
   referenceImage: boolean;
   extend: boolean;
@@ -126,6 +134,70 @@ export const RENDER_PROFILES: Record<RenderProfileId, RenderProfile> = {
       maxClipSeconds: 30,
       beatSeconds: HEYGEN_BEAT_SECONDS
     }
+  },
+  "seedance-mini-i2v": {
+    id: "seedance-mini-i2v",
+    label: "Seedance 2 Mini — image-to-video",
+    labelHe: "Seedance 2 Mini — זול בכמויות",
+    provider: "fal",
+    strategy: "multiclip",
+    falModel: "bytedance/seedance-2.0/mini/image-to-video",
+    costTier: "cheap",
+    capabilities: {
+      referenceImage: true,
+      extend: false,
+      nativeAudio: false,
+      maxClipSeconds: 15,
+      beatSeconds: SEEDANCE_BEAT_SECONDS
+    }
+  },
+  "seedance-fast-i2v": {
+    id: "seedance-fast-i2v",
+    label: "Seedance 2 Fast — image-to-video",
+    labelHe: "Seedance 2 Fast — מהיר",
+    provider: "fal",
+    strategy: "multiclip",
+    falModel: "bytedance/seedance-2.0/fast/image-to-video",
+    costTier: "standard",
+    capabilities: {
+      referenceImage: true,
+      extend: false,
+      nativeAudio: false,
+      maxClipSeconds: 15,
+      beatSeconds: SEEDANCE_BEAT_SECONDS
+    }
+  },
+  "seedance-i2v": {
+    id: "seedance-i2v",
+    label: "Seedance 2 — image-to-video",
+    labelHe: "Seedance 2 — איכות מלאה",
+    provider: "fal",
+    strategy: "multiclip",
+    falModel: "bytedance/seedance-2.0/image-to-video",
+    costTier: "standard",
+    capabilities: {
+      referenceImage: true,
+      extend: false,
+      nativeAudio: false,
+      maxClipSeconds: 15,
+      beatSeconds: SEEDANCE_BEAT_SECONDS
+    }
+  },
+  "luma-ray-i2v": {
+    id: "luma-ray-i2v",
+    label: "Luma Ray 3.2 — image-to-video",
+    labelHe: "Luma Ray 3.2 — מתמונה לווידאו",
+    provider: "fal",
+    strategy: "multiclip",
+    falModel: "luma/agent/ray/v3.2/image-to-video",
+    costTier: "cheap",
+    capabilities: {
+      referenceImage: true,
+      extend: false,
+      nativeAudio: false,
+      maxClipSeconds: 5,
+      beatSeconds: LUMA_RAY_BEAT_SECONDS
+    }
   }
 };
 export function listRenderProfiles(): RenderProfile[] {
@@ -134,7 +206,12 @@ export function listRenderProfiles(): RenderProfile[] {
 /** Profiles shown to end users — cheap / budget options only. */
 export function listCheapRenderProfiles(): RenderProfile[] {
   return listRenderProfiles().filter(
-    (p) => p.costTier === "cheap" || p.id === "kling-i2v" || p.id === "heygen-i2v"
+    (p) =>
+      p.costTier === "cheap" ||
+      p.id === "kling-i2v" ||
+      p.id === "heygen-i2v" ||
+      p.id === "seedance-fast-i2v" ||
+      p.id === "seedance-i2v"
   );
 }
 export function getRenderProfile(id: RenderProfileId): RenderProfile {
@@ -199,13 +276,19 @@ export function buildRenderProfileSnapshot(brief?: { renderProfile?: RenderProfi
     envDefault: defaultRenderProfileId()
   };
 }
-/** Rough USD per generated video second for cost estimates. */
+/** Rough USD per generated video second for cost estimates (720p-class). */
 export function profileVideoPerSecondUsd(profile: RenderProfile, veoModelPerSecond = 0.08): number {
   if (profile.provider === "kling") return 0.09;
   if (profile.provider === "heygen") return 0.12;
   if (profile.provider === "fal") {
     if (profile.id === "wan-i2v") return 0.04;
     if (profile.id === "hailuo-i2v") return 0.045;
+    // Seedance 2 (Runway-style credit rates → USD/sec at 720p).
+    if (profile.id === "seedance-mini-i2v") return 0.16;
+    if (profile.id === "seedance-fast-i2v") return 0.29;
+    if (profile.id === "seedance-i2v") return 0.36;
+    // Luma Ray 3.2: $0.30 / 5s @ 720p.
+    if (profile.id === "luma-ray-i2v") return 0.06;
     return 0.05;
   }
   return veoModelPerSecond;
@@ -230,6 +313,10 @@ export function videoProviderShortLabel(profile: RenderProfile | RenderProfileId
   if (p.provider === "fal") {
     if (p.id === "wan-i2v") return "Wan";
     if (p.id === "hailuo-i2v") return "Hailuo";
+    if (p.id === "seedance-mini-i2v") return "Seedance Mini";
+    if (p.id === "seedance-fast-i2v") return "Seedance Fast";
+    if (p.id === "seedance-i2v") return "Seedance";
+    if (p.id === "luma-ray-i2v") return "Luma Ray";
     return "fal";
   }
   if (p.strategy === "extend") return "Veo extend";

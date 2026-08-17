@@ -30,6 +30,14 @@ describe("resolveRenderProfile", () => {
     expect(getRenderProfile("wan-i2v").capabilities.referenceImage).toBe(true);
   });
 
+  it("includes Seedance and Luma Ray fal profiles", () => {
+    expect(getRenderProfile("seedance-mini-i2v").falModel).toContain("seedance-2.0/mini");
+    expect(getRenderProfile("seedance-fast-i2v").falModel).toContain("seedance-2.0/fast");
+    expect(getRenderProfile("seedance-i2v").falModel).toBe("bytedance/seedance-2.0/image-to-video");
+    expect(getRenderProfile("luma-ray-i2v").falModel).toContain("ray/v3.2");
+    expect(getRenderProfile("luma-ray-i2v").capabilities.beatSeconds).toBe(5);
+  });
+
   it("includes heygen-i2v lip-sync profile", () => {
     const profile = getRenderProfile("heygen-i2v");
     expect(profile.provider).toBe("heygen");
