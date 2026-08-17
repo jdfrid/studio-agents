@@ -5,11 +5,26 @@ import { classifyGeminiError, userFacingGeminiError } from "@studio/shared";
 function throwHttpError(url: string, status: number, text: string): never {
   const friendly = userFacingGeminiError(text, status);
   const isGemini = url.includes("generativelanguage.googleapis.com") || url.includes("googleapis.com");
-    if (isGemini && friendly && classifyGeminiError(text, status) !== "unknown") {
+  if (isGemini && friendly && classifyGeminiError(text, status) !== "unknown") {
     throw new ProviderError(friendly, {
       provider: "gemini",
       metadata: { status, raw: text.slice(0, 4000), kind: classifyGeminiError(text, status) }
     });
+  }
+  const lower = text.toLowerCase();
+  if (
+    lower.includes("content_policy_violation") ||
+    lower.includes("copyright") ||
+    lower.includes("sensitive content") ||
+    lower.includes("partner_validation_failed")
+  ) {
+    throw new ProviderError(
+      "ספק הווידאו חסם את הסצנה בגלל דמות מוכרת / זכויות יוצרים. השתמש בדמויות בדיוניות כלליות (בלי מנהיגים, סלבס או לוגואים), או החלף תמונות השראה.",
+      {
+        provider: "fal",
+        metadata: { status, raw: text.slice(0, 4000), kind: "content_policy_violation", url }
+      }
+    );
   }
   throw new Error(`HTTP ${status} for ${url}: ${text.slice(0, 800)}`);
 }

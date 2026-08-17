@@ -283,7 +283,7 @@ function enrichVeoPrompt(input: {
   if (!input.textToVideoOnly) {
     const compact = [
       `Scene ${input.order + 1} of ${input.total}.`,
-      "Keep the exact same people, faces, wardrobe, and place as the reference image.",
+      "Match the reference image wardrobe and setting; keep fictional characters consistent; only change pose and camera as described.",
       motion
     ]
       .filter(Boolean)
