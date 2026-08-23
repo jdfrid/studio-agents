@@ -232,6 +232,12 @@ export function formatApiErrorMessage(raw: string): string {
   ) {
     return "מודל Wan/Kling/Hailuo/HeyGen הוגדר בטעות כמודל Veo של Gemini. באדמין → הגדרות: נקה את שדה «וידאו (Veo)» (או שים veo-3.1-fast-generate-preview), ובחר את הפרופיל הנכון למעלה. ל-HeyGen ודא ש-HEYGEN_API_KEY מוגדר; ל-fal ודא ש-FAL_API_KEY מוגדר.";
   }
+  if (lower.includes("no audio inline data") || lower.includes("finishreason=other")) {
+    if (lower.includes("yiddish") || lower.includes("yi")) {
+      return "Gemini TTS לא הצליח להפיק אודיו ליידיש (finishReason=OTHER). נסה משפטי דיבוב קצרים יותר, או בחר שפה עברית עם מבטא יידיש — ואז הפעל מחדש את שלב האודיו.";
+    }
+    return "Gemini TTS לא החזיר אודיו (finishReason=OTHER). לרוב בגלל טקסט/שפה/קול לא נתמכים. נסה לשנות סגנון קול או לקצר את הדיבוב, והפעל מחדש את שלב האודיו.";
+  }
   if (lower.includes("failed to download")) {
     if (lower.includes("403") || lower.includes("expired")) {
       return "לא ניתן להוריד קובץ מ-Google Cloud Storage. ודא ש-GCS_CREDENTIALS_FILE תקין בשרת, ואז הרץ מחדש את שלב הרינדור.";

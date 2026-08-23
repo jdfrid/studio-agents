@@ -663,7 +663,8 @@ export function geminiTtsStyleFromCreative(creative?: CreativeOptions | null): s
 /** Stable default when no creative voice fields — avoid always Kore. */
 export function defaultGeminiVoiceForLanguage(language?: string | null): string {
   const lang = String(language ?? "").toLowerCase();
-  if (lang.startsWith("yi")) return "Fenrir";
+  // Prefer a widely supported female voice for Yiddish/Hebrew-script TTS (Fenrir often triggers OTHER).
+  if (lang.startsWith("yi")) return "Aoede";
   if (lang.startsWith("en")) return "Puck";
   return "Aoede";
 }
