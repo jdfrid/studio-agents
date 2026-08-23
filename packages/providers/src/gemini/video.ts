@@ -3,12 +3,19 @@ import { ProviderError } from "@studio/shared";
 import { httpBytes, httpJson } from "../http.js";
 import { geminiDownloadReference } from "./files.js";
 import { geminiApiKey, geminiBaseUrl, geminiModels, geminiUrl } from "./common.js";
+import { withGeminiRateLimitRetry } from "./rateLimitRetry.js";
 import { veoGenerateAudio, veoResolution, veoSupportsNativeAudio } from "@studio/shared";
 import { notChargedFromMessage, type GeminiUsageReporter } from "./usage.js";
 
 export interface GeminiVeoHooks {
   onPoll?: (operation: GeminiVeoOperation) => Promise<void> | void;
   onUsage?: GeminiUsageReporter;
+  onRateLimitWait?: (info: {
+    attempt: number;
+    maxAttempts: number;
+    delayMs: number;
+    phase: string;
+  }) => Promise<void> | void;
 }
 
 export interface GeminiInlineMedia {
@@ -106,15 +113,30 @@ async function runVeoGeneration(
 ): Promise<GeminiVeoOperation> {
   const wallStarted = Date.now();
   const instance = await buildVeoInstance(provider, req, model);
-  const queued = await httpJson<{ name?: string; operationName?: string }>(
-    geminiUrl(provider, `models/${model}:predictLongRunning`),
-    {
-      method: "POST",
-      body: {
-        instances: [instance],
-        parameters: buildVeoParameters(req, model)
-      },
-      timeoutMs: 120_000
+  const queued = await withGeminiRateLimitRetry(
+    "veo.predictLongRunning",
+    () =>
+      httpJson<{ name?: string; operationName?: string }>(geminiUrl(provider, `models/${model}:predictLongRunning`), {
+        method: "POST",
+        body: {
+          instances: [instance],
+          parameters: buildVeoParameters(req, model)
+        },
+        timeoutMs: 120_000
+      }),
+    async (info) => {
+      await hooks.onRateLimitWait?.({
+        attempt: info.attempt,
+        maxAttempts: info.maxAttempts,
+        delayMs: info.delayMs,
+        phase: info.label
+      });
+      await hooks.onPoll?.({
+        operationName: `rate-limit:${req.sceneId}`,
+        model,
+        status: "queued",
+        error: `429 rate limit — waiting ${Math.round(info.delayMs / 1000)}s (attempt ${info.attempt}/${info.maxAttempts})`
+      });
     }
   );
 
@@ -129,7 +151,24 @@ async function runVeoGeneration(
   let lastStatus: GeminiVeoOperation = { operationName, model, status: "polling" };
   while (Date.now() - startedAt < timeoutMs) {
     await new Promise((resolve) => setTimeout(resolve, Number(provider.config.videoPollIntervalMs ?? 8000)));
-    const status = await httpJson<unknown>(operationPollUrl(provider, operationName), { timeoutMs: 30_000 });
+    const status = await withGeminiRateLimitRetry(
+      "veo.poll",
+      () => httpJson<unknown>(operationPollUrl(provider, operationName), { timeoutMs: 30_000 }),
+      async (info) => {
+        await hooks.onRateLimitWait?.({
+          attempt: info.attempt,
+          maxAttempts: info.maxAttempts,
+          delayMs: info.delayMs,
+          phase: info.label
+        });
+        await hooks.onPoll?.({
+          operationName,
+          model,
+          status: "polling",
+          error: `429 rate limit on poll — waiting ${Math.round(info.delayMs / 1000)}s (attempt ${info.attempt}/${info.maxAttempts})`
+        });
+      }
+    );
     lastStatus = normalizeOperation(operationName, model, status);
     await hooks.onPoll?.(lastStatus);
     if (lastStatus.status === "failed") {

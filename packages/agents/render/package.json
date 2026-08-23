@@ -19,6 +19,7 @@
     "@studio/providers": "workspace:*",
     "@studio/shared": "workspace:*",
     "ffmpeg-static": "^5.2.0",
+    "ioredis": "^5.4.1",
     "nanoid": "^5.0.7",
     "zod": "^3.23.8"
   }

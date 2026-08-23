@@ -2,13 +2,18 @@ import { fetch as undiciFetch } from "undici";
 import { ProviderError } from "@studio/shared";
 import { classifyGeminiError, userFacingGeminiError } from "@studio/shared";
 
-function throwHttpError(url: string, status: number, text: string): never {
+function throwHttpError(url: string, status: number, text: string, retryAfter?: string | null): never {
   const friendly = userFacingGeminiError(text, status);
   const isGemini = url.includes("generativelanguage.googleapis.com") || url.includes("googleapis.com");
   if (isGemini && friendly && classifyGeminiError(text, status) !== "unknown") {
     throw new ProviderError(friendly, {
       provider: "gemini",
-      metadata: { status, raw: text.slice(0, 4000), kind: classifyGeminiError(text, status) }
+      metadata: {
+        status,
+        raw: text.slice(0, 4000),
+        kind: classifyGeminiError(text, status),
+        ...(retryAfter ? { retryAfter } : {})
+      }
     });
   }
   const lower = text.toLowerCase();
@@ -44,7 +49,7 @@ export async function httpJson<T = unknown>(
     });
     const text = await response.text();
     if (!response.ok) {
-      throwHttpError(url, response.status, text);
+      throwHttpError(url, response.status, text, response.headers.get("retry-after"));
     }
     return text ? (JSON.parse(text) as T) : (undefined as T);
   } finally {

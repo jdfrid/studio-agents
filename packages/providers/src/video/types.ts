@@ -29,16 +29,27 @@ export type VideoBeatResult = {
 };
 
 export type VideoBeatHooks = {
-  onPoll?: (event: { operationName: string; model: string; status: string; error?: string | null }) => Promise<void> | void;
+  onPoll?: (event: {
+    operationName: string;
+    model: string;
+    status: string;
+    error?: string | null;
+  }) => Promise<void> | void;
   onUsage?: (event: {
     activityType: string;
-    sceneId: string;
+    sceneId?: string;
     model: string;
-    durationMs: number | null;
-    billedUnits: number;
-    unit: string;
-    charged: "yes" | "no" | "unknown";
+    durationMs?: number | null;
+    billedUnits?: number;
+    unit?: string;
+    charged?: "yes" | "no" | "unknown";
     metadata?: Record<string, unknown>;
+  }) => Promise<void> | void;
+  onRateLimitWait?: (info: {
+    attempt: number;
+    maxAttempts: number;
+    delayMs: number;
+    phase: string;
   }) => Promise<void> | void;
 };
 

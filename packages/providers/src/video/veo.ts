@@ -28,6 +28,7 @@ export function createVeoBeatGenerator(profile: RenderProfile, credential: Provi
               error: operation.error ?? null
             });
           },
+          onRateLimitWait: hooks?.onRateLimitWait,
           onUsage: async (event) => {
             await hooks?.onUsage?.({
               activityType: event.activityType,

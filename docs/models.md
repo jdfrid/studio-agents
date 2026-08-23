@@ -92,6 +92,9 @@ flowchart TD
 | `HEYGEN_API_BASE` | ברירת מחדל `https://api.heygen.com` (ריק שובר upload) |
 | `ELEVENLABS_API_KEY` | שיבוט קול בלבד |
 | `GEMINI_VEO_AUDIO` | ברירת מחדל `0` — דיבוב מ־TTS + FFmpeg |
+| `GEMINI_VEO_SCENE_GAP_MS` | מרווח בין סצנות Veo (ברירת מחדל 20000) — מפחית 429 |
+| `GEMINI_VEO_MAX_INFLIGHT` | מקסימום יצירות Veo במקביל בכל ה־workers (ברירת מחדל 1) |
+| `GEMINI_VEO_429_MAX_ATTEMPTS` | כמה ניסיונות אוטומטיים על 429 (ברירת מחדל 8) |
 | `GCS_*` | ארטיפקטים / חתימות URL |
 
 ---
@@ -116,6 +119,7 @@ flowchart TD
 | `No such filter: 'drawte'` | FFmpeg title_card | פסיקים ב־`alpha=if(...)` חתכו את `drawtext` — תוקן (alpha פשוט / בלי ביטויי פסיק ב־`-vf`) |
 | Kling `string_too_long` | fal Kling | קיצור veoPrompt ב־package (~2400) |
 | IMAGE_OTHER / blockReason OTHER | Gemini image | retries + פרומפט רך + פחות refs |
+| `429 RESOURCE_EXHAUSTED` / quota | Gemini Veo | retry+backoff אוטומטי; מרווח בין סצנות; Rerun משתמש ב־clip cache |
 
 ---
 
@@ -126,6 +130,8 @@ flowchart TD
 - **תנועה מתמונה זולה:** `wan-i2v` / `hailuo-i2v` / `luma-ray-i2v`
 - **איכות I2V גבוהה יותר:** `kling-i2v` או Seedance (יקר)
 - **רצף ויזואלי אחד ארוך:** `veo-extend` (זהירות עלות/כשל)
+
+**לייצור לקוחות:** חשבון Gemini API ב־Paid עם מכסת Veo מספקת לדקה/ליום. המערכת מרככת 429 (retry, מרווח בין סצנות, מנעול גלובלי) אבל **לא מחליפה** מכסה יומית ריקה.
 
 ---
 

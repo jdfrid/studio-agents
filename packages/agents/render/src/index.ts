@@ -35,6 +35,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { nanoid } from "nanoid";
 import ffmpegStatic from "ffmpeg-static";
+import { withVeoInflightGate } from "./veoInflight.js";
 
 export const renderAgent: Agent<RenderInput, RenderOutput> = {
   name: "render",
@@ -76,6 +77,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
     const clipFiles: string[] = [];
     const geminiOperations: RenderOutput["geminiOperations"] = [];
     const existingClips = await loadExistingSceneClips(ctx);
+    let veoPaidCalls = 0;
     await ctx.log.log("render_clip_cache", "Existing rendered clips for reuse", {
       cachedScenes: existingClips.size,
       timelineScenes: input.timeline.length
@@ -169,24 +171,34 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         ]);
         const wantNativeAudio =
           scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1";
-        const result = await beatGenerator.generateBeat(
-          {
-            sceneId: scene.sceneId,
-            prompt: wantNativeAudio
-              ? scene.veoPrompt
-              : sanitizeVeoPromptForExternalAudio(scene.veoPrompt),
-            aspectRatio: input.aspectRatio === "16:9" ? "16:9" : "9:16",
-            durationBucket: scene.durationBucket,
-            durationSeconds: scene.durationSeconds,
-            referenceImage,
-            firstFrame,
-            lastFrame,
-            generateAudio: wantNativeAudio,
-            narrationText: scene.narration,
-            voiceAudio
-          },
-          buildBeatHooks(ctx, scene)
-        );
+        const beatReq = {
+          sceneId: scene.sceneId,
+          prompt: wantNativeAudio
+            ? scene.veoPrompt
+            : sanitizeVeoPromptForExternalAudio(scene.veoPrompt),
+          aspectRatio: (input.aspectRatio === "16:9" ? "16:9" : "9:16") as "9:16" | "16:9",
+          durationBucket: scene.durationBucket,
+          durationSeconds: scene.durationSeconds,
+          referenceImage,
+          firstFrame,
+          lastFrame,
+          generateAudio: wantNativeAudio,
+          narrationText: scene.narration,
+          voiceAudio
+        };
+        const result =
+          renderProfile.provider === "veo"
+            ? await withVeoInflightGate(
+                {
+                  applySceneGap: veoPaidCalls > 0,
+                  log: (event, message, meta) => ctx.log.log(event, message, meta)
+                },
+                () => beatGenerator.generateBeat(beatReq, buildBeatHooks(ctx, scene))
+              ).then((r) => {
+                veoPaidCalls += 1;
+                return r;
+              })
+            : await beatGenerator.generateBeat(beatReq, buildBeatHooks(ctx, scene));
         if (!result.videoBytes) {
           throw new Error(`Video generation completed without bytes for scene ${scene.sceneId}`);
         }
@@ -345,6 +357,7 @@ async function renderExtendChain(
   const geminiOperations: RenderOutput["geminiOperations"] = [];
   let extendHandle: string | null = null;
   let lastResult: VideoBeatResult | null = null;
+  let veoPaidCalls = 0;
   let lastModel = "";
 
   for (let index = 0; index < sortedTimeline.length; index++) {
@@ -374,23 +387,33 @@ async function renderExtendChain(
 
     const wantNativeAudio =
       scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1";
-    const result = await beatGenerator.generateBeat(
-      {
-        sceneId: scene.sceneId,
-        prompt: wantNativeAudio
-          ? scene.veoPrompt
-          : sanitizeVeoPromptForExternalAudio(scene.veoPrompt),
-        aspectRatio: input.aspectRatio === "16:9" ? "16:9" : "9:16",
-        durationBucket: scene.durationBucket,
-        durationSeconds: scene.durationSeconds,
-        referenceImage,
-        firstFrame,
-        lastFrame,
-        extendVideoHandle: extendHandle,
-        generateAudio: wantNativeAudio
-      },
-      buildBeatHooks(ctx, scene, renderProfile.id)
-    );
+    const beatReq = {
+      sceneId: scene.sceneId,
+      prompt: wantNativeAudio
+        ? scene.veoPrompt
+        : sanitizeVeoPromptForExternalAudio(scene.veoPrompt),
+      aspectRatio: (input.aspectRatio === "16:9" ? "16:9" : "9:16") as "9:16" | "16:9",
+      durationBucket: scene.durationBucket,
+      durationSeconds: scene.durationSeconds,
+      referenceImage,
+      firstFrame,
+      lastFrame,
+      extendVideoHandle: extendHandle,
+      generateAudio: wantNativeAudio
+    };
+    const result =
+      renderProfile.provider === "veo"
+        ? await withVeoInflightGate(
+            {
+              applySceneGap: veoPaidCalls > 0,
+              log: (event, message, meta) => ctx.log.log(event, message, meta)
+            },
+            () => beatGenerator.generateBeat(beatReq, buildBeatHooks(ctx, scene, renderProfile.id))
+          ).then((r) => {
+            veoPaidCalls += 1;
+            return r;
+          })
+        : await beatGenerator.generateBeat(beatReq, buildBeatHooks(ctx, scene, renderProfile.id));
 
     if (!result.videoBytes) {
       throw new Error(`Video extend completed without bytes for scene ${scene.sceneId}`);
@@ -557,6 +580,16 @@ function buildBeatHooks(ctx: AgentContext, scene: SceneTimelineEntry, renderProf
         status: operation.status,
         model: operation.model,
         error: operation.error ?? null,
+        renderProfile: renderProfileId ?? null
+      });
+    },
+    onRateLimitWait: async (info) => {
+      await ctx.log.log("veo_rate_limit_wait", "Waiting after Gemini/Veo 429 before retry", {
+        sceneId: scene.sceneId,
+        attempt: info.attempt,
+        maxAttempts: info.maxAttempts,
+        delayMs: info.delayMs,
+        phase: info.phase,
         renderProfile: renderProfileId ?? null
       });
     },
