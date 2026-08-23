@@ -245,7 +245,7 @@ export function formatApiErrorMessage(raw: string): string {
     return `שגיאה בהורדת קובץ מהאחסון: ${sanitized.slice(0, 220)}`;
   }
   if (lower.includes("issue with the audio") || lower.includes("audio for your prompt")) {
-    return "Veo נכשל ביצירת אודיו מקורי לפרומпт (מסנן בטיחות או בעיית עיבוד). הקול ממילא מגיע מ-TTS נפרד — ודא ש-GEMINI_VEO_AUDIO=0 בשרת והרץ Rerun לרינדור.";
+    return "Veo נכשל בגלל בקשת דיבור/מוזיקה בפרומפט הווידאו (ענף האודיו של Google). הקול מגיע מ-TTS נפרד — אחרי עדכון השרת הפרומפטים מנוקים אוטומטית; הפעל מחדש את שלב הרינדור (וודא GEMINI_VEO_AUDIO=0).";
   }
   if (
     lower.includes("real people") ||

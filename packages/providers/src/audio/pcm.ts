@@ -57,3 +57,50 @@ export function normalizeAudioForPlayback(body: Buffer, mimeType: string): { bod
     extension: "wav"
   };
 }
+
+/** Concatenate WAV clips that share the same PCM format (Gemini TTS output). */
+export function concatWavBuffers(parts: Buffer[]): Buffer {
+  if (parts.length === 0) throw new Error("concatWavBuffers requires at least one buffer");
+  if (parts.length === 1) return parts[0]!;
+  const pcmChunks: Buffer[] = [];
+  let format: PcmFormat | null = null;
+  for (const part of parts) {
+    const extracted = extractWavPcm(part);
+    if (!format) format = extracted.format;
+    else if (
+      format.sampleRate !== extracted.format.sampleRate ||
+      format.bitsPerSample !== extracted.format.bitsPerSample ||
+      format.channels !== extracted.format.channels
+    ) {
+      throw new Error("concatWavBuffers: mismatched WAV formats");
+    }
+    pcmChunks.push(extracted.pcm);
+  }
+  return pcmToWav(Buffer.concat(pcmChunks), format!);
+}
+
+function extractWavPcm(wav: Buffer): { pcm: Buffer; format: PcmFormat } {
+  if (wav.length < 44 || wav.toString("ascii", 0, 4) !== "RIFF") {
+    throw new Error("extractWavPcm: not a RIFF/WAV buffer");
+  }
+  const channels = wav.readUInt16LE(22);
+  const sampleRate = wav.readUInt32LE(24);
+  const bitsPerSample = wav.readUInt16LE(34);
+  let offset = 12;
+  while (offset + 8 <= wav.length) {
+    const id = wav.toString("ascii", offset, offset + 4);
+    const size = wav.readUInt32LE(offset + 4);
+    if (id === "data") {
+      return {
+        pcm: wav.subarray(offset + 8, offset + 8 + size),
+        format: { sampleRate, bitsPerSample, channels }
+      };
+    }
+    offset += 8 + size + (size % 2);
+  }
+  // Fallback: classic 44-byte header
+  return {
+    pcm: wav.subarray(44),
+    format: { sampleRate, bitsPerSample, channels }
+  };
+}

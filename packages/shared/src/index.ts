@@ -27,3 +27,4 @@ export * from "./continuity.js";
 export * from "./visualCorrections.js";
 export * from "./hebrewUi.js";
 export * from "./karaokeCaptions.js";
+export * from "./veoPrompt.js";

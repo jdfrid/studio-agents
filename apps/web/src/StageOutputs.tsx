@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "./api.js";
 import type { ArtifactRow, StageName } from "./types.js";
-import { videoPromptLabelHe, artifactKindLabelHe, FRAME_TYPE_LABELS_HE, type RenderProfileId } from "@studio/shared";
+import { videoPromptLabelHe, artifactKindLabelHe, FRAME_TYPE_LABELS_HE, formatApiErrorMessage, type RenderProfileId } from "@studio/shared";
 
 const STAGE_LABELS: Record<StageName, string> = {
   brief: "בריף",
@@ -283,8 +283,8 @@ function localizeProviderError(message: string): string {
   if (/שיבוט קול לא מוגדר|ELEVENLABS/i.test(message)) {
     return "שיבוט קול לא מוגדר בשרת — יש להגדיר ELEVENLABS_API_KEY.";
   }
-  if (/no audio inline data/i.test(message)) {
-    return "יצירת הקריינות נכשלה — לא התקבל קובץ אודיו מהספק. נסה להריץ מחדש את שלב האודיו.";
+  if (/no audio inline data|finishReason=OTHER/i.test(message)) {
+    return formatApiErrorMessage(message);
   }
   if (/enqueue_failed|locked by another worker/i.test(message)) {
     return "המשימה נעולה בתור העיבוד. המתן מעט או הרץ מחדש את השלב.";
@@ -292,7 +292,7 @@ function localizeProviderError(message: string): string {
   if (/Path .* not found|HTTP 404/i.test(message)) {
     return "שירות הרינדור לא מצא את המודל המבוקש. בדוק את הגדרות המודל באדמין והרץ מחדש.";
   }
-  return message;
+  return formatApiErrorMessage(message);
 }
 
 function Field({ label, value }: { label: string; value: unknown }) {

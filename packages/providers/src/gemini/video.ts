@@ -211,6 +211,7 @@ function buildVeoParameters(req: GeminiVeoRequest, model: string): Record<string
   if (veoSupportsNativeAudio(model)) {
     // Never enable Veo native audio unless explicitly opted in via GEMINI_VEO_AUDIO=1.
     // Voice is mixed from separate Gemini TTS + FFmpeg; native audio often fails safety filters.
+    // Always send an explicit false — omitting the flag can still trip Veo's audio branch.
     params.generateAudio = veoGenerateAudio() && Boolean(req.generateAudio);
   }
   return params;

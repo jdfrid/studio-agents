@@ -11,6 +11,7 @@ import {
   RenderOutputSchema,
   buildKaraokeAss,
   getRenderProfile,
+  sanitizeVeoPromptForExternalAudio,
   usesFalVideoProvider,
   usesHeygenVideoProvider,
   type Agent,
@@ -166,17 +167,21 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           loadMediaBytes(ctx.storage, scene.lastFrame),
           usesHeygenVideoProvider(renderProfile) ? loadMediaBytes(ctx.storage, scene.voice) : Promise.resolve(null)
         ]);
+        const wantNativeAudio =
+          scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1";
         const result = await beatGenerator.generateBeat(
           {
             sceneId: scene.sceneId,
-            prompt: scene.veoPrompt,
+            prompt: wantNativeAudio
+              ? scene.veoPrompt
+              : sanitizeVeoPromptForExternalAudio(scene.veoPrompt),
             aspectRatio: input.aspectRatio === "16:9" ? "16:9" : "9:16",
             durationBucket: scene.durationBucket,
             durationSeconds: scene.durationSeconds,
             referenceImage,
             firstFrame,
             lastFrame,
-            generateAudio: scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1",
+            generateAudio: wantNativeAudio,
             narrationText: scene.narration,
             voiceAudio
           },
@@ -367,10 +372,14 @@ async function renderExtendChain(
       isFirst ? loadMediaBytes(ctx.storage, scene.lastFrame) : Promise.resolve(null)
     ]);
 
+    const wantNativeAudio =
+      scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1";
     const result = await beatGenerator.generateBeat(
       {
         sceneId: scene.sceneId,
-        prompt: scene.veoPrompt,
+        prompt: wantNativeAudio
+          ? scene.veoPrompt
+          : sanitizeVeoPromptForExternalAudio(scene.veoPrompt),
         aspectRatio: input.aspectRatio === "16:9" ? "16:9" : "9:16",
         durationBucket: scene.durationBucket,
         durationSeconds: scene.durationSeconds,
@@ -378,7 +387,7 @@ async function renderExtendChain(
         firstFrame,
         lastFrame,
         extendVideoHandle: extendHandle,
-        generateAudio: scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1"
+        generateAudio: wantNativeAudio
       },
       buildBeatHooks(ctx, scene, renderProfile.id)
     );
@@ -1264,15 +1273,17 @@ async function createTitleCardClip(
   const fontOpt = font ? `:fontfile='${escapeFfmpegPath(font)}'` : "";
   const titleSize = Math.max(36, Math.round(Math.min(width, height) * 0.07));
   const subSize = Math.max(22, Math.round(Math.min(width, height) * 0.038));
+  // Do NOT put unescaped commas inside drawtext options when chaining with -vf
+  // (ffmpeg splits on ',' and truncates drawtext → "No such filter: 'drawte'").
   const drawParts = [
-    `drawtext=text='${escapeDrawtext(headline)}'${fontOpt}:fontsize=${titleSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-${sub ? Math.round(titleSize * 0.55) : 0}:alpha='if(lt(t\\,0.35)\\,t/0.35\\,if(gt(t\\,${(duration - 0.35).toFixed(2)})\\,(${duration}-t)/0.35\\,1))'`
+    `drawtext=text='${escapeDrawtext(headline)}'${fontOpt}:fontsize=${titleSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2${sub ? `-${Math.round(titleSize * 0.55)}` : ""}`
   ];
   if (sub) {
     drawParts.push(
-      `drawtext=text='${escapeDrawtext(sub)}'${fontOpt}:fontsize=${subSize}:fontcolor=white@0.9:x=(w-text_w)/2:y=(h-text_h)/2+${Math.round(titleSize * 0.85)}:alpha='if(lt(t\\,0.45)\\,t/0.45\\,if(gt(t\\,${(duration - 0.35).toFixed(2)})\\,(${duration}-t)/0.35\\,1))'`
+      `drawtext=text='${escapeDrawtext(sub)}'${fontOpt}:fontsize=${subSize}:fontcolor=white@0.9:x=(w-text_w)/2:y=(h-text_h)/2+${Math.round(titleSize * 0.85)}`
     );
   }
-  const vf = ["format=yuv420p", ...drawParts].join(",");
+  const vf = ["format=yuv420p", "fade=t=in:st=0:d=0.35", ...drawParts].join(",");
   await runFfmpeg([
     "-f",
     "lavfi",

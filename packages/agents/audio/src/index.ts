@@ -151,6 +151,8 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
             voiceError: message
           });
         }
+        // Brief pause between scenes — bursts of Gemini TTS often return finishReason=OTHER.
+        await new Promise((r) => setTimeout(r, 400));
       }
 
       const scenesNeedingVoice = input.scenes.filter(

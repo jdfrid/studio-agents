@@ -1,7 +1,7 @@
 import type { ProviderCredentialView } from "@studio/shared";
 import { ProviderError } from "@studio/shared";
 import { httpJson } from "../http.js";
-import { normalizeAudioForPlayback } from "../audio/pcm.js";
+import { concatWavBuffers, normalizeAudioForPlayback } from "../audio/pcm.js";
 import {
   describeGenerateContentFailure,
   extractInlineData,
@@ -48,6 +48,36 @@ export async function geminiSynthesizeSpeech(
     });
   }
 
+  try {
+    return await synthesizeOnce(provider, req, text, onUsage);
+  } catch (error) {
+    const chunks = splitNarrationForTts(text);
+    if (chunks.length < 2) throw error;
+    const parts: Buffer[] = [];
+    let model = primaryModel;
+    for (let i = 0; i < chunks.length; i++) {
+      if (i > 0) await sleep(350);
+      const part = await synthesizeOnce(provider, { ...req, style: undefined }, chunks[i]!, onUsage);
+      model = part.model;
+      parts.push(part.body);
+    }
+    return {
+      provider: "gemini",
+      model,
+      body: concatWavBuffers(parts),
+      mimeType: "audio/wav",
+      durationSeconds: null
+    };
+  }
+}
+
+async function synthesizeOnce(
+  provider: ProviderCredentialView,
+  req: GeminiTtsRequest,
+  text: string,
+  onUsage?: GeminiUsageReporter
+): Promise<GeminiTtsResponse> {
+  const primaryModel = geminiModels(provider).tts;
   const started = Date.now();
   const isYiddish = req.language.trim().toLowerCase().startsWith("yi");
   const preferredVoice = req.voiceName ?? String(provider.config.voiceName ?? "Aoede");
@@ -67,7 +97,9 @@ export async function geminiSynthesizeSpeech(
   let lastDetail = "empty candidates/parts";
   let lastModel = primaryModel;
 
-  for (const attempt of attempts) {
+  for (let i = 0; i < attempts.length; i++) {
+    const attempt = attempts[i]!;
+    if (i > 0) await sleep(200);
     lastModel = attempt.model;
     const generationConfig: Record<string, unknown> = {
       responseModalities: ["AUDIO"],
@@ -176,6 +208,26 @@ function buildTtsAttempts(input: {
 
   // Cap retries so a full-scene failure does not burn dozens of API calls.
   return attempts.slice(0, 10);
+}
+
+function splitNarrationForTts(text: string): string[] {
+  const trimmed = text.trim();
+  if (trimmed.length < 90) return [trimmed];
+  const parts = trimmed
+    .split(/(?<=[.!?…。؟])\s+|(?<=[;؛])\s+|\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) return parts;
+  const mid = Math.floor(trimmed.length / 2);
+  const space = trimmed.indexOf(" ", mid);
+  if (space > 20 && space < trimmed.length - 20) {
+    return [trimmed.slice(0, space).trim(), trimmed.slice(space).trim()];
+  }
+  return [trimmed];
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function uniqueVoices(names: string[]): string[] {

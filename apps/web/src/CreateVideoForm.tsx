@@ -471,16 +471,48 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
               סגנון חדשות אולפן
             </button>
           </div>
-          {preferHeygenDub ? (
-            <p className={`advanced-hint ${heygenNeedsAnchor ? "error-inline" : "muted"}`}>
-              דיבוב HeyGen פעיל — סנכרון שפתיים לתמונת ההשראה + אודיו TTS. העלו תמונת דמות ברורה.
-            </p>
-          ) : null}
+          <div className={`heygen-dub-control ${preferHeygenDub ? "heygen-dub-control--on" : ""}`}>
+            <div className="heygen-dub-control-row">
+              <label className="heygen-dub-label">
+                דיבוב HeyGen (סנכרון שפתיים)
+                <select
+                  value={String(creative.preferHeygenDub ?? "off")}
+                  onChange={(e) =>
+                    setCreativeField("preferHeygenDub", (e.target.value || "off") as never)
+                  }
+                >
+                  <option value="off">כבוי — ברירת מחדל (Veo)</option>
+                  <option value="on">פעיל — יקר יותר (סנכרון שפתיים)</option>
+                </select>
+              </label>
+              {preferHeygenDub ? (
+                <button
+                  type="button"
+                  className="heygen-dub-off-btn"
+                  onClick={() => setCreativeField("preferHeygenDub", "off")}
+                >
+                  כבה דיבוב
+                </button>
+              ) : null}
+            </div>
+            {preferHeygenDub ? (
+              <p className={`advanced-hint ${heygenNeedsAnchor ? "error-inline" : "muted"}`}>
+                דיבוב פעיל — סנכרון שפתיים לתמונת ההשראה + אודיו TTS. העלו תמונת דמות ברורה. לביטול: בחרו
+                «כבוי» או לחצו «כבה דיבוב».
+              </p>
+            ) : (
+              <p className="muted advanced-hint">
+                כבוי = רינדור Veo רגיל (מומלץ). פעיל = HeyGen לסנכרון שפתיים בלבד.
+              </p>
+            )}
+          </div>
           {CREATIVE_FIELD_SECTIONS.map((section) => (
             <div key={section.id} className="advanced-section">
               <h4 className="advanced-section-title">{section.titleHe}</h4>
               <div className="advanced-grid">
-                {section.fields.map((field) => (
+                {section.fields
+                  .filter((field) => field.key !== "preferHeygenDub")
+                  .map((field) => (
                   <label key={field.key}>
                     {field.labelHe}
                     {field.kind === "number" ? (

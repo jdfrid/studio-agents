@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isRawPcmMimeType, normalizeAudioForPlayback, pcmToWav } from "../pcm.js";
+import { concatWavBuffers, isRawPcmMimeType, normalizeAudioForPlayback, pcmToWav } from "../pcm.js";
 
 describe("pcm audio helpers", () => {
   it("detects Gemini LPCM mime types", () => {
@@ -21,5 +21,13 @@ describe("pcm audio helpers", () => {
     expect(out.mimeType).toBe("audio/wav");
     expect(out.extension).toBe("wav");
     expect(out.body.subarray(0, 4).toString()).toBe("RIFF");
+  });
+
+  it("concatenates WAV PCM payloads", () => {
+    const a = pcmToWav(Buffer.from([1, 0, 2, 0]), { sampleRate: 24000, bitsPerSample: 16, channels: 1 });
+    const b = pcmToWav(Buffer.from([3, 0, 4, 0]), { sampleRate: 24000, bitsPerSample: 16, channels: 1 });
+    const out = concatWavBuffers([a, b]);
+    expect(out.length).toBe(44 + 8);
+    expect(out.subarray(44).equals(Buffer.from([1, 0, 2, 0, 3, 0, 4, 0]))).toBe(true);
   });
 });

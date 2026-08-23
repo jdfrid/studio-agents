@@ -15,6 +15,7 @@ import {
   planSceneLayout,
   profileToProductionCostConfig,
   resolveRenderProfile,
+  sanitizeVeoPromptForExternalAudio,
   userFacingLanguageInstruction,
   type Agent,
   type ScriptInput,
@@ -65,9 +66,13 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt, visualPrompt, or characterBible — use generic fictional people only (video models block real-person likenesses).",
       "Avoid coded public-figure descriptions (e.g. Israeli leader / US president / named office holders). Describe age, hair, and wardrobe only for fictional characters.",
       "NARRATION–MOTION SYNC (mandatory): narration and veoPrompt are one timed beat — write them together.",
-      "In veoPrompt, mark speaking vs silent: when the line is spoken, the on-camera character faces camera / looks at product, mouths the words (subtle lip motion), natural blinks; do NOT have them turn away, walk off, or cover their mouth while speaking.",
+      heygenMode
+        ? "In veoPrompt, describe body/gaze/gesture timed to the spoken line; mouth sync comes from HeyGen audio."
+        : "CRITICAL (TTS mix): veoPrompt must be SILENT performance only — closed mouth, no speaking, no dialogue, no music, no lip-sync/mouthing words. Voiceover is added later via TTS+FFmpeg; asking Veo for speech often fails the whole clip.",
       "If narration is empty or muted, veoPrompt must say silent performance — closed mouth, no speaking gestures.",
-      "Pace gestures to the line: open with attention, hold product/gesture mid-line, end with a clear hold — avoid frantic action that fights the voiceover.",
+      heygenMode
+        ? "Pace gestures to the line: open with attention, hold product/gesture mid-line, end with a clear hold — avoid frantic action that fights the voiceover."
+        : "Pace gestures to the silent beat: face camera / look at product, natural blinks, hold product mid-beat — avoid frantic action.",
       "Optionally include 0–1 title_card scenes (sceneKind=title_card): short on-screen CTA/headline, empty narration, audioPolicy muted, durationSeconds 3–5, visualPrompt describes full-frame kinetic text background.",
       "Spoken beat scenes use sceneKind=beat (default). Keep dubbing lines short, conversational, and timed to the beat.",
       "Return strictly valid JSON only — escape quotes inside strings, no trailing commas, no markdown."
@@ -198,6 +203,14 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
               narrationRaw,
               narrationCharLimitForBucket(extendMode || beatI2vMode ? clipSeconds : Number(durationBucket))
             );
+      const veoPromptRaw =
+        scene.veoPrompt?.trim() ||
+        scene.visualPrompt?.trim() ||
+        (resolvedKind === "title_card" ? "Static full-frame title card, subtle fade-in text" : "");
+      const veoPrompt =
+        heygenMode || resolvedKind === "title_card"
+          ? veoPromptRaw
+          : sanitizeVeoPromptForExternalAudio(veoPromptRaw);
       return {
         id: nanoid(10),
         order: index,
@@ -208,10 +221,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
           (resolvedKind === "title_card"
             ? "Full-frame kinetic text card, dark studio backdrop, bold white Hebrew headline"
             : ""),
-        veoPrompt:
-          scene.veoPrompt?.trim() ||
-          scene.visualPrompt?.trim() ||
-          (resolvedKind === "title_card" ? "Static full-frame title card, subtle fade-in text" : ""),
+        veoPrompt,
         referenceImagePrompt: scene.referenceImagePrompt ?? scene.visualPrompt ?? undefined,
         firstFramePrompt: includeExtraFrames ? (scene.firstFramePrompt ?? scene.visualPrompt ?? undefined) : scene.firstFramePrompt,
         lastFramePrompt: includeExtraFrames ? (scene.lastFramePrompt ?? scene.visualPrompt ?? undefined) : scene.lastFramePrompt,
