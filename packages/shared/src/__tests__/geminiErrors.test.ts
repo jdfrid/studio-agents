@@ -86,10 +86,13 @@ describe("formatApiErrorMessage", () => {
     expect(msg).not.toContain("AIzaSySecret");
   });
 
-  it("maps celebrity likeness blocks to Hebrew", () => {
-    const msg = formatApiErrorMessage(
-      "Gemini Veo operation failed: Sorry, we can't create videos with real people's names or likenesses."
-    );
-    expect(msg).toContain("סלבריטאים");
+  it("maps HeyGen insufficient_credit to HeyGen billing message (not Google Prepay)", () => {
+    const raw =
+      'HTTP 402 for https://api.heygen.com/v3/videos: {"error":{"code":"insufficient_credit","message":"Insufficient credits. Purchase credit packs to continue."}}';
+    expect(classifyGeminiError(raw, 402)).toBe("billing_quota");
+    const msg = formatApiErrorMessage(raw);
+    expect(msg).toContain("HeyGen");
+    expect(msg).not.toContain("Prepay AI Studio");
+    expect(userFacingGeminiError(raw, 402)).toContain("HeyGen");
   });
 });

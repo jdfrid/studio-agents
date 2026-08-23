@@ -66,24 +66,56 @@ export function classifyGeminiError(raw: string, httpStatus?: number): GeminiErr
 
 export function userFacingGeminiError(raw: string, httpStatus?: number): string | null {
   const kind = classifyGeminiError(raw, httpStatus);
+  const provider = detectExternalProvider(raw);
   switch (kind) {
     case "billing_quota":
+      if (provider === "heygen") {
+        return [
+          "נגמרו הקרדיטים בחשבון HeyGen (לא Google).",
+          "היכנס ל-HeyGen → Billing / Credits, רכוש חבילת קרדיטים, ואז לחץ «הפעל מחדש את השלב».",
+          "מסמך: https://developers.heygen.com/docs/error-codes#insufficient-credit"
+        ].join(" ");
+      }
+      if (provider === "fal") {
+        return [
+          "נגמרו הקרדיטים ב-fal.ai (Kling / Seedance וכו׳) — לא Google.",
+          "טען יתרה ב-fal Dashboard ואז הפעל מחדש את שלב הרינדור."
+        ].join(" ");
+      }
       return [
         "ייתכן שנגמרו קרדיטים ב-Google AI Studio (Prepay) או שאין מספיק יתרה.",
         "Billing → How you pay → Prepay AI Studio → Buy credits.",
         "אם יש יתרה (למשל בתקציב Cloud) — בדוק גם Prepay AI Studio, לא רק Budgets."
       ].join(" ");
     case "rate_limit":
+      if (provider === "heygen") {
+        return "מגבלת קצב זמנית ב-HeyGen. המתן כמה דקות והפעל מחדש את שלב הרינדור.";
+      }
       return [
         "מגבלת קצב או מכסה זמנית של Gemini/Veo (429) — לא בהכרח 'נגמר כסף'.",
         "Google מחזיר 'quota exceeded' גם כשיש יתרה. המתן 5–10 דקות ולחץ «הפעל מחדש את השלב».",
         "ריצות עם הרבה סצנות Veo עלולות לפגוע במכסה לדקה/ליום."
       ].join(" ");
     case "auth":
+      if (provider === "heygen") {
+        return "מפתח HeyGen לא תקין או חסר — ודא ש-HEYGEN_API_KEY מוגדר בשרת.";
+      }
       return "בעיית הרשאה ל-Gemini API — בדוק שה-API key תקין וש-billing מחובר לפרויקט.";
     default:
       return null;
   }
+}
+
+function detectExternalProvider(raw: string): "heygen" | "fal" | "gemini" | null {
+  const lower = raw.toLowerCase();
+  if (lower.includes("heygen") || lower.includes("api.heygen.com")) return "heygen";
+  // HeyGen-specific error code (Google does not use this exact code string).
+  if (lower.includes("insufficient_credit") || lower.includes("purchase credit packs")) return "heygen";
+  if (lower.includes("fal.ai") || lower.includes("fal.media") || lower.includes("fal-ai")) return "fal";
+  if (lower.includes("generativelanguage.googleapis.com") || lower.includes("gemini") || lower.includes("veo")) {
+    return "gemini";
+  }
+  return null;
 }
 
 function looksLikeApiRaw(text: string): boolean {
@@ -92,7 +124,9 @@ function looksLikeApiRaw(text: string): boolean {
   if (t.startsWith("{") || t.includes('{"error"') || t.includes('"error":')) return true;
   if (/^\d{3}\s/.test(t)) return true;
   if (/generativelanguage\.googleapis\.com/i.test(t)) return true;
-  if (/RESOURCE_EXHAUSTED|PERMISSION_DENIED|INVALID_ARGUMENT/i.test(t)) return true;
+  if (/api\.heygen\.com/i.test(t)) return true;
+  if (/fal\.ai|fal\.media/i.test(t)) return true;
+  if (/RESOURCE_EXHAUSTED|PERMISSION_DENIED|INVALID_ARGUMENT|insufficient_credit/i.test(t)) return true;
   return false;
 }
 
