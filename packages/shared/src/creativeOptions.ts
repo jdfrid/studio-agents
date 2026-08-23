@@ -99,6 +99,7 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "אנגלית", labelHe: "אנגלית" },
           { value: "צרפתית", labelHe: "צרפתית" },
           { value: "יידיש", labelHe: "יידיש" },
+          { value: "אידיש", labelHe: "אידיש" },
           { value: "ערבית", labelHe: "ערבית" },
           { value: "רוסית", labelHe: "רוסית" },
           { value: "ספרדית", labelHe: "ספרדית" }
@@ -338,7 +339,8 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "אנגלית אמריקאית", labelHe: "אנגלית אמריקאית" },
           { value: "אנגלית בריטית", labelHe: "אנגלית בריטית" },
           { value: "צרפתית", labelHe: "צרפתית" },
-          { value: "יידיש", labelHe: "יידיש" }
+          { value: "יידיש", labelHe: "יידיש" },
+          { value: "אידיש", labelHe: "אידיש" }
         ]
       },
       {
@@ -610,16 +612,60 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
   return lines;
 }
 
-/** Gemini prebuilt TTS voice from creative gender (fallback Kore). */
+/** Gemini prebuilt TTS voice from creative gender / style / accent. */
 export function geminiVoiceNameFromCreative(creative?: CreativeOptions | null): string | undefined {
-  const gender = creative?.voiceGender;
-  if (gender === "male") return "Charon";
-  if (gender === "female") return "Kore";
-  const legacy = creative?.voiceType?.trim();
-  if (!legacy) return undefined;
-  if (/זכר|גברי|male/i.test(legacy)) return "Charon";
-  if (/נקבה|נשי|female/i.test(legacy)) return "Kore";
-  return undefined;
+  if (!creative) return undefined;
+  const gender = creative.voiceGender;
+  const type = String(creative.voiceType ?? "");
+  const style = String(creative.speechStyle ?? "");
+  const accent = String(creative.accent ?? "");
+  const hasVoiceHint = Boolean(gender || type || style || accent);
+  if (!hasVoiceHint) return undefined;
+
+  const blob = `${type} ${style} ${accent}`.toLowerCase();
+  const legacyMale = /זכר|גברי|male/i.test(type);
+  const legacyFemale = /נקבה|נשי|female/i.test(type);
+
+  let sex: "male" | "female" =
+    gender === "male" || legacyMale
+      ? "male"
+      : gender === "female" || legacyFemale
+        ? "female"
+        : /עמוק|סמכותי|מבוגר|חדשותי/.test(blob)
+          ? "male"
+          : "female";
+
+  if (sex === "male") {
+    if (/צעיר|ידידותי|קליל|puck/i.test(blob)) return "Puck";
+    if (/עמוק|סמכותי|דרמטי|fenrir/i.test(blob)) return "Fenrir";
+    if (/חדשותי|מבוגר|orus/i.test(blob)) return "Orus";
+    return "Charon";
+  }
+
+  if (/צעיר|ידידותי|קליל|aoede/i.test(blob)) return "Aoede";
+  if (/מרגש|דרמטי|zephyr/i.test(blob)) return "Zephyr";
+  if (/רגוע|leda/i.test(blob)) return "Leda";
+  return "Kore";
+}
+
+/** Spoken delivery hint prepended for Gemini TTS. */
+export function geminiTtsStyleFromCreative(creative?: CreativeOptions | null): string | undefined {
+  if (!creative) return undefined;
+  const parts: string[] = [];
+  if (creative.speechStyle) parts.push(String(creative.speechStyle));
+  if (creative.voiceType) parts.push(String(creative.voiceType));
+  if (creative.speechSpeed) parts.push(`מהירות: ${creative.speechSpeed}`);
+  if (creative.accent) parts.push(`מבטא: ${creative.accent}`);
+  if (!parts.length) return undefined;
+  return parts.join(", ");
+}
+
+/** Stable default when no creative voice fields — avoid always Kore. */
+export function defaultGeminiVoiceForLanguage(language?: string | null): string {
+  const lang = String(language ?? "").toLowerCase();
+  if (lang.startsWith("yi")) return "Fenrir";
+  if (lang.startsWith("en")) return "Puck";
+  return "Aoede";
 }
 
 /** Map orientation control to brief aspect ratio. */
@@ -629,15 +675,20 @@ export function aspectRatioFromCreative(creative?: CreativeOptions | null): "9:1
   return undefined;
 }
 
-export function languageCodeFromCreative(creative?: CreativeOptions | null): string | undefined {
-  const lang = creative?.language?.trim();
+function mapCreativeLanguageLabel(label?: string | null): string | undefined {
+  const lang = String(label ?? "").trim();
   if (!lang) return undefined;
+  // Yiddish first (אידיש / יידיש) — before Hebrew substring checks.
+  if (/ייד|איד|אידיש|yiddish/i.test(lang)) return "yi";
   if (lang.includes("עבר")) return "he";
   if (lang.includes("אנגל")) return "en";
   if (lang.includes("צרפ")) return "fr";
-  if (lang.includes("ייד")) return "yi";
   if (lang.includes("ערב")) return "ar";
   if (lang.includes("רוס")) return "ru";
   if (lang.includes("ספרד")) return "es";
   return undefined;
+}
+
+export function languageCodeFromCreative(creative?: CreativeOptions | null): string | undefined {
+  return mapCreativeLanguageLabel(creative?.language) ?? mapCreativeLanguageLabel(creative?.accent);
 }

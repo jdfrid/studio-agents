@@ -9,6 +9,8 @@ import {
   creativeFlagOn,
   formatCreativeConstraints,
   geminiVoiceNameFromCreative,
+  geminiTtsStyleFromCreative,
+  defaultGeminiVoiceForLanguage,
   languageCodeFromCreative,
   normalizeContentLanguage,
   resolveContentLanguage,
@@ -40,6 +42,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     const contentLang = resolveContentLanguage({
       language: languageCodeFromCreative(input.creative) ?? input.language,
       creativeLanguage: input.creative?.language,
+      creativeAccent: input.creative?.accent,
       title: input.title,
       sourceText: input.sourceText,
       instructions: input.instructions
@@ -52,6 +55,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       "visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots.",
       "If the user provided instructions (do/don't constraints), honor them strictly in visualDirection and brandConstraints.",
       "If branding.businessName is set, keep the business name consistent in summary, callToAction, and tone — do not invent a competing brand.",
+      "If attachments include role=anchor images, treat them as mandatory visual references for cast and/or setting/background — describe matching looks in visualDirection.",
       userFacingLanguageInstruction(contentLang),
       `Set the JSON "language" field to "${contentLang}".`
     ].join(" ");
@@ -271,8 +275,9 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       ? `\nUser instructions (MUST follow — do / don't):\n${instructions}`
       : "";
     const langFromCreative = languageCodeFromCreative(input.creative);
+    // Creative / form language wins over LLM guess (models often return "he" for Yiddish).
     const resolvedLanguage = normalizeContentLanguage(
-      langFromCreative ?? contentLang ?? parsed.language ?? input.language
+      langFromCreative ?? contentLang ?? input.language ?? parsed.language
     );
     const businessName = input.branding?.businessName?.trim() || "";
     const slogan = input.branding?.slogan?.trim() || "";
@@ -294,17 +299,23 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       : null;
 
     const endCardCredit =
-      resolvedLanguage === "he"
+      resolvedLanguage === "he" || resolvedLanguage === "yi"
         ? "בכרטיס הסיום יש לציין prompt2spot.com"
         : "End card must credit prompt2spot.com";
     const brandNameConstraint =
-      businessName && resolvedLanguage === "he"
+      businessName && (resolvedLanguage === "he" || resolvedLanguage === "yi")
         ? `שם העסק לשימוש עקבי בדיבוב וב-CTA: ${businessName}`
         : businessName
           ? `Use business name consistently in narration and CTA: ${businessName}`
           : null;
     const userInstructionsPrefix =
-      resolvedLanguage === "he" ? "הוראות משתמש (חובה לכבד)" : "User instructions (MUST follow)";
+      resolvedLanguage === "he" || resolvedLanguage === "yi"
+        ? "הוראות משתמש (חובה לכבד)"
+        : "User instructions (MUST follow)";
+    const anchorNote =
+      visualAnchors.length > 0
+        ? `User uploaded ${visualAnchors.length} inspiration/background image(s) — match cast and/or setting to those references.`
+        : "";
     const enriched: BriefOutput = {
       title: parsed.title ?? input.title,
       summary: parsed.summary ?? "",
@@ -330,11 +341,14 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         ...creativeLines,
         ...(brandNameConstraint ? [brandNameConstraint] : []),
         ...(slogan
-          ? [resolvedLanguage === "he" ? `סלוגן העסק: ${slogan}` : `Business slogan: ${slogan}`]
+          ? [resolvedLanguage === "he" || resolvedLanguage === "yi" ? `סלוגן העסק: ${slogan}` : `Business slogan: ${slogan}`]
           : []),
+        ...(anchorNote ? [anchorNote] : []),
         endCardCredit
       ],
-      visualDirection: `${parsed.visualDirection ?? ""}${creativeBlock}${instructionsBlock}`.trim(),
+      visualDirection: `${parsed.visualDirection ?? ""}${creativeBlock}${instructionsBlock}${
+        anchorNote ? `\n${anchorNote}` : ""
+      }`.trim(),
       musicDirection: [
         parsed.musicDirection ?? "",
         input.creative?.musicTempo ? `tempo: ${input.creative.musicTempo}` : "",
@@ -356,7 +370,8 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       voiceCloneSample,
       videoInsert,
       branding: brandingOut,
-      ttsVoiceName: geminiVoiceNameFromCreative(input.creative) ?? null,
+      ttsVoiceName:
+        geminiVoiceNameFromCreative(input.creative) ?? defaultGeminiVoiceForLanguage(resolvedLanguage),
       ...(input.creative ? { creative: input.creative } : {})
     };
 

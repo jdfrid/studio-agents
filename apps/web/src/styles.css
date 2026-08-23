@@ -506,6 +506,177 @@ main.layout-log { grid-template-columns: 1fr; }
   gap: 12px;
 }
 .run-view { width: 100%; }
+.stage-progress-clock {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 40;
+  width: 168px;
+  padding: 12px 10px 10px;
+  border-radius: 18px;
+  border: 1px solid #2a3348;
+  background: rgba(15, 18, 26, 0.92);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 10px;
+  transition: width 0.25s ease, box-shadow 0.25s ease;
+}
+.stage-progress-clock:hover,
+.stage-progress-clock:focus-within {
+  width: 220px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+.stage-progress-clock-face {
+  position: relative;
+  width: 128px;
+  height: 128px;
+  margin: 0 auto;
+}
+.stage-progress-clock-svg {
+  width: 128px;
+  height: 128px;
+  display: block;
+}
+.spc-track {
+  fill: none;
+  stroke: #232a3a;
+  stroke-width: 8;
+}
+.spc-progress {
+  fill: none;
+  stroke: #3b6ef0;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s ease;
+}
+.stage-progress-clock.is-done .spc-progress { stroke: #3ecf8e; }
+.stage-progress-clock.is-failed .spc-progress { stroke: #ff6b6b; }
+.stage-progress-clock.is-busy .spc-progress {
+  filter: drop-shadow(0 0 6px rgba(59, 110, 240, 0.55));
+  animation: spc-glow 1.6s ease-in-out infinite;
+}
+.spc-tick circle {
+  fill: #4a5568;
+  transition: fill 0.3s ease, r 0.3s ease;
+}
+.spc-tick-completed circle { fill: #3ecf8e; }
+.spc-tick-running circle { fill: #ffb347; }
+.spc-tick-queued circle { fill: #7adfff; }
+.spc-tick-awaiting circle { fill: #ffb56b; }
+.spc-tick-failed circle { fill: #ff6b6b; }
+.spc-tick-pulse {
+  fill: none;
+  stroke: #ffb347;
+  stroke-width: 1.5;
+  opacity: 0.65;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spc-pulse 1.4s ease-out infinite;
+}
+.spc-hand {
+  stroke: #e8ecf2;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: x2 0.55s ease, y2 0.55s ease;
+}
+.stage-progress-clock.is-busy .spc-hand {
+  animation: spc-hand-nudge 2.2s ease-in-out infinite;
+  transform-origin: 64px 64px;
+}
+.spc-hub { fill: #e8ecf2; }
+.stage-progress-clock-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+  gap: 2px;
+}
+.stage-progress-clock-center strong {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.stage-progress-clock-center span {
+  font-size: 0.72rem;
+  color: #9aa6c4;
+  max-width: 72px;
+  margin: 0 auto;
+  line-height: 1.2;
+}
+.stage-progress-clock-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: none;
+  gap: 4px;
+}
+.stage-progress-clock:hover .stage-progress-clock-legend,
+.stage-progress-clock:focus-within .stage-progress-clock-legend {
+  display: grid;
+}
+.stage-progress-clock-legend li {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.72rem;
+  color: #aeb8cc;
+}
+.spc-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4a5568;
+}
+.spc-legend-completed .spc-legend-dot { background: #3ecf8e; }
+.spc-legend-running .spc-legend-dot { background: #ffb347; }
+.spc-legend-queued .spc-legend-dot { background: #7adfff; }
+.spc-legend-awaiting .spc-legend-dot { background: #ffb56b; }
+.spc-legend-failed .spc-legend-dot { background: #ff6b6b; }
+.spc-legend-running .spc-legend-label,
+.spc-legend-awaiting .spc-legend-label { color: #ffe0a8; }
+.spc-legend-completed .spc-legend-label { color: #b8f5d8; }
+.spc-legend-failed .spc-legend-label { color: #ffb0b0; }
+.spc-legend-status { color: #6b7385; font-size: 0.68rem; }
+@keyframes spc-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+@keyframes spc-pulse {
+  0% { transform: scale(0.7); opacity: 0.8; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes spc-hand-nudge {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(4deg); }
+}
+@media (max-width: 720px) {
+  .stage-progress-clock {
+    left: 10px;
+    bottom: 10px;
+    width: 120px;
+    padding: 8px;
+  }
+  .stage-progress-clock-face,
+  .stage-progress-clock-svg {
+    width: 96px;
+    height: 96px;
+  }
+  .stage-progress-clock:hover,
+  .stage-progress-clock:focus-within {
+    width: min(220px, calc(100vw - 20px));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-progress-clock.is-busy .spc-progress,
+  .spc-tick-pulse,
+  .stage-progress-clock.is-busy .spc-hand {
+    animation: none;
+  }
+}
 .run-view-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .run-view-header h2 { margin: 0; flex: 1; min-width: 200px; }
 .run-settings-summary {

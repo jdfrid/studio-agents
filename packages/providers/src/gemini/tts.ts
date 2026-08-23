@@ -41,9 +41,13 @@ export async function geminiSynthesizeSpeech(
   }
 
   const started = Date.now();
-  const voiceName = req.voiceName ?? String(provider.config.voiceName ?? "Kore");
+  const voiceName = req.voiceName ?? String(provider.config.voiceName ?? "Aoede");
+  const langHint =
+    req.language.trim().toLowerCase().startsWith("yi")
+      ? "Speak clearly in Yiddish (not Modern Hebrew): "
+      : "";
   const style = req.style ? `[${req.style}] ` : "";
-  const spoken = `${style}${text}`;
+  const spoken = `${langHint}${style}${text}`;
   const languageCode = toSpeechLanguageCode(req.language);
 
   // languageCode is optional and sometimes causes empty AUDIO responses for he-IL — retry without it.
@@ -120,6 +124,7 @@ function alternateTtsModel(primary: string): string | null {
 function toSpeechLanguageCode(language: string): string {
   const normalized = language.trim().toLowerCase();
   if (normalized.startsWith("he")) return "he-IL";
+  if (normalized.startsWith("yi")) return "yi-Latn"; // Gemini may ignore; style prompt still forces Yiddish delivery
   if (normalized.startsWith("en")) return "en-US";
   if (normalized.includes("-")) return language;
   return `${normalized}-${normalized.toUpperCase()}`;

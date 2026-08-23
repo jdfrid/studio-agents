@@ -64,7 +64,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
     let anchorReference: ReferenceImageBytes | null = null;
 
-    const MAX_INLINE_ANCHORS = 2;
+    const MAX_INLINE_ANCHORS = 4;
 
     const resolvedAnchorPaths = Array.from(
       new Set(
@@ -245,25 +245,30 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
           const continuityRefs: ReferenceImageBytes[] = [];
 
-          if (assetMode === "shared_reference" && anchorReferences.length) {
-
-            continuityRefs.push(...anchorReferences);
-
+          // Always prefer user inspiration/background images when present (every scene).
+          if (anchorReferences.length) {
+            const primary = anchorReferences[0]!;
+            const rotated =
+              anchorReferences.length > 1
+                ? anchorReferences[sceneIndex % anchorReferences.length]!
+                : primary;
+            continuityRefs.push(primary);
+            if (rotated !== primary) continuityRefs.push(rotated);
           } else if (assetMode === "shared_reference" && anchorReference) {
-
             continuityRefs.push(anchorReference);
-
           } else if (chainReference) {
-
             continuityRefs.push(chainReference);
-
           }
+
+          const anchorHint = continuityRefs.length
+            ? " Match the uploaded reference photo(s) for character likeness and/or background/setting — do not invent a different place or cast."
+            : "";
 
           const reference = await geminiGenerateImage(
 
             gemini,
 
-            { prompt: referencePrompt, aspectRatio: input.aspectRatio, referenceImages: continuityRefs },
+            { prompt: `${referencePrompt}${anchorHint}`, aspectRatio: input.aspectRatio, referenceImages: continuityRefs },
 
             async (event) => {
 

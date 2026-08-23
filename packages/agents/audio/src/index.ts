@@ -95,7 +95,8 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
                     {
                       text: scene.narration,
                       language: input.language,
-                      ...(input.voiceName ? { voiceName: input.voiceName } : {})
+                      ...(input.voiceName ? { voiceName: input.voiceName } : {}),
+                      ...(input.voiceStyle ? { style: input.voiceStyle } : {})
                     },
                     async (event) => {
                       await ctx.cost.record({ ...event, sceneId: scene.sceneId });

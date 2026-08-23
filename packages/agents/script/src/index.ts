@@ -51,6 +51,12 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const systemParts = [
       "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline.",
       userFacingLanguageInstruction(contentLang),
+      contentLang === "yi"
+        ? "NARRATION MUST be Yiddish (ייִדיש), not Modern Israeli Hebrew. Prefer Yiddish wording even when the brief summary drifted into Hebrew."
+        : "",
+      brief.visualAnchors?.length
+        ? `User provided ${brief.visualAnchors.length} inspiration/background image(s). Keep visualPrompt/referenceImagePrompt aligned with those references (cast and/or setting).`
+        : "",
       `Keep each narration under ${narrationLimit} characters (must fit ${clipSeconds}s of spoken audio) in ${langEn}.`,
       "Keep visualPrompt and veoPrompt under 200 characters each.",
       "CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette.",
@@ -65,7 +71,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "Optionally include 0–1 title_card scenes (sceneKind=title_card): short on-screen CTA/headline, empty narration, audioPolicy muted, durationSeconds 3–5, visualPrompt describes full-frame kinetic text background.",
       "Spoken beat scenes use sceneKind=beat (default). Keep dubbing lines short, conversational, and timed to the beat.",
       "Return strictly valid JSON only — escape quotes inside strings, no trailing commas, no markdown."
-    ];
+    ].filter(Boolean);
     if (extendMode) {
       systemParts.push(
         "VEO EXTEND MODE: produce story beats (not independent clips). Beat 1 is the opening Veo generation; beats 2+ extend the same continuous shot — veoPrompt must describe what happens next in the same scene, same camera, no hard cut.",

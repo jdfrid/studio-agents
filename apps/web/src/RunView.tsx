@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "./api.js";
 import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
+import { StageProgressClock } from "./StageProgressClock.js";
 import { VisualCorrectionsPanel } from "./VisualCorrectionsPanel.js";
 import { StageErrorView } from "./StageErrorView.js";
 import { StageEditor, StageUploadControls } from "./StageEditor.js";
@@ -41,6 +42,7 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
 
   return (
     <div className="run-view">
+      <StageProgressClock run={run} />
       <header className="run-view-header">
         <button type="button" className="link-btn" onClick={onBack}>
           ← חזרה

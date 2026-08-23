@@ -21,12 +21,26 @@ describe("contentLanguage", () => {
 
   it("normalizes codes", () => {
     expect(normalizeContentLanguage("he-IL")).toBe("he");
+    expect(normalizeContentLanguage("אידיש")).toBe("yi");
+    expect(normalizeContentLanguage("יידיש")).toBe("yi");
     expect(contentLanguageEnglishName("he")).toBe("Hebrew");
+    expect(contentLanguageEnglishName("yi")).toBe("Yiddish");
+  });
+
+  it("uses Yiddish from accent or אידיש spelling", () => {
+    expect(resolveContentLanguage({ creativeAccent: "יידיש", sourceText: "עברית" })).toBe("yi");
+    expect(resolveContentLanguage({ creativeLanguage: "אידיש" })).toBe("yi");
   });
 
   it("builds language instruction for Hebrew", () => {
     const text = userFacingLanguageInstruction("he");
     expect(text).toContain("Hebrew");
     expect(text).toContain("do NOT translate");
+  });
+
+  it("builds Yiddish instruction that forbids Modern Hebrew", () => {
+    const text = userFacingLanguageInstruction("yi");
+    expect(text).toContain("Yiddish");
+    expect(text).toMatch(/not Modern Israeli Hebrew/i);
   });
 });

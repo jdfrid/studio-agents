@@ -247,7 +247,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         <small className="muted">הנחיות מחייבות ליצירה — מה לשמור, מה לשנות, תנועות מצלמה וכו׳.</small>
       </label>
       <label className="file-row">
-        תמונות השראה (אופציונלי)
+        תמונות השראה / רקע (אופציונלי)
         <input
           type="file"
           accept="image/*"
@@ -258,7 +258,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           }}
         />
         <small className="muted">
-          אפשר לבחור כמה תמונות (עד {MAX_VISUAL_FILES}) — דמויות, מקום, סגנון. בחירה נוספת מוסיפה לרשימה.
+          אפשר לבחור כמה תמונות (עד {MAX_VISUAL_FILES}) — דמויות, מקום/רקע, סגנון. הן ישמשו כהפניה ויזואלית בכל הסצנות.
         </small>
       </label>
       {visualFiles.length ? (

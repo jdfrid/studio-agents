@@ -5,6 +5,8 @@ import {
   createConsoleLogger,
   creativeFlagOn,
   geminiVoiceNameFromCreative,
+  geminiTtsStyleFromCreative,
+  defaultGeminiVoiceForLanguage,
   nextStage,
   resolveRenderProfile,
   type AgentContext,
@@ -129,9 +131,15 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         language?: string;
         voiceCloneSample?: { name: string; gcsPath: string; mimeType: string } | null;
         ttsVoiceName?: string | null;
+        creative?: Parameters<typeof geminiVoiceNameFromCreative>[0];
       };
       const briefInput = brief as { creative?: Parameters<typeof geminiVoiceNameFromCreative>[0] };
-      const voiceName = briefData.ttsVoiceName ?? geminiVoiceNameFromCreative(briefInput.creative);
+      const creative = briefData.creative ?? briefInput.creative;
+      const voiceName =
+        briefData.ttsVoiceName ??
+        geminiVoiceNameFromCreative(creative) ??
+        defaultGeminiVoiceForLanguage(briefData.language);
+      const voiceStyle = geminiTtsStyleFromCreative(creative);
       return {
         language: briefData.language ?? "he",
         scenes: (script?.scenes ?? []).map((scene) => ({
@@ -142,7 +150,8 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         })),
         musicPrompt: script?.musicPrompt ?? "",
         voiceCloneSample: briefData.voiceCloneSample ?? null,
-        ...(voiceName ? { voiceName } : {})
+        ...(voiceName ? { voiceName } : {}),
+        ...(voiceStyle ? { voiceStyle } : {})
       };
     }
     case "asset": {

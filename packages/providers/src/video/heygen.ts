@@ -7,6 +7,12 @@ import type { VideoBeatGenerator, VideoBeatHooks, VideoBeatRequest, VideoBeatRes
 const DEFAULT_BASE = "https://api.heygen.com";
 const MODEL_ID = "heygen/v3/videos/image";
 
+function resolveHeygenBaseUrl(credential: ProviderCredentialView): string {
+  const raw = String(credential.config.baseUrl ?? process.env.HEYGEN_API_BASE ?? "").trim();
+  const base = raw || DEFAULT_BASE;
+  return base.replace(/\/$/, "");
+}
+
 type HeygenCreateResponse = {
   data?: { video_id?: string; status?: string };
   error?: { message?: string; code?: string };
@@ -123,10 +129,7 @@ export function createHeygenBeatGenerator(
         });
       }
 
-      const baseUrl = String(credential.config.baseUrl ?? process.env.HEYGEN_API_BASE ?? DEFAULT_BASE).replace(
-        /\/$/,
-        ""
-      );
+      const baseUrl = resolveHeygenBaseUrl(credential);
       const voiceId = String(credential.config.voiceId ?? process.env.HEYGEN_VOICE_ID ?? "").trim() || null;
 
       await hooks?.onPoll?.({ operationName, model: MODEL_ID, status: "queued" });
