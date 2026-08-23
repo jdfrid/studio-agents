@@ -9,6 +9,7 @@ import {
   NoProviderConfiguredError,
   RenderInputSchema,
   RenderOutputSchema,
+  buildKaraokeAss,
   getRenderProfile,
   usesFalVideoProvider,
   usesHeygenVideoProvider,
@@ -17,6 +18,7 @@ import {
   type ArtifactRecord,
   type BriefBrandingOutput,
   type GcsClient,
+  type KaraokeLineCue,
   type ProviderCredentialView,
   type RenderInput,
   type RenderOutput,
@@ -84,11 +86,15 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       }
 
       for (const scene of input.timeline) {
-        const promptHash = stablePromptHash(scene.veoPrompt);
+        const isTitleCard = scene.sceneKind === "title_card";
+        const promptHash = stablePromptHash(
+          isTitleCard ? `title_card:${scene.title}:${scene.visualPrompt}` : scene.veoPrompt
+        );
         await ctx.log.log("render_scene_start", "Rendering scene", {
           sceneId: scene.sceneId,
           order: scene.order,
-          renderProfile: renderProfile.id
+          renderProfile: renderProfile.id,
+          sceneKind: isTitleCard ? "title_card" : "beat"
         });
 
         const cached = existingClips.get(scene.sceneId);
@@ -112,6 +118,41 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
             provider: String(cached.artifact.metadata.provider ?? "cached"),
             model: String(cached.artifact.metadata.model ?? ""),
             geminiOperationName: String(cached.artifact.metadata.geminiOperationName ?? ""),
+            promptHash
+          });
+          continue;
+        }
+
+        if (isTitleCard) {
+          const titlePath = await createTitleCardClip(dir, dimensions, scene);
+          const finalizedTitle = await finalizeSceneClip(titlePath, dir, scene.sceneId, dimensions);
+          const scenePath = finalizedTitle.path;
+          clipFiles.push(scenePath);
+          const clipArtifact = await ctx.artifacts.save({
+            runId: ctx.runId,
+            stage: "render",
+            kind: "scene_rendered_clip",
+            body: await readFile(scenePath),
+            mimeType: "video/mp4",
+            filename: `scene-${scene.order}-title.mp4`,
+            metadata: {
+              sceneId: scene.sceneId,
+              provider: "ffmpeg",
+              model: "title_card",
+              order: scene.order,
+              promptHash,
+              renderProfileId: renderProfile.id,
+              sceneKind: "title_card"
+            }
+          });
+          perScene.push({
+            sceneId: scene.sceneId,
+            artifactId: clipArtifact.id,
+            gcsPath: clipArtifact.gcsPath,
+            durationSeconds: finalizedTitle.durationSeconds,
+            provider: "ffmpeg",
+            model: "title_card",
+            geminiOperationName: null,
             promptHash
           });
           continue;
@@ -222,6 +263,8 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         await downloadMediaToFile(ctx.storage, musicGcsPath, musicLocal);
         finalPath = await muxMusicTrack(assembledPath, musicLocal, dir);
       }
+
+      finalPath = await burnKaraokeAndWatermark(finalPath, dir, dimensions, input, ctx.log);
 
       finalPath = await appendBrandingEndCard(finalPath, dir, dimensions, input.branding ?? null, ctx.storage);
 
@@ -428,6 +471,8 @@ async function renderExtendChain(
     await downloadMediaToFile(ctx.storage, musicGcsPath, musicLocal);
     finalPath = await muxMusicTrack(finalPath, musicLocal, dir);
   }
+
+  finalPath = await burnKaraokeAndWatermark(finalPath, dir, dimensions, input, ctx.log);
 
   finalPath = await appendBrandingEndCard(finalPath, dir, dimensions, input.branding ?? null, ctx.storage);
 
@@ -1187,6 +1232,157 @@ async function createEndCardClip(dir: string, dimensions: VideoDimensions, lastF
     endClip
   ]);
   return endClip;
+}
+
+function escapeFfmpegPath(filePath: string): string {
+  return filePath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+}
+
+function assFontNameFromPath(fontPath: string | null): string {
+  if (!fontPath) return "Arial";
+  const base = path.basename(fontPath).toLowerCase();
+  if (base.includes("dejavu")) return "DejaVu Sans";
+  if (base.includes("liberation")) return "Liberation Sans";
+  if (base.includes("noto")) return "Noto Sans";
+  if (base.includes("segoe")) return "Segoe UI";
+  if (base.includes("arial")) return "Arial";
+  return "Arial";
+}
+
+/** Full-frame kinetic text beat (no talking head / no paid video API). */
+async function createTitleCardClip(
+  dir: string,
+  dimensions: VideoDimensions,
+  scene: SceneTimelineEntry
+): Promise<string> {
+  const out = path.join(dir, `title-${scene.order}-${nanoid(4)}.mp4`);
+  const { width, height } = dimensions;
+  const duration = Math.min(5, Math.max(3, scene.durationSeconds || 4));
+  const headline = (scene.title || scene.narration || " ").trim() || " ";
+  const sub = (scene.narration || "").trim() && scene.narration.trim() !== headline ? scene.narration.trim() : "";
+  const font = resolveDrawtextFont();
+  const fontOpt = font ? `:fontfile='${escapeFfmpegPath(font)}'` : "";
+  const titleSize = Math.max(36, Math.round(Math.min(width, height) * 0.07));
+  const subSize = Math.max(22, Math.round(Math.min(width, height) * 0.038));
+  const drawParts = [
+    `drawtext=text='${escapeDrawtext(headline)}'${fontOpt}:fontsize=${titleSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-${sub ? Math.round(titleSize * 0.55) : 0}:alpha='if(lt(t\\,0.35)\\,t/0.35\\,if(gt(t\\,${(duration - 0.35).toFixed(2)})\\,(${duration}-t)/0.35\\,1))'`
+  ];
+  if (sub) {
+    drawParts.push(
+      `drawtext=text='${escapeDrawtext(sub)}'${fontOpt}:fontsize=${subSize}:fontcolor=white@0.9:x=(w-text_w)/2:y=(h-text_h)/2+${Math.round(titleSize * 0.85)}:alpha='if(lt(t\\,0.45)\\,t/0.45\\,if(gt(t\\,${(duration - 0.35).toFixed(2)})\\,(${duration}-t)/0.35\\,1))'`
+    );
+  }
+  const vf = ["format=yuv420p", ...drawParts].join(",");
+  await runFfmpeg([
+    "-f",
+    "lavfi",
+    "-i",
+    `color=c=0x101820:s=${width}x${height}:d=${duration}`,
+    "-f",
+    "lavfi",
+    "-i",
+    "anullsrc=channel_layout=stereo:sample_rate=44100",
+    "-t",
+    String(duration),
+    "-vf",
+    vf,
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-c:a",
+    "aac",
+    "-shortest",
+    "-movflags",
+    "+faststart",
+    "-y",
+    out
+  ]);
+  return out;
+}
+
+async function burnKaraokeAndWatermark(
+  videoPath: string,
+  dir: string,
+  dimensions: VideoDimensions,
+  input: RenderInput,
+  log: AgentContext["log"]
+): Promise<string> {
+  const wantKaraoke = Boolean(input.karaokeCaptions);
+  const wantMark = Boolean(input.sideWatermark);
+  if (!wantKaraoke && !wantMark) return videoPath;
+
+  try {
+    const filters: string[] = [];
+    let assPath: string | null = null;
+    if (wantKaraoke) {
+      const cues: KaraokeLineCue[] = input.timeline.flatMap((scene) =>
+        (scene.captionCues ?? []).map((cue) => ({
+          text: cue.text,
+          startSecond: cue.startSecond,
+          endSecond: cue.endSecond,
+          words: cue.words ?? []
+        }))
+      );
+      if (cues.length) {
+        const font = resolveDrawtextFont();
+        const ass = buildKaraokeAss(cues, { fontName: assFontNameFromPath(font) });
+        assPath = path.join(dir, `karaoke-${nanoid(4)}.ass`);
+        await writeFile(assPath, ass, "utf8");
+        const fontsDir = font ? path.dirname(font) : null;
+        const assEsc = escapeFfmpegPath(assPath);
+        const fontsEsc = fontsDir ? escapeFfmpegPath(fontsDir) : null;
+        filters.push(fontsEsc ? `ass='${assEsc}':fontsdir='${fontsEsc}'` : `ass='${assEsc}'`);
+      }
+    }
+
+    if (wantMark) {
+      const mark =
+        input.branding?.businessName?.trim() ||
+        input.branding?.slogan?.trim() ||
+        "prompt2spot.com";
+      const font = resolveDrawtextFont();
+      const fontOpt = font ? `:fontfile='${escapeFfmpegPath(font)}'` : "";
+      const size = Math.max(18, Math.round(Math.min(dimensions.width, dimensions.height) * 0.028));
+      filters.push(
+        `drawtext=text='${escapeDrawtext(mark)}'${fontOpt}:fontsize=${size}:fontcolor=white@0.38:x=${Math.round(dimensions.width * 0.035)}:y=(h+text_w)/2:angle=-PI/2`
+      );
+    }
+
+    if (!filters.length) return videoPath;
+
+    const out = path.join(dir, `overlay-${nanoid(4)}.mp4`);
+    await runFfmpeg([
+      "-i",
+      videoPath,
+      "-vf",
+      filters.join(","),
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-c:a",
+      "copy",
+      "-movflags",
+      "+faststart",
+      "-y",
+      out
+    ]);
+    await log.log("render_overlays", "Burned karaoke/watermark overlays", {
+      karaoke: wantKaraoke && Boolean(assPath),
+      sideWatermark: wantMark
+    });
+    return out;
+  } catch (error) {
+    await log.log("render_overlays_failed", "Overlay burn-in failed; continuing without", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return videoPath;
+  }
 }
 
 /**

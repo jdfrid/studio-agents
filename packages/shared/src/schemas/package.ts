@@ -65,7 +65,27 @@ export const SceneTimelineEntrySchema = z.object({
     artifactId: z.string().nullable(),
     gcsPath: z.string().nullable(),
     signedUrl: z.string().nullable()
-  })
+  }),
+  sceneKind: z.enum(["beat", "title_card"]).default("beat"),
+  /** Karaoke word/line cues for burn-in (absolute timeline seconds). */
+  captionCues: z
+    .array(
+      z.object({
+        text: z.string(),
+        startSecond: z.number(),
+        endSecond: z.number(),
+        words: z
+          .array(
+            z.object({
+              text: z.string(),
+              startSecond: z.number(),
+              endSecond: z.number()
+            })
+          )
+          .default([])
+      })
+    )
+    .optional()
 });
 export type SceneTimelineEntry = z.infer<typeof SceneTimelineEntrySchema>;
 

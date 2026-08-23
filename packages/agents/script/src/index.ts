@@ -62,6 +62,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "In veoPrompt, mark speaking vs silent: when the line is spoken, the on-camera character faces camera / looks at product, mouths the words (subtle lip motion), natural blinks; do NOT have them turn away, walk off, or cover their mouth while speaking.",
       "If narration is empty or muted, veoPrompt must say silent performance — closed mouth, no speaking gestures.",
       "Pace gestures to the line: open with attention, hold product/gesture mid-line, end with a clear hold — avoid frantic action that fights the voiceover.",
+      "Optionally include 0–1 title_card scenes (sceneKind=title_card): short on-screen CTA/headline, empty narration, audioPolicy muted, durationSeconds 3–5, visualPrompt describes full-frame kinetic text background.",
+      "Spoken beat scenes use sceneKind=beat (default). Keep dubbing lines short, conversational, and timed to the beat.",
       "Return strictly valid JSON only — escape quotes inside strings, no trailing commas, no markdown."
     ];
     if (extendMode) {
@@ -98,7 +100,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const includeExtraFrames = !budget && !extendMode && !beatI2vMode;
     const sceneSchema: Record<string, unknown> = {
       title: `short ${langNative} title`,
-      narration: `${langNative} narration, 1 short sentence (max ${narrationLimit} chars)`,
+      narration: `${langNative} narration, 1 short sentence (max ${narrationLimit} chars); empty string if sceneKind=title_card`,
       visualPrompt: "English visual directive for image models (max 200 chars)",
       veoPrompt: heygenMode
         ? "English HeyGen motion prompt: body/gaze/gesture timed to narration (max 200 chars)"
@@ -108,7 +110,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         ? "gemini_tts_only"
         : "gemini_tts_plus_music | gemini_tts_only | veo_native_audio | muted",
       durationSeconds: clipSeconds,
-      requiredAssets: ["voice", "music", "video"]
+      requiredAssets: ["voice", "music", "video"],
+      sceneKind: "beat | title_card"
     };
     if (includeExtraFrames) {
       sceneSchema.referenceImagePrompt = "optional English reference still prompt";
@@ -143,7 +146,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
 
     const completeJson = provider.type === "GEMINI" ? geminiCompleteJson : llmCompleteJson;
     const { parsed, model } = await completeJson<{
-      scenes: Omit<SceneSpec, "id" | "order">[];
+      scenes: Array<Partial<Omit<SceneSpec, "id" | "order">> & { title?: string; narration?: string }>;
       musicPrompt: string;
       backgroundVisualPrompt: string;
       characterBible?: string;
@@ -179,24 +182,49 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         beatI2vMode
       );
       const includeExtraFrames = !budget && !extendMode && !beatI2vMode;
-      const narration = trimNarration(
-        scene.narration ?? "",
-        narrationCharLimitForBucket(extendMode || beatI2vMode ? clipSeconds : Number(durationBucket))
-      );
+      // Title cards are FFmpeg-only; skip in continuous extend chains.
+      const resolvedKind = extendMode ? "beat" : scene.sceneKind === "title_card" ? "title_card" : "beat";
+      const narrationRaw = resolvedKind === "title_card" ? (scene.narration ?? "").trim() : (scene.narration ?? "");
+      const narration =
+        resolvedKind === "title_card"
+          ? narrationRaw.slice(0, narrationLimit)
+          : trimNarration(
+              narrationRaw,
+              narrationCharLimitForBucket(extendMode || beatI2vMode ? clipSeconds : Number(durationBucket))
+            );
       return {
         id: nanoid(10),
         order: index,
         title: scene.title ?? `Scene ${index + 1}`,
         narration,
-        visualPrompt: scene.visualPrompt ?? "",
-        veoPrompt: scene.veoPrompt ?? scene.visualPrompt ?? "",
+        visualPrompt:
+          scene.visualPrompt?.trim() ||
+          (resolvedKind === "title_card"
+            ? "Full-frame kinetic text card, dark studio backdrop, bold white Hebrew headline"
+            : ""),
+        veoPrompt:
+          scene.veoPrompt?.trim() ||
+          scene.visualPrompt?.trim() ||
+          (resolvedKind === "title_card" ? "Static full-frame title card, subtle fade-in text" : ""),
         referenceImagePrompt: scene.referenceImagePrompt ?? scene.visualPrompt ?? undefined,
         firstFramePrompt: includeExtraFrames ? (scene.firstFramePrompt ?? scene.visualPrompt ?? undefined) : scene.firstFramePrompt,
         lastFramePrompt: includeExtraFrames ? (scene.lastFramePrompt ?? scene.visualPrompt ?? undefined) : scene.lastFramePrompt,
         durationBucket,
-        audioPolicy: heygenMode ? "gemini_tts_only" : resolveSceneAudioPolicy(scene.audioPolicy, budget),
-        durationSeconds: extendMode || beatI2vMode ? clipSeconds : Number(durationBucket),
-        requiredAssets: scene.requiredAssets?.length ? scene.requiredAssets : ["voice", "music", "video"]
+        audioPolicy:
+          resolvedKind === "title_card" ? "muted" : heygenMode ? "gemini_tts_only" : resolveSceneAudioPolicy(scene.audioPolicy, budget),
+        durationSeconds:
+          resolvedKind === "title_card"
+            ? Math.min(5, Math.max(3, Number(scene.durationSeconds) || 4))
+            : extendMode || beatI2vMode
+              ? clipSeconds
+              : Number(durationBucket),
+        requiredAssets:
+          resolvedKind === "title_card"
+            ? ["music"]
+            : scene.requiredAssets?.length
+              ? scene.requiredAssets
+              : ["voice", "music", "video"],
+        sceneKind: resolvedKind
       };
     });
 

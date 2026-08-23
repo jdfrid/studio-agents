@@ -15,7 +15,8 @@ const baseScript = (): ScriptOutput => ({
       durationBucket: "8",
       audioPolicy: "gemini_tts_plus_music",
       durationSeconds: 8,
-      requiredAssets: ["voice", "music", "video"]
+      requiredAssets: ["voice", "music", "video"],
+      sceneKind: "beat"
     }
   ],
   totalDurationSeconds: 8,

@@ -142,6 +142,8 @@ export const BriefOutputSchema = z.object({
   /** Business branding for end card and UI preview. */
   branding: BriefBrandingOutputSchema.nullable().optional(),
   /** Gemini TTS prebuilt voice chosen from creative voice gender. */
-  ttsVoiceName: z.string().max(40).nullable().optional()
+  ttsVoiceName: z.string().max(40).nullable().optional(),
+  /** Echo of user creative controls for package/render flags. */
+  creative: CreativeOptionsSchema.optional()
 });
 export type BriefOutput = z.infer<typeof BriefOutputSchema>;

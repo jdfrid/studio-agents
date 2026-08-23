@@ -37,7 +37,13 @@ export const CreativeOptionsSchema = z
     musicSync: z.enum(["auto", "manual"]).optional(),
     logoPlacement: z.enum(["none", "always", "end_only", "open_and_end"]).optional(),
     /** Portrait (9:16) or landscape (16:9) final video. */
-    videoOrientation: z.enum(["portrait", "landscape"]).optional()
+    videoOrientation: z.enum(["portrait", "landscape"]).optional(),
+    /** Burn karaoke-style Hebrew captions (default on when "on"). */
+    karaokeCaptions: z.enum(["on", "off"]).optional(),
+    /** Vertical side watermark along the film. */
+    sideWatermark: z.enum(["on", "off"]).optional(),
+    /** Prefer HeyGen lip-sync render profile for dubbing. */
+    preferHeygenDub: z.enum(["on", "off"]).optional()
   })
   .strict();
 
@@ -54,386 +60,491 @@ export type CreativeFieldDef = {
   unit?: string;
 };
 
-export const CREATIVE_FIELD_DEFS: CreativeFieldDef[] = [
+export type CreativeFieldSectionId =
+  | "envelope"
+  | "brief"
+  | "script"
+  | "dubbing"
+  | "music"
+  | "visual"
+  | "render";
+
+export type CreativeFieldSection = {
+  id: CreativeFieldSectionId;
+  titleHe: string;
+  fields: CreativeFieldDef[];
+};
+
+/** Advanced fields grouped by pipeline stage (shown under «מתקדם»). */
+export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
   {
-    key: "videoOrientation",
-    labelHe: "כיוון סרטון",
-    kind: "select",
-    options: [
-      { value: "portrait", labelHe: "לאורך (אנכי)" },
-      { value: "landscape", labelHe: "לרוחב (אופקי)" }
+    id: "envelope",
+    titleHe: "מעטפת התכנית",
+    fields: [
+      {
+        key: "videoOrientation",
+        labelHe: "כיוון סרטון",
+        kind: "select",
+        options: [
+          { value: "portrait", labelHe: "לאורך (אנכי)" },
+          { value: "landscape", labelHe: "לרוחב (אופקי)" }
+        ]
+      },
+      {
+        key: "language",
+        labelHe: "שפה",
+        kind: "select",
+        options: [
+          { value: "עברית", labelHe: "עברית" },
+          { value: "אנגלית", labelHe: "אנגלית" },
+          { value: "צרפתית", labelHe: "צרפתית" },
+          { value: "יידיש", labelHe: "יידיש" },
+          { value: "ערבית", labelHe: "ערבית" },
+          { value: "רוסית", labelHe: "רוסית" },
+          { value: "ספרדית", labelHe: "ספרדית" }
+        ]
+      },
+      {
+        key: "targetAudience",
+        labelHe: "קהל יעד",
+        kind: "select",
+        options: [
+          { value: "ילדים", labelHe: "ילדים" },
+          { value: "צעירים", labelHe: "צעירים" },
+          { value: "משפחות", labelHe: "משפחות" },
+          { value: "בעלי עסקים", labelHe: "בעלי עסקים" },
+          { value: "תורמים", labelHe: "תורמים" },
+          { value: "לקוחות קיימים", labelHe: "לקוחות קיימים" }
+        ]
+      },
+      {
+        key: "communicationStyle",
+        labelHe: "סגנון תקשורת",
+        kind: "select",
+        options: [
+          { value: "מקצועי", labelHe: "מקצועי" },
+          { value: "מרגש", labelHe: "מרגש" },
+          { value: "דרמטי", labelHe: "דרמטי" },
+          { value: "קליל", labelHe: "קליל" },
+          { value: "יוקרתי", labelHe: "יוקרתי" },
+          { value: "חדשותי", labelHe: "חדשותי" },
+          { value: "ידידותי", labelHe: "ידידותי" }
+        ]
+      },
+      {
+        key: "pace",
+        labelHe: "קצב",
+        kind: "select",
+        options: [
+          { value: "איטי", labelHe: "איטי" },
+          { value: "רגוע", labelHe: "רגוע" },
+          { value: "בינוני", labelHe: "בינוני" },
+          { value: "מהיר", labelHe: "מהיר" },
+          { value: "אנרגטי", labelHe: "אנרגטי" }
+        ]
+      }
     ]
   },
   {
-    key: "voiceGender",
-    labelHe: "קול קריינות",
-    kind: "select",
-    options: [
-      { value: "male", labelHe: "זכר" },
-      { value: "female", labelHe: "נקבה" }
+    id: "brief",
+    titleHe: "בריף",
+    fields: [
+      {
+        key: "designStyle",
+        labelHe: "סגנון עיצוב / אנימציה",
+        kind: "select",
+        options: [
+          { value: "מודרני", labelHe: "מודרני" },
+          { value: "מינימליסטי", labelHe: "מינימליסטי" },
+          { value: "יוקרתי", labelHe: "יוקרתי" },
+          { value: "טכנולוגי", labelHe: "טכנולוגי" },
+          { value: "צבעוני", labelHe: "צבעוני" },
+          { value: "מסורתי", labelHe: "מסורתי" },
+          { value: "קומיקס", labelHe: "קומיקס" },
+          { value: "קריקטורה", labelHe: "קריקטורה" },
+          { value: "ילדותי", labelHe: "ילדותי" },
+          { value: "דמויות לגו", labelHe: "דמויות לגו" },
+          { value: "אנימציה תלת־ממד", labelHe: "אנימציה תלת־ממד" },
+          { value: "סגנון פיקסאר", labelHe: "סגנון פיקסאר" },
+          { value: "אנימה", labelHe: "אנימה" },
+          { value: "איור וקטורי", labelHe: "איור וקטורי" },
+          { value: "סטופ־מושן", labelHe: "סטופ־מושן" },
+          { value: "חדשות אולפן", labelHe: "חדשות אולפן" }
+        ]
+      },
+      {
+        key: "colorPalette",
+        labelHe: "צבעוניות",
+        kind: "select",
+        options: [
+          { value: "צבעי מותג", labelHe: "צבעי מותג" },
+          { value: "צבעים חמים", labelHe: "צבעים חמים" },
+          { value: "צבעים קרים", labelHe: "צבעים קרים" },
+          { value: "שחור־לבן", labelHe: "שחור־לבן" },
+          { value: "פסטל ילדותי", labelHe: "פסטל ילדותי" },
+          { value: "קומיקס בוהק", labelHe: "קומיקס בוהק" }
+        ]
+      },
+      {
+        key: "realism",
+        labelHe: "רמת מציאותיות",
+        kind: "select",
+        options: [
+          { value: "מציאותי", labelHe: "מציאותי" },
+          { value: "חצי־מציאותי", labelHe: "חצי־מציאותי" },
+          { value: "מאויר", labelHe: "מאויר" },
+          { value: "מופשט", labelHe: "מופשט" },
+          { value: "תלת־ממד מצויר", labelHe: "תלת־ממד מצויר" },
+          { value: "קריקטורה מוגזמת", labelHe: "קריקטורה מוגזמת" }
+        ]
+      },
+      {
+        key: "logoPlacement",
+        labelHe: "לוגו",
+        kind: "select",
+        options: [
+          { value: "none", labelHe: "ללא" },
+          { value: "always", labelHe: "קבוע" },
+          { value: "end_only", labelHe: "רק בסיום" },
+          { value: "open_and_end", labelHe: "פתיח וסיום" }
+        ]
+      }
     ]
   },
   {
-    key: "language",
-    labelHe: "שפה",
-    kind: "select",
-    options: [
-      { value: "עברית", labelHe: "עברית" },
-      { value: "אנגלית", labelHe: "אנגלית" },
-      { value: "צרפתית", labelHe: "צרפתית" },
-      { value: "יידיש", labelHe: "יידיש" },
-      { value: "ערבית", labelHe: "ערבית" },
-      { value: "רוסית", labelHe: "רוסית" },
-      { value: "ספרדית", labelHe: "ספרדית" }
+    id: "script",
+    titleHe: "תסריט",
+    fields: [
+      {
+        key: "location",
+        labelHe: "מיקום",
+        kind: "select",
+        options: [
+          { value: "משרד", labelHe: "משרד" },
+          { value: "בית", labelHe: "בית" },
+          { value: "רחוב", labelHe: "רחוב" },
+          { value: "טבע", labelHe: "טבע" },
+          { value: "חנות", labelHe: "חנות" },
+          { value: "סטודיו", labelHe: "סטודיו" },
+          { value: "רקע נקי", labelHe: "רקע נקי" },
+          { value: "אולפן חדשות", labelHe: "אולפן חדשות" }
+        ]
+      },
+      {
+        key: "timeOfDay",
+        labelHe: "זמן",
+        kind: "select",
+        options: [
+          { value: "יום", labelHe: "יום" },
+          { value: "לילה", labelHe: "לילה" },
+          { value: "זריחה", labelHe: "זריחה" },
+          { value: "שקיעה", labelHe: "שקיעה" }
+        ]
+      },
+      {
+        key: "weather",
+        labelHe: "מזג אוויר",
+        kind: "select",
+        options: [
+          { value: "שמש", labelHe: "שמש" },
+          { value: "גשם", labelHe: "גשם" },
+          { value: "שלג", labelHe: "שלג" },
+          { value: "ערפל", labelHe: "ערפל" },
+          { value: "ללא השפעה", labelHe: "ללא השפעה" }
+        ]
+      },
+      {
+        key: "characterType",
+        labelHe: "סוג דמות",
+        kind: "select",
+        options: [
+          { value: "לקוח", labelHe: "לקוח" },
+          { value: "עובד", labelHe: "עובד" },
+          { value: "בעל עסק", labelHe: "בעל עסק" },
+          { value: "קריין", labelHe: "קריין" },
+          { value: "מומחה", labelHe: "מומחה" },
+          { value: "דמות מצוירת", labelHe: "דמות מצוירת" },
+          { value: "דמות לגו", labelHe: "דמות לגו" }
+        ]
+      },
+      {
+        key: "ageGroup",
+        labelHe: "גיל כללי",
+        kind: "select",
+        options: [
+          { value: "ילד", labelHe: "ילד" },
+          { value: "צעיר", labelHe: "צעיר" },
+          { value: "מבוגר", labelHe: "מבוגר" },
+          { value: "קשיש", labelHe: "קשיש" }
+        ]
+      },
+      {
+        key: "wardrobe",
+        labelHe: "לבוש",
+        kind: "select",
+        options: [
+          { value: "יומיומי", labelHe: "יומיומי" },
+          { value: "עסקי", labelHe: "עסקי" },
+          { value: "מקצועי", labelHe: "מקצועי" },
+          { value: "רשמי", labelHe: "רשמי" },
+          { value: "צבעוני ילדותי", labelHe: "צבעוני ילדותי" }
+        ]
+      },
+      {
+        key: "expression",
+        labelHe: "הבעה",
+        kind: "select",
+        options: [
+          { value: "שמחה", labelHe: "שמחה" },
+          { value: "רצינות", labelHe: "רצינות" },
+          { value: "הפתעה", labelHe: "הפתעה" },
+          { value: "ביטחון", labelHe: "ביטחון" },
+          { value: "התרגשות", labelHe: "התרגשות" }
+        ]
+      },
+      {
+        key: "action",
+        labelHe: "פעולה",
+        kind: "select",
+        options: [
+          { value: "הליכה", labelHe: "הליכה" },
+          { value: "דיבור", labelHe: "דיבור" },
+          { value: "עבודה", labelHe: "עבודה" },
+          { value: "שימוש במוצר", labelHe: "שימוש במוצר" },
+          { value: "הצבעה", labelHe: "הצבעה" }
+        ]
+      }
     ]
   },
   {
-    key: "targetAudience",
-    labelHe: "קהל יעד",
-    kind: "select",
-    options: [
-      { value: "ילדים", labelHe: "ילדים" },
-      { value: "צעירים", labelHe: "צעירים" },
-      { value: "משפחות", labelHe: "משפחות" },
-      { value: "בעלי עסקים", labelHe: "בעלי עסקים" },
-      { value: "תורמים", labelHe: "תורמים" },
-      { value: "לקוחות קיימים", labelHe: "לקוחות קיימים" }
+    id: "dubbing",
+    titleHe: "דיבוב",
+    fields: [
+      {
+        key: "voiceGender",
+        labelHe: "קול קריינות",
+        kind: "select",
+        options: [
+          { value: "male", labelHe: "זכר" },
+          { value: "female", labelHe: "נקבה" }
+        ]
+      },
+      {
+        key: "accent",
+        labelHe: "שפה ומבטא",
+        kind: "select",
+        options: [
+          { value: "עברית ישראלית", labelHe: "עברית ישראלית" },
+          { value: "אנגלית אמריקאית", labelHe: "אנגלית אמריקאית" },
+          { value: "אנגלית בריטית", labelHe: "אנגלית בריטית" },
+          { value: "צרפתית", labelHe: "צרפתית" },
+          { value: "יידיש", labelHe: "יידיש" }
+        ]
+      },
+      {
+        key: "voiceType",
+        labelHe: "סגנון קול",
+        kind: "select",
+        options: [
+          { value: "עמוק", labelHe: "עמוק" },
+          { value: "סמכותי", labelHe: "סמכותי" },
+          { value: "ידידותי", labelHe: "ידידותי" },
+          { value: "צעיר", labelHe: "צעיר" },
+          { value: "מבוגר", labelHe: "מבוגר" }
+        ]
+      },
+      {
+        key: "speechStyle",
+        labelHe: "סגנון דיבור",
+        kind: "select",
+        options: [
+          { value: "פרסומי", labelHe: "פרסומי" },
+          { value: "רגוע", labelHe: "רגוע" },
+          { value: "מרגש", labelHe: "מרגש" },
+          { value: "חדשותי", labelHe: "חדשותי" },
+          { value: "דרמטי", labelHe: "דרמטי" }
+        ]
+      },
+      {
+        key: "speechSpeed",
+        labelHe: "מהירות דיבור",
+        kind: "select",
+        options: [
+          { value: "איטית", labelHe: "איטית" },
+          { value: "רגילה", labelHe: "רגילה" },
+          { value: "מהירה", labelHe: "מהירה" }
+        ]
+      }
     ]
   },
   {
-    key: "communicationStyle",
-    labelHe: "סגנון תקשורת",
-    kind: "select",
-    options: [
-      { value: "מקצועי", labelHe: "מקצועי" },
-      { value: "מרגש", labelHe: "מרגש" },
-      { value: "דרמטי", labelHe: "דרמטי" },
-      { value: "קליל", labelHe: "קליל" },
-      { value: "יוקרתי", labelHe: "יוקרתי" },
-      { value: "חדשותי", labelHe: "חדשותי" },
-      { value: "ידידותי", labelHe: "ידידותי" }
+    id: "music",
+    titleHe: "מוזיקה",
+    fields: [
+      {
+        key: "musicTempo",
+        labelHe: "קצב מוזיקה",
+        kind: "select",
+        options: [
+          { value: "איטי", labelHe: "איטי" },
+          { value: "בינוני", labelHe: "בינוני" },
+          { value: "מהיר", labelHe: "מהיר" }
+        ]
+      },
+      {
+        key: "musicVolumePercent",
+        labelHe: "עוצמת מוזיקה (%)",
+        kind: "number",
+        min: 5,
+        max: 40,
+        step: 1,
+        unit: "%"
+      },
+      {
+        key: "musicSync",
+        labelHe: "התאמה לקצב הסצנות",
+        kind: "select",
+        options: [
+          { value: "auto", labelHe: "אוטומטית" },
+          { value: "manual", labelHe: "ידנית" }
+        ]
+      }
     ]
   },
   {
-    key: "pace",
-    labelHe: "קצב",
-    kind: "select",
-    options: [
-      { value: "איטי", labelHe: "איטי" },
-      { value: "רגוע", labelHe: "רגוע" },
-      { value: "בינוני", labelHe: "בינוני" },
-      { value: "מהיר", labelHe: "מהיר" },
-      { value: "אנרגטי", labelHe: "אנרגטי" }
+    id: "visual",
+    titleHe: "תמונות וויזואל",
+    fields: [
+      {
+        key: "lighting",
+        labelHe: "תאורה",
+        kind: "select",
+        options: [
+          { value: "טבעית", labelHe: "טבעית" },
+          { value: "אולפן", labelHe: "אולפן" },
+          { value: "קולנועית", labelHe: "קולנועית" },
+          { value: "בהירה", labelHe: "בהירה" },
+          { value: "דרמטית", labelHe: "דרמטית" }
+        ]
+      },
+      {
+        key: "shotType",
+        labelHe: "סוג צילום",
+        kind: "select",
+        options: [
+          { value: "תקריב", labelHe: "תקריב" },
+          { value: "צילום בינוני", labelHe: "צילום בינוני" },
+          { value: "צילום רחב", labelHe: "צילום רחב" },
+          { value: "צילום עליון", labelHe: "צילום עליון" }
+        ]
+      },
+      {
+        key: "cameraAngle",
+        labelHe: "זווית מצלמה",
+        kind: "select",
+        options: [
+          { value: "בגובה העיניים", labelHe: "בגובה העיניים" },
+          { value: "מלמעלה", labelHe: "מלמעלה" },
+          { value: "מלמטה", labelHe: "מלמטה" },
+          { value: "זווית צד", labelHe: "זווית צד" }
+        ]
+      },
+      {
+        key: "cameraMovement",
+        labelHe: "תנועת מצלמה",
+        kind: "select",
+        options: [
+          { value: "סטטי", labelHe: "סטטי" },
+          { value: "זום פנימה", labelHe: "זום פנימה" },
+          { value: "זום החוצה", labelHe: "זום החוצה" },
+          { value: "מעקב", labelHe: "מעקב" },
+          { value: "סיבוב", labelHe: "סיבוב" },
+          { value: "תנועה אופקית", labelHe: "תנועה אופקית" }
+        ]
+      },
+      {
+        key: "motionSpeed",
+        labelHe: "מהירות תנועה",
+        kind: "select",
+        options: [
+          { value: "איטית", labelHe: "איטית" },
+          { value: "בינונית", labelHe: "בינונית" },
+          { value: "מהירה", labelHe: "מהירה" }
+        ]
+      },
+      {
+        key: "effects",
+        labelHe: "אפקטים",
+        kind: "select",
+        options: [
+          { value: "חלקיקים", labelHe: "חלקיקים" },
+          { value: "אור", labelHe: "אור" },
+          { value: "צל", labelHe: "צל" },
+          { value: "עשן", labelHe: "עשן" },
+          { value: "נצנוץ", labelHe: "נצנוץ" },
+          { value: "הדגשת מוצר", labelHe: "הדגשת מוצר" }
+        ]
+      }
     ]
   },
   {
-    key: "designStyle",
-    labelHe: "סגנון עיצוב",
-    kind: "select",
-    options: [
-      { value: "מודרני", labelHe: "מודרני" },
-      { value: "מינימליסטי", labelHe: "מינימליסטי" },
-      { value: "יוקרתי", labelHe: "יוקרתי" },
-      { value: "טכנולוגי", labelHe: "טכנולוגי" },
-      { value: "צבעוני", labelHe: "צבעוני" },
-      { value: "מסורתי", labelHe: "מסורתי" }
-    ]
-  },
-  {
-    key: "colorPalette",
-    labelHe: "צבעוניות",
-    kind: "select",
-    options: [
-      { value: "צבעי מותג", labelHe: "צבעי מותג" },
-      { value: "צבעים חמים", labelHe: "צבעים חמים" },
-      { value: "צבעים קרים", labelHe: "צבעים קרים" },
-      { value: "שחור־לבן", labelHe: "שחור־לבן" }
-    ]
-  },
-  {
-    key: "lighting",
-    labelHe: "תאורה",
-    kind: "select",
-    options: [
-      { value: "טבעית", labelHe: "טבעית" },
-      { value: "אולפן", labelHe: "אולפן" },
-      { value: "קולנועית", labelHe: "קולנועית" },
-      { value: "בהירה", labelHe: "בהירה" },
-      { value: "דרמטית", labelHe: "דרמטית" }
-    ]
-  },
-  {
-    key: "realism",
-    labelHe: "רמת מציאותיות",
-    kind: "select",
-    options: [
-      { value: "מציאותי", labelHe: "מציאותי" },
-      { value: "חצי־מציאותי", labelHe: "חצי־מציאותי" },
-      { value: "מאויר", labelHe: "מאויר" },
-      { value: "מופשט", labelHe: "מופשט" }
-    ]
-  },
-  {
-    key: "location",
-    labelHe: "מיקום",
-    kind: "select",
-    options: [
-      { value: "משרד", labelHe: "משרד" },
-      { value: "בית", labelHe: "בית" },
-      { value: "רחוב", labelHe: "רחוב" },
-      { value: "טבע", labelHe: "טבע" },
-      { value: "חנות", labelHe: "חנות" },
-      { value: "סטודיו", labelHe: "סטודיו" },
-      { value: "רקע נקי", labelHe: "רקע נקי" }
-    ]
-  },
-  {
-    key: "timeOfDay",
-    labelHe: "זמן",
-    kind: "select",
-    options: [
-      { value: "יום", labelHe: "יום" },
-      { value: "לילה", labelHe: "לילה" },
-      { value: "זריחה", labelHe: "זריחה" },
-      { value: "שקיעה", labelHe: "שקיעה" }
-    ]
-  },
-  {
-    key: "weather",
-    labelHe: "מזג אוויר",
-    kind: "select",
-    options: [
-      { value: "שמש", labelHe: "שמש" },
-      { value: "גשם", labelHe: "גשם" },
-      { value: "שלג", labelHe: "שלג" },
-      { value: "ערפל", labelHe: "ערפל" },
-      { value: "ללא השפעה", labelHe: "ללא השפעה" }
-    ]
-  },
-  {
-    key: "characterType",
-    labelHe: "סוג דמות",
-    kind: "select",
-    options: [
-      { value: "לקוח", labelHe: "לקוח" },
-      { value: "עובד", labelHe: "עובד" },
-      { value: "בעל עסק", labelHe: "בעל עסק" },
-      { value: "קריין", labelHe: "קריין" },
-      { value: "מומחה", labelHe: "מומחה" }
-    ]
-  },
-  {
-    key: "ageGroup",
-    labelHe: "גיל כללי",
-    kind: "select",
-    options: [
-      { value: "ילד", labelHe: "ילד" },
-      { value: "צעיר", labelHe: "צעיר" },
-      { value: "מבוגר", labelHe: "מבוגר" },
-      { value: "קשיש", labelHe: "קשיש" }
-    ]
-  },
-  {
-    key: "wardrobe",
-    labelHe: "לבוש",
-    kind: "select",
-    options: [
-      { value: "יומיומי", labelHe: "יומיומי" },
-      { value: "עסקי", labelHe: "עסקי" },
-      { value: "מקצועי", labelHe: "מקצועי" },
-      { value: "רשמי", labelHe: "רשמי" }
-    ]
-  },
-  {
-    key: "expression",
-    labelHe: "הבעה",
-    kind: "select",
-    options: [
-      { value: "שמחה", labelHe: "שמחה" },
-      { value: "רצינות", labelHe: "רצינות" },
-      { value: "הפתעה", labelHe: "הפתעה" },
-      { value: "ביטחון", labelHe: "ביטחון" },
-      { value: "התרגשות", labelHe: "התרגשות" }
-    ]
-  },
-  {
-    key: "action",
-    labelHe: "פעולה",
-    kind: "select",
-    options: [
-      { value: "הליכה", labelHe: "הליכה" },
-      { value: "דיבור", labelHe: "דיבור" },
-      { value: "עבודה", labelHe: "עבודה" },
-      { value: "שימוש במוצר", labelHe: "שימוש במוצר" },
-      { value: "הצבעה", labelHe: "הצבעה" }
-    ]
-  },
-  {
-    key: "shotType",
-    labelHe: "סוג צילום",
-    kind: "select",
-    options: [
-      { value: "תקריב", labelHe: "תקריב" },
-      { value: "צילום בינוני", labelHe: "צילום בינוני" },
-      { value: "צילום רחב", labelHe: "צילום רחב" },
-      { value: "צילום עליון", labelHe: "צילום עליון" }
-    ]
-  },
-  {
-    key: "cameraAngle",
-    labelHe: "זווית מצלמה",
-    kind: "select",
-    options: [
-      { value: "בגובה העיניים", labelHe: "בגובה העיניים" },
-      { value: "מלמעלה", labelHe: "מלמעלה" },
-      { value: "מלמטה", labelHe: "מלמטה" },
-      { value: "זווית צד", labelHe: "זווית צד" }
-    ]
-  },
-  {
-    key: "cameraMovement",
-    labelHe: "תנועת מצלמה",
-    kind: "select",
-    options: [
-      { value: "סטטי", labelHe: "סטטי" },
-      { value: "זום פנימה", labelHe: "זום פנימה" },
-      { value: "זום החוצה", labelHe: "זום החוצה" },
-      { value: "מעקב", labelHe: "מעקב" },
-      { value: "סיבוב", labelHe: "סיבוב" },
-      { value: "תנועה אופקית", labelHe: "תנועה אופקית" }
-    ]
-  },
-  {
-    key: "motionSpeed",
-    labelHe: "מהירות תנועה",
-    kind: "select",
-    options: [
-      { value: "איטית", labelHe: "איטית" },
-      { value: "בינונית", labelHe: "בינונית" },
-      { value: "מהירה", labelHe: "מהירה" }
-    ]
-  },
-  {
-    key: "sceneTransition",
-    labelHe: "מעבר בין סצנות",
-    kind: "select",
-    options: [
-      { value: "חיתוך", labelHe: "חיתוך" },
-      { value: "דהייה", labelHe: "דהייה" },
-      { value: "החלקה", labelHe: "החלקה" },
-      { value: "זום", labelHe: "זום" },
-      { value: "הבזק", labelHe: "הבזק" },
-      { value: "מעבר תואם תנועה", labelHe: "מעבר תואם תנועה" }
-    ]
-  },
-  {
-    key: "transitionSeconds",
-    labelHe: "מהירות מעבר (שניות)",
-    kind: "number",
-    min: 0.2,
-    max: 2,
-    step: 0.1,
-    unit: "שניות"
-  },
-  {
-    key: "effects",
-    labelHe: "אפקטים",
-    kind: "select",
-    options: [
-      { value: "חלקיקים", labelHe: "חלקיקים" },
-      { value: "אור", labelHe: "אור" },
-      { value: "צל", labelHe: "צל" },
-      { value: "עשן", labelHe: "עשן" },
-      { value: "נצנוץ", labelHe: "נצנוץ" },
-      { value: "הדגשת מוצר", labelHe: "הדגשת מוצר" }
-    ]
-  },
-  {
-    key: "accent",
-    labelHe: "שפה ומבטא",
-    kind: "select",
-    options: [
-      { value: "עברית ישראלית", labelHe: "עברית ישראלית" },
-      { value: "אנגלית אמריקאית", labelHe: "אנגלית אמריקאית" },
-      { value: "אנגלית בריטית", labelHe: "אנגלית בריטית" },
-      { value: "צרפתית", labelHe: "צרפתית" },
-      { value: "יידיש", labelHe: "יידיש" }
-    ]
-  },
-  {
-    key: "voiceType",
-    labelHe: "סגנון קול",
-    kind: "select",
-    options: [
-      { value: "עמוק", labelHe: "עמוק" },
-      { value: "סמכותי", labelHe: "סמכותי" },
-      { value: "ידידותי", labelHe: "ידידותי" },
-      { value: "צעיר", labelHe: "צעיר" },
-      { value: "מבוגר", labelHe: "מבוגר" }
-    ]
-  },
-  {
-    key: "speechStyle",
-    labelHe: "סגנון דיבור",
-    kind: "select",
-    options: [
-      { value: "פרסומי", labelHe: "פרסומי" },
-      { value: "רגוע", labelHe: "רגוע" },
-      { value: "מרגש", labelHe: "מרגש" },
-      { value: "חדשותי", labelHe: "חדשותי" },
-      { value: "דרמטי", labelHe: "דרמטי" }
-    ]
-  },
-  {
-    key: "speechSpeed",
-    labelHe: "מהירות דיבור",
-    kind: "select",
-    options: [
-      { value: "איטית", labelHe: "איטית" },
-      { value: "רגילה", labelHe: "רגילה" },
-      { value: "מהירה", labelHe: "מהירה" }
-    ]
-  },
-  {
-    key: "musicTempo",
-    labelHe: "קצב מוזיקה",
-    kind: "select",
-    options: [
-      { value: "איטי", labelHe: "איטי" },
-      { value: "בינוני", labelHe: "בינוני" },
-      { value: "מהיר", labelHe: "מהיר" }
-    ]
-  },
-  {
-    key: "musicVolumePercent",
-    labelHe: "עוצמת מוזיקה (%)",
-    kind: "number",
-    min: 5,
-    max: 40,
-    step: 1,
-    unit: "%"
-  },
-  {
-    key: "musicSync",
-    labelHe: "התאמה לקצב הסצנות",
-    kind: "select",
-    options: [
-      { value: "auto", labelHe: "אוטומטית" },
-      { value: "manual", labelHe: "ידנית" }
-    ]
-  },
-  {
-    key: "logoPlacement",
-    labelHe: "לוגו",
-    kind: "select",
-    options: [
-      { value: "none", labelHe: "ללא" },
-      { value: "always", labelHe: "קבוע" },
-      { value: "end_only", labelHe: "רק בסיום" },
-      { value: "open_and_end", labelHe: "פתיח וסיום" }
+    id: "render",
+    titleHe: "רינדור",
+    fields: [
+      {
+        key: "sceneTransition",
+        labelHe: "מעבר בין סצנות",
+        kind: "select",
+        options: [
+          { value: "חיתוך", labelHe: "חיתוך" },
+          { value: "דהייה", labelHe: "דהייה" },
+          { value: "החלקה", labelHe: "החלקה" },
+          { value: "זום", labelHe: "זום" },
+          { value: "הבזק", labelHe: "הבזק" },
+          { value: "מעבר תואם תנועה", labelHe: "מעבר תואם תנועה" }
+        ]
+      },
+      {
+        key: "transitionSeconds",
+        labelHe: "מהירות מעבר (שניות)",
+        kind: "number",
+        min: 0.2,
+        max: 2,
+        step: 0.1,
+        unit: "שניות"
+      },
+      {
+        key: "karaokeCaptions",
+        labelHe: "כתוביות קריוקי",
+        kind: "select",
+        options: [
+          { value: "on", labelHe: "פעיל (ברירת מחדל מומלצת)" },
+          { value: "off", labelHe: "כבוי" }
+        ]
+      },
+      {
+        key: "sideWatermark",
+        labelHe: "ווטרמארק צדדי",
+        kind: "select",
+        options: [
+          { value: "on", labelHe: "פעיל" },
+          { value: "off", labelHe: "כבוי" }
+        ]
+      },
+      {
+        key: "preferHeygenDub",
+        labelHe: "דיבוב HeyGen (סנכרון שפתיים)",
+        kind: "select",
+        options: [
+          { value: "on", labelHe: "פעיל — מומלץ לדיבוב" },
+          { value: "off", labelHe: "כבוי" }
+        ]
+      }
     ]
   }
 ];
+
+export const CREATIVE_FIELD_DEFS: CreativeFieldDef[] = CREATIVE_FIELD_SECTIONS.flatMap((s) => s.fields);
 
 const LABEL_BY_KEY = Object.fromEntries(CREATIVE_FIELD_DEFS.map((f) => [f.key, f.labelHe])) as Record<
   keyof CreativeOptions,
@@ -471,6 +582,27 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
     }
     if (key === "videoOrientation") {
       lines.push(`${label}: ${value === "landscape" ? "לרוחב (16:9)" : "לאורך (9:16)"}`);
+      continue;
+    }
+    if (key === "karaokeCaptions" || key === "sideWatermark" || key === "preferHeygenDub") {
+      lines.push(`${label}: ${value === "on" ? "פעיל" : "כבוי"}`);
+      continue;
+    }
+    if (key === "designStyle") {
+      const styleHints: Record<string, string> = {
+        קומיקס: "comic-book panels, bold outlines, halftone",
+        קריקטורה: "cartoon caricature, exaggerated features",
+        ילדותי: "child-friendly illustration, soft shapes",
+        "דמויות לגו": "LEGO minifigure characters, brick-built world",
+        "אנימציה תלת־ממד": "stylized 3D CGI animation",
+        "סגנון פיקסאר": "Pixar-style 3D characters, expressive eyes",
+        אנימה: "anime style, clean line art",
+        "איור וקטורי": "flat vector illustration",
+        "סטופ־מושן": "stop-motion clay/puppet look",
+        "חדשות אולפן": "TV news studio, desk and backdrop"
+      };
+      const hint = styleHints[String(value)];
+      lines.push(hint ? `${label}: ${value} (${hint})` : `${label}: ${value}`);
       continue;
     }
     lines.push(`${label}: ${value}`);

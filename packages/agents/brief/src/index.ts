@@ -6,6 +6,7 @@ import {
   aspectRatioFromCreative,
   contentLanguageEnglishName,
   contentLanguageNativeName,
+  creativeFlagOn,
   formatCreativeConstraints,
   geminiVoiceNameFromCreative,
   languageCodeFromCreative,
@@ -345,7 +346,9 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         .join("; "),
       callToAction: parsed.callToAction ?? businessName ?? "prompt2spot.com",
       budgetMode: input.budgetMode ?? false,
-      renderProfile: resolveRenderProfile(input).id,
+      renderProfile: creativeFlagOn(input.creative, "preferHeygenDub")
+        ? "heygen-i2v"
+        : resolveRenderProfile(input).id,
       references:
         parsed.references ??
         input.referenceLinks.map((link) => ({ kind: "link" as const, ref: link, note: undefined })),
@@ -353,7 +356,8 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       voiceCloneSample,
       videoInsert,
       branding: brandingOut,
-      ttsVoiceName: geminiVoiceNameFromCreative(input.creative) ?? null
+      ttsVoiceName: geminiVoiceNameFromCreative(input.creative) ?? null,
+      ...(input.creative ? { creative: input.creative } : {})
     };
 
     await ctx.artifacts.save({

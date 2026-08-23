@@ -61,7 +61,8 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
         if (
           (!useClonedVoice && !defaultTts) ||
           scene.audioPolicy === "veo_native_audio" ||
-          scene.audioPolicy === "muted"
+          scene.audioPolicy === "muted" ||
+          !String(scene.narration ?? "").trim()
         ) {
           perScene.push({
             sceneId: scene.sceneId,

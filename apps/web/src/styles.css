@@ -339,6 +339,41 @@ main.layout-log { grid-template-columns: 1fr; }
   background: #121722;
 }
 .advanced-hint { margin: 0 0 12px; font-size: 0.9rem; }
+.advanced-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.advanced-presets button {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #3a455c;
+  background: #1a2230;
+  color: #d7e0f5;
+  cursor: pointer;
+}
+.advanced-presets button:hover {
+  border-color: #5b6b8c;
+  background: #222b3c;
+}
+.advanced-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #2a3344;
+}
+.advanced-section:first-of-type {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: none;
+}
+.advanced-section-title {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #d7e0f5;
+}
 .advanced-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

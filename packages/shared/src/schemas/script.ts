@@ -18,7 +18,8 @@ export const SceneSpecSchema = z.object({
   id: z.string(),
   order: z.number().int().min(0),
   title: z.string().min(1).max(120),
-  narration: z.string().min(1).max(800),
+  /** Empty allowed for title_card scenes (muted, on-screen text only). */
+  narration: z.string().max(800).default(""),
   visualPrompt: z.string().min(1).max(1200),
   /** Short Veo prompt, intentionally concise because Veo input has tighter prompt limits than script models. */
   veoPrompt: z.string().min(1).max(1600),
@@ -28,7 +29,9 @@ export const SceneSpecSchema = z.object({
   durationBucket: VeoDurationBucketSchema.default("8"),
   audioPolicy: SceneAudioPolicySchema.default("gemini_tts_plus_music"),
   durationSeconds: z.number().int().min(1).max(60),
-  requiredAssets: z.array(RequiredAssetKindSchema).default(["voice", "music", "video"])
+  requiredAssets: z.array(RequiredAssetKindSchema).default(["voice", "music", "video"]),
+  /** title_card = full-frame kinetic text beat (no talking head). */
+  sceneKind: z.enum(["beat", "title_card"]).default("beat")
 });
 export type SceneSpec = z.infer<typeof SceneSpecSchema>;
 

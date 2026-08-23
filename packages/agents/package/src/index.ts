@@ -1,12 +1,15 @@
 import {
   PackageInputSchema,
   PackageOutputSchema,
+  buildKaraokeCues,
   buildRenderProfileSnapshot,
+  creativeFlagOn,
   resolveRenderProfile,
   type Agent,
   type AssetOutput,
   type AudioOutput,
   type BriefOutput,
+  type CreativeOptions,
   type PackageInput,
   type PackageOutput,
   type SceneTimelineEntry,
@@ -19,7 +22,7 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
   inputSchema: PackageInputSchema,
   outputSchema: PackageOutputSchema,
   async run(ctx, input) {
-    const brief = input.brief as BriefOutput;
+    const brief = input.brief as BriefOutput & { creative?: CreativeOptions | null };
     const script = input.script as ScriptOutput;
     const audio = input.audio as AudioOutput;
     const asset = input.asset as AssetOutput;
@@ -28,6 +31,7 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
 
     const voiceBySceneId = new Map(audio.perScene.map((s) => [s.sceneId, s] as const));
     const assetBySceneId = new Map(asset.perScene.map((s) => [s.sceneId, s] as const));
+    const karaokeOn = creativeFlagOn(brief.creative, "karaokeCaptions", true);
 
     let cursor = 0;
     const timeline: SceneTimelineEntry[] = [];
@@ -40,6 +44,11 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
       const start = cursor;
       const end = cursor + scene.durationSeconds;
       cursor = end;
+      const sceneKind = scene.sceneKind === "title_card" ? "title_card" : "beat";
+      const captionCues =
+        karaokeOn && sceneKind === "beat" && scene.narration.trim()
+          ? buildKaraokeCues(scene.narration, start, end)
+          : undefined;
       timeline.push({
         sceneId: scene.id,
         order: scene.order,
@@ -63,7 +72,7 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
         firstFramePrompt: scene.firstFramePrompt ?? null,
         lastFramePrompt: scene.lastFramePrompt ?? null,
         durationBucket: scene.durationBucket,
-        audioPolicy: scene.audioPolicy,
+        audioPolicy: sceneKind === "title_card" ? "muted" : scene.audioPolicy,
         background: {
           artifactId: a?.artifactId ?? null,
           gcsPath: a?.gcsPath ?? null,
@@ -92,15 +101,17 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
           model: a?.lastFrame?.model ?? null
         },
         voice: {
-          artifactId: v?.voiceArtifactId ?? null,
-          gcsPath: v?.voiceGcsPath ?? null,
-          signedUrl: voiceSigned
+          artifactId: sceneKind === "title_card" ? null : (v?.voiceArtifactId ?? null),
+          gcsPath: sceneKind === "title_card" ? null : (v?.voiceGcsPath ?? null),
+          signedUrl: sceneKind === "title_card" ? null : voiceSigned
         },
         music: {
           artifactId: audio.music.artifactId,
           gcsPath: audio.music.gcsPath,
           signedUrl: musicSigned
-        }
+        },
+        sceneKind,
+        ...(captionCues?.length ? { captionCues } : {})
       });
     }
 

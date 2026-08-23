@@ -19,7 +19,11 @@ export const RenderInputSchema = z.object({
   /** Optional short external clip spliced into the assembled film (before music/end card). */
   videoInsert: VideoInsertSchema.nullable().optional(),
   /** Optional business branding for the end card. */
-  branding: BriefBrandingOutputSchema.nullable().optional()
+  branding: BriefBrandingOutputSchema.nullable().optional(),
+  /** Burn karaoke captions onto the assembled film. */
+  karaokeCaptions: z.boolean().default(false),
+  /** Burn a vertical side watermark. */
+  sideWatermark: z.boolean().default(false)
 });
 export type RenderInput = z.infer<typeof RenderInputSchema>;
 

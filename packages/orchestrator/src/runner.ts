@@ -3,6 +3,7 @@ import {
   STAGE_ORDER,
   buildStageErrorRecord,
   createConsoleLogger,
+  creativeFlagOn,
   geminiVoiceNameFromCreative,
   nextStage,
   resolveRenderProfile,
@@ -153,6 +154,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           referenceImagePrompt?: string;
           firstFramePrompt?: string;
           lastFramePrompt?: string;
+          sceneKind?: "beat" | "title_card";
         }>;
         backgroundVisualPrompt?: string;
         characterBible?: string;
@@ -180,25 +182,33 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         characterBible: script?.characterBible,
         visualAnchorGcsPath,
         visualAnchorGcsPaths,
-        scenes: (script?.scenes ?? []).map((scene) => ({
-          sceneId: scene.id,
-          visualPrompt: scene.visualPrompt,
-          veoPrompt: scene.veoPrompt,
-          referenceImagePrompt: scene.referenceImagePrompt,
-          firstFramePrompt: scene.firstFramePrompt,
-          lastFramePrompt: scene.lastFramePrompt,
-          preferredKind: "image" as const,
-          uploadedAssetGcsPath: sceneOverride.get(scene.id)
-        }))
+        scenes: (script?.scenes ?? [])
+          .filter((scene) => scene.sceneKind !== "title_card")
+          .map((scene) => ({
+            sceneId: scene.id,
+            visualPrompt: scene.visualPrompt,
+            veoPrompt: scene.veoPrompt,
+            referenceImagePrompt: scene.referenceImagePrompt,
+            firstFramePrompt: scene.firstFramePrompt,
+            lastFramePrompt: scene.lastFramePrompt,
+            preferredKind: "image" as const,
+            uploadedAssetGcsPath: sceneOverride.get(scene.id)
+          }))
       };
     }
-    case "package":
+    case "package": {
+      const briefOut = (byName.get("brief") ?? brief) as Record<string, unknown>;
+      const briefInput = brief as { creative?: unknown };
       return {
-        brief: byName.get("brief") ?? brief,
+        brief: {
+          ...briefOut,
+          creative: briefOut.creative ?? briefInput.creative
+        },
         script: byName.get("script"),
         audio: byName.get("audio"),
         asset: byName.get("asset")
       };
+    }
     case "render": {
       const pkg = byName.get("package") as { timeline: unknown[] } | undefined;
       const briefOut = byName.get("brief") as { aspectRatio?: string; renderProfile?: string } | undefined;
@@ -218,14 +228,26 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           logo?: { name: string; gcsPath: string; mimeType: string } | null;
           logoPlacement?: "none" | "always" | "end_only" | "open_and_end";
         } | null;
+        creative?: {
+          karaokeCaptions?: string;
+          sideWatermark?: string;
+          preferHeygenDub?: string;
+        } | null;
       };
+      const briefInput = brief as { creative?: typeof briefData.creative };
+      const creative = briefData.creative ?? briefInput.creative ?? null;
+      const karaokeCaptions = creativeFlagOn(creative, "karaokeCaptions", true);
+      const sideWatermark =
+        creativeFlagOn(creative, "sideWatermark") || briefData.branding?.logoPlacement === "always";
       const renderProfile = resolveRenderProfile(briefOut ?? briefData).id;
       return {
         aspectRatio: briefData.aspectRatio ?? "9:16",
         timeline: pkg?.timeline ?? [],
         renderProfile,
         videoInsert: briefData.videoInsert ?? null,
-        branding: briefData.branding ?? null
+        branding: briefData.branding ?? null,
+        karaokeCaptions,
+        sideWatermark
       };
     }
     case "series":

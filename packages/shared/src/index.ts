@@ -26,3 +26,4 @@ export * from "./geminiPricing.js";
 export * from "./continuity.js";
 export * from "./visualCorrections.js";
 export * from "./hebrewUi.js";
+export * from "./karaokeCaptions.js";

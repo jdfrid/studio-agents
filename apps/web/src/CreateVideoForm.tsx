@@ -3,7 +3,7 @@ import { apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 import type { ProjectRunView } from "./types.js";
 import {
-  CREATIVE_FIELD_DEFS,
+  CREATIVE_FIELD_SECTIONS,
   aspectRatioFromCreative,
   languageCodeFromCreative,
   type ApprovalMode,
@@ -29,9 +29,12 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const [slogan, setSlogan] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [creative, setCreative] = useState<CreativeOptions>({});
+  const [creative, setCreative] = useState<CreativeOptions>({ karaokeCaptions: "on" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const preferHeygenDub = creative.preferHeygenDub === "on";
+  const heygenNeedsAnchor = preferHeygenDub && visualFiles.length === 0;
 
   const MAX_VOICE_BYTES = 10 * 1024 * 1024;
   const MAX_INSERT_BYTES = 40 * 1024 * 1024;
@@ -115,6 +118,10 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     }
     if (logoFile && logoFile.size > MAX_LOGO_BYTES) {
       setError("קובץ הלוגו גדול מדי (מקסימום 5MB).");
+      return;
+    }
+    if (preferHeygenDub && visualFiles.length === 0) {
+      setError("לדיבוב HeyGen נדרשת לפחות תמונת השראה אחת של הדמות.");
       return;
     }
     if (visualFiles.length > MAX_VISUAL_FILES) {
@@ -425,44 +432,92 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       </button>
       {advancedOpen ? (
         <div className="advanced-panel">
-          <p className="muted advanced-hint">שדות אופציונליים — משפיעים על סגנון, קריינות, צילום ומוזיקה.</p>
-          <div className="advanced-grid">
-            {CREATIVE_FIELD_DEFS.map((field) => (
-              <label key={field.key}>
-                {field.labelHe}
-                {field.kind === "number" ? (
-                  <input
-                    type="number"
-                    min={field.min}
-                    max={field.max}
-                    step={field.step ?? 1}
-                    value={creative[field.key] == null ? "" : String(creative[field.key])}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (!raw) {
-                        setCreativeField(field.key, "");
-                        return;
-                      }
-                      setCreativeField(field.key, Number(raw) as never);
-                    }}
-                    placeholder={field.unit ? `${field.min}–${field.max} ${field.unit}` : undefined}
-                  />
-                ) : (
-                  <select
-                    value={String(creative[field.key] ?? "")}
-                    onChange={(e) => setCreativeField(field.key, (e.target.value || "") as never)}
-                  >
-                    <option value="">— בחירה —</option>
-                    {(field.options ?? []).map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.labelHe}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </label>
-            ))}
+          <p className="muted advanced-hint">שדות אופציונליים — מחולקים לפי שלבי יצירת הסרטון.</p>
+          <div className="advanced-presets">
+            <button
+              type="button"
+              className="ghost"
+              onClick={() =>
+                setCreative((prev) => ({
+                  ...prev,
+                  designStyle: "סגנון פיקסאר",
+                  communicationStyle: "חדשותי",
+                  location: "אולפן חדשות",
+                  karaokeCaptions: "on",
+                  preferHeygenDub: "on",
+                  sideWatermark: "on",
+                  videoOrientation: "portrait"
+                }))
+              }
+            >
+              סגנון STORYZ (פיקסאר + דיבוב)
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() =>
+                setCreative((prev) => ({
+                  ...prev,
+                  designStyle: "חדשות אולפן",
+                  communicationStyle: "חדשותי",
+                  location: "אולפן חדשות",
+                  karaokeCaptions: "on",
+                  preferHeygenDub: "on",
+                  sideWatermark: "on",
+                  videoOrientation: "portrait"
+                }))
+              }
+            >
+              סגנון חדשות אולפן
+            </button>
           </div>
+          {preferHeygenDub ? (
+            <p className={`advanced-hint ${heygenNeedsAnchor ? "error-inline" : "muted"}`}>
+              דיבוב HeyGen פעיל — סנכרון שפתיים לתמונת ההשראה + אודיו TTS. העלו תמונת דמות ברורה.
+            </p>
+          ) : null}
+          {CREATIVE_FIELD_SECTIONS.map((section) => (
+            <div key={section.id} className="advanced-section">
+              <h4 className="advanced-section-title">{section.titleHe}</h4>
+              <div className="advanced-grid">
+                {section.fields.map((field) => (
+                  <label key={field.key}>
+                    {field.labelHe}
+                    {field.kind === "number" ? (
+                      <input
+                        type="number"
+                        min={field.min}
+                        max={field.max}
+                        step={field.step ?? 1}
+                        value={creative[field.key] == null ? "" : String(creative[field.key])}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (!raw) {
+                            setCreativeField(field.key, "");
+                            return;
+                          }
+                          setCreativeField(field.key, Number(raw) as never);
+                        }}
+                        placeholder={field.unit ? `${field.min}–${field.max} ${field.unit}` : undefined}
+                      />
+                    ) : (
+                      <select
+                        value={String(creative[field.key] ?? "")}
+                        onChange={(e) => setCreativeField(field.key, (e.target.value || "") as never)}
+                      >
+                        <option value="">— בחירה —</option>
+                        {(field.options ?? []).map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.labelHe}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
 
@@ -471,7 +526,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         <button
           type="button"
           className="primary"
-          disabled={busy || !canCreate || !title.trim() || !prompt.trim() || (!!voiceFile && !voiceConsent)}
+          disabled={
+            busy ||
+            !canCreate ||
+            !title.trim() ||
+            !prompt.trim() ||
+            (!!voiceFile && !voiceConsent) ||
+            heygenNeedsAnchor
+          }
           onClick={() => void submit()}
         >
           {busy ? "יוצר…" : "התחל יצירה"}
