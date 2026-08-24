@@ -6,7 +6,9 @@ import { RenderProfileIdSchema } from "../renderProfiles.js";
 export const BriefBrandingInputSchema = z
   .object({
     businessName: z.string().trim().max(120).optional(),
-    slogan: z.string().trim().max(200).optional()
+    slogan: z.string().trim().max(200).optional(),
+    /** Public website / CTA link shown on the end card. */
+    websiteUrl: z.string().trim().max(300).optional()
   })
   .strict();
 export type BriefBrandingInput = z.infer<typeof BriefBrandingInputSchema>;
@@ -15,6 +17,7 @@ export const BriefBrandingOutputSchema = z
   .object({
     businessName: z.string().trim().max(120).optional(),
     slogan: z.string().trim().max(200).optional(),
+    websiteUrl: z.string().trim().max(300).optional(),
     logo: z
       .object({
         name: z.string(),

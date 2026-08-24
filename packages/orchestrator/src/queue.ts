@@ -124,3 +124,37 @@ export async function shutdownQueues(): Promise<void> {
     connection = null;
   }
 }
+
+/** Best-effort remove pending/failed jobs for a run so cancelled work stops retrying. */
+export async function removeRunQueueJobs(runId: string): Promise<void> {
+  const { STAGE_ORDER } = await import("@studio/shared");
+  for (const stage of STAGE_ORDER) {
+    const queue = queueFor(stage);
+    const jobId = `${runId}-${stage}`;
+    try {
+      const existing = await queue.getJob(jobId);
+      if (existing) {
+        const state = await existing.getState();
+        if (state !== "active") {
+          await existing.remove();
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    try {
+      const jobs = await queue.getJobs(["waiting", "delayed", "failed", "prioritized"]);
+      for (const job of jobs) {
+        if (job.data?.runId === runId) {
+          try {
+            await job.remove();
+          } catch {
+            /* active/locked */
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+}

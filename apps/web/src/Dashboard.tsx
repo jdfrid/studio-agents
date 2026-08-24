@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost } from "./api.js";
+import { apiDelete, apiGet, apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 
 type RunSummary = {
@@ -20,11 +20,33 @@ export function Dashboard({
   const { user, refresh } = useAuth();
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState("");
 
+  async function refreshRuns() {
+    try {
+      setRuns(await apiGet<RunSummary[]>("/runs"));
+    } catch {
+      setRuns([]);
+    }
+  }
+
   useEffect(() => {
-    void apiGet<RunSummary[]>("/runs").then(setRuns).catch(() => setRuns([]));
+    void refreshRuns();
   }, []);
+
+  async function deleteRun(id: string, title: string) {
+    if (!window.confirm(`למחוק את «${title}»? התהליך ייעצר ולא ימשיך לנסות שוב.`)) return;
+    setDeletingId(id);
+    try {
+      await apiDelete(`/runs/${id}`);
+      await refreshRuns();
+    } catch (err) {
+      window.alert((err as Error).message || "מחיקה נכשלה");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function buy(plan: "payg" | "subscription") {
     setBusy(plan);
@@ -115,11 +137,22 @@ export function Dashboard({
         {runs.length === 0 ? <p className="muted">עדיין לא יצרת סרטונים.</p> : null}
         <ul className="run-cards">
           {runs.map((r) => (
-            <li key={r.id}>
+            <li key={r.id} className="run-card-row">
               <button type="button" className="run-card" onClick={() => onOpenRun(r.id)}>
                 <strong>{r.title}</strong>
                 <span className={`status-pill status-${r.status.toLowerCase()}`}>{statusHe(r.status)}</span>
                 <small>{new Date(r.updatedAt).toLocaleString("he-IL")}</small>
+              </button>
+              <button
+                type="button"
+                className="link-btn run-delete-btn"
+                disabled={deletingId === r.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void deleteRun(r.id, r.title);
+                }}
+              >
+                {deletingId === r.id ? "מוחק…" : "מחק"}
               </button>
             </li>
           ))}

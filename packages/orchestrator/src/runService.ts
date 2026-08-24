@@ -575,7 +575,11 @@ export async function recordStageError(stageExecutionId: string, error: string):
   });
 }
 
-export async function setRunStatus(runId: string, status: "RUNNING" | "AWAITING_APPROVAL" | "FAILED" | "COMPLETED", currentStage: StageName | null): Promise<void> {
+export async function setRunStatus(
+  runId: string,
+  status: "RUNNING" | "AWAITING_APPROVAL" | "FAILED" | "COMPLETED" | "CANCELLED",
+  currentStage: StageName | null
+): Promise<void> {
   await prisma.projectRun.update({
     where: { id: runId },
     data: { status, currentStage: currentStage ? toPrismaStage(currentStage) : null }
@@ -584,10 +588,42 @@ export async function setRunStatus(runId: string, status: "RUNNING" | "AWAITING_
     const { commitCredits } = await import("@studio/billing");
     await commitCredits(runId).catch(() => undefined);
   }
-  if (status === "FAILED") {
+  if (status === "FAILED" || status === "CANCELLED") {
     const { releaseCredits } = await import("@studio/billing");
     await releaseCredits(runId).catch(() => undefined);
   }
+}
+
+/** Stop queue work and remove the run so it cannot keep retrying. */
+export async function deleteRun(runId: string, userId?: string): Promise<boolean> {
+  const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
+  if (!run) return false;
+  if (userId && run.userId && run.userId !== userId) return false;
+
+  const { removeRunQueueJobs } = await import("./queue.js");
+  await removeRunQueueJobs(runId);
+
+  await prisma.stageExecution.updateMany({
+    where: {
+      runId,
+      status: { in: ["PENDING", "QUEUED", "RUNNING", "AWAITING_APPROVAL", "FAILED"] }
+    },
+    data: { status: "CANCELLED", completedAt: new Date(), error: null }
+  });
+  await prisma.projectRun.update({
+    where: { id: runId },
+    data: { status: "CANCELLED", currentStage: null }
+  });
+  await releaseCreditsSafe(runId);
+  await audit(run.tenantId, "run_deleted", "ProjectRun", runId, { previousStatus: run.status });
+
+  await prisma.projectRun.delete({ where: { id: runId } });
+  return true;
+}
+
+async function releaseCreditsSafe(runId: string): Promise<void> {
+  const { releaseCredits } = await import("@studio/billing");
+  await releaseCredits(runId).catch(() => undefined);
 }
 
 export async function audit(tenantId: string, action: string, entity: string, entityId: string | null, metadata: Record<string, unknown>) {

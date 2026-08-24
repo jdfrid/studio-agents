@@ -8,6 +8,7 @@ import {
   createArtifactsRepo,
   createProvidersRepo,
   createRun,
+  deleteRun,
   getQueueStats,
   getRun,
   getRunCostLedger,
@@ -166,6 +167,16 @@ export async function registerRoutes(app: FastifyInstance) {
         return { error: "not_found" };
       }
       return view;
+    });
+
+    userRoutes.delete("/runs/:id", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const ok = await deleteRun(id, request.user!.sub);
+      if (!ok) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return { ok: true };
     });
 
     userRoutes.post("/runs/:id/stages/:stage/approve", async (request, reply) => {

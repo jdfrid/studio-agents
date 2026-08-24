@@ -19,8 +19,8 @@ registerAgent(renderAgent);
 registerAgent(seriesAgent);
 
 const stageTimeouts: Record<StageName, number> = {
-  brief: 120_000,
-  script: 180_000,
+  brief: 600_000,
+  script: 300_000,
   audio: 600_000,
   asset: 600_000,
   package: 60_000,

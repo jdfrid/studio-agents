@@ -278,6 +278,9 @@ main.layout-log { grid-template-columns: 1fr; }
 .billing-note { margin-top: 10px; font-size: 0.9rem; }
 .dash-header button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
 .run-cards { list-style: none; padding: 0; display: grid; gap: 10px; }
+.run-card-row { display: flex; gap: 8px; align-items: stretch; }
+.run-card-row .run-card { flex: 1; }
+.run-delete-btn { align-self: center; white-space: nowrap; color: #ff8a8a; }
 .run-card { width: 100%; text-align: start; padding: 14px; border-radius: 10px; border: 1px solid #232733; background: #151a23; cursor: pointer; }
 .run-card:hover { border-color: #3b6ef0; }
 .status-pill { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; background: #232733; }
@@ -482,6 +485,11 @@ main.layout-log { grid-template-columns: 1fr; }
   color: rgba(242, 245, 251, 0.82);
   font-size: 0.9rem;
   line-height: 1.35;
+}
+.branding-preview-url {
+  margin: 4px 0 0;
+  color: #7ab5ff;
+  font-size: 0.85rem;
 }
 .branding-preview-credit {
   position: absolute;

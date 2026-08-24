@@ -51,6 +51,15 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
+export async function apiDelete<T = { ok: boolean }>(path: string): Promise<T> {
+  const res = await fetch(apiUrl(path), {
+    method: "DELETE",
+    credentials: "include"
+  });
+  if (!res.ok) await throwApiError(res);
+  return (await res.json()) as T;
+}
+
 export function authLoginUrl(): string {
   return apiUrl("/auth/google");
 }

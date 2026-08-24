@@ -5,6 +5,12 @@ export function veo429MaxAttempts(): number {
   return Number.isFinite(n) && n >= 1 ? Math.min(Math.floor(n), 20) : 8;
 }
 
+/** Shorter budget for brief/script text — long Veo-style waits stall the brief worker lock. */
+export function geminiText429MaxAttempts(): number {
+  const n = Number(process.env.GEMINI_TEXT_429_MAX_ATTEMPTS ?? 4);
+  return Number.isFinite(n) && n >= 1 ? Math.min(Math.floor(n), 10) : 4;
+}
+
 export function isGeminiRateLimitError(error: unknown): boolean {
   if (error instanceof ProviderError) {
     const kind = error.metadata?.kind;
@@ -18,10 +24,19 @@ export function isGeminiRateLimitError(error: unknown): boolean {
 }
 
 /** Delay after the Nth failed attempt (attempt starts at 1). Caps at 120s; honors Retry-After seconds. */
-export function rateLimitRetryDelayMs(attempt: number, error?: unknown): number {
+export function rateLimitRetryDelayMs(
+  attempt: number,
+  error?: unknown,
+  opts?: { maxDelayMs?: number; baseDelayMs?: number }
+): number {
   const fromHeader = readRetryAfterMs(error);
-  if (fromHeader != null) return fromHeader;
-  const exp = Math.min(120_000, 15_000 * 2 ** Math.max(0, attempt - 1));
+  if (fromHeader != null) {
+    const cap = opts?.maxDelayMs ?? 180_000;
+    return Math.min(cap, fromHeader);
+  }
+  const cap = opts?.maxDelayMs ?? 120_000;
+  const base = opts?.baseDelayMs ?? 15_000;
+  const exp = Math.min(cap, base * 2 ** Math.max(0, attempt - 1));
   return exp;
 }
 
@@ -50,9 +65,10 @@ export type RateLimitWaitInfo = {
 export async function withGeminiRateLimitRetry<T>(
   label: string,
   fn: () => Promise<T>,
-  onWait?: (info: RateLimitWaitInfo) => Promise<void> | void
+  onWait?: (info: RateLimitWaitInfo) => Promise<void> | void,
+  opts?: { maxAttempts?: number; maxDelayMs?: number; baseDelayMs?: number }
 ): Promise<T> {
-  const maxAttempts = veo429MaxAttempts();
+  const maxAttempts = opts?.maxAttempts ?? veo429MaxAttempts();
   let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -62,7 +78,10 @@ export async function withGeminiRateLimitRetry<T>(
       if (!isGeminiRateLimitError(error) || attempt >= maxAttempts) {
         throw error;
       }
-      const delayMs = rateLimitRetryDelayMs(attempt, error);
+      const delayMs = rateLimitRetryDelayMs(attempt, error, {
+        maxDelayMs: opts?.maxDelayMs,
+        baseDelayMs: opts?.baseDelayMs
+      });
       await onWait?.({ attempt, maxAttempts, delayMs, label });
       await sleep(delayMs);
     }

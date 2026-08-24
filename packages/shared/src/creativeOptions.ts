@@ -635,17 +635,32 @@ export function geminiVoiceNameFromCreative(creative?: CreativeOptions | null): 
           ? "male"
           : "female";
 
+  return pickGeminiVoiceForSex(sex, blob);
+}
+
+function pickGeminiVoiceForSex(sex: "male" | "female", blob: string): string {
   if (sex === "male") {
     if (/צעיר|ידידותי|קליל|puck/i.test(blob)) return "Puck";
     if (/עמוק|סמכותי|דרמטי|fenrir/i.test(blob)) return "Fenrir";
     if (/חדשותי|מבוגר|orus/i.test(blob)) return "Orus";
     return "Charon";
   }
-
   if (/צעיר|ידידותי|קליל|aoede/i.test(blob)) return "Aoede";
   if (/מרגש|דרמטי|zephyr/i.test(blob)) return "Zephyr";
   if (/רגוע|leda/i.test(blob)) return "Leda";
   return "Kore";
+}
+
+/** Primary + secondary voices for alternating dialogue (opposite gender when possible). */
+export function geminiDialogueVoicePair(creative?: CreativeOptions | null): {
+  primary: string;
+  secondary: string;
+} {
+  const primary =
+    geminiVoiceNameFromCreative(creative) ?? defaultGeminiVoiceForLanguage(creative?.language ?? null);
+  const primaryIsMale = /^(Charon|Puck|Fenrir|Orus)$/i.test(primary);
+  const secondary = pickGeminiVoiceForSex(primaryIsMale ? "female" : "male", "");
+  return { primary, secondary };
 }
 
 /** Spoken delivery hint prepended for Gemini TTS (voice + event/creative tone). */

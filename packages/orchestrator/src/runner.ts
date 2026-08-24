@@ -6,7 +6,7 @@ import {
   creativeFlagOn,
   geminiVoiceNameFromCreative,
   buildTtsDeliveryStyle,
-  defaultGeminiVoiceForLanguage,
+  geminiDialogueVoicePair,
   nextStage,
   resolveRenderProfile,
   type AgentContext,
@@ -33,9 +33,13 @@ export async function runStage(runId: string, stage: StageName): Promise<void> {
   if (!agent) {
     throw new Error(`No agent registered for stage ${stage}`);
   }
-  const run = await prisma.projectRun.findUniqueOrThrow({ where: { id: runId }, include: { stages: true } });
+  const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
+  if (!run || run.status === "CANCELLED") {
+    return;
+  }
   const stageRow = run.stages.find((s) => fromPrismaStage(s.stage) === stage);
   if (!stageRow) throw new Error(`StageExecution missing for run ${runId} stage ${stage}`);
+  if (stageRow.status === "CANCELLED") return;
 
   await recordStageStart(stageRow.id);
   const stageExec = await prisma.stageExecution.findUniqueOrThrow({ where: { id: stageRow.id } });
@@ -126,7 +130,17 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
     case "script":
       return { brief: byName.get("brief") };
     case "audio": {
-      const script = byName.get("script") as { scenes: Array<{ id: string; narration: string; durationSeconds: number; audioPolicy?: string }>; musicPrompt: string } | undefined;
+      const script = byName.get("script") as {
+        scenes: Array<{
+          id: string;
+          narration: string;
+          durationSeconds: number;
+          audioPolicy?: string;
+          speaker?: "a" | "b" | "narrator";
+          speakerName?: string;
+        }>;
+        musicPrompt: string;
+      } | undefined;
       const briefData = (byName.get("brief") ?? brief) as {
         language?: string;
         title?: string;
@@ -135,14 +149,18 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         style?: string;
         voiceCloneSample?: { name: string; gcsPath: string; mimeType: string } | null;
         ttsVoiceName?: string | null;
+        branding?: {
+          businessName?: string;
+          slogan?: string;
+          websiteUrl?: string;
+        } | null;
         creative?: Parameters<typeof geminiVoiceNameFromCreative>[0];
       };
       const briefInput = brief as { creative?: Parameters<typeof geminiVoiceNameFromCreative>[0] };
       const creative = briefData.creative ?? briefInput.creative;
-      const voiceName =
-        briefData.ttsVoiceName ??
-        geminiVoiceNameFromCreative(creative) ??
-        defaultGeminiVoiceForLanguage(briefData.language);
+      const pair = geminiDialogueVoicePair(creative);
+      const voiceName = briefData.ttsVoiceName ?? pair.primary;
+      const voiceNameB = pair.secondary;
       const voiceStyle = buildTtsDeliveryStyle({
         creative,
         title: briefData.title,
@@ -150,18 +168,39 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         toneOfVoice: briefData.toneOfVoice,
         style: briefData.style
       });
+      const brand = briefData.branding;
+      const lang = (briefData.language ?? "he").toLowerCase();
+      const visitPrefix = lang.startsWith("en") ? "Visit" : "בקרו ב־";
+      const brandParts = [
+        brand?.businessName?.trim(),
+        brand?.slogan?.trim(),
+        brand?.websiteUrl?.trim()
+          ? `${visitPrefix} ${brand.websiteUrl.trim().replace(/^https?:\/\//i, "")}`
+          : null
+      ].filter(Boolean);
+      const brandEndNarration = brandParts.length ? brandParts.join(". ") : undefined;
       return {
         language: briefData.language ?? "he",
-        scenes: (script?.scenes ?? []).map((scene) => ({
-          sceneId: scene.id,
-          narration: scene.narration,
-          durationSeconds: scene.durationSeconds,
-          audioPolicy: scene.audioPolicy
-        })),
+        scenes: (script?.scenes ?? []).map((scene) => {
+          const speaker = scene.speaker ?? "narrator";
+          const sceneVoice =
+            speaker === "b" ? voiceNameB : speaker === "a" || speaker === "narrator" ? voiceName : voiceName;
+          return {
+            sceneId: scene.id,
+            narration: scene.narration,
+            durationSeconds: scene.durationSeconds,
+            audioPolicy: scene.audioPolicy,
+            speaker,
+            ...(scene.speakerName ? { speakerName: scene.speakerName } : {}),
+            ...(sceneVoice ? { voiceName: sceneVoice } : {})
+          };
+        }),
         musicPrompt: script?.musicPrompt ?? "",
         voiceCloneSample: briefData.voiceCloneSample ?? null,
         ...(voiceName ? { voiceName } : {}),
-        ...(voiceStyle ? { voiceStyle } : {})
+        ...(voiceNameB ? { voiceNameB } : {}),
+        ...(voiceStyle ? { voiceStyle } : {}),
+        ...(brandEndNarration ? { brandEndNarration } : {})
       };
     }
     case "asset": {
@@ -231,6 +270,13 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
     case "render": {
       const pkg = byName.get("package") as { timeline: unknown[] } | undefined;
       const briefOut = byName.get("brief") as { aspectRatio?: string; renderProfile?: string } | undefined;
+      const audioOut = byName.get("audio") as {
+        brandEnd?: {
+          narration?: string;
+          voiceGcsPath?: string | null;
+          voiceDurationSeconds?: number | null;
+        } | null;
+      } | undefined;
       const briefData = (byName.get("brief") ?? brief) as {
         aspectRatio?: string;
         renderProfile?: string;
@@ -244,6 +290,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         branding?: {
           businessName?: string;
           slogan?: string;
+          websiteUrl?: string;
           logo?: { name: string; gcsPath: string; mimeType: string } | null;
           logoPlacement?: "none" | "always" | "end_only" | "open_and_end";
         } | null;
@@ -259,12 +306,21 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       const sideWatermark =
         creativeFlagOn(creative, "sideWatermark") || briefData.branding?.logoPlacement === "always";
       const renderProfile = resolveRenderProfile(briefOut ?? briefData).id;
+      const brandEnd = audioOut?.brandEnd;
       return {
         aspectRatio: briefData.aspectRatio ?? "9:16",
         timeline: pkg?.timeline ?? [],
         renderProfile,
         videoInsert: briefData.videoInsert ?? null,
         branding: briefData.branding ?? null,
+        brandEndVoice:
+          brandEnd?.voiceGcsPath
+            ? {
+                gcsPath: brandEnd.voiceGcsPath,
+                durationSeconds: brandEnd.voiceDurationSeconds ?? null,
+                narration: brandEnd.narration
+              }
+            : null,
         karaokeCaptions,
         sideWatermark
       };

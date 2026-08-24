@@ -27,6 +27,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const [insertAudioSource, setInsertAudioSource] = useState<"clip" | "narration">("clip");
   const [businessName, setBusinessName] = useState("");
   const [slogan, setSlogan] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [creative, setCreative] = useState<CreativeOptions>({ karaokeCaptions: "on" });
@@ -60,7 +61,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   }, [visualPreviewUrls]);
 
   const previewAspect = aspectRatioFromCreative(creative) ?? "9:16";
-  const showBrandingPreview = Boolean(businessName.trim() || slogan.trim() || logoFile);
+  const showBrandingPreview = Boolean(businessName.trim() || slogan.trim() || websiteUrl.trim() || logoFile);
 
   function addVisualFiles(incoming: FileList | File[]) {
     const next = [...visualFiles];
@@ -183,10 +184,11 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       }
       const creativePayload = Object.keys(creative).length > 0 ? creative : undefined;
       const brandingPayload =
-        businessName.trim() || slogan.trim()
+        businessName.trim() || slogan.trim() || websiteUrl.trim()
           ? {
               ...(businessName.trim() ? { businessName: businessName.trim() } : {}),
-              ...(slogan.trim() ? { slogan: slogan.trim() } : {})
+              ...(slogan.trim() ? { slogan: slogan.trim() } : {}),
+              ...(websiteUrl.trim() ? { websiteUrl: websiteUrl.trim() } : {})
             }
           : undefined;
       const run = await apiPost<ProjectRunView>("/runs", {
@@ -372,7 +374,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
 
       <section className="branding-section" aria-label="מיתוג העסק">
         <h3 className="branding-section-title">מיתוג העסק</h3>
-        <p className="muted branding-hint">יופיע בכרטיס הסיום של הסרטון — שם, סלוגן ולוגו.</p>
+        <p className="muted branding-hint">יופיע בכרטיס הסיום — שם, סלוגן, קישור ולוגו, עם דיבוב קצר למותג.</p>
         <label>
           שם העסק
           <input
@@ -389,6 +391,16 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
             onChange={(e) => setSlogan(e.target.value)}
             placeholder="משפט קצר שמלווה את המותג"
             maxLength={200}
+          />
+        </label>
+        <label>
+          קישור לאתר / דף נחיתה
+          <input
+            value={websiteUrl}
+            onChange={(e) => setWebsiteUrl(e.target.value)}
+            placeholder="https://example.com"
+            maxLength={300}
+            inputMode="url"
           />
         </label>
         <label className="file-row">
@@ -413,6 +425,9 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
               )}
               {businessName.trim() ? <p className="branding-preview-name">{businessName.trim()}</p> : null}
               {slogan.trim() ? <p className="branding-preview-slogan">{slogan.trim()}</p> : null}
+              {websiteUrl.trim() ? (
+                <p className="branding-preview-url">{websiteUrl.trim().replace(/^https?:\/\//i, "")}</p>
+              ) : null}
               <p className="branding-preview-credit">prompt2spot.com</p>
             </div>
           </div>

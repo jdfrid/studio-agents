@@ -31,7 +31,14 @@ export const SceneSpecSchema = z.object({
   durationSeconds: z.number().int().min(1).max(60),
   requiredAssets: z.array(RequiredAssetKindSchema).default(["voice", "music", "video"]),
   /** title_card = full-frame kinetic text beat (no talking head). */
-  sceneKind: z.enum(["beat", "title_card"]).default("beat")
+  sceneKind: z.enum(["beat", "title_card"]).default("beat"),
+  /**
+   * Spoken voice for this beat when two-character dialogue is used.
+   * a = primary voice, b = secondary (alternating), narrator = single VO.
+   */
+  speaker: z.enum(["a", "b", "narrator"]).optional(),
+  /** Display name of the speaking character (for script clarity; not spoken if narration is clean). */
+  speakerName: z.string().max(80).optional()
 });
 export type SceneSpec = z.infer<typeof SceneSpecSchema>;
 

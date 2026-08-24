@@ -20,6 +20,15 @@ export const RenderInputSchema = z.object({
   videoInsert: VideoInsertSchema.nullable().optional(),
   /** Optional business branding for the end card. */
   branding: BriefBrandingOutputSchema.nullable().optional(),
+  /** Spoken brand outro from audio stage (GCS path). */
+  brandEndVoice: z
+    .object({
+      gcsPath: z.string(),
+      durationSeconds: z.number().nullable().optional(),
+      narration: z.string().optional()
+    })
+    .nullable()
+    .optional(),
   /** Burn karaoke captions onto the assembled film. */
   karaokeCaptions: z.boolean().default(false),
   /** Burn a vertical side watermark. */

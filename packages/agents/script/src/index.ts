@@ -79,6 +79,10 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         : "Pace gestures to the silent beat: face camera / look at product, natural blinks, hold product mid-beat — avoid frantic action.",
       "Optionally include 0–1 title_card scenes (sceneKind=title_card): short on-screen CTA/headline, empty narration, audioPolicy muted, durationSeconds 3–5, visualPrompt describes full-frame kinetic text background.",
       "Spoken beat scenes use sceneKind=beat (default). Keep dubbing lines short, conversational, and timed to the beat.",
+      "DIALOGUE DUBBING (mandatory when cast has 2+ speaking characters): alternate speakers across consecutive beat scenes.",
+      "Set speaker to \"a\" or \"b\" and speakerName to the character's short name from characterBible.",
+      "narration must be ONLY the spoken words for that character — clear natural dialogue, no 'Name:' prefixes, no stage directions.",
+      "Alternate a/b so the audio engine can use two distinct TTS voices. Use speaker \"narrator\" only for non-dialogue VO.",
       "Return strictly valid JSON only — escape quotes inside strings, no trailing commas, no markdown."
     ].filter(Boolean);
     if (extendMode) {
@@ -126,7 +130,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         : "gemini_tts_plus_music | gemini_tts_only | veo_native_audio | muted",
       durationSeconds: clipSeconds,
       requiredAssets: ["voice", "music", "video"],
-      sceneKind: "beat | title_card"
+      sceneKind: "beat | title_card",
+      speaker: "a | b | narrator — alternate a/b for dialogue",
+      speakerName: "short character name for this spoken line"
     };
     if (includeExtraFrames) {
       sceneSchema.referenceImagePrompt = "optional English reference still prompt";
@@ -218,9 +224,20 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         resolvedKind === "title_card"
           ? narrationRaw.slice(0, narrationLimit)
           : trimNarration(
-              narrationRaw,
+              stripSpeakerPrefix(narrationRaw),
               narrationCharLimitForBucket(extendMode || beatI2vMode ? clipSeconds : Number(durationBucket))
             );
+      const speakerRaw = String((scene as { speaker?: string }).speaker ?? "").toLowerCase();
+      const speaker =
+        resolvedKind === "title_card"
+          ? undefined
+          : speakerRaw === "a" || speakerRaw === "b" || speakerRaw === "narrator"
+            ? (speakerRaw as "a" | "b" | "narrator")
+            : ("narrator" as const);
+      const speakerName =
+        resolvedKind === "title_card"
+          ? undefined
+          : String((scene as { speakerName?: string }).speakerName ?? "").trim().slice(0, 80) || undefined;
       const veoPromptRaw =
         scene.veoPrompt?.trim() ||
         scene.visualPrompt?.trim() ||
@@ -258,7 +275,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
             : scene.requiredAssets?.length
               ? scene.requiredAssets
               : ["voice", "music", "video"],
-        sceneKind: resolvedKind
+        sceneKind: resolvedKind,
+        ...(speaker ? { speaker } : {}),
+        ...(speakerName ? { speakerName } : {})
       };
     });
 
@@ -327,6 +346,14 @@ function trimNarration(text: string, maxChars: number): string {
   const cut = trimmed.slice(0, maxChars);
   const lastSpace = cut.lastIndexOf(" ");
   return (lastSpace > maxChars * 0.6 ? cut.slice(0, lastSpace) : cut).trim();
+}
+
+/** Remove "Name:" / "שם —" prefixes so TTS speaks only dialogue. */
+function stripSpeakerPrefix(text: string): string {
+  return text
+    .replace(/^\s*[^:\n]{1,40}\s*[:：]\s*/u, "")
+    .replace(/^\s*[^—\n]{1,40}\s*[—–-]\s*/u, "")
+    .trim();
 }
 
 function normalizeDurationBucket(

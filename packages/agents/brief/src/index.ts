@@ -281,8 +281,14 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     );
     const businessName = input.branding?.businessName?.trim() || "";
     const slogan = input.branding?.slogan?.trim() || "";
+    const websiteUrlRaw = input.branding?.websiteUrl?.trim() || "";
+    const websiteUrl = websiteUrlRaw
+      ? /^https?:\/\//i.test(websiteUrlRaw)
+        ? websiteUrlRaw
+        : `https://${websiteUrlRaw}`
+      : "";
     const creativeLogoPlacement = input.creative?.logoPlacement;
-    const hasBusinessBrand = Boolean(businessName || slogan || logoAsset);
+    const hasBusinessBrand = Boolean(businessName || slogan || logoAsset || websiteUrl);
     let logoPlacement: NonNullable<BriefOutput["branding"]>["logoPlacement"] | undefined;
     if (hasBusinessBrand) {
       if (creativeLogoPlacement === "none") logoPlacement = "none";
@@ -293,6 +299,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       ? {
           ...(businessName ? { businessName } : {}),
           ...(slogan ? { slogan } : {}),
+          ...(websiteUrl ? { websiteUrl } : {}),
           logo: logoAsset,
           ...(logoPlacement ? { logoPlacement } : {})
         }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost } from "./api.js";
+import { apiDelete, apiGet, apiPost } from "./api.js";
 import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
 import { StageProgressClock } from "./StageProgressClock.js";
 import { VisualCorrectionsPanel } from "./VisualCorrectionsPanel.js";
@@ -18,6 +18,7 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
   const [run, setRun] = useState<ProjectRunView | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactRow[]>([]);
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   async function refresh() {
     try {
@@ -25,6 +26,20 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
       setArtifacts(await apiGet<ArtifactRow[]>(`/runs/${runId}/artifacts`));
     } catch (err) {
       setError((err as Error).message);
+    }
+  }
+
+  async function deleteThisRun() {
+    if (!run) return;
+    if (!window.confirm(`למחוק את «${run.brief.title}»? התהליך ייעצר ולא ימשיך לנסות.`)) return;
+    setDeleting(true);
+    try {
+      await apiDelete(`/runs/${run.id}`);
+      onBack();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -49,6 +64,15 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
         </button>
         <h2>{run.brief.title}</h2>
         <span className={`status-pill status-${run.status.toLowerCase()}`}>{statusLabelHe(run.status)}</span>
+        {run.status !== "COMPLETED" ? (
+          <button type="button" className="link-btn run-delete-btn" disabled={deleting} onClick={() => void deleteThisRun()}>
+            {deleting ? "מוחק…" : "מחק תהליך"}
+          </button>
+        ) : (
+          <button type="button" className="link-btn run-delete-btn" disabled={deleting} onClick={() => void deleteThisRun()}>
+            {deleting ? "מוחק…" : "מחק"}
+          </button>
+        )}
       </header>
 
       <RunSettingsSummary run={run} artifacts={artifacts} />

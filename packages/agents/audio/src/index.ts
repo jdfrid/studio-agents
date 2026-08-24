@@ -95,7 +95,9 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
                     {
                       text: scene.narration,
                       language: input.language,
-                      ...(input.voiceName ? { voiceName: input.voiceName } : {}),
+                      ...((scene.voiceName || input.voiceName)
+                        ? { voiceName: scene.voiceName || input.voiceName }
+                        : {}),
                       ...(input.voiceStyle ? { style: input.voiceStyle } : {})
                     },
                     async (event) => {
@@ -122,7 +124,10 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
               sceneId: scene.sceneId,
               provider: audio.provider,
               model: "model" in audio && typeof audio.model === "string" ? audio.model : undefined,
-              clonedVoice: useClonedVoice
+              clonedVoice: useClonedVoice,
+              speaker: scene.speaker,
+              speakerName: scene.speakerName,
+              voiceName: scene.voiceName || input.voiceName
             }
           });
           perScene.push({
@@ -228,12 +233,58 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
         };
       }
 
+      let brandEnd: AudioOutput["brandEnd"] = null;
+      const brandLine = input.brandEndNarration?.trim();
+      if (brandLine && !useClonedVoice && defaultTts?.type === "GEMINI") {
+        try {
+          const audio = await geminiSynthesizeSpeech(
+            defaultTts,
+            {
+              text: brandLine,
+              language: input.language,
+              ...(input.voiceName ? { voiceName: input.voiceName } : {}),
+              ...(input.voiceStyle ? { style: input.voiceStyle } : {})
+            },
+            async (event) => {
+              await ctx.cost.record({ ...event, sceneId: "brand_end" });
+            }
+          );
+          const voiceExt = audio.mimeType.includes("wav")
+            ? "wav"
+            : audio.mimeType.includes("mpeg")
+              ? "mp3"
+              : "audio";
+          const artifact = await ctx.artifacts.save({
+            runId: ctx.runId,
+            stage: "audio",
+            kind: "voice_clip",
+            body: audio.body,
+            mimeType: audio.mimeType,
+            filename: `voice-brand-end.${voiceExt}`,
+            metadata: { role: "brand_end", narration: brandLine }
+          });
+          brandEnd = {
+            narration: brandLine,
+            voiceArtifactId: artifact.id,
+            voiceGcsPath: artifact.gcsPath,
+            voiceDurationSeconds: audio.durationSeconds,
+            provider: audio.provider,
+            model: "model" in audio && typeof audio.model === "string" ? audio.model : null
+          };
+        } catch (error) {
+          await ctx.log.log("audio_brand_end_failed", "Brand end TTS failed", {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+
       await ctx.log.log("audio_done", "Audio Agent finished", {
         voiced: perScene.filter((s) => s.voiceArtifactId).length,
         hasMusic: !!musicOut.artifactId,
-        clonedVoice: useClonedVoice
+        clonedVoice: useClonedVoice,
+        hasBrandEnd: Boolean(brandEnd?.voiceGcsPath)
       });
-      return { perScene, music: musicOut };
+      return { perScene, music: musicOut, brandEnd };
     } finally {
       if (clonedVoiceId && elevenApiKey) {
         try {

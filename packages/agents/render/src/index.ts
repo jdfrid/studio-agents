@@ -287,7 +287,14 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
 
       finalPath = await burnKaraokeAndWatermark(finalPath, dir, dimensions, input, ctx.log);
 
-      finalPath = await appendBrandingEndCard(finalPath, dir, dimensions, input.branding ?? null, ctx.storage);
+      finalPath = await appendBrandingEndCard(
+        finalPath,
+        dir,
+        dimensions,
+        input.branding ?? null,
+        ctx.storage,
+        input.brandEndVoice ?? null
+      );
 
       const outputScale = Number(process.env.RENDER_OUTPUT_SCALE ?? 0);
       if (outputScale > 0) {
@@ -512,7 +519,14 @@ async function renderExtendChain(
 
   finalPath = await burnKaraokeAndWatermark(finalPath, dir, dimensions, input, ctx.log);
 
-  finalPath = await appendBrandingEndCard(finalPath, dir, dimensions, input.branding ?? null, ctx.storage);
+  finalPath = await appendBrandingEndCard(
+    finalPath,
+    dir,
+    dimensions,
+    input.branding ?? null,
+    ctx.storage,
+    input.brandEndVoice ?? null
+  );
 
   const outputScale = Number(process.env.RENDER_OUTPUT_SCALE ?? 0);
   if (outputScale > 0) {
@@ -1069,6 +1083,7 @@ async function downscaleVideo(videoPath: string, width: number, dir: string): Pr
 }
 
 const BRANDING_END_CARD_SECONDS = 2.8;
+const BRANDING_END_CARD_WITH_VOICE_SECONDS = 5.5;
 const BRANDING_END_FADE_SECONDS = 0.85;
 const BRANDING_END_TEXT = "prompt2spot.com";
 
@@ -1116,32 +1131,50 @@ function escapeDrawtext(text: string): string {
 function shouldUseBusinessEndCard(branding: BriefBrandingOutput | null | undefined): boolean {
   if (!branding) return false;
   if (branding.logoPlacement === "none") return false;
-  return Boolean(branding.businessName?.trim() || branding.slogan?.trim() || branding.logo?.gcsPath);
+  return Boolean(
+    branding.businessName?.trim() ||
+      branding.slogan?.trim() ||
+      branding.websiteUrl?.trim() ||
+      branding.logo?.gcsPath
+  );
 }
 
 async function createBusinessEndCardClip(
   dir: string,
   dimensions: VideoDimensions,
   branding: BriefBrandingOutput,
-  storage: GcsClient
+  storage: GcsClient,
+  brandVoice?: { gcsPath: string; durationSeconds?: number | null } | null
 ): Promise<string> {
   const endClip = path.join(dir, `biz-end-${nanoid(4)}.mp4`);
   const { width, height } = dimensions;
   const name = branding.businessName?.trim() || "";
   const slogan = branding.slogan?.trim() || "";
+  const website = (branding.websiteUrl?.trim() || "").replace(/^https?:\/\//i, "");
   const font = resolveDrawtextFont();
   const fontOpt = font ? `:fontfile='${font.replace(/\\/g, "/").replace(/:/g, "\\:")}'` : "";
   const nameSize = Math.max(28, Math.round(Math.min(width, height) * 0.06));
   const sloganSize = Math.max(18, Math.round(Math.min(width, height) * 0.035));
+  const urlSize = Math.max(16, Math.round(Math.min(width, height) * 0.032));
   const creditSize = Math.max(14, Math.round(Math.min(width, height) * 0.028));
   const logoMax = Math.round(Math.min(width, height) * 0.28);
   const hasLogo = Boolean(branding.logo?.gcsPath);
+  const voiceDur = Number(brandVoice?.durationSeconds);
+  const cardSeconds = brandVoice?.gcsPath
+    ? Math.min(8, Math.max(BRANDING_END_CARD_WITH_VOICE_SECONDS, Number.isFinite(voiceDur) && voiceDur > 0 ? voiceDur + 0.4 : BRANDING_END_CARD_WITH_VOICE_SECONDS))
+    : BRANDING_END_CARD_SECONDS;
 
   let logoLocal: string | null = null;
   if (hasLogo && branding.logo?.gcsPath) {
     const ext = path.extname(branding.logo.name) || ".png";
     logoLocal = path.join(dir, `biz-logo-${nanoid(4)}${ext}`);
     await downloadMediaToFile(storage, branding.logo.gcsPath, logoLocal);
+  }
+
+  let voiceLocal: string | null = null;
+  if (brandVoice?.gcsPath) {
+    voiceLocal = path.join(dir, `biz-voice-${nanoid(4)}${musicExtension(brandVoice.gcsPath)}`);
+    await downloadMediaToFile(storage, brandVoice.gcsPath, voiceLocal);
   }
 
   const drawParts: string[] = [];
@@ -1161,9 +1194,22 @@ async function createBusinessEndCardClip(
       `drawtext=text='${escapeDrawtext(slogan)}'${fontOpt}:fontsize=${sloganSize}:fontcolor=white@0.88:x=(w-text_w)/2:y=${y}`
     );
   }
+  if (website) {
+    const yBase = hasLogo
+      ? Math.round(logoMax * 0.55 + nameSize * 1.35 + (slogan ? sloganSize * 1.4 : 0))
+      : Math.round(nameSize * (slogan ? 2.2 : 0.9));
+    const y = hasLogo ? `(h/2)+${yBase}` : name || slogan ? `(h-text_h)/2+${yBase}` : `(h-text_h)/2`;
+    drawParts.push(
+      `drawtext=text='${escapeDrawtext(website)}'${fontOpt}:fontsize=${urlSize}:fontcolor=0x7ab5ff:x=(w-text_w)/2:y=${y}`
+    );
+  }
   drawParts.push(
     `drawtext=text='${escapeDrawtext(BRANDING_END_TEXT)}'${fontOpt}:fontsize=${creditSize}:fontcolor=white@0.55:x=(w-text_w)/2:y=h-th-${Math.round(height * 0.06)}`
   );
+
+  const audioArgs = voiceLocal
+    ? ["-i", voiceLocal]
+    : ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"];
 
   if (logoLocal) {
     const filter = [
@@ -1176,15 +1222,12 @@ async function createBusinessEndCardClip(
       "-f",
       "lavfi",
       "-i",
-      `color=c=0x0d1117:s=${width}x${height}:d=${BRANDING_END_CARD_SECONDS}`,
+      `color=c=0x0d1117:s=${width}x${height}:d=${cardSeconds}`,
       "-loop",
       "1",
       "-i",
       logoLocal,
-      "-f",
-      "lavfi",
-      "-i",
-      "anullsrc=channel_layout=stereo:sample_rate=44100",
+      ...audioArgs,
       "-filter_complex",
       filter,
       "-map",
@@ -1192,7 +1235,7 @@ async function createBusinessEndCardClip(
       "-map",
       "2:a",
       "-t",
-      String(BRANDING_END_CARD_SECONDS),
+      String(cardSeconds),
       "-c:v",
       "libx264",
       "-preset",
@@ -1215,13 +1258,10 @@ async function createBusinessEndCardClip(
     "-f",
     "lavfi",
     "-i",
-    `color=c=0x0d1117:s=${width}x${height}:d=${BRANDING_END_CARD_SECONDS}`,
-    "-f",
-    "lavfi",
-    "-i",
-    "anullsrc=channel_layout=stereo:sample_rate=44100",
+    `color=c=0x0d1117:s=${width}x${height}:d=${cardSeconds}`,
+    ...audioArgs,
     "-t",
-    String(BRANDING_END_CARD_SECONDS),
+    String(cardSeconds),
     "-vf",
     vf,
     "-c:v",
@@ -1455,13 +1495,14 @@ async function appendBrandingEndCard(
   dir: string,
   dimensions: VideoDimensions,
   branding: BriefBrandingOutput | null | undefined,
-  storage: GcsClient
+  storage: GcsClient,
+  brandVoice?: { gcsPath: string; durationSeconds?: number | null } | null
 ): Promise<string> {
   try {
     const lastFrame = path.join(dir, `end-last-${nanoid(4)}.png`);
     await runFfmpeg(["-sseof", "-0.08", "-i", videoPath, "-frames:v", "1", "-y", lastFrame]);
     const endClip = shouldUseBusinessEndCard(branding)
-      ? await createBusinessEndCardClip(dir, dimensions, branding!, storage)
+      ? await createBusinessEndCardClip(dir, dimensions, branding!, storage, brandVoice)
       : await createEndCardClip(dir, dimensions, lastFrame);
 
     const out = path.join(dir, `with-end-${nanoid(4)}.mp4`);
