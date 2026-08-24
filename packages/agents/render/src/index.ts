@@ -1107,6 +1107,7 @@ function escapeDrawtext(text: string): string {
     .replace(/\\/g, "\\\\")
     .replace(/:/g, "\\:")
     .replace(/'/g, "\\'")
+    .replace(/,/g, "\\,")
     .replace(/%/g, "%%")
     .replace(/\r?\n/g, " ");
 }
@@ -1146,7 +1147,7 @@ async function createBusinessEndCardClip(
   if (name) {
     const y = hasLogo ? `(h/2)+${Math.round(logoMax * 0.55)}` : `(h-text_h)/2-${Math.round(nameSize * 0.4)}`;
     drawParts.push(
-      `drawtext=text='${escapeDrawtext(name)}'${fontOpt}:fontsize=${nameSize}:fontcolor=white:x=(w-text_w)/2:y=${y}:alpha='if(lt(t\\,0.4)\\,t/0.4\\,1)'`
+      `drawtext=text='${escapeDrawtext(name)}'${fontOpt}:fontsize=${nameSize}:fontcolor=white:x=(w-text_w)/2:y=${y}`
     );
   }
   if (slogan) {
@@ -1156,18 +1157,18 @@ async function createBusinessEndCardClip(
         ? `(h-text_h)/2+${Math.round(nameSize * 0.9)}`
         : `(h-text_h)/2`;
     drawParts.push(
-      `drawtext=text='${escapeDrawtext(slogan)}'${fontOpt}:fontsize=${sloganSize}:fontcolor=white@0.88:x=(w-text_w)/2:y=${y}:alpha='if(lt(t\\,0.5)\\,t/0.5\\,1)'`
+      `drawtext=text='${escapeDrawtext(slogan)}'${fontOpt}:fontsize=${sloganSize}:fontcolor=white@0.88:x=(w-text_w)/2:y=${y}`
     );
   }
   drawParts.push(
-    `drawtext=text='${BRANDING_END_TEXT}'${fontOpt}:fontsize=${creditSize}:fontcolor=white@0.55:x=(w-text_w)/2:y=h-th-${Math.round(height * 0.06)}`
+    `drawtext=text='${escapeDrawtext(BRANDING_END_TEXT)}'${fontOpt}:fontsize=${creditSize}:fontcolor=white@0.55:x=(w-text_w)/2:y=h-th-${Math.round(height * 0.06)}`
   );
 
   if (logoLocal) {
     const filter = [
       `[0:v]scale=${width}:${height},format=yuv420p[bg]`,
       `[1:v]scale=w='min(iw\\,${logoMax})':h='min(ih\\,${logoMax})':force_original_aspect_ratio=decrease[logo]`,
-      `[bg][logo]overlay=(W-w)/2:(H-h)/2-${Math.round(logoMax * 0.35)}[base]`,
+      `[bg][logo]overlay=(W-w)/2:(H-h)/2-${Math.round(logoMax * 0.35)},fade=t=in:st=0:d=0.35[base]`,
       `[base]${drawParts.join(",")}[vout]`
     ].join(";");
     await runFfmpeg([
@@ -1208,7 +1209,7 @@ async function createBusinessEndCardClip(
     return endClip;
   }
 
-  const vf = [`scale=${width}:${height}`, "format=yuv420p", ...drawParts].join(",");
+  const vf = [`scale=${width}:${height}`, "format=yuv420p", "fade=t=in:st=0:d=0.35", ...drawParts].join(",");
   await runFfmpeg([
     "-f",
     "lavfi",
@@ -1248,7 +1249,8 @@ async function createEndCardClip(dir: string, dimensions: VideoDimensions, lastF
     : [
         normalizeVideoFilter(dimensions.width, dimensions.height),
         "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.55:t=fill",
-        `drawtext=text='${BRANDING_END_TEXT}':fontsize=${Math.max(28, Math.round(Math.min(dimensions.width, dimensions.height) * 0.055))}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:alpha='if(lt(t\\,0.45)\\,t/0.45\\,1)'`
+        "fade=t=in:st=0:d=0.35",
+        `drawtext=text='${escapeDrawtext(BRANDING_END_TEXT)}':fontsize=${Math.max(28, Math.round(Math.min(dimensions.width, dimensions.height) * 0.055))}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2`
       ].join(",");
 
   await runFfmpeg([
