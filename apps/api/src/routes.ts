@@ -3,6 +3,7 @@ import { z } from "zod";
 import { StageNameSchema, CreateRunRequestSchema, CheckoutRequestSchema } from "@studio/shared";
 import {
   approveStage,
+  alignDubbingToVisual,
   applyVisualCorrectionsToRun,
   createArtifactsRepo,
   createProvidersRepo,
@@ -297,6 +298,25 @@ export async function registerRoutes(app: FastifyInstance) {
             error: (error as Error).message
           }).catch(() => undefined);
         }
+        reply.code(400);
+        return { error: (error as Error).message };
+      }
+    });
+
+    userRoutes.post("/runs/:id/align-dubbing-to-visual", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      if (!(await assertRunOwner(id, request.user!.sub, request.user!.role))) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      try {
+        const view = await alignDubbingToVisual(id);
+        if (!view) {
+          reply.code(404);
+          return { error: "not_found" };
+        }
+        return view;
+      } catch (error) {
         reply.code(400);
         return { error: (error as Error).message };
       }

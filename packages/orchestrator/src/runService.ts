@@ -494,6 +494,42 @@ export async function rerunStage(runId: string, stage: StageName): Promise<Proje
   return getRun(runId);
 }
 
+/** Keep script output; clear audio+downstream and re-queue audio (used after narration rewrite). */
+export async function invalidateDownstreamAndRerunAudio(runId: string): Promise<ProjectRunView | null> {
+  const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
+  if (!run) return null;
+  const audioRow = run.stages.find((s) => fromPrismaStage(s.stage) === "audio");
+  if (!audioRow) return toView(run);
+  await prisma.$transaction([
+    prisma.stageExecution.update({
+      where: { id: audioRow.id },
+      data: {
+        status: "QUEUED",
+        error: null,
+        output: Prisma.DbNull,
+        attempts: 0,
+        completedAt: null,
+        startedAt: null
+      }
+    }),
+    prisma.projectRun.update({
+      where: { id: run.id },
+      data: { currentStage: toPrismaStage("audio"), status: "RUNNING" }
+    })
+  ]);
+  await invalidateDownstreamStages(runId, "audio");
+  await audit(run.tenantId, "align_dubbing_rerun_audio", "StageExecution", audioRow.id, {});
+  try {
+    await enqueueStage("audio", { runId: run.id, stage: "audio" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await recordStageError(audioRow.id, `enqueue_failed: ${message}`);
+    await setRunStatus(run.id, "FAILED", "audio");
+    throw error;
+  }
+  return getRun(runId);
+}
+
 export function shouldWaitForApproval(stage: StageName, approvalMode: ApprovalMode = "manual"): boolean {
   return stageRequiresApproval(stage, approvalMode);
 }

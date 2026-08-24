@@ -22,8 +22,8 @@ export const AudioInputSchema = z.object({
     .optional(),
   /** Gemini TTS prebuilt voice (e.g. Charon / Kore). Ignored when voice clone is used. */
   voiceName: z.string().max(40).optional(),
-  /** Delivery style hint prepended to TTS text (speechStyle / accent / speed). */
-  voiceStyle: z.string().max(200).optional()
+  /** Delivery style hint prepended to TTS text (speechStyle / accent / event tone). */
+  voiceStyle: z.string().max(500).optional()
 });
 export type AudioInput = z.infer<typeof AudioInputSchema>;
 

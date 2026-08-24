@@ -5,7 +5,7 @@ import {
   createConsoleLogger,
   creativeFlagOn,
   geminiVoiceNameFromCreative,
-  geminiTtsStyleFromCreative,
+  buildTtsDeliveryStyle,
   defaultGeminiVoiceForLanguage,
   nextStage,
   resolveRenderProfile,
@@ -129,6 +129,10 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       const script = byName.get("script") as { scenes: Array<{ id: string; narration: string; durationSeconds: number; audioPolicy?: string }>; musicPrompt: string } | undefined;
       const briefData = (byName.get("brief") ?? brief) as {
         language?: string;
+        title?: string;
+        summary?: string;
+        toneOfVoice?: string;
+        style?: string;
         voiceCloneSample?: { name: string; gcsPath: string; mimeType: string } | null;
         ttsVoiceName?: string | null;
         creative?: Parameters<typeof geminiVoiceNameFromCreative>[0];
@@ -139,7 +143,13 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         briefData.ttsVoiceName ??
         geminiVoiceNameFromCreative(creative) ??
         defaultGeminiVoiceForLanguage(briefData.language);
-      const voiceStyle = geminiTtsStyleFromCreative(creative);
+      const voiceStyle = buildTtsDeliveryStyle({
+        creative,
+        title: briefData.title,
+        summary: briefData.summary,
+        toneOfVoice: briefData.toneOfVoice,
+        style: briefData.style
+      });
       return {
         language: briefData.language ?? "he",
         scenes: (script?.scenes ?? []).map((scene) => ({

@@ -7,6 +7,7 @@ import {
   applyContinuityToScript,
   contentLanguageEnglishName,
   contentLanguageNativeName,
+  formatCreativeConstraints,
   forcedVeoDurationBucket,
   isBudgetMode,
   isProductAdBrief,
@@ -66,6 +67,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt, visualPrompt, or characterBible — use generic fictional people only (video models block real-person likenesses).",
       "Avoid coded public-figure descriptions (e.g. Israeli leader / US president / named office holders). Describe age, hair, and wardrobe only for fictional characters.",
       "NARRATION–MOTION SYNC (mandatory): narration and veoPrompt are one timed beat — write them together.",
+      "NARRATION TONE (mandatory): every spoken line must match the event mood and creative style — not generic announcer copy.",
+      "If creative/communicationStyle/designStyle/location/targetAudience are set, narration vocabulary and energy MUST reflect them (e.g. wedding warmth, news urgency, kids playful, Pixar whimsy).",
+      "Do not write flat product-demo narration when the brief describes a ceremony, party, documentary, or stylized world.",
       heygenMode
         ? "In veoPrompt, describe body/gaze/gesture timed to the spoken line; mouth sync comes from HeyGen audio."
         : "CRITICAL (TTS mix): veoPrompt must be SILENT performance only — closed mouth, no speaking, no dialogue, no music, no lip-sync/mouthing words. Voiceover is added later via TTS+FFmpeg; asking Veo for speech often fails the whole clip.",
@@ -153,7 +157,21 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         : klingMode
           ? ` Kling I2V mode: ${sceneCount} beats × ~10s each (reference frame per beat).`
           : "";
-    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Total video length will be ~${totalVideoSeconds}s (brief asks for ${brief.durationSeconds}s). User-facing text (titles, narration, characterBible, backgroundVisualPrompt, musicPrompt) MUST be in ${langEn}. For every scene, align narration wording with the motion described in veoPrompt (who speaks, when they face camera, when mouth/gestures match the line).${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}`;
+    const creativeLines = formatCreativeConstraints(
+      (brief as { creative?: Parameters<typeof formatCreativeConstraints>[0] }).creative
+    );
+    const creativeBlock =
+      creativeLines.length > 0
+        ? `\n\nCreative constraints (MUST shape narration tone + visuals):\n${creativeLines.map((l) => `- ${l}`).join("\n")}`
+        : "";
+    const toneHint = [
+      brief.toneOfVoice ? `Brief toneOfVoice: ${brief.toneOfVoice}` : "",
+      brief.style ? `Brief style: ${brief.style}` : "",
+      brief.summary ? `Brief summary: ${String(brief.summary).slice(0, 280)}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}${creativeBlock}${toneHint ? `\n\n${toneHint}` : ""}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Total video length will be ~${totalVideoSeconds}s (brief asks for ${brief.durationSeconds}s). User-facing text (titles, narration, characterBible, backgroundVisualPrompt, musicPrompt) MUST be in ${langEn}. Narration must sound like it belongs to this specific event/style (not generic ads). For every scene, align narration wording with the motion described in veoPrompt.${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}`;
 
     const completeJson = provider.type === "GEMINI" ? geminiCompleteJson : llmCompleteJson;
     const { parsed, model } = await completeJson<{

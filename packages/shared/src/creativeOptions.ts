@@ -648,7 +648,7 @@ export function geminiVoiceNameFromCreative(creative?: CreativeOptions | null): 
   return "Kore";
 }
 
-/** Spoken delivery hint prepended for Gemini TTS. */
+/** Spoken delivery hint prepended for Gemini TTS (voice + event/creative tone). */
 export function geminiTtsStyleFromCreative(creative?: CreativeOptions | null): string | undefined {
   if (!creative) return undefined;
   const parts: string[] = [];
@@ -656,8 +656,32 @@ export function geminiTtsStyleFromCreative(creative?: CreativeOptions | null): s
   if (creative.voiceType) parts.push(String(creative.voiceType));
   if (creative.speechSpeed) parts.push(`מהירות: ${creative.speechSpeed}`);
   if (creative.accent) parts.push(`מבטא: ${creative.accent}`);
+  if (creative.communicationStyle) parts.push(`טון תקשורת: ${creative.communicationStyle}`);
+  if (creative.designStyle) parts.push(`סגנון ויזואלי: ${creative.designStyle}`);
+  if (creative.location) parts.push(`מיקום/אירוע: ${creative.location}`);
+  if (creative.targetAudience) parts.push(`קהל: ${creative.targetAudience}`);
+  if (creative.pace) parts.push(`קצב: ${creative.pace}`);
   if (!parts.length) return undefined;
-  return parts.join(", ");
+  return parts.join(", ").slice(0, 480);
+}
+
+/** Merge creative TTS style with brief event tone (title / summary / toneOfVoice). */
+export function buildTtsDeliveryStyle(input: {
+  creative?: CreativeOptions | null;
+  title?: string | null;
+  summary?: string | null;
+  toneOfVoice?: string | null;
+  style?: string | null;
+}): string | undefined {
+  const parts: string[] = [];
+  const fromCreative = geminiTtsStyleFromCreative(input.creative);
+  if (fromCreative) parts.push(fromCreative);
+  if (input.toneOfVoice?.trim()) parts.push(`טון בריף: ${input.toneOfVoice.trim()}`);
+  if (input.style?.trim()) parts.push(`סגנון: ${input.style.trim()}`);
+  if (input.title?.trim()) parts.push(`נושא: ${input.title.trim()}`);
+  if (input.summary?.trim()) parts.push(`תקציר: ${input.summary.trim().slice(0, 160)}`);
+  if (!parts.length) return undefined;
+  return parts.join(" | ").slice(0, 480);
 }
 
 /** Stable default when no creative voice fields — avoid always Kore. */

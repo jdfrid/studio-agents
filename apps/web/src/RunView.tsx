@@ -71,6 +71,8 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
         <VisualCorrectionsPanel runId={runId} scriptOutput={scriptOutput} runStatus={run.status} onSaved={() => void refresh()} />
       ) : null}
 
+      <AlignDubbingPanel run={run} onDone={() => void refresh()} />
+
       <div className="stage-stack">
         {STAGE_ORDER.map((stage) => (
           <UserStageCard
@@ -83,6 +85,48 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
         ))}
       </div>
     </div>
+  );
+}
+
+function AlignDubbingPanel({ run, onDone }: { run: ProjectRunView; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const scriptDone = run.stages.some((s) => s.stage === "script" && (s.status === "COMPLETED" || s.status === "AWAITING_APPROVAL"));
+  const afterVisual = run.stages.some(
+    (s) =>
+      (s.stage === "package" || s.stage === "render") &&
+      (s.status === "COMPLETED" || s.status === "AWAITING_APPROVAL")
+  );
+  const runIdle = run.status === "COMPLETED" || run.status === "FAILED" || run.status === "AWAITING_APPROVAL";
+  if (!scriptDone || !afterVisual || !runIdle) return null;
+
+  async function align() {
+    if (!window.confirm("לכתוב מחדש את הדיבוב לפי הסצנות הוויזואליות ולהריץ TTS מחדש? קליפי הווידאו יישמרו אם הפרומפטים לא השתנו.")) {
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await apiPost(`/runs/${run.id}/align-dubbing-to-visual`);
+      onDone();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="visual-corrections-panel">
+      <header className="panel-header">
+        <h3>התאמת דיבוב</h3>
+      </header>
+      <p className="muted">כתיבה מחדש של הקריינות לפי התיאור הוויזואלי של כל סצנה, ואז דיבוב TTS מחדש (בלי לייצר קליפים מחדש כשאין שינוי בפרומפט).</p>
+      {error ? <p className="error">{error}</p> : null}
+      <button type="button" className="primary" disabled={busy} onClick={() => void align()}>
+        {busy ? "מתאים…" : "התאם דיבוב לוויזואל"}
+      </button>
+    </section>
   );
 }
 
