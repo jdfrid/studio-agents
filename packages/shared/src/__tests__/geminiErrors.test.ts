@@ -14,6 +14,12 @@ describe("classifyGeminiError", () => {
     expect(classifyGeminiError(raw, 429)).toBe("rate_limit");
     expect(userFacingGeminiError(raw, 429)).toContain("מגבלת קצב");
     expect(userFacingGeminiError(raw, 429)).not.toContain("Prepay");
+    expect(userFacingGeminiError(raw, 429)).not.toContain("Veo");
+  });
+
+  it("mentions Veo only for video API rate limits", () => {
+    const raw = `429 RESOURCE_EXHAUSTED predictLongRunning veo generateVideos`;
+    expect(userFacingGeminiError(raw, 429)).toContain("Veo");
   });
 
   it("detects billing when payment keywords present", () => {

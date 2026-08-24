@@ -91,11 +91,19 @@ export function userFacingGeminiError(raw: string, httpStatus?: number): string 
       if (provider === "heygen") {
         return "מגבלת קצב זמנית ב-HeyGen. המתן כמה דקות והפעל מחדש את שלב הרינדור.";
       }
+      // Veo-specific copy only when the failure is actually from video APIs — not brief/script/TTS text.
+      if (/\bveo\b|predictlongrunning|generatevideos|video.*generation/i.test(raw)) {
+        return [
+          "מגבלת קצב או מכסה זמנית של Gemini Veo (429) — לא בהכרח 'נגמר כסף'.",
+          "המערכת מנסה שוב אוטומטית עם המתנה בין ניסיונות.",
+          "אם עדיין נכשל אחרי כל הניסיונות: המתן כמה דקות ולחץ «הפעל מחדש את השלב» — סצנות שכבר הצליחו לא יחויבו שוב.",
+          "לייצור לקוחות ודא מכסת Veo מספקת בחשבון Google (Paid)."
+        ].join(" ");
+      }
       return [
-        "מגבלת קצב או מכסה זמנית של Gemini/Veo (429) — לא בהכרח 'נגמר כסף'.",
+        "מגבלת קצב זמנית של Gemini (HTTP 429) — לא בהכרח נגמרו קרדיטים.",
         "המערכת מנסה שוב אוטומטית עם המתנה בין ניסיונות.",
-        "אם עדיין נכשל אחרי כל הניסיונות: המתן כמה דקות ולחץ «הפעל מחדש את השלב» — סצנות שכבר הצליחו לא יחויבו שוב.",
-        "לייצור לקוחות ודא מכסת Veo מספקת בחשבון Google (Paid)."
+        "אם עדיין נכשל: המתן דקה–שתיים ולחץ «הפעל מחדש את השלב»."
       ].join(" ");
     case "auth":
       if (provider === "heygen") {

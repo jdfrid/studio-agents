@@ -8,6 +8,8 @@ import { parseJsonObjectWithRepair } from "../jsonParse.js";
 
 import { extractText, geminiModels, geminiUrl } from "./common.js";
 
+import { withGeminiRateLimitRetry } from "./rateLimitRetry.js";
+
 import { reportGenerateContentUsage } from "./reportUsage.js";
 
 import type { GeminiUsageReporter } from "./usage.js";
@@ -102,7 +104,10 @@ export async function geminiCompleteJson<T>(
 
     const temperature = attempt === 1 ? (req.temperature ?? 0.3) : 0.15;
 
-    const response = await callGemini(provider, model, prompt, { ...req, temperature }, maxOutputTokens);
+    // Brief/script share the same Gemini RPM as Veo — retry 429 here so early stages don't fail hard.
+    const response = await withGeminiRateLimitRetry(`gemini_text:${model}`, () =>
+      callGemini(provider, model, prompt, { ...req, temperature }, maxOutputTokens)
+    );
 
     lastRaw = extractText(response);
 
