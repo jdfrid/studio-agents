@@ -177,7 +177,10 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           sceneId: scene.sceneId,
           prompt: wantNativeAudio
             ? scene.veoPrompt
-            : sanitizeVeoPromptForExternalAudio(scene.veoPrompt),
+            : sanitizeVeoPromptForExternalAudio(scene.veoPrompt, {
+                speakerName: scene.speakerName,
+                multiCast: Boolean(scene.speakerName)
+              }),
           aspectRatio: input.aspectRatio === "16:9" ? "16:9" : "9:16",
           durationBucket: scene.durationBucket,
           durationSeconds: scene.durationSeconds,

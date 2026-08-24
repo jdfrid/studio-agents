@@ -245,15 +245,17 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
           const continuityRefs: ReferenceImageBytes[] = [];
 
-          // Always prefer user inspiration/background images when present (every scene).
+          // Prefer user character photos: speaker a→photo1, b→photo2; always pass both when available.
           if (anchorReferences.length) {
-            const primary = anchorReferences[0]!;
-            const rotated =
-              anchorReferences.length > 1
-                ? anchorReferences[sceneIndex % anchorReferences.length]!
-                : primary;
+            const speakerIdx =
+              scene.speaker === "b" ? 1 : scene.speaker === "a" ? 0 : sceneIndex % anchorReferences.length;
+            const primary =
+              anchorReferences[Math.min(speakerIdx, anchorReferences.length - 1)] ?? anchorReferences[0]!;
             continuityRefs.push(primary);
-            if (rotated !== primary) continuityRefs.push(rotated);
+            if (anchorReferences.length > 1) {
+              const other = anchorReferences.find((r) => r !== primary) ?? anchorReferences[1]!;
+              if (other !== primary) continuityRefs.push(other);
+            }
           } else if (assetMode === "shared_reference" && anchorReference) {
             continuityRefs.push(anchorReference);
           } else if (chainReference) {
@@ -261,7 +263,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
           }
 
           const anchorHint = continuityRefs.length
-            ? " Match the uploaded reference photo(s) for character likeness and/or background/setting — do not invent a different place or cast."
+            ? " The attached photo(s) ARE the cast: preserve their exact faces and identities (photo 1 = character A, photo 2 = character B when two photos). Do not invent different people. You may adjust pose, framing, and background to match the scene."
             : "";
 
           const reference = await geminiGenerateImage(

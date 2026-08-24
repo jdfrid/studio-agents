@@ -601,7 +601,7 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
         אנימה: "anime style, clean line art",
         "איור וקטורי": "flat vector illustration",
         "סטופ־מושן": "stop-motion clay/puppet look",
-        "חדשות אולפן": "TV news studio, desk and backdrop"
+        "חדשות אולפן": "TV news studio desk and plain backdrop — no wall maps, globes, tickers, or graphics overlays"
       };
       const hint = styleHints[String(value)];
       lines.push(hint ? `${label}: ${value} (${hint})` : `${label}: ${value}`);
@@ -651,15 +651,73 @@ function pickGeminiVoiceForSex(sex: "male" | "female", blob: string): string {
   return "Kore";
 }
 
-/** Primary + secondary voices for alternating dialogue (opposite gender when possible). */
-export function geminiDialogueVoicePair(creative?: CreativeOptions | null): {
+const MALE_GEMINI_VOICES = ["Charon", "Puck", "Fenrir", "Orus"] as const;
+const FEMALE_GEMINI_VOICES = ["Kore", "Aoede", "Zephyr", "Leda"] as const;
+
+function isMaleGeminiVoice(name: string): boolean {
+  return /^(Charon|Puck|Fenrir|Orus)$/i.test(name);
+}
+
+/** Infer character sexes from locked cast text (Hebrew/English cues). */
+export function inferCastSexesFromBible(characterBible?: string | null): Array<"male" | "female"> {
+  const text = characterBible?.trim() ?? "";
+  if (!text) return [];
+  const chunks = text
+    .split(/(?:\n|;|\||(?:^|\s)(?:and|ו|-)\s+|character\s*\d+|דמות\s*\d+)/i)
+    .map((c) => c.trim())
+    .filter((c) => c.length > 2);
+  const sexes: Array<"male" | "female"> = [];
+  for (const chunk of chunks.length ? chunks : [text]) {
+    const male = /\b(male|man|men|boy|gentleman)\b|זכר|גבר|גברים|בחור|איש\b|נער\b/i.test(chunk);
+    const female = /\b(female|woman|women|girl|lady)\b|נקבה|אישה|אשה|נשים|בחורה|ילדה/i.test(chunk);
+    if (male && !female) sexes.push("male");
+    else if (female && !male) sexes.push("female");
+  }
+  if (sexes.length >= 2) return sexes;
+  const maleHits = (text.match(/\b(male|man|men|boy)\b|זכר|גבר|גברים|בחור/gi) ?? []).length;
+  const femaleHits = (text.match(/\b(female|woman|women|girl)\b|נקבה|אישה|אשה|נשים|בחורה/gi) ?? []).length;
+  if (maleHits >= 2 && femaleHits === 0) return ["male", "male"];
+  if (femaleHits >= 2 && maleHits === 0) return ["female", "female"];
+  if (maleHits >= 1 && femaleHits >= 1) return ["male", "female"];
+  if (sexes.length === 1) return [sexes[0]!, sexes[0]!];
+  return sexes;
+}
+
+function pickDifferentGeminiVoice(sex: "male" | "female", exclude: string): string {
+  const pool = sex === "male" ? MALE_GEMINI_VOICES : FEMALE_GEMINI_VOICES;
+  const alt = pool.find((v) => v.toLowerCase() !== exclude.toLowerCase());
+  return alt ?? pickGeminiVoiceForSex(sex, "");
+}
+
+/**
+ * Primary + secondary TTS voices for alternating dialogue.
+ * Matches cast gender from characterBible when possible (two men → two male voices).
+ */
+export function geminiDialogueVoicePair(
+  creative?: CreativeOptions | null,
+  characterBible?: string | null
+): {
   primary: string;
   secondary: string;
 } {
   const primary =
     geminiVoiceNameFromCreative(creative) ?? defaultGeminiVoiceForLanguage(creative?.language ?? null);
-  const primaryIsMale = /^(Charon|Puck|Fenrir|Orus)$/i.test(primary);
-  const secondary = pickGeminiVoiceForSex(primaryIsMale ? "female" : "male", "");
+  const primarySex: "male" | "female" = isMaleGeminiVoice(primary) ? "male" : "female";
+  const cast = inferCastSexesFromBible(characterBible);
+
+  let secondarySex: "male" | "female";
+  if (cast.length >= 2) {
+    secondarySex = cast[1]!;
+  } else if (cast.length === 1) {
+    secondarySex = cast[0]!;
+  } else if (creative?.voiceGender === "male" || creative?.voiceGender === "female") {
+    secondarySex = creative.voiceGender;
+  } else {
+    // Same sex as primary — opposite-gender pairing was surprising for same-sex casts.
+    secondarySex = primarySex;
+  }
+
+  const secondary = pickDifferentGeminiVoice(secondarySex, primary);
   return { primary, secondary };
 }
 

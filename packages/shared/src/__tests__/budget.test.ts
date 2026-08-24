@@ -20,12 +20,12 @@ describe("planSceneLayout", () => {
     expect(layout.totalVideoSeconds).not.toBe(12);
   });
 
-  it("uses 3 beats × 8s Veo bucket in extend mode for 30s brief", () => {
+  it("plans ~32s (4×8s buckets) in extend mode for a 30s brief", () => {
     const layout = planSceneLayout(30, true, { veoMode: "extend", renderProfileId: "veo-extend" });
     expect(layout.veoMode).toBe("extend");
-    expect(layout.sceneCount).toBe(3);
-    expect(layout.clipSeconds).toBe(10);
-    expect(layout.totalVideoSeconds).toBe(24);
+    expect(layout.sceneCount).toBe(4);
+    expect(layout.clipSeconds).toBe(8);
+    expect(layout.totalVideoSeconds).toBe(32);
   });
 
   it("uses 3×10s beats for kling-i2v profile", () => {
@@ -70,7 +70,7 @@ describe("estimateRunCost", () => {
     expect(est.isExpensive).toBe(false);
   });
 
-  it("estimates extend mode with 3 Veo calls for 30s brief", () => {
+  it("estimates extend mode with 4 Veo calls for 30s brief", () => {
     const est = estimateRunCost(
       { budgetMode: true, durationSeconds: 30 },
       {
@@ -80,8 +80,8 @@ describe("estimateRunCost", () => {
         renderProfileId: "veo-extend"
       }
     );
-    expect(est.sceneCount).toBe(3);
-    expect(est.veoSeconds).toBe(24);
+    expect(est.sceneCount).toBe(4);
+    expect(est.veoSeconds).toBe(32);
   });
 
   it("uses actual script scenes when provided", () => {

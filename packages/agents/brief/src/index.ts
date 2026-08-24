@@ -321,7 +321,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         : "User instructions (MUST follow)";
     const anchorNote =
       visualAnchors.length > 0
-        ? `User uploaded ${visualAnchors.length} inspiration/background image(s) — match cast and/or setting to those references.`
+        ? `User uploaded ${visualAnchors.length} character photo(s) — those people ARE the cast; preserve their faces in every scene.`
         : "";
     const enriched: BriefOutput = {
       title: parsed.title ?? input.title,

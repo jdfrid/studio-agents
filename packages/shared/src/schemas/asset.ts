@@ -18,6 +18,7 @@ export const AssetInputSchema = z.object({
       firstFramePrompt: z.string().optional(),
       lastFramePrompt: z.string().optional(),
       preferredKind: z.enum(["video", "image"]).default("video"),
+      speaker: z.enum(["a", "b", "narrator"]).optional(),
       /** Optional brief-uploaded attachment path to use as the visual source. */
       uploadedAssetGcsPath: z.string().optional()
     })

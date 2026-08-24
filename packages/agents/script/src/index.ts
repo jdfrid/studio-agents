@@ -58,22 +58,25 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         ? "NARRATION MUST be Yiddish (ייִדיש), not Modern Israeli Hebrew. Prefer Yiddish wording even when the brief summary drifted into Hebrew."
         : "",
       brief.visualAnchors?.length
-        ? `User provided ${brief.visualAnchors.length} inspiration/background image(s). Keep visualPrompt/referenceImagePrompt aligned with those references (cast and/or setting).`
+        ? `User uploaded ${brief.visualAnchors.length} CHARACTER PHOTO(s). Those people ARE the cast — describe them in characterBible from the photos (gender, age, hair, skin, outfit). visualPrompt/referenceImagePrompt must keep those exact identities; do not invent different faces.`
         : "",
       `Keep each narration under ${narrationLimit} characters (must fit ${clipSeconds}s of spoken audio) in ${langEn}.`,
       "Keep visualPrompt and veoPrompt under 200 characters each.",
       "CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette.",
-      `Output characterBible in ${langEn}: a fixed description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes.`,
+      `Output characterBible in ${langEn}: a fixed description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes. Explicitly state each character's gender (male/female or זכר/נקבה).`,
       "Each veoPrompt must explicitly continue from the previous scene without changing setting or cast.",
-      "NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt, visualPrompt, or characterBible — use generic fictional people only (video models block real-person likenesses).",
+      brief.visualAnchors?.length
+        ? "Uploaded photos define the cast identity — keep those faces. Still avoid naming real celebrities in text prompts."
+        : "NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt, visualPrompt, or characterBible — use generic fictional people only (video models block real-person likenesses).",
       "Avoid coded public-figure descriptions (e.g. Israeli leader / US president / named office holders). Describe age, hair, and wardrobe only for fictional characters.",
+      "NO UNSOLICITED GRAPHICS: do not invent wall maps, globes, news tickers, lower-thirds, or on-screen data overlays unless the user brief explicitly asks for them.",
       "NARRATION–MOTION SYNC (mandatory): narration and veoPrompt are one timed beat — write them together.",
       "NARRATION TONE (mandatory): every spoken line must match the event mood and creative style — not generic announcer copy.",
       "If creative/communicationStyle/designStyle/location/targetAudience are set, narration vocabulary and energy MUST reflect them (e.g. wedding warmth, news urgency, kids playful, Pixar whimsy).",
       "Do not write flat product-demo narration when the brief describes a ceremony, party, documentary, or stylized world.",
       heygenMode
-        ? "In veoPrompt, describe body/gaze/gesture timed to the spoken line; mouth sync comes from HeyGen audio."
-        : "CRITICAL (TTS mix): veoPrompt must be SILENT performance only — closed mouth, no speaking, no dialogue, no music, no lip-sync/mouthing words. Voiceover is added later via TTS+FFmpeg; asking Veo for speech often fails the whole clip.",
+        ? "In veoPrompt, describe body/gaze/gesture timed to the spoken line; mouth sync comes from HeyGen audio. With 2+ people on screen, only the active speaker (speakerName) should mouth words; others listen with closed mouth."
+        : "CRITICAL (TTS mix): veoPrompt must be SILENT performance only — closed mouth, no speaking, no dialogue, no music, no lip-sync/mouthing words. Voiceover is added later via TTS+FFmpeg; asking Veo for speech often fails the whole clip. With 2+ people: only speakerName shows mild expression; everyone else listens with a fully closed mouth and no lip motion.",
       "If narration is empty or muted, veoPrompt must say silent performance — closed mouth, no speaking gestures.",
       heygenMode
         ? "Pace gestures to the line: open with attention, hold product/gesture mid-line, end with a clear hold — avoid frantic action that fights the voiceover."
@@ -94,7 +97,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     if (extendMode) {
       systemParts.push(
         "VEO EXTEND MODE: produce story beats (not independent clips). Beat 1 is the opening Veo generation; beats 2+ extend the same continuous shot — veoPrompt must describe what happens next in the same scene, same camera, no hard cut.",
-        `Each beat targets ${clipSeconds}s of story time; Veo renders an 8s bucket per API call in a single extend chain.`
+        `Each beat targets ${clipSeconds}s of story/render time in a single extend chain.`
       );
     }
     if (klingMode) {

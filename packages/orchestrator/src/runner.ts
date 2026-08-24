@@ -140,6 +140,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           speakerName?: string;
         }>;
         musicPrompt: string;
+        characterBible?: string;
       } | undefined;
       const briefData = (byName.get("brief") ?? brief) as {
         language?: string;
@@ -158,7 +159,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       };
       const briefInput = brief as { creative?: Parameters<typeof geminiVoiceNameFromCreative>[0] };
       const creative = briefData.creative ?? briefInput.creative;
-      const pair = geminiDialogueVoicePair(creative);
+      const pair = geminiDialogueVoicePair(creative, script?.characterBible);
       const voiceName = briefData.ttsVoiceName ?? pair.primary;
       const voiceNameB = pair.secondary;
       const voiceStyle = buildTtsDeliveryStyle({
@@ -213,6 +214,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           firstFramePrompt?: string;
           lastFramePrompt?: string;
           sceneKind?: "beat" | "title_card";
+          speaker?: "a" | "b" | "narrator";
         }>;
         backgroundVisualPrompt?: string;
         characterBible?: string;
@@ -250,6 +252,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
             firstFramePrompt: scene.firstFramePrompt,
             lastFramePrompt: scene.lastFramePrompt,
             preferredKind: "image" as const,
+            ...(scene.speaker ? { speaker: scene.speaker } : {}),
             uploadedAssetGcsPath: sceneOverride.get(scene.id)
           }))
       };

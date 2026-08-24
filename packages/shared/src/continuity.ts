@@ -116,4 +116,4 @@ export function applyContinuityToScript(
 export type ReferenceImageBytes = { data: Buffer; mimeType: string };
 
 export const REFERENCE_IMAGE_INSTRUCTION =
-  "Use the attached reference image(s) for wardrobe, setting, and overall look continuity. Keep the same fictional characters and environment; change pose/action as described. Do not copy real celebrity likenesses or brand logos.";
+  "The attached photo(s) ARE the on-screen cast: preserve each person's exact face, hair, skin tone, age, and identity. Do not invent different people. Keep wardrobe/setting continuity; change pose/action and camera as described. Do not copy real celebrity likenesses or brand logos unless they are literally in the uploaded photo.";

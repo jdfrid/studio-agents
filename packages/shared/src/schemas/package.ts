@@ -67,6 +67,8 @@ export const SceneTimelineEntrySchema = z.object({
     signedUrl: z.string().nullable()
   }),
   sceneKind: z.enum(["beat", "title_card"]).default("beat"),
+  speaker: z.enum(["a", "b", "narrator"]).optional(),
+  speakerName: z.string().max(80).optional(),
   /** Karaoke word/line cues for burn-in (absolute timeline seconds). */
   captionCues: z
     .array(

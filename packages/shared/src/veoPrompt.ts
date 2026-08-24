@@ -6,14 +6,23 @@
 const AUDIO_CUE_RE =
   /\b(speak(?:s|ing)?|speech|dialogue|dialog|talk(?:s|ing)?|says?|said|voiceover|voice-over|narrat(?:e|es|ion|ing)|lip[-\s]?sync|mouth(?:s|ing)?\s+(?:the\s+)?words?|mouths?\s+the|sing(?:s|ing)?|soundtrack|background\s+music|bgm|audio\s+cue)\b/gi;
 
-export function sanitizeVeoPromptForExternalAudio(prompt: string): string {
+export function sanitizeVeoPromptForExternalAudio(
+  prompt: string,
+  opts?: { speakerName?: string | null; multiCast?: boolean }
+): string {
   const cleaned = prompt
     .replace(AUDIO_CUE_RE, " ")
     .replace(/\s{2,}/g, " ")
     .replace(/\s+,/g, ",")
     .trim();
   const base = cleaned || prompt.trim() || "Cinematic silent shot, natural motion";
-  const suffix = "Silent video only: closed mouth, no dialogue, no music, no sound effects.";
-  if (/silent video only/i.test(base)) return base.slice(0, 280);
-  return `${base} ${suffix}`.slice(0, 280);
+  const speaker = opts?.speakerName?.trim();
+  const multi = opts?.multiCast === true || Boolean(speaker);
+  const suffix = multi
+    ? speaker
+      ? `Silent video only: only ${speaker} may show mild facial expression; every other person listens with a fully closed mouth and no lip motion; no dialogue, no music.`
+      : "Silent video only: at most one person shows mild expression; all others fully closed mouth, listening, no lip motion; no dialogue, no music."
+    : "Silent video only: closed mouth, no dialogue, no music, no sound effects.";
+  if (/silent video only/i.test(base)) return base.slice(0, 320);
+  return `${base} ${suffix}`.slice(0, 320);
 }

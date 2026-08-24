@@ -71,14 +71,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     for (const file of Array.from(incoming)) {
       if (!file.type.startsWith("image/")) continue;
       if (file.size > MAX_VISUAL_BYTES) {
-        setError(`תמונת השראה גדולה מדי (מקסימום 5MB): ${file.name}`);
+        setError(`תמונת דמות גדולה מדי (מקסימום 5MB): ${file.name}`);
         continue;
       }
       if (next.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
         continue;
       }
       if (next.length >= MAX_VISUAL_FILES) {
-        setError(`ניתן להעלות עד ${MAX_VISUAL_FILES} תמונות השראה.`);
+        setError(`ניתן להעלות עד ${MAX_VISUAL_FILES} תמונות דמויות.`);
         break;
       }
       next.push(file);
@@ -125,15 +125,15 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       return;
     }
     if (preferHeygenDub && visualFiles.length === 0) {
-      setError("לדיבוב HeyGen נדרשת לפחות תמונת השראה אחת של הדמות.");
+      setError("לדיבוב HeyGen נדרשת לפחות תמונת דמות אחת.");
       return;
     }
     if (visualFiles.length > MAX_VISUAL_FILES) {
-      setError(`ניתן להעלות עד ${MAX_VISUAL_FILES} תמונות השראה.`);
+      setError(`ניתן להעלות עד ${MAX_VISUAL_FILES} תמונות דמויות.`);
       return;
     }
     if (visualFiles.some((f) => f.size > MAX_VISUAL_BYTES)) {
-      setError("אחת מתמונות ההשראה גדולה מדי (מקסימום 5MB לקובץ).");
+      setError("אחת מתמונות הדמויות גדולה מדי (מקסימום 5MB לקובץ).");
       return;
     }
     setBusy(true);
@@ -252,7 +252,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         <small className="muted">הנחיות מחייבות ליצירה — מה לשמור, מה לשנות, תנועות מצלמה וכו׳.</small>
       </label>
       <label className="file-row">
-        תמונות השראה / רקע (אופציונלי)
+        תמונות דמויות / רקע (אופציונלי)
         <input
           type="file"
           accept="image/*"
@@ -263,7 +263,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           }}
         />
         <small className="muted">
-          אפשר לבחור כמה תמונות (עד {MAX_VISUAL_FILES}) — דמויות, מקום/רקע, סגנון. הן ישמשו כהפניה ויזואלית בכל הסצנות.
+          עד {MAX_VISUAL_FILES} תמונות — תמונה 1 = דמות א׳, תמונה 2 = דמות ב׳. הן ישמשו כזהות הפנים בסרטון (לא רק השראה כללית).
         </small>
       </label>
       {visualFiles.length ? (
@@ -354,6 +354,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           value={durationSeconds}
           onChange={(e) => setDurationSeconds(Number(e.target.value) || 30)}
         />
+        <small className="muted">האורך הסופי מעוגל לפי מנוע הווידאו (למשל קטעים של 5–8 שניות) — בחר 30 או 60 אם אתה רוצה סרטון ארוך יותר.</small>
       </label>
       <fieldset className="approval-fieldset">
         <legend>מצב יצירה</legend>
@@ -515,7 +516,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
             </div>
             {preferHeygenDub ? (
               <p className={`advanced-hint ${heygenNeedsAnchor ? "error-inline" : "muted"}`}>
-                דורש קרדיטים בחשבון HeyGen בנפרד מתשלום Prompt2Spot. חובה תמונת השראה של הדמות.
+                דורש קרדיטים בחשבון HeyGen בנפרד מתשלום Prompt2Spot. חובה תמונת דמות.
               </p>
             ) : (
               <p className="muted advanced-hint">

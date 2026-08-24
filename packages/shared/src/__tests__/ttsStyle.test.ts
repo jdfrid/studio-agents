@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildTtsDeliveryStyle, geminiTtsStyleFromCreative } from "../creativeOptions.js";
+import {
+  buildTtsDeliveryStyle,
+  geminiDialogueVoicePair,
+  geminiTtsStyleFromCreative,
+  inferCastSexesFromBible
+} from "../creativeOptions.js";
 
 describe("geminiTtsStyleFromCreative", () => {
   it("includes designStyle and event context when set", () => {
@@ -37,5 +42,34 @@ describe("buildTtsDeliveryStyle", () => {
     expect(style!).toContain("דוקומנטרי");
     expect(style!).toContain("מקצועי");
     expect(style!).toContain("פתיחת חנות");
+  });
+});
+
+describe("geminiDialogueVoicePair", () => {
+  it("uses two male voices when characterBible has two men", () => {
+    const pair = geminiDialogueVoicePair(
+      { voiceGender: "male" },
+      "Character A: male, 40, short hair. Character B: male, 35, beard."
+    );
+    expect(["Charon", "Puck", "Fenrir", "Orus"]).toContain(pair.primary);
+    expect(["Charon", "Puck", "Fenrir", "Orus"]).toContain(pair.secondary);
+    expect(pair.primary).not.toBe(pair.secondary);
+  });
+
+  it("uses opposite sexes when bible has mixed cast", () => {
+    const pair = geminiDialogueVoicePair(
+      { voiceGender: "male" },
+      "Host: male news anchor. Guest: female reporter."
+    );
+    const male = /^(Charon|Puck|Fenrir|Orus)$/i.test(pair.primary);
+    const secondaryMale = /^(Charon|Puck|Fenrir|Orus)$/i.test(pair.secondary);
+    expect(male).toBe(true);
+    expect(secondaryMale).toBe(false);
+  });
+});
+
+describe("inferCastSexesFromBible", () => {
+  it("detects two Hebrew men", () => {
+    expect(inferCastSexesFromBible("דמות א: גבר מבוגר. דמות ב: גבר צעיר.")).toEqual(["male", "male"]);
   });
 });

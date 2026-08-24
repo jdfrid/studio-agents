@@ -35,12 +35,15 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** Reduce trademark / luxury-brand triggers that often cause IMAGE_OTHER. */
-export function softenImagePrompt(prompt: string): string {
+export function softenImagePrompt(prompt: string, opts?: { hasReferencePhotos?: boolean }): string {
   const generic = prompt
     .replace(/\brolex\b/gi, "luxury Swiss watch")
     .replace(/\b(louis vuitton|gucci|chanel|hermes|prada|cartier|omega|patek philippe)\b/gi, "luxury fashion item")
     .replace(/\b(nike|adidas|apple|samsung|google|microsoft|amazon)\b/gi, "consumer tech product")
     .replace(/\b(coca-cola|pepsi|mcdonald's|starbucks)\b/gi, "beverage brand");
+  if (opts?.hasReferencePhotos) {
+    return `${generic}\nPreserve the exact faces from the uploaded reference photo(s) as the cast. No visible logos or trademarks. Unbranded product.`;
+  }
   return `${generic}\nGeneric fictional people only. No visible logos, trademarks, or celebrity likenesses. Unbranded product.`;
 }
 
@@ -86,7 +89,7 @@ function buildImageGenerationBody(
 }
 
 const REFERENCE_IMAGE_INSTRUCTION =
-  "Use the attached reference image(s) for wardrobe, setting, and overall look continuity. Keep the same fictional characters and environment; change pose/action as described. Do not copy real celebrity likenesses or brand logos.";
+  "The attached photo(s) ARE the on-screen cast: preserve each person's exact face, hair, skin tone, age, and identity. Do not invent different people. Keep wardrobe/setting continuity; change pose/action and camera as described. Do not copy real celebrity likenesses or brand logos unless they are literally in the uploaded photo.";
 
 function isRetryableImageFailure(detail: string): boolean {
   const d = detail.toUpperCase();
@@ -111,12 +114,17 @@ export async function geminiGenerateImage(
   let lastDetail = "empty candidates/parts";
 
   const allRefs = (req.referenceImages ?? []).slice(0, MAX_INLINE_REFS);
+  const hasRefs = allRefs.length > 0;
   const strategies: Array<{ prompt: string; refs: Array<{ data: Buffer; mimeType: string }>; label: string }> = [
     { prompt: req.prompt, refs: allRefs, label: "primary" },
-    { prompt: softenImagePrompt(req.prompt), refs: allRefs, label: "softened" }
+    { prompt: softenImagePrompt(req.prompt, { hasReferencePhotos: hasRefs }), refs: allRefs, label: "softened" }
   ];
   if (allRefs.length > 1) {
-    strategies.push({ prompt: softenImagePrompt(req.prompt), refs: allRefs.slice(0, 1), label: "single-ref" });
+    strategies.push({
+      prompt: softenImagePrompt(req.prompt, { hasReferencePhotos: true }),
+      refs: allRefs.slice(0, 1),
+      label: "single-ref"
+    });
   }
   if (allRefs.length > 0) {
     strategies.push({ prompt: softenImagePrompt(req.prompt), refs: [], label: "no-ref" });

@@ -55,12 +55,13 @@ export function planSceneLayout(
   const mode = profileVeoMode(profile);
 
   if (profile.strategy === "extend") {
-    const beatSeconds = profile.capabilities.beatSeconds;
-    const sceneCount = Math.max(1, Math.round(durationSeconds / beatSeconds));
+    // Plan by the actual Veo extend bucket (usually 8s) so total length matches the brief —
+    // older math used 10s story beats → ~24s video for a 30s ask.
     const bucket = Number(config?.forcedVeoBucket ?? forcedVeoDurationBucket() ?? "8") as number;
+    const sceneCount = Math.max(1, Math.round(durationSeconds / bucket));
     return {
       sceneCount,
-      clipSeconds: beatSeconds,
+      clipSeconds: bucket,
       totalVideoSeconds: sceneCount * bucket,
       veoMode: mode
     };

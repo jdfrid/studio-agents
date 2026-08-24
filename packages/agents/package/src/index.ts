@@ -72,7 +72,9 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
           total: script.scenes.length,
           referenceImagePrompt: scene.referenceImagePrompt ?? null,
           referenceFramePrompt: a?.referenceFrame?.prompt ?? null,
-          textToVideoOnly: !a?.referenceFrame?.signedUrl && !a?.referenceFrame?.gcsPath
+          textToVideoOnly: !a?.referenceFrame?.signedUrl && !a?.referenceFrame?.gcsPath,
+          speakerName: scene.speakerName ?? null,
+          multiCast: Boolean(script.characterBible && /(?:and|ו-|זכר|male|female|נקבה|גבר|אישה)/i.test(script.characterBible))
         }),
         referenceImagePrompt: scene.referenceImagePrompt ?? null,
         firstFramePrompt: scene.firstFramePrompt ?? null,
@@ -117,6 +119,8 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
           signedUrl: musicSigned
         },
         sceneKind,
+        ...(scene.speaker ? { speaker: scene.speaker } : {}),
+        ...(scene.speakerName ? { speakerName: scene.speakerName } : {}),
         ...(captionCues?.length ? { captionCues } : {})
       });
     }
@@ -291,17 +295,27 @@ function enrichVeoPrompt(input: {
   referenceImagePrompt: string | null;
   referenceFramePrompt: string | null;
   textToVideoOnly: boolean;
+  speakerName?: string | null;
+  multiCast?: boolean;
 }): string {
   // Kling / fal I2V reject prompts longer than 2500 chars — keep headroom.
   const MAX = 2400;
   const motion = stripDuplicatedContinuity(input.veoPrompt).trim();
+  const speaker = input.speakerName?.trim();
+  const listenLock =
+    input.multiCast || speaker
+      ? speaker
+        ? ` Only ${speaker} shows mild expression; every other person listens with a fully closed mouth and no lip motion.`
+        : " At most one person shows mild expression; all others listen with closed mouths, no lip motion."
+      : "";
 
   // With a reference still, identity comes from the image — keep prompt motion-focused.
   if (!input.textToVideoOnly) {
     const compact = [
       `Scene ${input.order + 1} of ${input.total}.`,
-      "Match the reference image wardrobe and setting; keep fictional characters consistent; only change pose and camera as described.",
-      motion
+      "Match the reference image faces, wardrobe and setting exactly; keep those identities; only change pose and camera as described.",
+      motion,
+      listenLock.trim()
     ]
       .filter(Boolean)
       .join(" ");
@@ -313,7 +327,7 @@ function enrichVeoPrompt(input: {
   const continuity = `Same cast (${cast}). Same place (${place}). Scene ${input.order + 1}/${input.total}.`;
   const refPrompt = (input.referenceFramePrompt ?? input.referenceImagePrompt ?? "").trim().slice(0, 400);
   const refSuffix = refPrompt ? ` Match look: ${refPrompt}.` : "";
-  return clampText(`${continuity} ${motion}${refSuffix}`.trim(), MAX);
+  return clampText(`${continuity} ${motion}${listenLock}${refSuffix}`.trim(), MAX);
 }
 
 function stripDuplicatedContinuity(text: string): string {
