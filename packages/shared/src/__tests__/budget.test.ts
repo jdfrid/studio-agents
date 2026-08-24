@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   estimateRunCost,
   geminiVeoMode,
+  isCorporateProductFilm,
   isProductAdBrief,
   planSceneLayout,
   veoGenerateAudio,
@@ -46,6 +47,13 @@ describe("isProductAdBrief", () => {
   it("detects Hebrew product-ad briefs", () => {
     expect(isProductAdBrief({ title: "פרסומת פופקומן", sourceText: "ילדים בגן" })).toBe(true);
     expect(isProductAdBrief({ title: "Documentary", sourceText: "nature film" })).toBe(false);
+  });
+
+  it("detects corporate_product film template", () => {
+    expect(isCorporateProductFilm({ creative: { filmTemplate: "corporate_product" } })).toBe(true);
+    expect(isProductAdBrief({ title: "x", sourceText: "y", creative: { filmTemplate: "corporate_product" } })).toBe(
+      true
+    );
   });
 });
 

@@ -95,6 +95,19 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
     }
 
+    const productPaths = Array.from(new Set((input.visualProductGcsPaths ?? []).filter(Boolean)));
+    const productReferences: ReferenceImageBytes[] = [];
+    for (const gcsPath of productPaths.slice(0, MAX_INLINE_ANCHORS)) {
+      const product = await ctx.storage.download(gcsPath);
+      productReferences.push({ data: product.body, mimeType: product.mimeType });
+    }
+    if (productReferences.length) {
+      await ctx.log.log("asset_product_plates", "Using locked product B-roll plates", {
+        count: productReferences.length,
+        gcsPaths: productPaths
+      });
+    }
+
     if (resolvedAnchorPaths.length) {
 
       await ctx.log.log("asset_visual_anchor", "Using brief visual anchors for continuity", {
@@ -114,6 +127,48 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
 
     for (const [sceneIndex, scene] of input.scenes.entries()) {
+
+      // Locked product / B-roll plate — use the upload pixels directly as the I2V still.
+      if (!scene.uploadedAssetGcsPath && productReferences.length) {
+        const plate = productReferences[sceneIndex % productReferences.length]!;
+        const plateMime = plate.mimeType.startsWith("image/") ? plate.mimeType : "image/png";
+        const referenceArtifact = await ctx.artifacts.save({
+          runId: ctx.runId,
+          stage: "asset",
+          kind: "scene_reference_frame",
+          body: plate.data,
+          mimeType: plateMime,
+          filename: `scene-${scene.sceneId}-product-plate.png`,
+          metadata: {
+            sceneId: scene.sceneId,
+            viaProductPlate: true,
+            prompt: "locked product B-roll plate"
+          }
+        });
+        const referenceSignedUrl = await ctx.storage.signedUrl(referenceArtifact.gcsPath);
+        const frameRef: ReferenceImageBytes = { data: plate.data, mimeType: plateMime };
+        if (!anchorReference) anchorReference = frameRef;
+        chainReference = frameRef;
+        perScene.push({
+          sceneId: scene.sceneId,
+          kind: scene.preferredKind === "video" ? "video" : "image",
+          sourceProvider: "user-product-plate",
+          sourceUrl: null,
+          artifactId: referenceArtifact.id,
+          gcsPath: referenceArtifact.gcsPath,
+          mimeType: plateMime,
+          width: null,
+          height: null,
+          referenceFrame: {
+            artifactId: referenceArtifact.id,
+            gcsPath: referenceArtifact.gcsPath,
+            signedUrl: referenceSignedUrl,
+            prompt: "locked product B-roll plate",
+            model: "user-product-plate"
+          }
+        });
+        continue;
+      }
 
       if (scene.uploadedAssetGcsPath) {
 

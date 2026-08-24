@@ -20,6 +20,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const [durationSeconds, setDurationSeconds] = useState(30);
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("auto");
   const [visualFiles, setVisualFiles] = useState<File[]>([]);
+  const [productFiles, setProductFiles] = useState<File[]>([]);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [voiceConsent, setVoiceConsent] = useState(false);
   const [insertFile, setInsertFile] = useState<File | null>(null);
@@ -63,6 +64,16 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     };
   }, [visualPreviewUrls]);
 
+  const productPreviewUrls = useMemo(
+    () => productFiles.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
+    [productFiles]
+  );
+  useEffect(() => {
+    return () => {
+      for (const item of productPreviewUrls) URL.revokeObjectURL(item.url);
+    };
+  }, [productPreviewUrls]);
+
   const previewAspect = aspectRatioFromCreative(creative) ?? "9:16";
   const showBrandingPreview = Boolean(businessName.trim() || slogan.trim() || websiteUrl.trim() || logoFile);
 
@@ -88,6 +99,30 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
 
   function removeVisualFile(index: number) {
     setVisualFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function addProductFiles(incoming: FileList | File[]) {
+    const next = [...productFiles];
+    for (const file of Array.from(incoming)) {
+      if (!file.type.startsWith("image/")) continue;
+      if (file.size > MAX_VISUAL_BYTES) {
+        setError(`תמונת מוצר גדולה מדי (מקסימום 5MB): ${file.name}`);
+        continue;
+      }
+      if (next.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
+        continue;
+      }
+      if (next.length >= MAX_VISUAL_FILES) {
+        setError(`ניתן להעלות עד ${MAX_VISUAL_FILES} תמונות מוצר.`);
+        break;
+      }
+      next.push(file);
+    }
+    setProductFiles(next);
+  }
+
+  function removeProductFile(index: number) {
+    setProductFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
   function setCreativeField<K extends keyof CreativeOptions>(key: K, value: CreativeOptions[K] | "") {
@@ -143,7 +178,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         name: string;
         mimeType: string;
         kind: "image" | "video" | "audio";
-        role: "anchor" | "voice_clone" | "insert_clip" | "logo";
+        role: "anchor" | "voice_clone" | "insert_clip" | "logo" | "product";
         dataUrl: string;
         insertAtSeconds?: number;
         audioSource?: "clip" | "narration";
@@ -156,6 +191,16 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           dataUrl: await fileToDataUrl(file)
         }))
       );
+      const productAttachments = await Promise.all(
+        productFiles.map(async (file) => ({
+          name: file.name,
+          mimeType: file.type || "image/png",
+          kind: "image" as const,
+          role: "product" as const,
+          dataUrl: await fileToDataUrl(file)
+        }))
+      );
+      attachments.push(...productAttachments);
       if (voiceFile) {
         attachments.push({
           name: voiceFile.name,
@@ -282,6 +327,36 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         </ul>
       ) : null}
       <label className="file-row">
+        תמונות מוצר / B-roll (אופציונלי)
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => {
+            if (e.target.files?.length) addProductFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <small className="muted">
+          עד {MAX_VISUAL_FILES} תמונות מוצר — יישמרו כצלחות נעולות בסרטון (בלי להמציא מכשיר אחר). מומלץ לסרט תדמית B2B.
+        </small>
+      </label>
+      {productFiles.length ? (
+        <ul className="visual-files-list">
+          {productPreviewUrls.map((item, index) => (
+            <li key={`product-${item.name}-${index}`} className="visual-file-item">
+              <img src={item.url} alt="" className="visual-file-thumb" />
+              <span className="visual-file-name" title={item.name}>
+                {item.name}
+              </span>
+              <button type="button" className="link-btn" onClick={() => removeProductFile(index)}>
+                הסר
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <label className="file-row">
         שיבוט קול (אופציונלי)
         <input
           type="file"
@@ -350,11 +425,13 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         <input
           type="number"
           min={5}
-          max={60}
+          max={180}
           value={durationSeconds}
-          onChange={(e) => setDurationSeconds(Number(e.target.value) || 30)}
+          onChange={(e) => setDurationSeconds(Math.min(180, Math.max(5, Number(e.target.value) || 30)))}
         />
-        <small className="muted">האורך הסופי מעוגל לפי מנוע הווידאו (למשל קטעים של 5–8 שניות) — בחר 30 או 60 אם אתה רוצה סרטון ארוך יותר.</small>
+        <small className="muted">
+          עד 180 שנ׳ (3 דק׳). האורך הסופי מעוגל לפי מנוע הווידאו (קטעים של 5–8 שנ׳). סרטי תדמית B2B: מומלץ 60–120.
+        </small>
       </label>
       <fieldset className="approval-fieldset">
         <legend>מצב יצירה</legend>
@@ -456,6 +533,29 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
             <button
               type="button"
               className="ghost"
+              onClick={() => {
+                setDurationSeconds(90);
+                setCreative((prev) => ({
+                  ...prev,
+                  designStyle: "סרט מוצר B2B",
+                  filmTemplate: "corporate_product",
+                  communicationStyle: "מקצועי",
+                  speechStyle: "חדשותי",
+                  location: "משרד / מתקן מאובטח",
+                  karaokeCaptions: "on",
+                  lowerThirds: "on",
+                  preferHeygenDub: "off",
+                  sideWatermark: "on",
+                  videoOrientation: "landscape"
+                }));
+                setAdvancedOpen(true);
+              }}
+            >
+              סרט מוצר B2B (תדמית)
+            </button>
+            <button
+              type="button"
+              className="ghost"
               onClick={() =>
                 setCreative((prev) => ({
                   ...prev,
@@ -529,7 +629,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
               <h4 className="advanced-section-title">{section.titleHe}</h4>
               <div className="advanced-grid">
                 {section.fields
-                  .filter((field) => field.key !== "preferHeygenDub")
+                  .filter((field) => field.key !== "preferHeygenDub" && field.key !== "filmTemplate")
                   .map((field) => (
                   <label key={field.key}>
                     {field.labelHe}

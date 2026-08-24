@@ -187,8 +187,11 @@ function escapeAss(text: string): string {
 }
 
 export function creativeFlagOn(
-  creative: { karaokeCaptions?: string; sideWatermark?: string; preferHeygenDub?: string } | null | undefined,
-  key: "karaokeCaptions" | "sideWatermark" | "preferHeygenDub",
+  creative:
+    | { karaokeCaptions?: string; sideWatermark?: string; preferHeygenDub?: string; lowerThirds?: string }
+    | null
+    | undefined,
+  key: "karaokeCaptions" | "sideWatermark" | "preferHeygenDub" | "lowerThirds",
   defaultOn = false
 ): boolean {
   const v = creative?.[key];

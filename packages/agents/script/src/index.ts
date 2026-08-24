@@ -10,6 +10,7 @@ import {
   formatCreativeConstraints,
   forcedVeoDurationBucket,
   isBudgetMode,
+  isCorporateProductFilm,
   isProductAdBrief,
   narrationCharLimitForBucket,
   normalizeContentLanguage,
@@ -42,7 +43,13 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const costConfig = profileToProductionCostConfig(renderProfile);
     const { sceneCount, clipSeconds, totalVideoSeconds } = planSceneLayout(brief.durationSeconds, budget, costConfig);
     const narrationLimit = narrationCharLimitForBucket(clipSeconds);
-    const productAd = isProductAdBrief(brief);
+    const productAd = isProductAdBrief({
+      ...brief,
+      creative: (brief as { creative?: { filmTemplate?: string; designStyle?: string } }).creative
+    });
+    const corporateFilm = isCorporateProductFilm({
+      creative: (brief as { creative?: { filmTemplate?: string; designStyle?: string } }).creative
+    });
     const extendMode = renderProfile.strategy === "extend";
     const klingMode = renderProfile.provider === "kling";
     const heygenMode = renderProfile.provider === "heygen";
@@ -121,7 +128,14 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         `Each beat targets ~${clipSeconds}s of story time.`
       );
     }
-    if (productAd) {
+    if (corporateFilm) {
+      systemParts.push(
+        "CORPORATE PRODUCT FILM (B2B / HighsecLabs-style): structure the timeline as Hook → Problem → Product hero → Benefits → CTA.",
+        "Prefer professional VO (speaker narrator), clean product/facility visuals, and short authoritative narration — not cartoon dialogue or news-desk banter.",
+        "When product photos are provided, every product-hero beat must show that exact product (locked plate); do not invent a different device.",
+        "Scene titles should be short lower-third labels (e.g. Problem, Product, Benefit, CTA)."
+      );
+    } else if (productAd) {
       systemParts.push(
         "PRODUCT AD: use a clear arc — hook (attention) → product hero (show packaging clearly, hold up product) → kids/audience reaction and CTA.",
         "The product or brand name from the brief MUST appear in narration and veoPrompt wherever the product or packaging is visible.",
@@ -170,9 +184,11 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       2
     );
 
-    const adHint = productAd
-      ? " Product-ad brief: include brand/product name, packaging hero shot, and excited reaction."
-      : "";
+    const adHint = corporateFilm
+      ? " Corporate B2B film: Hook→Problem→Product→Benefits→CTA; product plates stay locked; professional narrator VO."
+      : productAd
+        ? " Product-ad brief: include brand/product name, packaging hero shot, and excited reaction."
+        : "";
     const extendHint = extendMode
       ? ` Veo extend mode: ${sceneCount} beats in one continuous chain (~${totalVideoSeconds}s billed Veo time).`
       : heygenMode

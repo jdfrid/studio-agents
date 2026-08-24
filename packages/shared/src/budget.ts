@@ -92,11 +92,30 @@ export function narrationCharLimitForBucket(bucketSeconds: number): number {
 }
 
 const PRODUCT_AD_KEYWORDS =
-  /פרסומ|commercial|advert|promo|מוצר|product|cta|קנה|buy now|brand|מותג|חטיף|snack|package|אריזה|popcorn|פופקור/i;
+  /פרסומ|commercial|advert|promo|מוצר|product|cta|קנה|buy now|brand|מותג|חטיף|snack|package|אריזה|popcorn|פופקור|B2B|אבטחה|security|enterprise|תדמית|corporate|kvm|air.?gap/i;
 
-export function isProductAdBrief(brief: { title?: string; sourceText?: string; summary?: string }): boolean {
+export function isProductAdBrief(brief: {
+  title?: string;
+  sourceText?: string;
+  summary?: string;
+  creative?: { filmTemplate?: string; designStyle?: string } | null;
+}): boolean {
+  if (brief.creative?.filmTemplate === "corporate_product") return true;
+  if (/סרט מוצר|B2B|תדמית מוצר/i.test(String(brief.creative?.designStyle ?? ""))) return true;
   const text = `${brief.title ?? ""} ${brief.sourceText ?? ""} ${brief.summary ?? ""}`;
   return PRODUCT_AD_KEYWORDS.test(text);
+}
+
+/** Corporate B2B product film (HighsecLabs-style): hook → problem → product → benefits → CTA. */
+export function isCorporateProductFilm(brief: {
+  creative?: { filmTemplate?: string; designStyle?: string } | null;
+  title?: string;
+  sourceText?: string;
+  summary?: string;
+}): boolean {
+  if (brief.creative?.filmTemplate === "corporate_product") return true;
+  if (/סרט מוצר B2B|תדמית מוצר/i.test(String(brief.creative?.designStyle ?? ""))) return true;
+  return false;
 }
 
 export type AssetGenerationMode = "full" | "reference_only" | "shared_reference";

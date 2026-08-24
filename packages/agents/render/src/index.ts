@@ -1454,7 +1454,8 @@ async function burnKaraokeAndWatermark(
 ): Promise<string> {
   const wantKaraoke = Boolean(input.karaokeCaptions);
   const wantMark = Boolean(input.sideWatermark);
-  if (!wantKaraoke && !wantMark) return videoPath;
+  const wantLower = Boolean(input.lowerThirds);
+  if (!wantKaraoke && !wantMark && !wantLower) return videoPath;
 
   try {
     const filters: string[] = [];
@@ -1497,6 +1498,35 @@ async function burnKaraokeAndWatermark(
       );
     }
 
+    if (wantLower) {
+      const font = resolveDrawtextFont();
+      const fontOpt = font ? `:fontfile='${escapeFfmpegPath(font)}'` : "";
+      const titleSize = Math.max(22, Math.round(Math.min(dimensions.width, dimensions.height) * 0.042));
+      const subSize = Math.max(16, Math.round(titleSize * 0.72));
+      const brand = input.branding?.businessName?.trim() || "";
+      const barH = Math.round(dimensions.height * 0.14);
+      const yTitle = dimensions.height - barH + Math.round(barH * 0.22);
+      const ySub = yTitle + titleSize + Math.round(barH * 0.08);
+      for (const scene of input.timeline) {
+        if (scene.sceneKind === "title_card") continue;
+        const title = String(scene.title ?? "").trim().slice(0, 48);
+        if (!title) continue;
+        const start = Math.max(0, scene.startSecond);
+        const end = Math.min(scene.endSecond, start + 2.8);
+        if (end <= start + 0.2) continue;
+        const enable = `enable='between(t\\,${start.toFixed(2)}\\,${end.toFixed(2)})'`;
+        filters.push(`drawbox=x=0:y=h-${barH}:w=w:h=${barH}:color=black@0.55:t=fill:${enable}`);
+        filters.push(
+          `drawtext=text='${escapeDrawtext(title)}'${fontOpt}:fontsize=${titleSize}:fontcolor=white:x=${Math.round(dimensions.width * 0.05)}:y=${yTitle}:${enable}`
+        );
+        if (brand) {
+          filters.push(
+            `drawtext=text='${escapeDrawtext(brand)}'${fontOpt}:fontsize=${subSize}:fontcolor=white@0.85:x=${Math.round(dimensions.width * 0.05)}:y=${ySub}:${enable}`
+          );
+        }
+      }
+    }
+
     if (!filters.length) return videoPath;
 
     const out = path.join(dir, `overlay-${nanoid(4)}.mp4`);
@@ -1518,9 +1548,10 @@ async function burnKaraokeAndWatermark(
       "-y",
       out
     ]);
-    await log.log("render_overlays", "Burned karaoke/watermark overlays", {
+    await log.log("render_overlays", "Burned karaoke/watermark/lower-third overlays", {
       karaoke: wantKaraoke && Boolean(assPath),
-      sideWatermark: wantMark
+      sideWatermark: wantMark,
+      lowerThirds: wantLower
     });
     return out;
   } catch (error) {

@@ -48,5 +48,8 @@ if command -v caddy >/dev/null 2>&1 && [ -f /etc/caddy/Caddyfile ]; then
 fi
 
 echo "Studio Agents is up."
+echo "  Git HEAD: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 echo "  User app:  http://prompt2spot.com (or http://$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'))"
 echo "  Admin app: http://admin.prompt2spot.com (docker port ${ADMIN_HTTP_PORT:-8081})"
+echo ""
+echo "If deploy was run elsewhere: on this VPS use: cd ~/studio-agents && git pull && bash infra/hetzner/deploy.sh"

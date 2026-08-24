@@ -235,14 +235,14 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         continue;
       }
 
-      if (att.role !== "anchor" && att.role !== "scene") continue;
+      if (att.role !== "anchor" && att.role !== "scene" && att.role !== "product") continue;
 
       if (att.gcsPath) {
         visualAnchors.push({
           name: att.name,
           gcsPath: att.gcsPath,
           mimeType: att.mimeType,
-          role: att.role === "scene" ? "scene" : "anchor"
+          role: att.role === "scene" ? "scene" : att.role === "product" ? "product" : "anchor"
         });
         continue;
       }
@@ -265,7 +265,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         name: att.name,
         gcsPath: saved.gcsPath,
         mimeType,
-        role: att.role === "scene" ? "scene" : "anchor"
+        role: att.role === "scene" ? "scene" : att.role === "product" ? "product" : "anchor"
       });
     }
 
@@ -369,8 +369,11 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       budgetMode: input.budgetMode ?? false,
       renderProfile: (() => {
         if (creativeFlagOn(input.creative, "preferHeygenDub")) return "heygen-i2v";
-        // Character photos need image→video; Veo Fast ignores reference frames and invents new faces.
-        if (visualAnchors.length > 0 && process.env.FAL_API_KEY?.trim()) return "wan-i2v";
+        // Character or product photos need image→video; Veo Fast ignores reference frames.
+        const hasPhotoPlates =
+          visualAnchors.length > 0 ||
+          input.attachments.some((a) => a.role === "product" || a.role === "anchor");
+        if (hasPhotoPlates && process.env.FAL_API_KEY?.trim()) return "wan-i2v";
         return resolveRenderProfile(input).id;
       })(),
       references:

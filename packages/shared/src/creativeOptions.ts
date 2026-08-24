@@ -43,7 +43,11 @@ export const CreativeOptionsSchema = z
     /** Vertical side watermark along the film. */
     sideWatermark: z.enum(["on", "off"]).optional(),
     /** Prefer HeyGen lip-sync render profile for dubbing. */
-    preferHeygenDub: z.enum(["on", "off"]).optional()
+    preferHeygenDub: z.enum(["on", "off"]).optional(),
+    /** Burn per-scene lower-third titles (product / beat name). */
+    lowerThirds: z.enum(["on", "off"]).optional(),
+    /** Structured film template for script planning. */
+    filmTemplate: z.enum(["corporate_product"]).optional()
   })
   .strict();
 
@@ -170,7 +174,8 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "אנימה", labelHe: "אנימה" },
           { value: "איור וקטורי", labelHe: "איור וקטורי" },
           { value: "סטופ־מושן", labelHe: "סטופ־מושן" },
-          { value: "חדשות אולפן", labelHe: "חדשות אולפן" }
+          { value: "חדשות אולפן", labelHe: "חדשות אולפן" },
+          { value: "סרט מוצר B2B", labelHe: "סרט מוצר B2B (תדמית)" }
         ]
       },
       {
@@ -534,6 +539,15 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
         ]
       },
       {
+        key: "lowerThirds",
+        labelHe: "כותרות תחתונות (lower third)",
+        kind: "select",
+        options: [
+          { value: "on", labelHe: "פעיל — כותרת סצנה / מוצר" },
+          { value: "off", labelHe: "כבוי" }
+        ]
+      },
+      {
         key: "preferHeygenDub",
         labelHe: "תנועות שפתיים (HeyGen)",
         kind: "select",
@@ -586,8 +600,12 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
       lines.push(`${label}: ${value === "landscape" ? "לרוחב (16:9)" : "לאורך (9:16)"}`);
       continue;
     }
-    if (key === "karaokeCaptions" || key === "sideWatermark" || key === "preferHeygenDub") {
+    if (key === "karaokeCaptions" || key === "sideWatermark" || key === "preferHeygenDub" || key === "lowerThirds") {
       lines.push(`${label}: ${value === "on" ? "פעיל" : "כבוי"}`);
+      continue;
+    }
+    if (key === "filmTemplate") {
+      lines.push(`${label}: ${value === "corporate_product" ? "סרט מוצר B2B" : String(value)}`);
       continue;
     }
     if (key === "designStyle") {
@@ -601,7 +619,8 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
         אנימה: "anime style, clean line art",
         "איור וקטורי": "flat vector illustration",
         "סטופ־מושן": "stop-motion clay/puppet look",
-        "חדשות אולפן": "TV news studio desk and plain backdrop — no wall maps, globes, tickers, or graphics overlays"
+        "חדשות אולפן": "TV news studio desk and plain backdrop — no wall maps, globes, tickers, or graphics overlays",
+        "סרט מוצר B2B": "corporate B2B product film — clean product hero shots, office/secure facility, professional VO pacing"
       };
       const hint = styleHints[String(value)];
       lines.push(hint ? `${label}: ${value} (${hint})` : `${label}: ${value}`);

@@ -34,7 +34,9 @@ export const RenderInputSchema = z.object({
   /** Burn karaoke captions onto the assembled film. */
   karaokeCaptions: z.boolean().default(false),
   /** Burn a vertical side watermark. */
-  sideWatermark: z.boolean().default(false)
+  sideWatermark: z.boolean().default(false),
+  /** Burn per-scene lower-third titles. */
+  lowerThirds: z.boolean().default(false)
 });
 export type RenderInput = z.infer<typeof RenderInputSchema>;
 

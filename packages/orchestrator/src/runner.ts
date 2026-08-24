@@ -226,10 +226,13 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       };
       const sceneOverride = new Map<string, string>();
       const visualAnchorGcsPaths: string[] = [];
+      const visualProductGcsPaths: string[] = [];
       let visualAnchorGcsPath: string | undefined;
       for (const anchor of briefData.visualAnchors ?? []) {
         if (anchor.role === "scene" && anchor.sceneId) {
           sceneOverride.set(anchor.sceneId, anchor.gcsPath);
+        } else if (anchor.role === "product" && anchor.gcsPath) {
+          visualProductGcsPaths.push(anchor.gcsPath);
         } else if (anchor.gcsPath) {
           visualAnchorGcsPaths.push(anchor.gcsPath);
           if (!visualAnchorGcsPath) visualAnchorGcsPath = anchor.gcsPath;
@@ -242,6 +245,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         characterBible: script?.characterBible,
         visualAnchorGcsPath,
         visualAnchorGcsPaths,
+        visualProductGcsPaths,
         scenes: (script?.scenes ?? [])
           .filter((scene) => scene.sceneKind !== "title_card")
           .map((scene) => ({
@@ -302,6 +306,8 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           karaokeCaptions?: string;
           sideWatermark?: string;
           preferHeygenDub?: string;
+          lowerThirds?: string;
+          filmTemplate?: string;
         } | null;
       };
       const briefInput = brief as { creative?: typeof briefData.creative; language?: string };
@@ -309,6 +315,8 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       const karaokeCaptions = creativeFlagOn(creative, "karaokeCaptions", true);
       const sideWatermark =
         creativeFlagOn(creative, "sideWatermark") || briefData.branding?.logoPlacement === "always";
+      const lowerThirds =
+        creativeFlagOn(creative, "lowerThirds") || creative?.filmTemplate === "corporate_product";
       const renderProfile = resolveRenderProfile(briefOut ?? briefData).id;
       const brandEnd = audioOut?.brandEnd;
       return {
@@ -327,7 +335,8 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
             : null,
         language: briefData.language ?? briefInput.language ?? "he",
         karaokeCaptions,
-        sideWatermark
+        sideWatermark,
+        lowerThirds
       };
     }
     case "series":

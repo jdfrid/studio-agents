@@ -9,6 +9,8 @@ export const AssetInputSchema = z.object({
   visualAnchorGcsPath: z.string().optional(),
   /** All brief inspiration images (anchors); first also mirrored in visualAnchorGcsPath. */
   visualAnchorGcsPaths: z.array(z.string()).max(12).default([]),
+  /** Locked product / B-roll stills — used directly as I2V plates (no face invent). */
+  visualProductGcsPaths: z.array(z.string()).max(12).default([]),
   scenes: z.array(
     z.object({
       sceneId: z.string(),
