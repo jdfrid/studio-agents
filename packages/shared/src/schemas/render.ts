@@ -29,6 +29,8 @@ export const RenderInputSchema = z.object({
     })
     .nullable()
     .optional(),
+  /** Content language for caption BiDi (he/ar RTL, en LTR). */
+  language: z.string().optional(),
   /** Burn karaoke captions onto the assembled film. */
   karaokeCaptions: z.boolean().default(false),
   /** Burn a vertical side watermark. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { concatWavBuffers, isRawPcmMimeType, normalizeAudioForPlayback, pcmToWav } from "../pcm.js";
+import { concatWavBuffers, isRawPcmMimeType, normalizeAudioForPlayback, pcmToWav, wavDurationSeconds } from "../pcm.js";
 
 describe("pcm audio helpers", () => {
   it("detects Gemini LPCM mime types", () => {
@@ -29,5 +29,11 @@ describe("pcm audio helpers", () => {
     const out = concatWavBuffers([a, b]);
     expect(out.length).toBe(44 + 8);
     expect(out.subarray(44).equals(Buffer.from([1, 0, 2, 0, 3, 0, 4, 0]))).toBe(true);
+  });
+
+  it("reports duration for a known PCM length", () => {
+    const pcm = Buffer.alloc(24000 * 2); // 1s mono 16-bit @ 24kHz
+    const wav = pcmToWav(pcm, { sampleRate: 24000, bitsPerSample: 16, channels: 1 });
+    expect(wavDurationSeconds(wav)).toBeCloseTo(1, 2);
   });
 });

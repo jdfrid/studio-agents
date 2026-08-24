@@ -280,6 +280,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       const briefData = (byName.get("brief") ?? brief) as {
         aspectRatio?: string;
         renderProfile?: string;
+        language?: string;
         videoInsert?: {
           name: string;
           gcsPath: string;
@@ -300,7 +301,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           preferHeygenDub?: string;
         } | null;
       };
-      const briefInput = brief as { creative?: typeof briefData.creative };
+      const briefInput = brief as { creative?: typeof briefData.creative; language?: string };
       const creative = briefData.creative ?? briefInput.creative ?? null;
       const karaokeCaptions = creativeFlagOn(creative, "karaokeCaptions", true);
       const sideWatermark =
@@ -321,6 +322,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
                 narration: brandEnd.narration
               }
             : null,
+        language: briefData.language ?? briefInput.language ?? "he",
         karaokeCaptions,
         sideWatermark
       };

@@ -17,6 +17,16 @@ export type KaraokeLineCue = {
 
 const MAX_CHARS_PER_LINE = 28;
 
+/** Hebrew niqqud / cantillation marks — strip for on-screen captions (keep for TTS). */
+export function stripNiqqud(text: string): string {
+  return String(text ?? "").replace(/[\u0591-\u05C7]/g, "");
+}
+
+export function isRtlContentLanguage(language?: string | null): boolean {
+  const lang = String(language ?? "").toLowerCase();
+  return lang.startsWith("he") || lang.startsWith("ar") || lang.startsWith("yi") || lang.startsWith("fa");
+}
+
 export function splitNarrationWords(narration: string): string[] {
   return String(narration ?? "")
     .replace(/\s+/g, " ")
@@ -49,9 +59,11 @@ export function packWordsIntoLines(words: string[], maxChars = MAX_CHARS_PER_LIN
 export function buildKaraokeCues(
   narration: string,
   startSecond: number,
-  endSecond: number
+  endSecond: number,
+  opts?: { forDisplay?: boolean }
 ): KaraokeLineCue[] {
-  const words = splitNarrationWords(narration);
+  const source = opts?.forDisplay === false ? narration : stripNiqqud(narration);
+  const words = splitNarrationWords(source);
   if (!words.length) return [];
   const duration = Math.max(0.4, endSecond - startSecond);
   const totalWeight = words.reduce((sum, w) => sum + Math.max(1, w.length), 0);
@@ -92,9 +104,16 @@ function assTime(seconds: number): string {
   return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
 }
 
-/** Build ASS with karaoke {\k} tags — SecondaryColour is the highlight (blue). */
-export function buildKaraokeAss(lines: KaraokeLineCue[], opts?: { fontName?: string }): string {
+/**
+ * Build ASS with karaoke {\k} tags.
+ * RTL (he/ar/yi): reverse word order for karaoke highlight + wrap with RLE so punctuation stays correct.
+ */
+export function buildKaraokeAss(
+  lines: KaraokeLineCue[],
+  opts?: { fontName?: string; rtl?: boolean; language?: string | null }
+): string {
   const font = opts?.fontName ?? "Arial";
+  const rtl = opts?.rtl ?? isRtlContentLanguage(opts?.language);
   const header = `[Script Info]
 ScriptType: v4.00+
 WrapStyle: 0
@@ -110,15 +129,20 @@ Style: Karaoke,${font},52,&H00FFFFFF,&H00E07020,&H80000000,&H64000000,-1,0,0,0,1
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
+  const RLE = "\u202B";
+  const PDF = "\u202C";
+
   const events = lines
     .map((line) => {
+      // Keep speaking order for {\k}; RLE places the first spoken word on the right for he/ar.
       const kText = line.words
         .map((w) => {
           const durCs = Math.max(1, Math.round((w.endSecond - w.startSecond) * 100));
           return `{\\k${durCs}}${escapeAss(w.text)}`;
         })
-        .join(" ");
-      return `Dialogue: 0,${assTime(line.startSecond)},${assTime(line.endSecond)},Karaoke,,0,0,0,,${kText}`;
+        .join(rtl ? "" : " ");
+      const body = rtl ? `${RLE}${kText}${PDF}` : kText;
+      return `Dialogue: 0,${assTime(line.startSecond)},${assTime(line.endSecond)},Karaoke,,0,0,0,,${body}`;
     })
     .join("\n");
 
@@ -128,12 +152,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 /** Simple centered title card ASS (avoids fragile drawtext -vf chains). */
 export function buildTitleCardAss(
   input: { headline: string; subtitle?: string; durationSeconds: number; width: number; height: number },
-  opts?: { fontName?: string }
+  opts?: { fontName?: string; rtl?: boolean }
 ): string {
   const font = opts?.fontName ?? "Arial";
   const dur = Math.max(1, input.durationSeconds);
-  const headline = escapeAss(input.headline.trim() || " ");
-  const subtitle = input.subtitle?.trim() ? escapeAss(input.subtitle.trim()) : "";
+  const rtl = Boolean(opts?.rtl);
+  const RLE = "\u202B";
+  const PDF = "\u202C";
+  const wrap = (t: string) => (rtl ? `${RLE}${t}${PDF}` : t);
+  const headline = wrap(escapeAss(input.headline.trim() || " "));
+  const subtitle = input.subtitle?.trim() ? wrap(escapeAss(input.subtitle.trim())) : "";
   const titleSize = Math.max(36, Math.round(Math.min(input.width, input.height) * 0.07));
   const subSize = Math.max(22, Math.round(Math.min(input.width, input.height) * 0.038));
   return `[Script Info]

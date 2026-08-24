@@ -42,12 +42,18 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
       const assetSigned = a?.gcsPath ? await ctx.storage.signedUrl(a.gcsPath) : null;
       const musicSigned = audio.music.gcsPath ? await ctx.storage.signedUrl(audio.music.gcsPath) : null;
       const start = cursor;
+      const voiceDur =
+        typeof v?.voiceDurationSeconds === "number" && v.voiceDurationSeconds > 0
+          ? v.voiceDurationSeconds
+          : null;
+      // Cap caption/voice window to the scene so cues never spill into the next beat.
+      const cueWindow = voiceDur != null ? Math.min(scene.durationSeconds, voiceDur) : scene.durationSeconds;
       const end = cursor + scene.durationSeconds;
       cursor = end;
       const sceneKind = scene.sceneKind === "title_card" ? "title_card" : "beat";
       const captionCues =
         karaokeOn && sceneKind === "beat" && scene.narration.trim()
-          ? buildKaraokeCues(scene.narration, start, end)
+          ? buildKaraokeCues(scene.narration, start, start + Math.max(0.4, cueWindow))
           : undefined;
       timeline.push({
         sceneId: scene.id,

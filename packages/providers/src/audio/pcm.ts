@@ -79,6 +79,19 @@ export function concatWavBuffers(parts: Buffer[]): Buffer {
   return pcmToWav(Buffer.concat(pcmChunks), format!);
 }
 
+/** Duration in seconds from a WAV buffer (PCM). */
+export function wavDurationSeconds(wav: Buffer): number | null {
+  try {
+    const { pcm, format } = extractWavPcm(wav);
+    const bytesPerSample = (format.bitsPerSample / 8) * format.channels;
+    if (bytesPerSample <= 0 || format.sampleRate <= 0) return null;
+    const seconds = pcm.length / (format.sampleRate * bytesPerSample);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+  } catch {
+    return null;
+  }
+}
+
 function extractWavPcm(wav: Buffer): { pcm: Buffer; format: PcmFormat } {
   if (wav.length < 44 || wav.toString("ascii", 0, 4) !== "RIFF") {
     throw new Error("extractWavPcm: not a RIFF/WAV buffer");

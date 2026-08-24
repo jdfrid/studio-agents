@@ -1,7 +1,7 @@
 import type { ProviderCredentialView } from "@studio/shared";
 import { ProviderError } from "@studio/shared";
 import { httpJson } from "../http.js";
-import { concatWavBuffers, normalizeAudioForPlayback } from "../audio/pcm.js";
+import { concatWavBuffers, normalizeAudioForPlayback, wavDurationSeconds } from "../audio/pcm.js";
 import {
   describeGenerateContentFailure,
   extractInlineData,
@@ -61,12 +61,13 @@ export async function geminiSynthesizeSpeech(
       model = part.model;
       parts.push(part.body);
     }
+    const body = concatWavBuffers(parts);
     return {
       provider: "gemini",
       model,
-      body: concatWavBuffers(parts),
+      body,
       mimeType: "audio/wav",
-      durationSeconds: null
+      durationSeconds: wavDurationSeconds(body)
     };
   }
 }
@@ -137,7 +138,7 @@ async function synthesizeOnce(
       model: attempt.model,
       body: normalized.body,
       mimeType: normalized.mimeType,
-      durationSeconds: null
+      durationSeconds: wavDurationSeconds(normalized.body)
     };
   }
 

@@ -517,11 +517,11 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
       },
       {
         key: "karaokeCaptions",
-        labelHe: "כתוביות קריוקי",
+        labelHe: "כתוביות",
         kind: "select",
         options: [
-          { value: "on", labelHe: "פעיל (ברירת מחדל מומלצת)" },
-          { value: "off", labelHe: "כבוי" }
+          { value: "on", labelHe: "כן — הצג כתוביות" },
+          { value: "off", labelHe: "לא — בלי כתוביות" }
         ]
       },
       {
@@ -535,11 +535,11 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
       },
       {
         key: "preferHeygenDub",
-        labelHe: "דיבוב HeyGen (סנכרון שפתיים)",
+        labelHe: "תנועות שפתיים (HeyGen)",
         kind: "select",
         options: [
-          { value: "off", labelHe: "כבוי — ברירת מחדל (Veo)" },
-          { value: "on", labelHe: "פעיל — יקר יותר (סנכרון שפתיים)" }
+          { value: "on", labelHe: "כן — סנכרון שפתיים לדיבוב (מומלץ)" },
+          { value: "off", labelHe: "לא — וידאו שקט + דיבוב חיצוני (Veo/Wan)" }
         ]
       }
     ]

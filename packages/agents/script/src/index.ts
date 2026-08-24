@@ -19,6 +19,7 @@ import {
   sanitizeVeoPromptForExternalAudio,
   userFacingLanguageInstruction,
   type Agent,
+  type AgentContext,
   type ScriptInput,
   type ScriptOutput,
   type SceneSpec
@@ -83,6 +84,11 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "Set speaker to \"a\" or \"b\" and speakerName to the character's short name from characterBible.",
       "narration must be ONLY the spoken words for that character — clear natural dialogue, no 'Name:' prefixes, no stage directions.",
       "Alternate a/b so the audio engine can use two distinct TTS voices. Use speaker \"narrator\" only for non-dialogue VO.",
+      contentLang === "he" || contentLang === "yi"
+        ? "HEBREW NIKUD (mandatory): every narration line MUST include full niqqud (ניקוד) for correct TTS pronunciation and stress — e.g. שָׁלוֹם not שלום."
+        : contentLang === "ar"
+          ? "ARABIC: use clear vocalization where needed for correct TTS pronunciation."
+          : "",
       "Return strictly valid JSON only — escape quotes inside strings, no trailing commas, no markdown."
     ].filter(Boolean);
     if (extendMode) {
@@ -285,6 +291,10 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       throw new Error("Script Agent produced no scenes");
     }
 
+    if (contentLang === "he" || contentLang === "yi") {
+      await applyHebrewNiqqud(scenes, provider, completeJson, ctx);
+    }
+
     const totalDurationSeconds = scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0);
     const output: ScriptOutput = applyContinuityToScript(
       {
@@ -354,6 +364,60 @@ function stripSpeakerPrefix(text: string): string {
     .replace(/^\s*[^:\n]{1,40}\s*[:：]\s*/u, "")
     .replace(/^\s*[^—\n]{1,40}\s*[—–-]\s*/u, "")
     .trim();
+}
+
+function hasHebrewNiqqud(text: string): boolean {
+  return /[\u05B0-\u05BB\u05C1\u05C2\u05C4\u05C5]/.test(text);
+}
+
+async function applyHebrewNiqqud(
+  scenes: SceneSpec[],
+  provider: Parameters<typeof geminiCompleteJson>[0],
+  completeJson: typeof geminiCompleteJson | typeof llmCompleteJson,
+  ctx: AgentContext
+): Promise<void> {
+  const needs = scenes.filter(
+    (s) => s.sceneKind !== "title_card" && s.narration.trim() && !hasHebrewNiqqud(s.narration)
+  );
+  if (!needs.length) return;
+
+  try {
+    const { parsed } = await completeJson<{ scenes: Array<{ id: string; narration: string }> }>(provider, {
+      system: [
+        "You add full Hebrew niqqud (ניקוד) for text-to-speech.",
+        "Keep the exact words and meaning — only add vowel points and shin/sin dots.",
+        "Do not translate. Do not shorten. Return JSON only."
+      ].join(" "),
+      user: `${JSON.stringify(
+        { scenes: needs.map((s) => ({ id: s.id, narration: s.narration })) },
+        null,
+        2
+      )}\n\nReturn {"scenes":[{"id":"...","narration":"...with niqqud..."}]} for every input scene.`,
+      schemaName: "NiqqudNarration",
+      schemaHint: JSON.stringify({
+        scenes: [{ id: "scene id", narration: "Hebrew with full niqqud" }]
+      }),
+      temperature: 0.1,
+      maxOutputTokens: 4096
+    });
+    const byId = new Map((parsed.scenes ?? []).map((s) => [s.id, String(s.narration ?? "").trim()]));
+    let updated = 0;
+    for (const scene of scenes) {
+      const next = byId.get(scene.id);
+      if (next && hasHebrewNiqqud(next)) {
+        scene.narration = next.slice(0, 800);
+        updated += 1;
+      }
+    }
+    await ctx.log.log("script_niqqud_applied", "Added Hebrew niqqud for TTS", {
+      updated,
+      needed: needs.length
+    });
+  } catch (error) {
+    await ctx.log.log("script_niqqud_failed", "Niqqud pass failed — keeping plain narration", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
 }
 
 function normalizeDurationBucket(

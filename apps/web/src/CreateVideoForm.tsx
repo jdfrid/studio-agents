@@ -30,7 +30,10 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [creative, setCreative] = useState<CreativeOptions>({ karaokeCaptions: "on" });
+  const [creative, setCreative] = useState<CreativeOptions>({
+    karaokeCaptions: "on",
+    preferHeygenDub: "on"
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -489,15 +492,15 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           <div className={`heygen-dub-control ${preferHeygenDub ? "heygen-dub-control--on" : ""}`}>
             <div className="heygen-dub-control-row">
               <label className="heygen-dub-label">
-                דיבוב HeyGen (סנכרון שפתיים)
+                תנועות שפתיים (HeyGen)
                 <select
-                  value={String(creative.preferHeygenDub ?? "off")}
+                  value={String(creative.preferHeygenDub ?? "on")}
                   onChange={(e) =>
-                    setCreativeField("preferHeygenDub", (e.target.value || "off") as never)
+                    setCreativeField("preferHeygenDub", (e.target.value || "on") as never)
                   }
                 >
-                  <option value="off">כבוי — ברירת מחדל (Veo)</option>
-                  <option value="on">פעיל — יקר יותר (סנכרון שפתיים)</option>
+                  <option value="on">כן — סנכרון שפתיים לדיבוב (מומלץ)</option>
+                  <option value="off">לא — וידאו שקט + דיבוב חיצוני</option>
                 </select>
               </label>
               {preferHeygenDub ? (
@@ -506,18 +509,17 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                   className="heygen-dub-off-btn"
                   onClick={() => setCreativeField("preferHeygenDub", "off")}
                 >
-                  כבה דיבוב
+                  כבה סנכרון שפתיים
                 </button>
               ) : null}
             </div>
             {preferHeygenDub ? (
               <p className={`advanced-hint ${heygenNeedsAnchor ? "error-inline" : "muted"}`}>
-                דיבוב פעיל — סנכרון שפתיים לתמונת ההשראה + אודיו TTS. העלו תמונת דמות ברורה. לביטול: בחרו
-                «כבוי» או לחצו «כבה דיבוב».
+                פעיל: השפתיים יתאימו לדיבוב. חובה תמונת השראה ברורה של הדמות. יקר יותר מ־Veo בלבד.
               </p>
             ) : (
               <p className="muted advanced-hint">
-                כבוי = רינדור Veo רגיל (מומלץ). פעיל = HeyGen לסנכרון שפתיים בלבד.
+                כבוי: הדיבוב יתווסף מעל וידאו שקט (בלי סנכרון שפתיים אמיתי).
               </p>
             )}
           </div>

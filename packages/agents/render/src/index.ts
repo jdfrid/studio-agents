@@ -682,14 +682,18 @@ async function mixExtendTimelineAudio(
     return videoPath;
   }
 
-  const voiceTracks: Array<{ path: string; delayMs: number }> = [];
+  const voiceTracks: Array<{ path: string; delayMs: number; sceneDur: number }> = [];
   for (const scene of timeline) {
     if (!shouldUseVoice(scene)) continue;
     const voiceGcsPath = resolveGcsPath(storage, scene.voice);
     if (!voiceGcsPath) continue;
     const voiceLocal = path.join(dir, `voice-${scene.sceneId}-${nanoid(4)}.audio`);
     await downloadMediaToFile(storage, voiceGcsPath, voiceLocal);
-    voiceTracks.push({ path: voiceLocal, delayMs: Math.round(scene.startSecond * 1000) });
+    voiceTracks.push({
+      path: voiceLocal,
+      delayMs: Math.round(scene.startSecond * 1000),
+      sceneDur: Math.max(0.2, scene.durationSeconds)
+    });
   }
 
   if (voiceTracks.length === 0) {
@@ -705,11 +709,15 @@ async function mixExtendTimelineAudio(
     const track = voiceTracks[i]!;
     inputs.push("-i", track.path);
     const delay = track.delayMs;
-    filterParts.push(`[${i + 1}:a]adelay=${delay}|${delay},apad=whole_dur=${videoDur}[v${i}]`);
+    const sceneDur = track.sceneDur;
+    // Trim each voice to its scene window before delay so tracks cannot overwrite neighbours.
+    filterParts.push(
+      `[${i + 1}:a]atrim=0:${sceneDur},asetpts=PTS-STARTPTS,adelay=${delay}|${delay},apad=whole_dur=${videoDur}[v${i}]`
+    );
   }
 
   const mixInputs = voiceTracks.map((_, i) => `[v${i}]`).join("");
-  filterParts.push(`${mixInputs}amix=inputs=${voiceTracks.length}:duration=longest:dropout_transition=0[aout]`);
+  filterParts.push(`${mixInputs}amix=inputs=${voiceTracks.length}:duration=first:dropout_transition=0,atrim=0:${videoDur},asetpts=PTS-STARTPTS[aout]`);
 
   await runFfmpeg([
     ...inputs,
@@ -807,15 +815,17 @@ async function mixSceneAudio(
   const videoDur = await probeDuration(videoPath);
   const voiceLocal = path.join(dir, `voice-${scene.sceneId}-${nanoid(4)}.audio`);
   await downloadMediaToFile(storage, voiceGcsPath, voiceLocal);
+  const voiceDur = await probeDuration(voiceLocal).catch(() => 0);
   const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-voice.mp4`);
-  // Keep full Veo clip; trim or pad narration to match video length (never shorten video with -shortest).
+  // Fit narration into the clip window: mild atempo when slightly long, then pad/trim — never spill past videoDur.
+  const audioFilter = fitVoiceToVideoFilter(voiceDur, videoDur);
   await runFfmpeg([
     "-i",
     videoPath,
     "-i",
     voiceLocal,
     "-filter_complex",
-    `[1:a]atrim=0:${videoDur},asetpts=PTS-STARTPTS,apad=whole_dur=${videoDur}[aout]`,
+    `${audioFilter}[aout]`,
     "-map",
     "0:v:0",
     "-map",
@@ -832,6 +842,26 @@ async function mixSceneAudio(
     out
   ]);
   return out;
+}
+
+/** Build ffmpeg audio filter that keeps voice inside [0, videoDur] without hard mid-word cuts when possible. */
+function fitVoiceToVideoFilter(voiceDur: number, videoDur: number): string {
+  const target = Math.max(0.2, videoDur);
+  if (!(voiceDur > 0) || !Number.isFinite(voiceDur)) {
+    return `[1:a]atrim=0:${target},asetpts=PTS-STARTPTS,apad=whole_dur=${target}`;
+  }
+  if (voiceDur <= target + 0.05) {
+    return `[1:a]asetpts=PTS-STARTPTS,apad=whole_dur=${target}`;
+  }
+  // Speed up slightly (max ~1.35x) so long lines still fit; then hard-trim if still over.
+  const tempo = Math.min(1.35, voiceDur / target);
+  const chain: string[] = ["[1:a]asetpts=PTS-STARTPTS"];
+  if (tempo > 1.02) {
+    // atempo only accepts 0.5–2.0
+    chain.push(`atempo=${tempo.toFixed(3)}`);
+  }
+  chain.push(`atrim=0:${target}`, `apad=whole_dur=${target}`);
+  return chain.join(",");
 }
 
 async function stripAudio(videoPath: string, dir: string): Promise<string> {
@@ -1429,7 +1459,11 @@ async function burnKaraokeAndWatermark(
       );
       if (cues.length) {
         const font = resolveDrawtextFont();
-        const ass = buildKaraokeAss(cues, { fontName: assFontNameFromPath(font) });
+        const ass = buildKaraokeAss(cues, {
+          fontName: assFontNameFromPath(font),
+          language: input.language,
+          rtl: undefined
+        });
         assPath = path.join(dir, `karaoke-${nanoid(4)}.ass`);
         await writeFile(assPath, ass, "utf8");
         const fontsDir = font ? path.dirname(font) : null;
