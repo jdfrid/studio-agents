@@ -388,22 +388,17 @@ function trimNarration(text: string, maxChars: number): string {
 
 /** Remove "Name:" / "שם —" prefixes so TTS speaks only dialogue. */
 function stripSpeakerPrefix(text: string): string {
-  let t = text.trim();
-  // Drop "Name:" / "א:" style labels at the start of a line.
-  t = t.replace(/^[^\n:]{1,40}:\s*/u, "").trim();
-  // If the model packed two speakers into one beat, keep only the first utterance.
-  const split = t.split(/\n+|;\s+(?=[A-Zא-ת][^\n:]{0,30}:)/u);
-  if (split.length > 1) {
-    t = split[0]!.trim();
-  }
-  // Drop trailing second-speaker lines like "ב: ..." / "Name: ..."
-  t = t.replace(/(?:\n|^)\s*[^\n:]{1,40}:\s*[^\n]+$/u, "").trim();
-  return t;
-}
-  return text
+  let t = text
     .replace(/^\s*[^:\n]{1,40}\s*[:：]\s*/u, "")
     .replace(/^\s*[^—\n]{1,40}\s*[—–-]\s*/u, "")
     .trim();
+  // If the model packed two speakers into one beat, keep only the first utterance.
+  const lines = t.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length > 1 && /^[^\n:]{1,40}\s*[:：]/.test(lines[1]!)) {
+    t = lines[0]!;
+  }
+  t = t.replace(/\s+[^\s:]{1,40}\s*[:：]\s+.+$/u, "").trim();
+  return t;
 }
 
 function hasHebrewNiqqud(text: string): boolean {
