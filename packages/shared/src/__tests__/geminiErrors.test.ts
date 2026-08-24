@@ -9,6 +9,14 @@ import {
 import { ProviderError } from "../errors.js";
 
 describe("classifyGeminiError", () => {
+  it("429 with prepayment credits depleted is billing (not rate limit)", () => {
+    const raw = `429 { "error": { "code": 429, "message": "Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing.", "status": "RESOURCE_EXHAUSTED" } }`;
+    expect(classifyGeminiError(raw, 429)).toBe("billing_quota");
+    expect(userFacingGeminiError(raw, 429)).toContain("Prepay");
+    expect(userFacingGeminiError(raw, 429)).toContain("נגמרו קרדיטי");
+    expect(userFacingGeminiError(raw, 429)).toContain("זו לא מגבלת קצב");
+  });
+
   it("treats generic 429 quota as rate limit (not billing)", () => {
     const raw = `429 { "error": { "code": 429, "message": "You exceeded your current quota", "status": "RESOURCE_EXHAUSTED" } }`;
     expect(classifyGeminiError(raw, 429)).toBe("rate_limit");

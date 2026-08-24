@@ -34,7 +34,13 @@ const BILLING_QUOTA_PATTERNS = [
   "purchase credits",
   "buy credits",
   "prepay balance",
-  "prepay ai studio"
+  "prepay ai studio",
+  "prepayment",
+  "prepayment credits",
+  "credits are depleted",
+  "credits depleted",
+  "depleted. please go to ai studio",
+  "manage your project and billing"
 ];
 
 const RATE_LIMIT_PATTERNS = [
@@ -83,9 +89,9 @@ export function userFacingGeminiError(raw: string, httpStatus?: number): string 
         ].join(" ");
       }
       return [
-        "ייתכן שנגמרו קרדיטים ב-Google AI Studio (Prepay) או שאין מספיק יתרה.",
-        "Billing → How you pay → Prepay AI Studio → Buy credits.",
-        "אם יש יתרה (למשל בתקציב Cloud) — בדוק גם Prepay AI Studio, לא רק Budgets."
+        "נגמרו קרדיטי Prepay ב-Google AI Studio — זו לא מגבלת קצב זמנית.",
+        "פתח https://aistudio.google.com/ → הפרויקט → Billing / Prepay → Buy credits.",
+        "אחרי טעינת יתרה לחץ «הפעל מחדש את השלב» (או מחק את הריצה והתחל מחדש)."
       ].join(" ");
     case "rate_limit":
       if (provider === "heygen") {

@@ -67,6 +67,18 @@ describe("Gemini Veo rate-limit retry", () => {
     expect(waits).toEqual([15_000]);
   });
 
+  it("does not treat prepayment depletion as retryable rate limit", () => {
+    const err = new ProviderError("depleted", {
+      provider: "gemini",
+      metadata: {
+        status: 429,
+        kind: "billing_quota",
+        raw: "Your prepayment credits are depleted. Please go to AI Studio"
+      }
+    });
+    expect(isGeminiRateLimitError(err)).toBe(false);
+  });
+
   it("does not retry non-rate-limit errors", async () => {
     await expect(
       withGeminiRateLimitRetry("test", async () => {

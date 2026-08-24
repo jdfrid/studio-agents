@@ -1,4 +1,4 @@
-import { ProviderError } from "@studio/shared";
+import { ProviderError, classifyGeminiError } from "@studio/shared";
 
 export function veo429MaxAttempts(): number {
   const n = Number(process.env.GEMINI_VEO_429_MAX_ATTEMPTS ?? 8);
@@ -11,16 +11,37 @@ export function geminiText429MaxAttempts(): number {
   return Number.isFinite(n) && n >= 1 ? Math.min(Math.floor(n), 10) : 4;
 }
 
+export function isGeminiBillingDepletedError(error: unknown): boolean {
+  if (error instanceof ProviderError) {
+    if (error.metadata?.kind === "billing_quota") return true;
+    const status = typeof error.metadata?.status === "number" ? error.metadata.status : undefined;
+    const raw = String(error.metadata?.raw ?? error.message ?? "");
+    return classifyGeminiError(raw, status) === "billing_quota";
+  }
+  return classifyGeminiError(error instanceof Error ? error.message : String(error)) === "billing_quota";
+}
+
 export function isGeminiRateLimitError(error: unknown): boolean {
+  // Never retry when Prepay credits are gone — waiting will not help.
+  if (isGeminiBillingDepletedError(error)) return false;
   if (error instanceof ProviderError) {
     const kind = error.metadata?.kind;
     if (kind === "rate_limit") return true;
-    if (error.metadata?.status === 429) return true;
+    if (kind === "billing_quota" || kind === "auth") return false;
+    if (error.metadata?.status === 429) {
+      const raw = String(error.metadata?.raw ?? "");
+      return classifyGeminiError(raw, 429) === "rate_limit";
+    }
     const raw = String(error.metadata?.raw ?? "");
-    if (/RESOURCE_EXHAUSTED|exceeded your current quota/i.test(raw)) return true;
+    if (/RESOURCE_EXHAUSTED|exceeded your current quota/i.test(raw)) {
+      return classifyGeminiError(raw, 429) === "rate_limit";
+    }
   }
   const message = error instanceof Error ? error.message : String(error);
-  return /(?:^|\D)429(?:\D|$)|RESOURCE_EXHAUSTED|rate.?limit|exceeded your current quota/i.test(message);
+  if (!/(?:^|\D)429(?:\D|$)|RESOURCE_EXHAUSTED|rate.?limit|exceeded your current quota/i.test(message)) {
+    return false;
+  }
+  return classifyGeminiError(message, 429) === "rate_limit";
 }
 
 /** Delay after the Nth failed attempt (attempt starts at 1). Caps at 120s; honors Retry-After seconds. */
