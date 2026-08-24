@@ -549,11 +549,11 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
       },
       {
         key: "preferHeygenDub",
-        labelHe: "תנועות שפתיים (HeyGen)",
+        labelHe: "תנועות שפתיים (Kling Avatar)",
         kind: "select",
         options: [
-          { value: "off", labelHe: "כבוי — כלול בתשלום Prompt2Spot (מומלץ)" },
-          { value: "on", labelHe: "פעיל — חיוב נפרד בחשבון HeyGen" }
+          { value: "off", labelHe: "כבוי — דיבוב TTS על וידאו (מומלץ)" },
+          { value: "on", labelHe: "פעיל — סנכרון שפתיים דרך fal (~$0.056/ש׳)" }
         ]
       }
     ]

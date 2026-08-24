@@ -64,6 +64,7 @@ export function videoProviderShortLabelHe(profile: RenderProfileId): string {
   if (p.provider === "kling") return "קלינג";
   if (p.provider === "heygen") return "הייג׳ן";
   if (p.provider === "fal") {
+    if (p.id === "kling-avatar-i2v") return "קלינג אווטאר";
     if (p.id === "wan-i2v") return "ואן";
     if (p.id === "hailuo-i2v") return "האילואו";
     if (p.id === "seedance-mini-i2v") return "סידנס מיני";

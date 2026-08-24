@@ -106,6 +106,29 @@ describe("estimateRunCost", () => {
     expect(est.sceneCount).toBe(3);
     expect(est.veoSeconds).toBe(12);
   });
+
+  it("estimates Wan photo runs near fal 720p list price", () => {
+    const est = estimateRunCost(
+      { budgetMode: true, durationSeconds: 30 },
+      { usdToIls: 3.6, renderProfileId: "wan-i2v" }
+    );
+    expect(est.renderProfileId).toBe("wan-i2v");
+    expect(est.perSecondUsd).toBe(0.1);
+    expect(est.veoUsd).toBeCloseTo(est.veoSeconds * 0.1, 5);
+  });
+
+  it("estimates Kling Avatar lip-sync cheaper than Wan", () => {
+    const wan = estimateRunCost(
+      { budgetMode: true, durationSeconds: 30 },
+      { usdToIls: 3.6, renderProfileId: "wan-i2v" }
+    );
+    const avatar = estimateRunCost(
+      { budgetMode: true, durationSeconds: 30 },
+      { usdToIls: 3.6, renderProfileId: "kling-avatar-i2v" }
+    );
+    expect(avatar.perSecondUsd).toBeLessThan(wan.perSecondUsd);
+    expect(avatar.videoProviderLabel).toMatch(/Avatar/i);
+  });
 });
 describe("veoModelTier", () => {
   it("detects tiers", () => {

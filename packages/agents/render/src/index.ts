@@ -16,6 +16,7 @@ import {
   sanitizeVeoPromptForExternalAudio,
   usesFalVideoProvider,
   usesHeygenVideoProvider,
+  usesLipSyncVideoProvider,
   type Agent,
   type AgentContext,
   type ArtifactRecord,
@@ -169,7 +170,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           loadMediaBytes(ctx.storage, referenceSource),
           loadMediaBytes(ctx.storage, scene.firstFrame),
           loadMediaBytes(ctx.storage, scene.lastFrame),
-          usesHeygenVideoProvider(renderProfile) ? loadMediaBytes(ctx.storage, scene.voice) : Promise.resolve(null)
+          usesLipSyncVideoProvider(renderProfile) ? loadMediaBytes(ctx.storage, scene.voice) : Promise.resolve(null)
         ]);
         const wantNativeAudio =
           scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1";

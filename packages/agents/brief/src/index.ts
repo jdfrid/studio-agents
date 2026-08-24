@@ -368,12 +368,16 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       callToAction: parsed.callToAction ?? businessName ?? "prompt2spot.com",
       budgetMode: input.budgetMode ?? false,
       renderProfile: (() => {
-        if (creativeFlagOn(input.creative, "preferHeygenDub")) return "heygen-i2v";
-        // Character or product photos need image→video; Veo Fast ignores reference frames.
         const hasPhotoPlates =
           visualAnchors.length > 0 ||
           input.attachments.some((a) => a.role === "product" || a.role === "anchor");
-        if (hasPhotoPlates && process.env.FAL_API_KEY?.trim()) return "wan-i2v";
+        const falOk = Boolean(process.env.FAL_API_KEY?.trim());
+        // Lip-sync toggle → cheap Kling Avatar on fal (HeyGen only if fal missing).
+        if (creativeFlagOn(input.creative, "preferHeygenDub")) {
+          return falOk ? "kling-avatar-i2v" : "heygen-i2v";
+        }
+        // Character or product photos need image→video; Veo Fast ignores reference frames.
+        if (hasPhotoPlates && falOk) return "wan-i2v";
         return resolveRenderProfile(input).id;
       })(),
       references:

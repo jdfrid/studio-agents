@@ -3,6 +3,8 @@ import {
   buildRenderProfileSnapshot,
   defaultRenderProfileId,
   getRenderProfile,
+  predictRenderProfileId,
+  profileVideoPerSecondUsd,
   resolveRenderProfile
 } from "../renderProfiles.js";
 
@@ -43,6 +45,28 @@ describe("resolveRenderProfile", () => {
     expect(profile.provider).toBe("heygen");
     expect(profile.capabilities.referenceImage).toBe(true);
     expect(profile.capabilities.nativeAudio).toBe(true);
+  });
+
+  it("includes kling-avatar-i2v cheap lip-sync profile", () => {
+    const profile = getRenderProfile("kling-avatar-i2v");
+    expect(profile.provider).toBe("fal");
+    expect(profile.falModel).toContain("ai-avatar");
+    expect(profile.capabilities.nativeAudio).toBe(true);
+    expect(profileVideoPerSecondUsd(profile)).toBeCloseTo(0.0562, 4);
+  });
+
+  it("prices Wan 2.7 at fal 720p list rate", () => {
+    expect(profileVideoPerSecondUsd(getRenderProfile("wan-i2v"))).toBe(0.1);
+  });
+});
+
+describe("predictRenderProfileId", () => {
+  it("picks kling-avatar when lip-sync is on", () => {
+    expect(predictRenderProfileId({ preferLipSync: true })).toBe("kling-avatar-i2v");
+  });
+
+  it("picks wan when photos are present", () => {
+    expect(predictRenderProfileId({ hasPhotoPlates: true })).toBe("wan-i2v");
   });
 });
 

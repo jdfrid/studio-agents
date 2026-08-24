@@ -88,6 +88,9 @@ export function priceVeoScene(
 /** USD per second for ledger estimates (Veo or Kling/fal). */
 export function videoPerSecondUsd(model: string, generateAudio = veoGenerateAudio()): number {
   const m = model.toLowerCase();
+  if (m.includes("ai-avatar") || m.includes("kling-avatar")) {
+    return profileVideoPerSecondUsd(getRenderProfile("kling-avatar-i2v"));
+  }
   if (m.includes("kling") || m.includes("fal-ai/kling")) {
     return profileVideoPerSecondUsd(getRenderProfile("kling-i2v"));
   }

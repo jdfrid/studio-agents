@@ -9,8 +9,16 @@ function resolveFalModel(profile: RenderProfile): string {
   throw new ProviderError(`fal model missing for profile ${profile.id}`, { provider: profile.provider });
 }
 
+function isLipSyncFalProfile(profile: RenderProfile): boolean {
+  return profile.id === "kling-avatar-i2v";
+}
+
 /** fal MiniMax Hailuo accepts only string enums "6" | "10". Kling uses "5" | "10". */
 function durationForModel(profile: RenderProfile, seconds: number): string | number {
+  if (isLipSyncFalProfile(profile)) {
+    // Avatar length follows audio; bill by planned beat seconds.
+    return Math.max(1, Math.round(seconds) || 8);
+  }
   if (profile.id === "hailuo-i2v") {
     return seconds >= 9 ? "10" : "6";
   }
@@ -48,6 +56,23 @@ function buildFalBody(
   duration: string | number,
   promptOverride?: string
 ): Record<string, unknown> {
+  if (isLipSyncFalProfile(profile)) {
+    if (!req.voiceAudio?.body?.length) {
+      throw new ProviderError(`${profile.label} requires scene voice audio for lip-sync`, {
+        provider: profile.provider,
+        metadata: { sceneId: req.sceneId, profileId: profile.id }
+      });
+    }
+    const audioMime = req.voiceAudio.mimeType || "audio/mpeg";
+    const audioUrl = `data:${audioMime};base64,${req.voiceAudio.body.toString("base64")}`;
+    const prompt = clampFalPrompt(softenFalMotionPrompt(promptOverride ?? req.prompt ?? "."), 500) || ".";
+    return {
+      image_url: imageUrl,
+      audio_url: audioUrl,
+      prompt
+    };
+  }
+
   // Kling rejects prompts > 2500; Wan/Hailuo/Seedance/Luma are safer under the same cap.
   const prompt = clampFalPrompt(softenFalMotionPrompt(promptOverride ?? req.prompt), 2400);
   const body: Record<string, unknown> = {

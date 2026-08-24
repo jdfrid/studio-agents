@@ -52,8 +52,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     });
     const extendMode = renderProfile.strategy === "extend";
     const klingMode = renderProfile.provider === "kling";
-    const heygenMode = renderProfile.provider === "heygen";
-    const beatI2vMode = klingMode || heygenMode || renderProfile.provider === "fal";
+    const lipSyncMode = renderProfile.capabilities.nativeAudio === true;
+    const beatI2vMode = klingMode || lipSyncMode || renderProfile.provider === "fal";
     const contentLang = normalizeContentLanguage(brief.language);
     const langEn = contentLanguageEnglishName(contentLang);
     const langNative = contentLanguageNativeName(contentLang);
@@ -81,11 +81,11 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "NARRATION TONE (mandatory): every spoken line must match the event mood and creative style — not generic announcer copy.",
       "If creative/communicationStyle/designStyle/location/targetAudience are set, narration vocabulary and energy MUST reflect them (e.g. wedding warmth, news urgency, kids playful, Pixar whimsy).",
       "Do not write flat product-demo narration when the brief describes a ceremony, party, documentary, or stylized world.",
-      heygenMode
-        ? "In veoPrompt, describe body/gaze/gesture timed to the spoken line; mouth sync comes from HeyGen audio. With 2+ people on screen, only the active speaker (speakerName) should mouth words; others listen with closed mouth."
+      lipSyncMode
+        ? "In veoPrompt, describe body/gaze/gesture timed to the spoken line; mouth sync comes from lip-sync audio. With 2+ people on screen, only the active speaker (speakerName) should mouth words; others listen with closed mouth."
         : "CRITICAL (TTS mix): veoPrompt must be SILENT performance only — closed mouth, no speaking, no dialogue, no music, no lip-sync/mouthing words. Voiceover is added later via TTS+FFmpeg; asking Veo for speech often fails the whole clip. With 2+ people: only speakerName shows mild expression; everyone else listens with a fully closed mouth and no lip motion.",
       "If narration is empty or muted, veoPrompt must say silent performance — closed mouth, no speaking gestures.",
-      heygenMode
+      lipSyncMode
         ? "Pace gestures to the line: open with attention, hold product/gesture mid-line, end with a clear hold — avoid frantic action that fights the voiceover."
         : "Pace gestures to the silent beat: face camera / look at product, natural blinks, hold product mid-beat — avoid frantic action.",
       "Optionally include 0–1 title_card scenes (sceneKind=title_card): short on-screen CTA/headline, empty narration, audioPolicy muted, durationSeconds 3–5, visualPrompt describes full-frame kinetic text background.",
@@ -120,9 +120,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         `Each beat targets ${clipSeconds}s of story time.`
       );
     }
-    if (heygenMode) {
+    if (lipSyncMode) {
       systemParts.push(
-        "HEYGEN LIP-SYNC MODE: each beat is a talking-head clip from a reference still with true lip-sync to the scene narration audio.",
+        "LIP-SYNC MODE (Kling Avatar / HeyGen): each beat is a talking-head clip from a reference still with true lip-sync to the scene narration audio.",
         "veoPrompt is a short motion_prompt (body/gesture only — mouth sync comes from audio). Prefer facing camera, natural head nods, hand gestures that match the spoken line.",
         `Narration must be clear spoken lines in ${langEn} (this audio drives lip-sync). Keep visual continuity via referenceImagePrompt.`,
         `Each beat targets ~${clipSeconds}s of story time.`
@@ -152,11 +152,11 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       narration: `${langNative} narration, 1 short sentence (max ${narrationLimit} chars); empty string if sceneKind=title_card`,
       visualPrompt:
         "English visual: for 2+ cast prefer two-shot both people visible; name speaker vs listener (max 200 chars)",
-      veoPrompt: heygenMode
-        ? "English HeyGen motion prompt: body/gaze/gesture timed to narration (max 200 chars)"
+      veoPrompt: lipSyncMode
+        ? "English lip-sync motion prompt: body/gaze/gesture timed to narration (max 200 chars)"
         : "English motion prompt timed to narration (speaking vs silent, gaze, gestures; max 200 chars)",
       durationBucket: "4 | 6 | 8",
-      audioPolicy: heygenMode
+      audioPolicy: lipSyncMode
         ? "gemini_tts_only"
         : "gemini_tts_plus_music | gemini_tts_only | veo_native_audio | muted",
       durationSeconds: clipSeconds,
@@ -191,7 +191,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         : "";
     const extendHint = extendMode
       ? ` Veo extend mode: ${sceneCount} beats in one continuous chain (~${totalVideoSeconds}s billed Veo time).`
-      : heygenMode
+      : lipSyncMode
         ? ` HeyGen lip-sync mode: ${sceneCount} beats × ~${clipSeconds}s each (reference still + narration audio per beat).`
         : klingMode
           ? ` Kling I2V mode: ${sceneCount} beats × ~10s each (reference frame per beat).`
@@ -292,7 +292,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         scene.visualPrompt?.trim() ||
         (resolvedKind === "title_card" ? "Static full-frame title card, subtle fade-in text" : "");
       const veoPrompt =
-        heygenMode || resolvedKind === "title_card"
+        lipSyncMode || resolvedKind === "title_card"
           ? veoPromptRaw
           : sanitizeVeoPromptForExternalAudio(veoPromptRaw);
       return {
@@ -311,7 +311,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         lastFramePrompt: includeExtraFrames ? (scene.lastFramePrompt ?? scene.visualPrompt ?? undefined) : scene.lastFramePrompt,
         durationBucket,
         audioPolicy:
-          resolvedKind === "title_card" ? "muted" : heygenMode ? "gemini_tts_only" : resolveSceneAudioPolicy(scene.audioPolicy, budget),
+          resolvedKind === "title_card" ? "muted" : lipSyncMode ? "gemini_tts_only" : resolveSceneAudioPolicy(scene.audioPolicy, budget),
         durationSeconds:
           resolvedKind === "title_card"
             ? Math.min(5, Math.max(3, Number(scene.durationSeconds) || 4))

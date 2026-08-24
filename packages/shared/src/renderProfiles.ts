@@ -3,6 +3,7 @@ export const RenderProfileIdSchema = z.enum([
   "veo-multiclip",
   "veo-extend",
   "kling-i2v",
+  "kling-avatar-i2v",
   "wan-i2v",
   "hailuo-i2v",
   "heygen-i2v",
@@ -16,8 +17,10 @@ export type VideoProviderName = "veo" | "kling" | "fal" | "heygen" | "runway" | 
 export type RenderStrategy = "multiclip" | "extend";
 /** Target beat length for script/narration in extend / kling profiles. */
 export const VEO_EXTEND_BEAT_SECONDS = 10;
-/** HeyGen image→talking-head beat length (driven by narration audio). */
+/** HeyGen / Kling Avatar image→talking-head beat length (driven by narration audio). */
 export const HEYGEN_BEAT_SECONDS = 8;
+/** Kling AI Avatar v2 Standard — audio-driven lip-sync on fal. */
+export const KLING_AVATAR_BEAT_SECONDS = 8;
 /** Luma Ray 3.2 single-image i2v is capped at 5s (10s needs multi-keyframe). */
 export const LUMA_RAY_BEAT_SECONDS = 5;
 /** Seedance 2 beat length — short clips for volume / cost control. */
@@ -86,6 +89,22 @@ export const RENDER_PROFILES: Record<RenderProfileId, RenderProfile> = {
       nativeAudio: false,
       maxClipSeconds: 10,
       beatSeconds: VEO_EXTEND_BEAT_SECONDS
+    }
+  },
+  "kling-avatar-i2v": {
+    id: "kling-avatar-i2v",
+    label: "Kling Avatar v2 — lip-sync",
+    labelHe: "Kling Avatar — סנכרון שפתיים (זול)",
+    provider: "fal",
+    strategy: "multiclip",
+    falModel: "fal-ai/kling-video/ai-avatar/v2/standard",
+    costTier: "cheap",
+    capabilities: {
+      referenceImage: true,
+      extend: false,
+      nativeAudio: true,
+      maxClipSeconds: 15,
+      beatSeconds: KLING_AVATAR_BEAT_SECONDS
     }
   },
   "wan-i2v": {
@@ -209,10 +228,32 @@ export function listCheapRenderProfiles(): RenderProfile[] {
     (p) =>
       p.costTier === "cheap" ||
       p.id === "kling-i2v" ||
+      p.id === "kling-avatar-i2v" ||
       p.id === "heygen-i2v" ||
       p.id === "seedance-fast-i2v" ||
       p.id === "seedance-i2v"
   );
+}
+
+/**
+ * Predict which render profile the brief agent will pick before the run starts.
+ * Mirrors packages/agents/brief profile selection (lip-sync → photos → default).
+ */
+export function predictRenderProfileId(input: {
+  preferLipSync?: boolean;
+  hasPhotoPlates?: boolean;
+  briefRenderProfile?: string | null;
+  falAvailable?: boolean;
+}): RenderProfileId {
+  const falOk = input.falAvailable !== false;
+  if (input.preferLipSync) {
+    return falOk ? "kling-avatar-i2v" : "heygen-i2v";
+  }
+  if (input.hasPhotoPlates && falOk) return "wan-i2v";
+  if (typeof input.briefRenderProfile === "string" && isRenderProfileId(input.briefRenderProfile)) {
+    return input.briefRenderProfile;
+  }
+  return defaultRenderProfileId();
 }
 export function getRenderProfile(id: RenderProfileId): RenderProfile {
   return RENDER_PROFILES[id];
@@ -276,12 +317,14 @@ export function buildRenderProfileSnapshot(brief?: { renderProfile?: RenderProfi
     envDefault: defaultRenderProfileId()
   };
 }
-/** Rough USD per generated video second for cost estimates (720p-class). */
+/** Rough USD per generated video second for cost estimates (720p-class, fal list prices). */
 export function profileVideoPerSecondUsd(profile: RenderProfile, veoModelPerSecond = 0.08): number {
-  if (profile.provider === "kling") return 0.09;
   if (profile.provider === "heygen") return 0.12;
+  if (profile.id === "kling-avatar-i2v") return 0.0562;
+  if (profile.provider === "kling") return 0.09;
   if (profile.provider === "fal") {
-    if (profile.id === "wan-i2v") return 0.04;
+    // fal Wan 2.7: $0.10/s @ 720p (default API tier is 1080p @ $0.15 — we force 720p).
+    if (profile.id === "wan-i2v") return 0.1;
     if (profile.id === "hailuo-i2v") return 0.045;
     // Seedance 2 (Runway-style credit rates → USD/sec at 720p).
     if (profile.id === "seedance-mini-i2v") return 0.16;
@@ -311,6 +354,7 @@ export function videoProviderShortLabel(profile: RenderProfile | RenderProfileId
   if (p.provider === "kling") return "Kling";
   if (p.provider === "heygen") return "HeyGen";
   if (p.provider === "fal") {
+    if (p.id === "kling-avatar-i2v") return "Kling Avatar";
     if (p.id === "wan-i2v") return "Wan";
     if (p.id === "hailuo-i2v") return "Hailuo";
     if (p.id === "seedance-mini-i2v") return "Seedance Mini";
@@ -348,6 +392,11 @@ export function usesFalVideoProvider(profile: RenderProfile | RenderProfileId): 
 export function usesHeygenVideoProvider(profile: RenderProfile | RenderProfileId): boolean {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   return p.provider === "heygen";
+}
+/** True lip-sync / talking-head (image + TTS audio) — HeyGen or fal Kling Avatar. */
+export function usesLipSyncVideoProvider(profile: RenderProfile | RenderProfileId): boolean {
+  const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  return p.capabilities.nativeAudio === true;
 }
 /** Independent I2V-style profiles that plan scenes by beatSeconds (not Veo buckets). */
 export function usesBeatLayoutProvider(profile: RenderProfile | RenderProfileId): boolean {

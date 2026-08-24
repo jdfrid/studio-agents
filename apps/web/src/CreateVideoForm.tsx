@@ -5,7 +5,12 @@ import type { ProjectRunView } from "./types.js";
 import {
   CREATIVE_FIELD_SECTIONS,
   aspectRatioFromCreative,
+  estimateRunCost,
+  formatCostNis,
+  getRenderProfile,
   languageCodeFromCreative,
+  predictRenderProfileId,
+  profileToProductionCostConfig,
   type ApprovalMode,
   type CreativeOptions
 } from "@studio/shared";
@@ -40,6 +45,16 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
 
   const preferHeygenDub = creative.preferHeygenDub === "on";
   const heygenNeedsAnchor = preferHeygenDub && visualFiles.length === 0;
+  const costEstimate = useMemo(() => {
+    const profileId = predictRenderProfileId({
+      preferLipSync: preferHeygenDub,
+      hasPhotoPlates: visualFiles.length > 0 || productFiles.length > 0
+    });
+    return estimateRunCost(
+      { budgetMode: true, durationSeconds },
+      profileToProductionCostConfig(getRenderProfile(profileId))
+    );
+  }, [preferHeygenDub, visualFiles.length, productFiles.length, durationSeconds]);
 
   const MAX_VOICE_BYTES = 10 * 1024 * 1024;
   const MAX_INSERT_BYTES = 40 * 1024 * 1024;
@@ -433,6 +448,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           עד 180 שנ׳ (3 דק׳). האורך הסופי מעוגל לפי מנוע הווידאו (קטעים של 5–8 שנ׳). סרטי תדמית B2B: מומלץ 60–120.
         </small>
       </label>
+      <p className="muted create-cost-estimate" title={`${costEstimate.videoModelDisplay} · $${costEstimate.perSecondUsd.toFixed(3)}/s`}>
+        הערכת עלות API (ריצה אחת): <strong>{formatCostNis(costEstimate.nis)}</strong>
+        {" · "}
+        {costEstimate.videoProviderLabel} · {costEstimate.veoSeconds}s וידאו (~${costEstimate.usd.toFixed(2)})
+        {visualFiles.length > 0 || productFiles.length > 0 || preferHeygenDub
+          ? " — לפי הפרופיל שייבחר בפועל (תמונות/שפתיים)"
+          : null}
+      </p>
       <fieldset className="approval-fieldset">
         <legend>מצב יצירה</legend>
         <label>
@@ -593,15 +616,15 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           <div className={`heygen-dub-control ${preferHeygenDub ? "heygen-dub-control--on" : ""}`}>
             <div className="heygen-dub-control-row">
               <label className="heygen-dub-label">
-                תנועות שפתיים (HeyGen)
+                תנועות שפתיים (Kling Avatar)
                 <select
                   value={String(creative.preferHeygenDub ?? "off")}
                   onChange={(e) =>
                     setCreativeField("preferHeygenDub", (e.target.value || "off") as never)
                   }
                 >
-                  <option value="off">לא — וידאו + דיבוב (כלול בתשלום שלך)</option>
-                  <option value="on">כן — סנכרון שפתיים HeyGen (חיוב נפרד ב־HeyGen)</option>
+                  <option value="off">לא — וידאו + דיבוב TTS (כלול בתשלום שלך)</option>
+                  <option value="on">כן — סנכרון שפתיים Kling Avatar דרך fal (~$0.056/ש׳)</option>
                 </select>
               </label>
               {preferHeygenDub ? (
@@ -616,11 +639,11 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
             </div>
             {preferHeygenDub ? (
               <p className={`advanced-hint ${heygenNeedsAnchor ? "error-inline" : "muted"}`}>
-                דורש קרדיטים בחשבון HeyGen בנפרד מתשלום Prompt2Spot. חובה תמונת דמות.
+                חיוב לפי שימוש ב־fal (לא HeyGen). חובה תמונת דמות. זול משמעותית מ־HeyGen.
               </p>
             ) : (
               <p className="muted advanced-hint">
-                ברירת מחדל: דיבוב TTS על וידאו (Veo/Wan) — נכלל במנוי/קרדיטים של Prompt2Spot. בלי חיוב HeyGen.
+                ברירת מחדל: דיבוב TTS על וידאו (Veo/Wan) — בלי סנכרון שפתיים אמיתי. עם תמונות יופעל Wan (~$0.10/ש׳ @720p).
               </p>
             )}
           </div>
