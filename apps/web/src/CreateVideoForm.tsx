@@ -32,7 +32,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [creative, setCreative] = useState<CreativeOptions>({
     karaokeCaptions: "on",
-    preferHeygenDub: "on"
+    preferHeygenDub: "off"
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -494,13 +494,13 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
               <label className="heygen-dub-label">
                 תנועות שפתיים (HeyGen)
                 <select
-                  value={String(creative.preferHeygenDub ?? "on")}
+                  value={String(creative.preferHeygenDub ?? "off")}
                   onChange={(e) =>
-                    setCreativeField("preferHeygenDub", (e.target.value || "on") as never)
+                    setCreativeField("preferHeygenDub", (e.target.value || "off") as never)
                   }
                 >
-                  <option value="on">כן — סנכרון שפתיים לדיבוב (מומלץ)</option>
-                  <option value="off">לא — וידאו שקט + דיבוב חיצוני</option>
+                  <option value="off">לא — וידאו + דיבוב (כלול בתשלום שלך)</option>
+                  <option value="on">כן — סנכרון שפתיים HeyGen (חיוב נפרד ב־HeyGen)</option>
                 </select>
               </label>
               {preferHeygenDub ? (
@@ -515,11 +515,11 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
             </div>
             {preferHeygenDub ? (
               <p className={`advanced-hint ${heygenNeedsAnchor ? "error-inline" : "muted"}`}>
-                פעיל: השפתיים יתאימו לדיבוב. חובה תמונת השראה ברורה של הדמות. יקר יותר מ־Veo בלבד.
+                דורש קרדיטים בחשבון HeyGen בנפרד מתשלום Prompt2Spot. חובה תמונת השראה של הדמות.
               </p>
             ) : (
               <p className="muted advanced-hint">
-                כבוי: הדיבוב יתווסף מעל וידאו שקט (בלי סנכרון שפתיים אמיתי).
+                ברירת מחדל: דיבוב TTS על וידאו (Veo/Wan) — נכלל במנוי/קרדיטים של Prompt2Spot. בלי חיוב HeyGen.
               </p>
             )}
           </div>

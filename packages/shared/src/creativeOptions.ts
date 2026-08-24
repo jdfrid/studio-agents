@@ -538,8 +538,8 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
         labelHe: "תנועות שפתיים (HeyGen)",
         kind: "select",
         options: [
-          { value: "on", labelHe: "כן — סנכרון שפתיים לדיבוב (מומלץ)" },
-          { value: "off", labelHe: "לא — וידאו שקט + דיבוב חיצוני (Veo/Wan)" }
+          { value: "off", labelHe: "כבוי — כלול בתשלום Prompt2Spot (מומלץ)" },
+          { value: "on", labelHe: "פעיל — חיוב נפרד בחשבון HeyGen" }
         ]
       }
     ]

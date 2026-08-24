@@ -77,9 +77,10 @@ export function userFacingGeminiError(raw: string, httpStatus?: number): string 
     case "billing_quota":
       if (provider === "heygen") {
         return [
-          "נגמרו הקרדיטים בחשבון HeyGen (לא Google).",
-          "היכנס ל-HeyGen → Billing / Credits, רכוש חבילת קרדיטים, ואז לחץ «הפעל מחדש את השלב».",
-          "מסמך: https://developers.heygen.com/docs/error-codes#insufficient-credit"
+          "נגמרו הקרדיטים בחשבון HeyGen — זה לא התשלום ל-Prompt2Spot.",
+          "תשלום ₪ ב-Prompt2Spot מכסה יצירת סרטונים במערכת; סנכרון שפתיים (HeyGen) הוא שירות נפרד שדורש קרדיטים ב-HeyGen.",
+          "אפשרויות: (1) HeyGen → Billing / Credits → רכוש קרדיטים, ואז «הפעל מחדש את השלב»;",
+          "או (2) צור סרטון חדש עם «תנועות שפתיים» כבוי — ואז הרינדור רץ על Veo/Wan בלי HeyGen."
         ].join(" ");
       }
       if (provider === "fal") {
