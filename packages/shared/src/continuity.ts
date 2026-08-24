@@ -6,7 +6,7 @@ export const CONTINUITY_LOCK =
 
 /** When the user uploaded character photos — preserve those identities. */
 export const CONTINUITY_LOCK_USER_PHOTOS =
-  "CRITICAL: The attached/uploaded photos ARE the cast. Preserve each person's exact face, hair, skin tone, age, and identity in every scene. Place them in the event location together. Only pose, framing, and micro-action may change — never invent different people.";
+  "CRITICAL: The attached/uploaded photos ARE the cast. Preserve each person's exact face, hair, skin tone, age, identity, AND wardrobe (same coat/jacket color, fabric, and outfit in every scene). Place them in the event location together. Only pose, framing, and micro-action may change — never invent different people or recolor clothing.";
 
 export type ContinuityContext = {
   characterBible: string;
@@ -41,7 +41,7 @@ export function buildReferenceImagePrompt(
   const action = stripContinuityPrefix(ctx.sceneAction).trim();
   const lock = ctx.hasUserCharacterPhotos ? CONTINUITY_LOCK_USER_PHOTOS : CONTINUITY_LOCK;
   const sameLine = ctx.hasUserCharacterPhotos
-    ? "Composite the uploaded people into the event setting — prefer two-shot discussion when cast is 2+."
+    ? "Composite the uploaded people into the event setting with identical wardrobe/coat colors; prefer speaker close-up or OTS (listener closed mouth)."
     : "Same people, same clothes, same place — only pose and micro-action change.";
   // Reserve room for lock + action; trim bible/location so Zod max(1600) never fails.
   const fixed = [lock, `Scene ${ctx.order + 1} of ${ctx.total}.`, sameLine].join(" ");

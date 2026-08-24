@@ -87,11 +87,13 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "Set speaker to \"a\" or \"b\" and speakerName to the character's short name from characterBible.",
       "narration must be ONLY the spoken words for that character — clear natural dialogue, no 'Name:' prefixes, no stage directions.",
       "Alternate a/b so the audio engine can use two distinct TTS voices. Use speaker \"narrator\" only for non-dialogue VO — prefer a/b when two people are conversing.",
-      "VISUAL DISCUSSION (mandatory for 2+ cast): this must LOOK like a conversation, not two solo monologues.",
-      "Prefer a medium two-shot with BOTH people visible in most beats (side-by-side, across a table, or standing together at the event).",
-      "Use over-the-shoulder / reverse angle only for emphasis; avoid solo news-anchor talking-head framing unless the brief asks for a single presenter.",
-      "Every visualPrompt and veoPrompt must name both characters and who is speaking vs listening (listener reacts: nod, glance, closed mouth).",
+      "VISUAL DISCUSSION (mandatory for 2+ cast): this must LOOK like a conversation, not two solo monologues and not a choir.",
+      "Prefer over-the-shoulder or medium close-up on the ACTIVE speaker; the listener can be partly visible but must have a fully closed mouth and no lip motion.",
+      "Avoid framing where both faces are equally large and both mouths move — that reads as speaking in chorus.",
+      "Every visualPrompt and veoPrompt must name both characters and who is speaking vs listening (listener still, closed mouth).",
       "Write back-and-forth discussion lines (question/answer, agreement/pushback) — not one long announcer speech split across scenes.",
+      "CRITICAL AUDIO: each narration is ONLY one character's spoken words for that beat — never put both characters' lines in the same narration (no overlapping dialogue, no chorus).",
+      "WARDROBE LOCK: coat/jacket/shirt colors and outfits stay identical in every scene — do not invent new clothing colors.",
       contentLang === "he" || contentLang === "yi"
         ? "HEBREW NIKUD (mandatory): every narration line MUST include full niqqud (ניקוד) for correct TTS pronunciation and stress — e.g. שָׁלוֹם not שלום."
         : contentLang === "ar"
@@ -386,6 +388,18 @@ function trimNarration(text: string, maxChars: number): string {
 
 /** Remove "Name:" / "שם —" prefixes so TTS speaks only dialogue. */
 function stripSpeakerPrefix(text: string): string {
+  let t = text.trim();
+  // Drop "Name:" / "א:" style labels at the start of a line.
+  t = t.replace(/^[^\n:]{1,40}:\s*/u, "").trim();
+  // If the model packed two speakers into one beat, keep only the first utterance.
+  const split = t.split(/\n+|;\s+(?=[A-Zא-ת][^\n:]{0,30}:)/u);
+  if (split.length > 1) {
+    t = split[0]!.trim();
+  }
+  // Drop trailing second-speaker lines like "ב: ..." / "Name: ..."
+  t = t.replace(/(?:\n|^)\s*[^\n:]{1,40}:\s*[^\n]+$/u, "").trim();
+  return t;
+}
   return text
     .replace(/^\s*[^:\n]{1,40}\s*[:：]\s*/u, "")
     .replace(/^\s*[^—\n]{1,40}\s*[—–-]\s*/u, "")

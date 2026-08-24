@@ -264,8 +264,37 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
             continuityRefs.push(chainReference);
           }
 
+          // With uploaded cast photos: generate ONE locked plate (wardrobe+faces) and reuse it for every beat.
+          // Per-scene Gemini regen was inventing new coat colors and breaking continuity.
+          if (anchorReferences.length && chainReference) {
+            referenceBody = chainReference.data;
+            referenceMimeType = chainReference.mimeType;
+            referenceModel = "shared-cast-plate";
+            const referenceArtifact = await ctx.artifacts.save({
+              runId: ctx.runId,
+              stage: "asset",
+              kind: "scene_reference_frame",
+              body: referenceBody,
+              mimeType: referenceMimeType,
+              filename: `scene-${scene.sceneId}-reference.png`,
+              metadata: {
+                sceneId: scene.sceneId,
+                prompt: referencePrompt,
+                provider: "shared-cast-plate",
+                model: referenceModel,
+                continuityChained: true,
+                reusedSharedPlate: true
+              }
+            });
+            referenceArtifactId = referenceArtifact.id;
+            referenceGcsPath = referenceArtifact.gcsPath;
+            referenceSignedUrl = await ctx.storage.signedUrl(referenceArtifact.gcsPath);
+            await ctx.log.log("asset_shared_cast_plate", "Reusing locked cast plate for wardrobe continuity", {
+              sceneId: scene.sceneId
+            });
+          } else {
           const anchorHint = continuityRefs.length
-            ? " The attached photo(s) ARE the cast: preserve their exact faces and identities (photo 1 = character A, photo 2 = character B when two photos). Place BOTH people together in the event location in a conversational two-shot when possible. Do not invent different people. You may adjust pose, framing, and background to match the scene."
+            ? " The attached photo(s) ARE the cast: preserve their exact faces, identities, AND wardrobe (same coat/jacket colors). Place them at the event. Prefer a conversational framing. Do not invent different people or recolor clothing. Keep outfits identical for the whole film."
             : "";
 
           let plateProvider = "gemini";
@@ -320,7 +349,9 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
               model: referenceModel,
 
-              continuityChained: continuityRefs.length > 0
+              continuityChained: continuityRefs.length > 0,
+
+              sharedCastPlate: anchorReferences.length > 0
 
             }
 
@@ -331,6 +362,8 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
           referenceGcsPath = referenceArtifact.gcsPath;
 
           referenceSignedUrl = await ctx.storage.signedUrl(referenceArtifact.gcsPath);
+
+          }
 
         }
 

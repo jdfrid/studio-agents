@@ -713,14 +713,21 @@ async function mixExtendTimelineAudio(
     inputs.push("-i", track.path);
     const delay = track.delayMs;
     const sceneDur = track.sceneDur;
-    // Trim each voice to its scene window before delay so tracks cannot overwrite neighbours.
+    const startSec = (delay / 1000).toFixed(3);
+    const endSec = (delay / 1000 + sceneDur).toFixed(3);
+    // Hard gate: voice is audible only inside its scene window — prevents chorus/overlap.
     filterParts.push(
-      `[${i + 1}:a]atrim=0:${sceneDur},asetpts=PTS-STARTPTS,adelay=${delay}|${delay},apad=whole_dur=${videoDur}[v${i}]`
+      `[${i + 1}:a]atrim=0:${sceneDur},asetpts=PTS-STARTPTS,adelay=${delay}|${delay}:all=1,` +
+        `volume=enable='between(t\\,${startSec}\\,${endSec})':volume=1,` +
+        `afade=t=out:st=${Math.max(0, sceneDur - 0.05).toFixed(3)}:d=0.05,` +
+        `apad=whole_dur=${videoDur}[v${i}]`
     );
   }
 
   const mixInputs = voiceTracks.map((_, i) => `[v${i}]`).join("");
-  filterParts.push(`${mixInputs}amix=inputs=${voiceTracks.length}:duration=first:dropout_transition=0,atrim=0:${videoDur},asetpts=PTS-STARTPTS[aout]`);
+  filterParts.push(
+    `${mixInputs}amix=inputs=${voiceTracks.length}:duration=first:dropout_transition=0:normalize=0,atrim=0:${videoDur},asetpts=PTS-STARTPTS[aout]`
+  );
 
   await runFfmpeg([
     ...inputs,
@@ -850,11 +857,12 @@ async function mixSceneAudio(
 /** Build ffmpeg audio filter that keeps voice inside [0, videoDur] without hard mid-word cuts when possible. */
 function fitVoiceToVideoFilter(voiceDur: number, videoDur: number): string {
   const target = Math.max(0.2, videoDur);
+  const fadeSt = Math.max(0, target - 0.06).toFixed(3);
   if (!(voiceDur > 0) || !Number.isFinite(voiceDur)) {
-    return `[1:a]atrim=0:${target},asetpts=PTS-STARTPTS,apad=whole_dur=${target}`;
+    return `[1:a]atrim=0:${target},asetpts=PTS-STARTPTS,afade=t=out:st=${fadeSt}:d=0.05,apad=whole_dur=${target}`;
   }
   if (voiceDur <= target + 0.05) {
-    return `[1:a]asetpts=PTS-STARTPTS,apad=whole_dur=${target}`;
+    return `[1:a]asetpts=PTS-STARTPTS,afade=t=out:st=${fadeSt}:d=0.05,apad=whole_dur=${target},atrim=0:${target}`;
   }
   // Speed up slightly (max ~1.35x) so long lines still fit; then hard-trim if still over.
   const tempo = Math.min(1.35, voiceDur / target);
@@ -863,7 +871,7 @@ function fitVoiceToVideoFilter(voiceDur: number, videoDur: number): string {
     // atempo only accepts 0.5–2.0
     chain.push(`atempo=${tempo.toFixed(3)}`);
   }
-  chain.push(`atrim=0:${target}`, `apad=whole_dur=${target}`);
+  chain.push(`atrim=0:${target}`, `afade=t=out:st=${fadeSt}:d=0.05`, `apad=whole_dur=${target}`);
   return chain.join(",");
 }
 
@@ -1725,9 +1733,9 @@ async function concatClipsHardCut(prepared: string[], outputPath: string, dimens
 }
 
 function sceneXfadeSeconds(clipCount: number): number {
+  // Crossfades blend adjacent clip audio and read as two people speaking at once — keep hard cuts.
   const value = Number(process.env.RENDER_SCENE_XFADE_SECONDS ?? 0);
   if (!Number.isFinite(value) || value <= 0) return 0;
-  // Chained xfade is unreliable beyond a handful of clips.
   if (clipCount > 6) return 0;
   return Math.min(value, 1.5);
 }

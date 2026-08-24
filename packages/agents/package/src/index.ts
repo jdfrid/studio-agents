@@ -305,8 +305,8 @@ function enrichVeoPrompt(input: {
   const listenLock =
     input.multiCast || speaker
       ? speaker
-        ? ` Only ${speaker} shows mild expression; every other person listens with a fully closed mouth and no lip motion.`
-        : " At most one person shows mild expression; all others listen with closed mouths, no lip motion."
+        ? ` Only ${speaker} may gesture or show mild expression; every other person is still with a fully closed mouth and no lip motion — never both speaking.`
+        : " At most one person shows mild expression; all others listen with closed mouths, no lip motion — never a chorus."
       : "";
 
   // With a reference still, identity comes from the image — keep prompt motion-focused.
