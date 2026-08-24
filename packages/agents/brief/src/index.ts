@@ -367,9 +367,12 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         .join("; "),
       callToAction: parsed.callToAction ?? businessName ?? "prompt2spot.com",
       budgetMode: input.budgetMode ?? false,
-      renderProfile: creativeFlagOn(input.creative, "preferHeygenDub")
-        ? "heygen-i2v"
-        : resolveRenderProfile(input).id,
+      renderProfile: (() => {
+        if (creativeFlagOn(input.creative, "preferHeygenDub")) return "heygen-i2v";
+        // Character photos need image→video; Veo Fast ignores reference frames and invents new faces.
+        if (visualAnchors.length > 0 && process.env.FAL_API_KEY?.trim()) return "wan-i2v";
+        return resolveRenderProfile(input).id;
+      })(),
       references:
         parsed.references ??
         input.referenceLinks.map((link) => ({ kind: "link" as const, ref: link, note: undefined })),

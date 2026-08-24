@@ -126,9 +126,7 @@ export async function geminiGenerateImage(
       label: "single-ref"
     });
   }
-  if (allRefs.length > 0) {
-    strategies.push({ prompt: softenImagePrompt(req.prompt), refs: [], label: "no-ref" });
-  }
+  // Never drop face refs when the user uploaded character photos — inventing faces breaks identity.
 
   for (const strategy of strategies) {
     for (let attempt = 1; attempt <= IMAGE_ATTEMPTS; attempt += 1) {

@@ -2,13 +2,19 @@ import type { SceneSpec, ScriptOutput } from "./schemas/script.js";
 
 /** Core system rule: every scene must share cast, wardrobe, and location. */
 export const CONTINUITY_LOCK =
-  "CRITICAL: Use the EXACT same fictional characters (same gender, age, face, hair, skin tone, wardrobe) and the EXACT same location in every scene. Only action, pose, and camera may change.";
+  "CRITICAL: Use the EXACT same characters (same gender, age, face, hair, skin tone, wardrobe) and the EXACT same location in every scene. Only action, pose, and camera may change.";
+
+/** When the user uploaded character photos — preserve those identities. */
+export const CONTINUITY_LOCK_USER_PHOTOS =
+  "CRITICAL: The attached/uploaded photos ARE the cast. Preserve each person's exact face, hair, skin tone, age, and identity in every scene. Place them in the event location together. Only pose, framing, and micro-action may change — never invent different people.";
 
 export type ContinuityContext = {
   characterBible: string;
   backgroundVisualPrompt: string;
   order: number;
   total: number;
+  /** User uploaded character photos that must stay on screen. */
+  hasUserCharacterPhotos?: boolean;
 };
 
 export function deriveCharacterBible(backgroundVisualPrompt: string, explicit?: string | null): string {
@@ -33,12 +39,12 @@ export function buildReferenceImagePrompt(
   ctx: ContinuityContext & { sceneAction: string }
 ): string {
   const action = stripContinuityPrefix(ctx.sceneAction).trim();
+  const lock = ctx.hasUserCharacterPhotos ? CONTINUITY_LOCK_USER_PHOTOS : CONTINUITY_LOCK;
+  const sameLine = ctx.hasUserCharacterPhotos
+    ? "Composite the uploaded people into the event setting — prefer two-shot discussion when cast is 2+."
+    : "Same people, same clothes, same place — only pose and micro-action change.";
   // Reserve room for lock + action; trim bible/location so Zod max(1600) never fails.
-  const fixed = [
-    CONTINUITY_LOCK,
-    `Scene ${ctx.order + 1} of ${ctx.total}.`,
-    "Same people, same clothes, same place — only pose and micro-action change."
-  ].join(" ");
+  const fixed = [lock, `Scene ${ctx.order + 1} of ${ctx.total}.`, sameLine].join(" ");
   const budget = PROMPT_MAX - fixed.length - 48;
   const half = Math.max(80, Math.floor(budget / 3));
   const characters = ctx.characterBible.trim().slice(0, half);
@@ -47,19 +53,20 @@ export function buildReferenceImagePrompt(
   const actionClamped = action.slice(0, actionBudget);
   return clampPrompt(
     [
-      CONTINUITY_LOCK,
+      lock,
       `Scene ${ctx.order + 1} of ${ctx.total}.`,
       `Characters (locked): ${characters}.`,
       `Location (locked): ${location}.`,
       `Action for this frame only: ${actionClamped}.`,
-      "Same people, same clothes, same place — only pose and micro-action change."
+      sameLine
     ].join(" ")
   );
 }
 
 export function buildVeoContinuityPrefix(ctx: ContinuityContext): string {
+  const lock = ctx.hasUserCharacterPhotos ? CONTINUITY_LOCK_USER_PHOTOS : CONTINUITY_LOCK;
   return [
-    CONTINUITY_LOCK,
+    lock,
     `Scene ${ctx.order + 1} of ${ctx.total}.`,
     `Character lock: ${ctx.characterBible.trim()}.`,
     `Location lock: ${ctx.backgroundVisualPrompt.trim()}.`
@@ -67,10 +74,10 @@ export function buildVeoContinuityPrefix(ctx: ContinuityContext): string {
 }
 
 function stripContinuityPrefix(text: string): string {
-  if (!text.includes(CONTINUITY_LOCK)) return text;
+  if (!text.includes(CONTINUITY_LOCK) && !text.includes(CONTINUITY_LOCK_USER_PHOTOS)) return text;
   const idx = text.lastIndexOf("Action for this frame only:");
   if (idx >= 0) return text.slice(idx + "Action for this frame only:".length).trim();
-  return text.replace(CONTINUITY_LOCK, "").trim();
+  return text.replace(CONTINUITY_LOCK_USER_PHOTOS, "").replace(CONTINUITY_LOCK, "").trim();
 }
 
 function prefixScenePrompt(existing: string, ctx: ContinuityContext): string {
@@ -83,17 +90,20 @@ function prefixScenePrompt(existing: string, ctx: ContinuityContext): string {
 /** Post-process script output so every scene carries locked cast/location tokens. */
 export function applyContinuityToScript(
   output: ScriptOutput,
-  explicitCharacterBible?: string | null
+  explicitCharacterBible?: string | null,
+  opts?: { hasUserCharacterPhotos?: boolean }
 ): ScriptOutput {
   const characterBible = deriveCharacterBible(output.backgroundVisualPrompt, explicitCharacterBible ?? output.characterBible);
   const total = output.scenes.length;
+  const hasUserCharacterPhotos = opts?.hasUserCharacterPhotos === true;
 
   const scenes: SceneSpec[] = output.scenes.map((scene, index) => {
     const ctx: ContinuityContext = {
       characterBible,
       backgroundVisualPrompt: output.backgroundVisualPrompt,
       order: index,
-      total
+      total,
+      hasUserCharacterPhotos
     };
     const actionSource = scene.referenceImagePrompt ?? scene.visualPrompt ?? scene.veoPrompt;
     return {

@@ -55,10 +55,9 @@ export function planSceneLayout(
   const mode = profileVeoMode(profile);
 
   if (profile.strategy === "extend") {
-    // Plan by the actual Veo extend bucket (usually 8s) so total length matches the brief —
-    // older math used 10s story beats → ~24s video for a 30s ask.
+    // Plan by the actual Veo extend bucket (usually 8s) so total length matches the brief.
     const bucket = Number(config?.forcedVeoBucket ?? forcedVeoDurationBucket() ?? "8") as number;
-    const sceneCount = Math.max(1, Math.round(durationSeconds / bucket));
+    const sceneCount = Math.max(1, Math.ceil(durationSeconds / bucket));
     return {
       sceneCount,
       clipSeconds: bucket,
@@ -69,7 +68,7 @@ export function planSceneLayout(
 
   if (profile.provider === "kling" || profile.provider === "fal" || profile.provider === "heygen") {
     const beatSeconds = profile.capabilities.beatSeconds;
-    const sceneCount = Math.max(1, Math.round(durationSeconds / beatSeconds));
+    const sceneCount = Math.max(1, Math.ceil(durationSeconds / beatSeconds));
     const clipSeconds =
       profile.provider === "heygen" ? beatSeconds : profile.capabilities.maxClipSeconds;
     return {
@@ -81,7 +80,7 @@ export function planSceneLayout(
   }
 
   const clipSeconds = veoClipSeconds(budget, config?.forcedVeoBucket ?? forcedVeoDurationBucket());
-  const sceneCount = Math.max(1, Math.round(durationSeconds / clipSeconds));
+  const sceneCount = Math.max(1, Math.ceil(durationSeconds / clipSeconds));
   return { sceneCount, clipSeconds, totalVideoSeconds: sceneCount * clipSeconds, veoMode: mode };
 }
 

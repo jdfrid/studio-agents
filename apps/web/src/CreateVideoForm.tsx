@@ -463,7 +463,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                   communicationStyle: "חדשותי",
                   location: "אולפן חדשות",
                   karaokeCaptions: "on",
-                  preferHeygenDub: "on",
+                  preferHeygenDub: "off",
                   sideWatermark: "on",
                   videoOrientation: "portrait"
                 }))
@@ -481,7 +481,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                   communicationStyle: "חדשותי",
                   location: "אולפן חדשות",
                   karaokeCaptions: "on",
-                  preferHeygenDub: "on",
+                  preferHeygenDub: "off",
                   sideWatermark: "on",
                   videoOrientation: "portrait"
                 }))

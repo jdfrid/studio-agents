@@ -86,7 +86,12 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "DIALOGUE DUBBING (mandatory when cast has 2+ speaking characters): alternate speakers across consecutive beat scenes.",
       "Set speaker to \"a\" or \"b\" and speakerName to the character's short name from characterBible.",
       "narration must be ONLY the spoken words for that character — clear natural dialogue, no 'Name:' prefixes, no stage directions.",
-      "Alternate a/b so the audio engine can use two distinct TTS voices. Use speaker \"narrator\" only for non-dialogue VO.",
+      "Alternate a/b so the audio engine can use two distinct TTS voices. Use speaker \"narrator\" only for non-dialogue VO — prefer a/b when two people are conversing.",
+      "VISUAL DISCUSSION (mandatory for 2+ cast): this must LOOK like a conversation, not two solo monologues.",
+      "Prefer a medium two-shot with BOTH people visible in most beats (side-by-side, across a table, or standing together at the event).",
+      "Use over-the-shoulder / reverse angle only for emphasis; avoid solo news-anchor talking-head framing unless the brief asks for a single presenter.",
+      "Every visualPrompt and veoPrompt must name both characters and who is speaking vs listening (listener reacts: nod, glance, closed mouth).",
+      "Write back-and-forth discussion lines (question/answer, agreement/pushback) — not one long announcer speech split across scenes.",
       contentLang === "he" || contentLang === "yi"
         ? "HEBREW NIKUD (mandatory): every narration line MUST include full niqqud (ניקוד) for correct TTS pronunciation and stress — e.g. שָׁלוֹם not שלום."
         : contentLang === "ar"
@@ -129,7 +134,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const sceneSchema: Record<string, unknown> = {
       title: `short ${langNative} title`,
       narration: `${langNative} narration, 1 short sentence (max ${narrationLimit} chars); empty string if sceneKind=title_card`,
-      visualPrompt: "English visual directive for image models (max 200 chars)",
+      visualPrompt:
+        "English visual: for 2+ cast prefer two-shot both people visible; name speaker vs listener (max 200 chars)",
       veoPrompt: heygenMode
         ? "English HeyGen motion prompt: body/gaze/gesture timed to narration (max 200 chars)"
         : "English motion prompt timed to narration (speaking vs silent, gaze, gestures; max 200 chars)",
@@ -209,11 +215,24 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       }
     );
 
-    const rawScenes = parsed.scenes ?? [];
+    const rawScenes = [...(parsed.scenes ?? [])];
     if (rawScenes.length !== sceneCount) {
       await ctx.log.log("script_scene_count_mismatch", "LLM returned different scene count than planned", {
         planned: sceneCount,
         received: rawScenes.length
+      });
+    }
+
+    // Pad short scripts so final length does not undershoot the brief.
+    while (rawScenes.length > 0 && rawScenes.length < sceneCount) {
+      const src = rawScenes[rawScenes.length - 1]!;
+      rawScenes.push({
+        ...src,
+        title: `${String(src.title ?? "Beat")} (cont.)`,
+        narration: String(src.narration ?? "").trim()
+          ? String(src.narration)
+          : "מַמְשִׁיכִים אֶת הַשִּׂיחָה בְּאוֹתוֹ מָקוֹם.",
+        speaker: (rawScenes.length % 2 === 0 ? "a" : "b") as "a" | "b"
       });
     }
 
@@ -237,12 +256,15 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
               narrationCharLimitForBucket(extendMode || beatI2vMode ? clipSeconds : Number(durationBucket))
             );
       const speakerRaw = String((scene as { speaker?: string }).speaker ?? "").toLowerCase();
+      const dialogueCast = Boolean(brief.visualAnchors && brief.visualAnchors.length >= 2);
       const speaker =
         resolvedKind === "title_card"
           ? undefined
           : speakerRaw === "a" || speakerRaw === "b" || speakerRaw === "narrator"
             ? (speakerRaw as "a" | "b" | "narrator")
-            : ("narrator" as const);
+            : dialogueCast
+              ? ((index % 2 === 0 ? "a" : "b") as "a" | "b")
+              : ("narrator" as const);
       const speakerName =
         resolvedKind === "title_card"
           ? undefined
@@ -308,7 +330,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         characterBible: parsed.characterBible ?? "",
         geminiModel: provider.type === "GEMINI" ? model : undefined
       },
-      parsed.characterBible
+      parsed.characterBible,
+      { hasUserCharacterPhotos: Boolean(brief.visualAnchors?.length) }
     );
 
     await ctx.artifacts.save({

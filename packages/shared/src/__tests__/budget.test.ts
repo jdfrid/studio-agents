@@ -20,7 +20,7 @@ describe("planSceneLayout", () => {
     expect(layout.totalVideoSeconds).not.toBe(12);
   });
 
-  it("plans ~32s (4×8s buckets) in extend mode for a 30s brief", () => {
+  it("plans at least 30s (ceil to 4×8s) in extend mode for a 30s brief", () => {
     const layout = planSceneLayout(30, true, { veoMode: "extend", renderProfileId: "veo-extend" });
     expect(layout.veoMode).toBe("extend");
     expect(layout.sceneCount).toBe(4);
@@ -28,11 +28,17 @@ describe("planSceneLayout", () => {
     expect(layout.totalVideoSeconds).toBe(32);
   });
 
-  it("uses 3×10s beats for kling-i2v profile", () => {
+  it("uses ceil beats for kling-i2v so 30s brief is not undershot", () => {
     const layout = planSceneLayout(30, true, { renderProfileId: "kling-i2v" });
     expect(layout.sceneCount).toBe(3);
     expect(layout.clipSeconds).toBe(10);
     expect(layout.totalVideoSeconds).toBe(30);
+  });
+
+  it("ceils wan-i2v so 25s brief becomes 6×5s", () => {
+    const layout = planSceneLayout(25, true, { renderProfileId: "wan-i2v" });
+    expect(layout.sceneCount).toBe(5);
+    expect(layout.totalVideoSeconds).toBe(25);
   });
 });
 

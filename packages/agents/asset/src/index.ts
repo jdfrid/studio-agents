@@ -199,7 +199,9 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
           order: sceneIndex,
 
-          total: input.scenes.length
+          total: input.scenes.length,
+
+          hasUserCharacterPhotos: anchorReferences.length > 0
 
         });
 
@@ -263,22 +265,36 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
           }
 
           const anchorHint = continuityRefs.length
-            ? " The attached photo(s) ARE the cast: preserve their exact faces and identities (photo 1 = character A, photo 2 = character B when two photos). Do not invent different people. You may adjust pose, framing, and background to match the scene."
+            ? " The attached photo(s) ARE the cast: preserve their exact faces and identities (photo 1 = character A, photo 2 = character B when two photos). Place BOTH people together in the event location in a conversational two-shot when possible. Do not invent different people. You may adjust pose, framing, and background to match the scene."
             : "";
 
-          const reference = await geminiGenerateImage(
+          let plateProvider = "gemini";
 
-            gemini,
-
-            { prompt: `${referencePrompt}${anchorHint}`, aspectRatio: input.aspectRatio, referenceImages: continuityRefs },
-
-            async (event) => {
-
-              await ctx.cost.record({ ...event, sceneId: scene.sceneId });
-
-            }
-
-          );
+          try {
+            const reference = await geminiGenerateImage(
+              gemini,
+              { prompt: `${referencePrompt}${anchorHint}`, aspectRatio: input.aspectRatio, referenceImages: continuityRefs },
+              async (event) => {
+                await ctx.cost.record({ ...event, sceneId: scene.sceneId });
+              }
+            );
+            referenceBody = reference.body;
+            referenceMimeType = reference.mimeType;
+            referenceModel = reference.model;
+            plateProvider = reference.provider;
+          } catch (err) {
+            // Never invent faces: fall back to the speaker's uploaded photo as the I2V plate.
+            if (!continuityRefs.length) throw err;
+            const fallback = continuityRefs[0]!;
+            await ctx.log.log("asset_anchor_plate_fallback", "Gemini image failed; using uploaded character photo as reference plate", {
+              sceneId: scene.sceneId,
+              error: err instanceof Error ? err.message : String(err)
+            });
+            referenceBody = fallback.data;
+            referenceMimeType = fallback.mimeType;
+            referenceModel = "user-upload-plate";
+            plateProvider = "user-upload";
+          }
 
           const referenceArtifact = await ctx.artifacts.save({
 
@@ -288,9 +304,9 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
             kind: "scene_reference_frame",
 
-            body: reference.body,
+            body: referenceBody,
 
-            mimeType: reference.mimeType,
+            mimeType: referenceMimeType,
 
             filename: `scene-${scene.sceneId}-reference.png`,
 
@@ -300,9 +316,9 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
               prompt: referencePrompt,
 
-              provider: reference.provider,
+              provider: plateProvider,
 
-              model: reference.model,
+              model: referenceModel,
 
               continuityChained: continuityRefs.length > 0
 
@@ -314,13 +330,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
           referenceGcsPath = referenceArtifact.gcsPath;
 
-          referenceMimeType = reference.mimeType;
-
-          referenceModel = reference.model;
-
           referenceSignedUrl = await ctx.storage.signedUrl(referenceArtifact.gcsPath);
-
-          referenceBody = reference.body;
 
         }
 
