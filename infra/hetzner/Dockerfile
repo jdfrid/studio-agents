@@ -21,7 +21,11 @@ RUN pnpm run render:build && pnpm run render:build:web && pnpm --filter @studio/
 FROM node:20-bookworm-slim AS runtime
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends \
+    openssl \
+    ca-certificates \
+    ffmpeg \
+    fonts-dejavu-core \
   && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate

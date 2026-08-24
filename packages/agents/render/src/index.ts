@@ -11,6 +11,7 @@ import {
   RenderInputSchema,
   RenderOutputSchema,
   buildKaraokeAss,
+  buildTitleCardAss,
   getRenderProfile,
   sanitizeVeoPromptForExternalAudio,
   usesFalVideoProvider,
@@ -1308,50 +1309,59 @@ async function createTitleCardClip(
   const { width, height } = dimensions;
   const duration = Math.min(5, Math.max(3, scene.durationSeconds || 4));
   const headline = (scene.title || scene.narration || " ").trim() || " ";
-  const sub = (scene.narration || "").trim() && scene.narration.trim() !== headline ? scene.narration.trim() : "";
-  const font = resolveDrawtextFont();
-  const fontOpt = font ? `:fontfile='${escapeFfmpegPath(font)}'` : "";
-  const titleSize = Math.max(36, Math.round(Math.min(width, height) * 0.07));
-  const subSize = Math.max(22, Math.round(Math.min(width, height) * 0.038));
-  // Do NOT put unescaped commas inside drawtext options when chaining with -vf
-  // (ffmpeg splits on ',' and truncates drawtext → "No such filter: 'drawte'").
-  const drawParts = [
-    `drawtext=text='${escapeDrawtext(headline)}'${fontOpt}:fontsize=${titleSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2${sub ? `-${Math.round(titleSize * 0.55)}` : ""}`
-  ];
-  if (sub) {
-    drawParts.push(
-      `drawtext=text='${escapeDrawtext(sub)}'${fontOpt}:fontsize=${subSize}:fontcolor=white@0.9:x=(w-text_w)/2:y=(h-text_h)/2+${Math.round(titleSize * 0.85)}`
+  const sub =
+    (scene.narration || "").trim() && scene.narration.trim() !== headline ? scene.narration.trim() : "";
+
+  const baseArgs = (vf: string) =>
+    [
+      "-f",
+      "lavfi",
+      "-i",
+      `color=c=0x101820:s=${width}x${height}:d=${duration}`,
+      "-f",
+      "lavfi",
+      "-i",
+      "anullsrc=channel_layout=stereo:sample_rate=44100",
+      "-t",
+      String(duration),
+      "-vf",
+      vf,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "23",
+      "-c:a",
+      "aac",
+      "-shortest",
+      "-movflags",
+      "+faststart",
+      "-y",
+      out
+    ] as string[];
+
+  try {
+    const font = resolveDrawtextFont();
+    const ass = buildTitleCardAss(
+      { headline, subtitle: sub || undefined, durationSeconds: duration, width, height },
+      { fontName: assFontNameFromPath(font) }
     );
+    const assPath = path.join(dir, `title-card-${nanoid(4)}.ass`);
+    await writeFile(assPath, ass, "utf8");
+    const assEsc = escapeFfmpegPath(assPath);
+    const fontsDir = font ? path.dirname(font) : null;
+    const fontsEsc = fontsDir ? escapeFfmpegPath(fontsDir) : null;
+    const vf = fontsEsc
+      ? `format=yuv420p,fade=t=in:st=0:d=0.35,ass='${assEsc}':fontsdir='${fontsEsc}'`
+      : `format=yuv420p,fade=t=in:st=0:d=0.35,ass='${assEsc}'`;
+    await runFfmpeg(baseArgs(vf));
+    return out;
+  } catch {
+    // Soft-fail: solid card without text so render can continue.
+    await runFfmpeg(baseArgs("format=yuv420p,fade=t=in:st=0:d=0.35"));
+    return out;
   }
-  const vf = ["format=yuv420p", "fade=t=in:st=0:d=0.35", ...drawParts].join(",");
-  await runFfmpeg([
-    "-f",
-    "lavfi",
-    "-i",
-    `color=c=0x101820:s=${width}x${height}:d=${duration}`,
-    "-f",
-    "lavfi",
-    "-i",
-    "anullsrc=channel_layout=stereo:sample_rate=44100",
-    "-t",
-    String(duration),
-    "-vf",
-    vf,
-    "-c:v",
-    "libx264",
-    "-preset",
-    "fast",
-    "-crf",
-    "23",
-    "-c:a",
-    "aac",
-    "-shortest",
-    "-movflags",
-    "+faststart",
-    "-y",
-    out
-  ]);
-  return out;
 }
 
 async function burnKaraokeAndWatermark(
@@ -1822,7 +1832,7 @@ async function probeHasAudio(filePath: string): Promise<boolean> {
 }
 
 async function ffmpegStderr(args: string[]): Promise<string> {
-  const bin = (ffmpegStatic as unknown as string) ?? "ffmpeg";
+  const bin = resolveFfmpegBinary();
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
@@ -1835,13 +1845,20 @@ async function ffmpegStderr(args: string[]): Promise<string> {
         resolve(stderr);
         return;
       }
-      reject(new Error(`ffmpeg probe exited ${code}: ${stderr.slice(-800)}`));
+      reject(new Error(`ffmpeg probe exited ${code}: ${stderr.slice(-1200)}`));
     });
   });
 }
 
+function resolveFfmpegBinary(): string {
+  const fromEnv = process.env.FFMPEG_PATH?.trim();
+  if (fromEnv && existsSync(fromEnv)) return fromEnv;
+  if (existsSync("/usr/bin/ffmpeg")) return "/usr/bin/ffmpeg";
+  return (ffmpegStatic as unknown as string) ?? "ffmpeg";
+}
+
 async function runFfmpeg(args: string[]): Promise<void> {
-  const bin = (ffmpegStatic as unknown as string) ?? "ffmpeg";
+  const bin = resolveFfmpegBinary();
   await new Promise<void>((resolve, reject) => {
     const child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
@@ -1854,7 +1871,7 @@ async function runFfmpeg(args: string[]): Promise<void> {
         resolve();
         return;
       }
-      reject(new Error(`ffmpeg exited ${code}: ${stderr.slice(-800)}`));
+      reject(new Error(`ffmpeg exited ${code}: ${stderr.slice(-1200)}`));
     });
   });
 }

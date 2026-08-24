@@ -125,6 +125,35 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   return `${header}${events}\n`;
 }
 
+/** Simple centered title card ASS (avoids fragile drawtext -vf chains). */
+export function buildTitleCardAss(
+  input: { headline: string; subtitle?: string; durationSeconds: number; width: number; height: number },
+  opts?: { fontName?: string }
+): string {
+  const font = opts?.fontName ?? "Arial";
+  const dur = Math.max(1, input.durationSeconds);
+  const headline = escapeAss(input.headline.trim() || " ");
+  const subtitle = input.subtitle?.trim() ? escapeAss(input.subtitle.trim()) : "";
+  const titleSize = Math.max(36, Math.round(Math.min(input.width, input.height) * 0.07));
+  const subSize = Math.max(22, Math.round(Math.min(input.width, input.height) * 0.038));
+  return `[Script Info]
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+PlayResX: ${input.width}
+PlayResY: ${input.height}
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Title,${font},${titleSize},&H00FFFFFF,&H00FFFFFF,&H80000000,&H64000000,-1,0,0,0,100,100,0,0,1,3,0,2,48,48,${Math.round(input.height * 0.42)},1
+Style: Sub,${font},${subSize},&H00E6E6E6,&H00FFFFFF,&H80000000,&H64000000,0,0,0,0,100,100,0,0,1,2,0,2,48,48,${Math.round(input.height * 0.52)},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,${assTime(0)},${assTime(dur)},Title,,0,0,0,,${headline}
+${subtitle ? `Dialogue: 0,${assTime(0.15)},${assTime(dur)},Sub,,0,0,0,,${subtitle}\n` : ""}`;
+}
+
 function escapeAss(text: string): string {
   return text.replace(/\\/g, "\\\\").replace(/\{/g, "(").replace(/\}/g, ")");
 }
