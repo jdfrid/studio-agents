@@ -196,7 +196,7 @@ export function createHeygenBeatGenerator(
       await hooks?.onPoll?.({ operationName: videoId, model: MODEL_ID, status: "polling" });
 
       const timeoutMs = Number(credential.config.videoTimeoutSeconds ?? process.env.HEYGEN_TIMEOUT_SECONDS ?? 900) * 1000;
-      const pollMs = Number(credential.config.videoPollIntervalMs ?? process.env.HEYGEN_POLL_MS ?? 8000);
+      const pollMs = Number(credential.config.videoPollIntervalMs ?? process.env.HEYGEN_POLL_MS ?? 4000);
       const startedAt = Date.now();
       let lastStatus = created.data?.status ?? "pending";
 

@@ -198,7 +198,6 @@ main.layout-log { grid-template-columns: 1fr; }
 .runs-log-table { border-collapse: separate; border-spacing: 0; font-size: 0.78rem; min-width: max-content; width: 100%; }
 .runs-log-table th, .runs-log-table td { border-bottom: 1px solid #232733; border-right: 1px solid #232733; padding: 6px 8px; text-align: start; white-space: nowrap; vertical-align: middle; }
 .runs-log-table thead th { position: sticky; top: 0; background: #1a2030; z-index: 2; }
-.runs-log-table thead tr:nth-child(2) th { top: 32px; }
 .runs-log-table .group-head { text-align: center; background: #151c2a; color: #a8c4ff; }
 .runs-log-table .subhead { font-weight: 500; color: #8b94a6; font-size: 0.72rem; }
 .runs-log-table .activity-head { writing-mode: vertical-rl; transform: rotate(180deg); max-height: 120px; font-size: 0.72rem; color: #9eb0d0; }

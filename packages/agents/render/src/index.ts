@@ -91,7 +91,24 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         return await renderExtendChain(ctx, input, beatGenerator, provider, dir, renderProfile, dimensions);
       }
 
-      for (const scene of input.timeline) {
+      const beatConcurrency =
+        usesFalVideoProvider(renderProfile) || usesHeygenVideoProvider(renderProfile)
+          ? Math.min(3, Math.max(1, Number(process.env.RENDER_BEAT_CONCURRENCY ?? 2) || 2))
+          : 1;
+      await ctx.log.log("render_beat_concurrency", "Multiclip beat concurrency", {
+        beatConcurrency,
+        renderProfile: renderProfile.id,
+        sceneCount: input.timeline.length
+      });
+
+      type MulticlipSceneOut = {
+        order: number;
+        clipPath: string;
+        sceneResult: RenderSceneResult;
+        ops: NonNullable<RenderOutput["geminiOperations"]>;
+      };
+
+      const renderMulticlipScene = async (scene: SceneTimelineEntry): Promise<MulticlipSceneOut> => {
         const isTitleCard = scene.sceneKind === "title_card";
         const promptHash = stablePromptHash(
           isTitleCard ? `title_card:${scene.title}:${scene.visualPrompt}` : scene.veoPrompt
@@ -115,25 +132,27 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           const rawReuse = path.join(dir, `scene-${scene.order}-reused-raw.mp4`);
           await writeFile(rawReuse, downloaded.body);
           const finalizedReuse = await finalizeSceneClip(rawReuse, dir, scene.sceneId, dimensions);
-          clipFiles.push(finalizedReuse.path);
-          perScene.push({
-            sceneId: scene.sceneId,
-            artifactId: cached.artifact.id,
-            gcsPath: cached.artifact.gcsPath,
-            durationSeconds: finalizedReuse.durationSeconds,
-            provider: String(cached.artifact.metadata.provider ?? "cached"),
-            model: String(cached.artifact.metadata.model ?? ""),
-            geminiOperationName: String(cached.artifact.metadata.geminiOperationName ?? ""),
-            promptHash
-          });
-          continue;
+          return {
+            order: scene.order,
+            clipPath: finalizedReuse.path,
+            sceneResult: {
+              sceneId: scene.sceneId,
+              artifactId: cached.artifact.id,
+              gcsPath: cached.artifact.gcsPath,
+              durationSeconds: finalizedReuse.durationSeconds,
+              provider: String(cached.artifact.metadata.provider ?? "cached"),
+              model: String(cached.artifact.metadata.model ?? ""),
+              geminiOperationName: String(cached.artifact.metadata.geminiOperationName ?? ""),
+              promptHash
+            },
+            ops: []
+          };
         }
 
         if (isTitleCard) {
           const titlePath = await createTitleCardClip(dir, dimensions, scene);
           const finalizedTitle = await finalizeSceneClip(titlePath, dir, scene.sceneId, dimensions);
           const scenePath = finalizedTitle.path;
-          clipFiles.push(scenePath);
           const clipArtifact = await ctx.artifacts.save({
             runId: ctx.runId,
             stage: "render",
@@ -151,17 +170,21 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
               sceneKind: "title_card"
             }
           });
-          perScene.push({
-            sceneId: scene.sceneId,
-            artifactId: clipArtifact.id,
-            gcsPath: clipArtifact.gcsPath,
-            durationSeconds: finalizedTitle.durationSeconds,
-            provider: "ffmpeg",
-            model: "title_card",
-            geminiOperationName: null,
-            promptHash
-          });
-          continue;
+          return {
+            order: scene.order,
+            clipPath: scenePath,
+            sceneResult: {
+              sceneId: scene.sceneId,
+              artifactId: clipArtifact.id,
+              gcsPath: clipArtifact.gcsPath,
+              durationSeconds: finalizedTitle.durationSeconds,
+              provider: "ffmpeg",
+              model: "title_card",
+              geminiOperationName: null,
+              promptHash
+            },
+            ops: []
+          };
         }
 
         const referenceSource =
@@ -210,13 +233,15 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         if (!result.videoBytes) {
           throw new Error(`Video generation completed without bytes for scene ${scene.sceneId}`);
         }
-        geminiOperations.push({
-          sceneId: scene.sceneId,
-          operationName: result.operationName,
-          status: result.status === "completed" ? "completed" : "failed",
-          model: result.model,
-          error: result.error ?? null
-        });
+        const ops: NonNullable<RenderOutput["geminiOperations"]> = [
+          {
+            sceneId: scene.sceneId,
+            operationName: result.operationName,
+            status: result.status === "completed" ? "completed" : "failed",
+            model: result.model,
+            error: result.error ?? null
+          }
+        ];
         await saveBeatOperationArtifact(ctx, scene, promptHash, result, renderProfile, { extendsPrevious: false });
 
         const rawPath = path.join(dir, `scene-${scene.order}-raw.mp4`);
@@ -226,7 +251,6 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         });
         const finalized = await finalizeSceneClip(mixedPath, dir, scene.sceneId, dimensions);
         const scenePath = finalized.path;
-        clipFiles.push(scenePath);
 
         const clipArtifact = await ctx.artifacts.save({
           runId: ctx.runId,
@@ -246,16 +270,40 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           }
         });
 
-        perScene.push({
-          sceneId: scene.sceneId,
-          artifactId: clipArtifact.id,
-          gcsPath: clipArtifact.gcsPath,
-          durationSeconds: finalized.durationSeconds,
-          provider: result.provider,
-          model: result.model,
-          geminiOperationName: result.operationName,
-          promptHash
-        });
+        return {
+          order: scene.order,
+          clipPath: scenePath,
+          sceneResult: {
+            sceneId: scene.sceneId,
+            artifactId: clipArtifact.id,
+            gcsPath: clipArtifact.gcsPath,
+            durationSeconds: finalized.durationSeconds,
+            provider: result.provider,
+            model: result.model,
+            geminiOperationName: result.operationName,
+            promptHash
+          },
+          ops
+        };
+      };
+
+      const orderedScenes = [...input.timeline].sort((a, b) => a.order - b.order);
+      const sceneOuts: MulticlipSceneOut[] = new Array(orderedScenes.length);
+      let nextSceneIndex = 0;
+      const workers = Array.from({ length: beatConcurrency }, async () => {
+        while (true) {
+          const i = nextSceneIndex;
+          nextSceneIndex += 1;
+          if (i >= orderedScenes.length) return;
+          sceneOuts[i] = await renderMulticlipScene(orderedScenes[i]!);
+        }
+      });
+      await Promise.all(workers);
+      for (const out of sceneOuts) {
+        if (!out) continue;
+        clipFiles.push(out.clipPath);
+        perScene.push(out.sceneResult);
+        geminiOperations.push(...out.ops);
       }
 
       const concatPath = path.join(dir, `concat-${nanoid(8)}.mp4`);

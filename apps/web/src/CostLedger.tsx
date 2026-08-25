@@ -283,7 +283,7 @@ export function CostLedger({
 
               <th>tokens</th>
 
-              <th>זמן</th>
+              <th title="משך קריאת וידאו בלבד">זמן רינדור</th>
 
               <th>יחידות</th>
 
@@ -379,7 +379,11 @@ export function CostLedger({
 
                   </td>
 
-                  <td>{formatDuration(event.durationMs)}</td>
+                  <td>
+                    {event.activityType === "veo_video" || event.stage === "render"
+                      ? formatDuration(event.durationMs)
+                      : "—"}
+                  </td>
 
                   <td>{formatUnits(event, renderProfileId)}</td>
 

@@ -2,7 +2,7 @@ import { prisma } from "@studio/infra-prisma";
 import {
   COST_ACTIVITY_ORDER,
   STAGE_ORDER,
-  runTotalDurationMs,
+  runWorkDurationMs,
   stageDurationMs,
   summarizeRunCosts,
   type CostActivityType,
@@ -90,11 +90,8 @@ export async function getRunsLogMatrix(limit = 100): Promise<RunLogMatrixRespons
       renderProfile: brief.renderProfile ?? null,
       createdAt: run.createdAt.toISOString(),
       updatedAt: run.updatedAt.toISOString(),
-      totalDurationMs: runTotalDurationMs(
-        run.createdAt,
-        run.updatedAt,
-        run.stages.map((s) => s.completedAt)
-      ),
+      // Work time only — do not count idle waits for manual approval between stages.
+      totalDurationMs: runWorkDurationMs(stages.map((s) => s.durationMs)),
       totalNis: summary.totalNis,
       totalUsd: summary.totalUsd,
       stages,

@@ -49,6 +49,17 @@ export function stageDurationMs(startedAt: Date | string | null, completedAt: Da
   return Math.max(0, end - start);
 }
 
+/**
+ * Sum of stage work durations (agent run time).
+ * Excludes idle gaps waiting for user approval between stages.
+ */
+export function runWorkDurationMs(stageDurationsMs: Array<number | null | undefined>): number | null {
+  const parts = stageDurationsMs.filter((n): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0);
+  if (parts.length === 0) return null;
+  return parts.reduce((sum, n) => sum + n, 0);
+}
+
+/** @deprecated Prefer runWorkDurationMs — wall-clock inflates approval-mode waits. */
 export function runTotalDurationMs(
   createdAt: Date | string,
   updatedAt: Date | string,

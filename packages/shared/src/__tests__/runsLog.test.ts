@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDurationMs, runTotalDurationMs, stageDurationMs } from "../runsLog.js";
+import { formatDurationMs, runTotalDurationMs, runWorkDurationMs, stageDurationMs } from "../runsLog.js";
 
 describe("runsLog helpers", () => {
   it("computes stage duration", () => {
@@ -18,7 +18,12 @@ describe("runsLog helpers", () => {
     expect(formatDurationMs(659_999)).toBe("11m");
   });
 
-  it("computes run total duration to latest stage completion", () => {
+  it("sums stage work durations excluding approval idle gaps", () => {
+    // brief 2m + script 3m = 5m work; wall clock would be 20m if user waited 15m between stages
+    expect(runWorkDurationMs([120_000, 180_000, null])).toBe(300_000);
+  });
+
+  it("computes run wall-clock duration to latest stage completion", () => {
     const created = new Date("2026-01-01T10:00:00Z");
     const updated = new Date("2026-01-01T10:30:00Z");
     const completed = [new Date("2026-01-01T10:05:00Z"), new Date("2026-01-01T10:12:00Z")];

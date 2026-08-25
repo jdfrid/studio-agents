@@ -241,7 +241,7 @@ export function createFalI2vBeatGenerator(profile: RenderProfile, credential: Pr
           let lastStatus = "IN_QUEUE";
 
           while (Date.now() - startedAt < timeoutMs) {
-            await new Promise((resolve) => setTimeout(resolve, Number(credential.config.videoPollIntervalMs ?? 8000)));
+            await new Promise((resolve) => setTimeout(resolve, Number(credential.config.videoPollIntervalMs ?? 3000)));
             const status = await httpJson<{ status?: string; error?: string }>(statusUrl, {
               headers: { Authorization: `Key ${apiKey}` },
               timeoutMs: 30_000
