@@ -1606,6 +1606,129 @@ a { color: inherit; }
   .run-card-thumb { width: 42px; height: 42px; }
 }
 
+/* Mobile form hardening: readable contrast and reliable centering on real phones */
+.create-form > label,
+.create-form > .insert-clip-options,
+.create-form > .approval-fieldset,
+.branding-section,
+.advanced-panel {
+  border-color: rgba(173, 186, 208, 0.26);
+  background: #101827;
+}
+.create-form > label,
+.branding-section > label,
+.advanced-grid label,
+.approval-fieldset legend {
+  color: #f4f7fc;
+}
+.create-form label small,
+.create-form .muted,
+.form-section-heading p,
+.advanced-hint,
+.branding-hint {
+  color: #b6c1d3;
+}
+.create-form input:not([type="checkbox"]):not([type="radio"]),
+.create-form textarea,
+.create-form select {
+  border-color: rgba(173, 186, 208, 0.3);
+  background: #080f1b;
+  color: #f8faff;
+}
+.create-form input::placeholder,
+.create-form textarea::placeholder {
+  color: #8794aa;
+  opacity: 1;
+}
+.create-form input:focus,
+.create-form textarea:focus,
+.create-form select:focus {
+  border-color: #8f7cff;
+  box-shadow: 0 0 0 3px rgba(117, 89, 255, 0.16);
+}
+
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  html,
+  body,
+  #root,
+  .layout,
+  .saas-layout {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  .saas-layout > main {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+    padding: 28px 16px 96px;
+  }
+  .create-form {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 680px;
+    margin-inline: auto;
+    padding-inline: 0;
+  }
+  .create-form > *,
+  .branding-section,
+  .advanced-panel,
+  .advanced-grid,
+  .heygen-dub-control {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .create-form > label,
+  .create-form > .insert-clip-options,
+  .create-form > .approval-fieldset,
+  .branding-section,
+  .advanced-panel {
+    width: 100%;
+  }
+  .create-form label {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+  .create-form label small,
+  .form-section-heading p,
+  .advanced-hint,
+  .branding-hint {
+    font-size: 0.82rem;
+    line-height: 1.65;
+  }
+  .create-form input:not([type="checkbox"]):not([type="radio"]),
+  .create-form textarea,
+  .create-form select {
+    min-height: 48px;
+    font-size: 1rem;
+  }
+  .create-form textarea {
+    min-height: 132px;
+  }
+  .form-section-heading {
+    width: 100%;
+    align-items: flex-start;
+  }
+  .visual-files-list {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+  .branding-preview {
+    width: min(100%, 320px);
+    margin-inline: auto;
+  }
+  .advanced-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .create-actions {
+    left: auto;
+    right: auto;
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
