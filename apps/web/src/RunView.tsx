@@ -302,9 +302,13 @@ function RunSettingsSummary({ run, artifacts }: { run: ProjectRunView; artifacts
         ? "שיבוט קול"
         : att.role === "insert_clip"
           ? `שילוב סרטון${att.insertAtSeconds != null ? ` @${att.insertAtSeconds}ש׳` : ""}`
-          : att.role === "logo"
-            ? "לוגו"
-            : "תמונת השראה";
+          : att.role === "reference_video"
+            ? "סרטון השראה — לניתוח בלבד"
+            : att.role === "product"
+              ? "תמונת מוצר"
+              : att.role === "logo"
+                ? "לוגו"
+                : "תמונת דמות / השראה";
     return `${role}: ${att.name}`;
   });
 

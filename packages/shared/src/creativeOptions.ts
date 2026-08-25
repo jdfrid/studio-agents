@@ -47,7 +47,9 @@ export const CreativeOptionsSchema = z
     /** Burn per-scene lower-third titles (product / beat name). */
     lowerThirds: z.enum(["on", "off"]).optional(),
     /** Structured film template for script planning. */
-    filmTemplate: z.enum(["corporate_product"]).optional()
+    filmTemplate: z
+      .enum(["corporate_product", "social_explainer", "public_service_explainer", "product_demo", "testimonial"])
+      .optional()
   })
   .strict();
 
@@ -133,7 +135,17 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "קליל", labelHe: "קליל" },
           { value: "יוקרתי", labelHe: "יוקרתי" },
           { value: "חדשותי", labelHe: "חדשותי" },
-          { value: "ידידותי", labelHe: "ידידותי" }
+          { value: "ידידותי", labelHe: "ידידותי" },
+          { value: "הסברתי", labelHe: "הסברתי" },
+          { value: "חינוכי", labelHe: "חינוכי" },
+          { value: "שיחתי", labelHe: "שיחתי וטבעי" },
+          { value: "משכנע", labelHe: "משכנע ומכירתי" },
+          { value: "אמפתי", labelHe: "אמפתי" },
+          { value: "הומוריסטי", labelHe: "הומוריסטי" },
+          { value: "מעורר השראה", labelHe: "מעורר השראה" },
+          { value: "ישיר", labelHe: "ישיר ותכליתי" },
+          { value: "שירות ציבורי", labelHe: "שירות ציבורי" },
+          { value: "סיפור אישי", labelHe: "סיפור אישי" }
         ]
       },
       {
@@ -175,7 +187,21 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "איור וקטורי", labelHe: "איור וקטורי" },
           { value: "סטופ־מושן", labelHe: "סטופ־מושן" },
           { value: "חדשות אולפן", labelHe: "חדשות אולפן" },
-          { value: "סרט מוצר B2B", labelHe: "סרט מוצר B2B (תדמית)" }
+          { value: "סרט מוצר B2B", labelHe: "סרט מוצר B2B (תדמית)" },
+          { value: "אנימציה תלת־ממד משפחתית", labelHe: "אנימציה תלת־ממד משפחתית" },
+          { value: "אנימציה דו־ממד", labelHe: "אנימציה דו־ממד" },
+          { value: "סרט קולנועי", labelHe: "סרט קולנועי" },
+          { value: "דוקומנטרי", labelHe: "דוקומנטרי" },
+          { value: "UGC אותנטי", labelHe: "UGC אותנטי / צילום טלפון" },
+          { value: "לייף סטייל", labelHe: "לייף סטייל" },
+          { value: "סרטון הסברה", labelHe: "סרטון הסברה" },
+          { value: "הדגמת מוצר", labelHe: "הדגמת מוצר" },
+          { value: "קליימיישן", labelHe: "קליימיישן / פלסטלינה" },
+          { value: "גזירי נייר", labelHe: "גזירי נייר" },
+          { value: "איזומטרי", labelHe: "איור איזומטרי" },
+          { value: "רטרו", labelHe: "רטרו" },
+          { value: "סוריאליסטי", labelHe: "סוריאליסטי" },
+          { value: "עריכת מגזין", labelHe: "עריכת מגזין יוקרתית" }
         ]
       },
       {
@@ -188,7 +214,17 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "צבעים קרים", labelHe: "צבעים קרים" },
           { value: "שחור־לבן", labelHe: "שחור־לבן" },
           { value: "פסטל ילדותי", labelHe: "פסטל ילדותי" },
-          { value: "קומיקס בוהק", labelHe: "קומיקס בוהק" }
+          { value: "קומיקס בוהק", labelHe: "קומיקס בוהק" },
+          { value: "פסטל רך", labelHe: "פסטל רך" },
+          { value: "קונטרסט גבוה", labelHe: "קונטרסט גבוה" },
+          { value: "טבעית", labelHe: "צבעוניות טבעית" },
+          { value: "אדמתית", labelHe: "גוונים אדמתיים" },
+          { value: "ניאון", labelHe: "ניאון" },
+          { value: "כהה קולנועית", labelHe: "כהה קולנועית" },
+          { value: "טורקיז וכתום", labelHe: "טורקיז וכתום קולנועי" },
+          { value: "מונוכרומטית", labelHe: "מונוכרומטית" },
+          { value: "צבעי יסוד", labelHe: "צבעי יסוד" },
+          { value: "בהירה ונקייה", labelHe: "בהירה ונקייה" }
         ]
       },
       {
@@ -201,7 +237,27 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "מאויר", labelHe: "מאויר" },
           { value: "מופשט", labelHe: "מופשט" },
           { value: "תלת־ממד מצויר", labelHe: "תלת־ממד מצויר" },
-          { value: "קריקטורה מוגזמת", labelHe: "קריקטורה מוגזמת" }
+          { value: "קריקטורה מוגזמת", labelHe: "קריקטורה מוגזמת" },
+          { value: "פוטוריאליסטי", labelHe: "פוטוריאליסטי" },
+          { value: "היפר־ריאליסטי", labelHe: "היפר־ריאליסטי" },
+          { value: "תלת־ממד ריאליסטי", labelHe: "תלת־ממד ריאליסטי" },
+          { value: "תלת־ממד מסוגנן", labelHe: "תלת־ממד מסוגנן" },
+          { value: "איור דו־ממד", labelHe: "איור דו־ממד" },
+          { value: "צילום UGC", labelHe: "צילום UGC טבעי" },
+          { value: "דוקומנטרי טבעי", labelHe: "דוקומנטרי טבעי" },
+          { value: "סינמטי מסוגנן", labelHe: "סינמטי מסוגנן" }
+        ]
+      },
+      {
+        key: "filmTemplate",
+        labelHe: "מבנה הסרטון",
+        kind: "select",
+        options: [
+          { value: "social_explainer", labelHe: "סרטון הסברה לרשתות" },
+          { value: "public_service_explainer", labelHe: "הסברה / שירות ציבורי" },
+          { value: "product_demo", labelHe: "בעיה → הדגמת מוצר → פתרון" },
+          { value: "testimonial", labelHe: "עדות / סיפור לקוח" },
+          { value: "corporate_product", labelHe: "סרט מוצר B2B" }
         ]
       },
       {
@@ -270,7 +326,19 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "קריין", labelHe: "קריין" },
           { value: "מומחה", labelHe: "מומחה" },
           { value: "דמות מצוירת", labelHe: "דמות מצוירת" },
-          { value: "דמות לגו", labelHe: "דמות לגו" }
+          { value: "דמות לגו", labelHe: "דמות לגו" },
+          { value: "ילד", labelHe: "ילד / ילדה" },
+          { value: "הורה", labelHe: "הורה" },
+          { value: "מורה", labelHe: "מורה" },
+          { value: "תלמיד", labelHe: "תלמיד" },
+          { value: "רופא", labelHe: "רופא / מטפל" },
+          { value: "משפיען", labelHe: "משפיען / יוצר תוכן" },
+          { value: "מגיש", labelHe: "מגיש" },
+          { value: "קמע מותג", labelHe: "קמע מותג" },
+          { value: "משפחה", labelHe: "משפחה" },
+          { value: "זוג", labelHe: "זוג" },
+          { value: "צוות", labelHe: "צוות" },
+          { value: "ללא דמות", labelHe: "ללא דמות — מוצר בלבד" }
         ]
       },
       {
@@ -293,7 +361,17 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "עסקי", labelHe: "עסקי" },
           { value: "מקצועי", labelHe: "מקצועי" },
           { value: "רשמי", labelHe: "רשמי" },
-          { value: "צבעוני ילדותי", labelHe: "צבעוני ילדותי" }
+          { value: "צבעוני ילדותי", labelHe: "צבעוני ילדותי" },
+          { value: "קז׳ואל אלגנטי", labelHe: "קז׳ואל אלגנטי" },
+          { value: "ספורטיבי", labelHe: "ספורטיבי" },
+          { value: "מדי עבודה", labelHe: "מדי עבודה" },
+          { value: "מדים רפואיים", labelHe: "מדים רפואיים" },
+          { value: "אופנתי", labelHe: "אופנתי" },
+          { value: "יוקרתי", labelHe: "יוקרתי" },
+          { value: "מסורתי", labelHe: "מסורתי" },
+          { value: "עתידני", labelHe: "עתידני" },
+          { value: "בגדי בית", labelHe: "בגדי בית" },
+          { value: "בהתאם לתמונת המקור", labelHe: "זהה לתמונת המקור" }
         ]
       },
       {
@@ -305,7 +383,17 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "רצינות", labelHe: "רצינות" },
           { value: "הפתעה", labelHe: "הפתעה" },
           { value: "ביטחון", labelHe: "ביטחון" },
-          { value: "התרגשות", labelHe: "התרגשות" }
+          { value: "התרגשות", labelHe: "התרגשות" },
+          { value: "דאגה", labelHe: "דאגה" },
+          { value: "בלבול", labelHe: "בלבול" },
+          { value: "הקלה", labelHe: "הקלה" },
+          { value: "אמפתיה", labelHe: "אמפתיה" },
+          { value: "התלהבות", labelHe: "התלהבות" },
+          { value: "אמון", labelHe: "אמון" },
+          { value: "סקרנות", labelHe: "סקרנות" },
+          { value: "רוגע", labelHe: "רוגע" },
+          { value: "נחישות", labelHe: "נחישות" },
+          { value: "טבעית ועדינה", labelHe: "טבעית ועדינה" }
         ]
       },
       {
@@ -317,7 +405,18 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "דיבור", labelHe: "דיבור" },
           { value: "עבודה", labelHe: "עבודה" },
           { value: "שימוש במוצר", labelHe: "שימוש במוצר" },
-          { value: "הצבעה", labelHe: "הצבעה" }
+          { value: "הצבעה", labelHe: "הצבעה" },
+          { value: "השוואת מוצרים", labelHe: "השוואת מוצרים" },
+          { value: "הדגמה", labelHe: "הדגמה" },
+          { value: "בדיקה", labelHe: "בדיקה / בחינה" },
+          { value: "בחירה", labelHe: "בחירה" },
+          { value: "פתיחת אריזה", labelHe: "פתיחת אריזה" },
+          { value: "הרכבה", labelHe: "הרכבה" },
+          { value: "שיחה", labelHe: "שיחה בין דמויות" },
+          { value: "הצגת נתון", labelHe: "הצגת נתון" },
+          { value: "לפני ואחרי", labelHe: "לפני ואחרי" },
+          { value: "פתרון בעיה", labelHe: "פתרון בעיה" },
+          { value: "צילום מוצר", labelHe: "צילום מוצר בלבד" }
         ]
       }
     ]
@@ -357,7 +456,16 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "סמכותי", labelHe: "סמכותי" },
           { value: "ידידותי", labelHe: "ידידותי" },
           { value: "צעיר", labelHe: "צעיר" },
-          { value: "מבוגר", labelHe: "מבוגר" }
+          { value: "מבוגר", labelHe: "מבוגר" },
+          { value: "חם", labelHe: "חם ונעים" },
+          { value: "רך", labelHe: "רך ומרגיע" },
+          { value: "אנרגטי", labelHe: "אנרגטי" },
+          { value: "טבעי", labelHe: "טבעי ולא פרסומי" },
+          { value: "מספר סיפורים", labelHe: "מספר סיפורים" },
+          { value: "רשמי", labelHe: "רשמי / ממלכתי" },
+          { value: "רדיופוני", labelHe: "רדיופוני" },
+          { value: "קרוב ואישי", labelHe: "קרוב ואישי" },
+          { value: "טכנולוגי", labelHe: "טכנולוגי" }
         ]
       },
       {
@@ -369,7 +477,17 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "רגוע", labelHe: "רגוע" },
           { value: "מרגש", labelHe: "מרגש" },
           { value: "חדשותי", labelHe: "חדשותי" },
-          { value: "דרמטי", labelHe: "דרמטי" }
+          { value: "דרמטי", labelHe: "דרמטי" },
+          { value: "הסברתי", labelHe: "הסברתי" },
+          { value: "חינוכי", labelHe: "חינוכי" },
+          { value: "שיחתי", labelHe: "שיחתי וטבעי" },
+          { value: "הומוריסטי", labelHe: "הומוריסטי" },
+          { value: "משכנע", labelHe: "משכנע" },
+          { value: "אמפתי", labelHe: "אמפתי" },
+          { value: "דוקומנטרי", labelHe: "דוקומנטרי" },
+          { value: "סיפור אישי", labelHe: "סיפור אישי" },
+          { value: "מהיר לרשתות", labelHe: "מהיר לרשתות" },
+          { value: "שירות ציבורי", labelHe: "שירות ציבורי / ממלכתי" }
         ]
       },
       {
@@ -489,7 +607,20 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "צל", labelHe: "צל" },
           { value: "עשן", labelHe: "עשן" },
           { value: "נצנוץ", labelHe: "נצנוץ" },
-          { value: "הדגשת מוצר", labelHe: "הדגשת מוצר" }
+          { value: "הדגשת מוצר", labelHe: "הדגשת מוצר" },
+          { value: "ללא אפקטים", labelHe: "ללא אפקטים" },
+          { value: "עומק שדה", labelHe: "עומק שדה" },
+          { value: "בוקה", labelHe: "בוקה" },
+          { value: "קרני אור", labelHe: "קרני אור" },
+          { value: "פרלקסה", labelHe: "פרלקסה" },
+          { value: "גרפיקה בתנועה", labelHe: "גרפיקה בתנועה" },
+          { value: "אייקונים מרחפים", labelHe: "אייקונים מרחפים" },
+          { value: "קווי מהירות", labelHe: "קווי מהירות" },
+          { value: "גליץ׳ דיגיטלי", labelHe: "גליץ׳ דיגיטלי" },
+          { value: "פילם גריין", labelHe: "פילם גריין" },
+          { value: "הילוך איטי", labelHe: "הילוך איטי" },
+          { value: "טיים־לאפס", labelHe: "טיים־לאפס" },
+          { value: "מסך מפוצל", labelHe: "מסך מפוצל" }
         ]
       }
     ]
@@ -605,7 +736,14 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
       continue;
     }
     if (key === "filmTemplate") {
-      lines.push(`${label}: ${value === "corporate_product" ? "סרט מוצר B2B" : String(value)}`);
+      const map: Record<string, string> = {
+        corporate_product: "סרט מוצר B2B",
+        social_explainer: "סרטון הסברה לרשתות — Hook → בעיה → הסבר חזותי → פתרון → CTA",
+        public_service_explainer: "הסברה / שירות ציבורי — מצב → סיכון → כללים מעשיים → מסר מסכם",
+        product_demo: "בעיה → הדגמת מוצר → יתרונות → פתרון → CTA",
+        testimonial: "בעיה אישית → חוויה → שינוי → המלצה"
+      };
+      lines.push(`${label}: ${map[String(value)] ?? value}`);
       continue;
     }
     if (key === "designStyle") {
@@ -616,6 +754,20 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
         "דמויות לגו": "LEGO minifigure characters, brick-built world",
         "אנימציה תלת־ממד": "stylized 3D CGI animation",
         "סגנון פיקסאר": "Pixar-style 3D characters, expressive eyes",
+        "אנימציה תלת־ממד משפחתית": "premium family-friendly stylized 3D animation, rounded expressive characters",
+        "אנימציה דו־ממד": "clean 2D animation with readable shapes and controlled motion",
+        "סרט קולנועי": "cinematic commercial, deliberate composition, shallow depth and motivated camera",
+        דוקומנטרי: "natural documentary photography, observational camera and authentic moments",
+        "UGC אותנטי": "authentic smartphone UGC, natural light and candid framing",
+        "לייף סטייל": "aspirational lifestyle commercial with natural product use",
+        "סרטון הסברה": "clear visual explainer with concrete demonstrations and instructional pacing",
+        "הדגמת מוצר": "step-by-step product demonstration with close-up feature shots",
+        קליימיישן: "handcrafted clay stop-motion look",
+        "גזירי נייר": "layered paper-cut illustration and tactile shadows",
+        איזומטרי: "clean isometric illustration and structured spatial composition",
+        רטרו: "retro commercial design with period-appropriate texture and palette",
+        סוריאליסטי: "surreal but coherent commercial imagery",
+        "עריכת מגזין": "premium editorial composition, restrained motion and luxury typography",
         אנימה: "anime style, clean line art",
         "איור וקטורי": "flat vector illustration",
         "סטופ־מושן": "stop-motion clay/puppet look",
@@ -645,7 +797,7 @@ export function geminiVoiceNameFromCreative(creative?: CreativeOptions | null): 
   const legacyMale = /זכר|גברי|male/i.test(type);
   const legacyFemale = /נקבה|נשי|female/i.test(type);
 
-  let sex: "male" | "female" =
+  const sex: "male" | "female" =
     gender === "male" || legacyMale
       ? "male"
       : gender === "female" || legacyFemale

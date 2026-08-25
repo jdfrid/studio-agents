@@ -58,10 +58,13 @@ export const BriefInputSchema = z.object({
          * scene = override one scene only;
          * voice_clone = narration voice sample;
          * insert_clip = short external video spliced into the final cut;
+         * reference_video = inspiration analyzed for style, pacing and structure, never spliced;
          * product = locked product / B-roll still used as I2V plate;
          * logo = business branding logo for end card / preview
          */
-        role: z.enum(["anchor", "scene", "voice_clone", "insert_clip", "logo", "product"]).default("anchor"),
+        role: z
+          .enum(["anchor", "scene", "voice_clone", "insert_clip", "reference_video", "logo", "product"])
+          .default("anchor"),
         sceneIndex: z.number().int().min(0).optional(),
         /** Absolute second in the finished film where insert_clip begins (before end card). */
         insertAtSeconds: z.number().min(0).max(180).optional(),
@@ -140,6 +143,20 @@ export const BriefOutputSchema = z.object({
       mimeType: z.string(),
       insertAtSeconds: z.number().min(0).max(180),
       audioSource: z.enum(["clip", "narration"])
+    })
+    .nullable()
+    .optional(),
+  /** Creative observations extracted from an inspiration video; the source is never inserted into the output. */
+  referenceVideoAnalysis: z
+    .object({
+      summary: z.string(),
+      visualStyle: z.string(),
+      colorPalette: z.string(),
+      shotRhythm: z.string(),
+      cameraLanguage: z.string(),
+      captionStyle: z.string(),
+      storyStructure: z.string(),
+      reusableDirections: z.array(z.string()).default([])
     })
     .nullable()
     .optional(),

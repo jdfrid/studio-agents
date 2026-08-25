@@ -50,6 +50,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const corporateFilm = isCorporateProductFilm({
       creative: (brief as { creative?: { filmTemplate?: string; designStyle?: string } }).creative
     });
+    const filmTemplate = brief.creative?.filmTemplate;
     const extendMode = renderProfile.strategy === "extend";
     const klingMode = renderProfile.provider === "kling";
     const lipSyncMode = renderProfile.capabilities.nativeAudio === true;
@@ -126,6 +127,30 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         "veoPrompt is a short motion_prompt (body/gesture only — mouth sync comes from audio). Prefer facing camera, natural head nods, hand gestures that match the spoken line.",
         `Narration must be clear spoken lines in ${langEn} (this audio drives lip-sync). Keep visual continuity via referenceImagePrompt.`,
         `Each beat targets ~${clipSeconds}s of story time.`
+      );
+    }
+    if (filmTemplate === "social_explainer") {
+      systemParts.push(
+        "SOCIAL EXPLAINER TEMPLATE: structure the timeline as immediate visual Hook → relatable Problem → 2–3 concrete visual explanations/demonstrations → clear Solution → concise CTA.",
+        "Show the claimed guidance through actions, comparisons and close-ups. Keep each beat understandable without audio; captions are added in packaging, so never ask the video model to render text."
+      );
+    }
+    if (filmTemplate === "public_service_explainer") {
+      systemParts.push(
+        "PUBLIC-SERVICE EXPLAINER: structure as Situation → Risk or common mistake → practical checks/rules → correct behavior → authoritative closing message.",
+        "Use calm, trustworthy narration and literal visual demonstrations. Do not invent statistics, medical claims, government marks or institutional logos."
+      );
+    }
+    if (filmTemplate === "product_demo") {
+      systemParts.push(
+        "PRODUCT DEMO TEMPLATE: structure as Problem → Product reveal → step-by-step use → 2–3 observable benefits → resolved outcome → CTA.",
+        "Use close-ups and hands-on demonstrations; when product plates exist, preserve the exact uploaded product."
+      );
+    }
+    if (filmTemplate === "testimonial") {
+      systemParts.push(
+        "TESTIMONIAL TEMPLATE: structure as personal Before/problem → discovery → specific experience → After/result → honest recommendation.",
+        "Do not invent measurable customer results or imply a real testimonial unless the brief provides them."
       );
     }
     if (corporateFilm) {

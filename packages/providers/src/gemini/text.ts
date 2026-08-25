@@ -30,6 +30,12 @@ export interface GeminiJsonRequest {
 
   maxOutputTokens?: number;
 
+  /** Optional inline media analyzed alongside the text prompt (Gemini only). */
+  media?: {
+    mimeType: string;
+    dataBase64: string;
+  };
+
 }
 
 
@@ -157,6 +163,16 @@ async function callGemini(
   maxOutputTokens: number
 
 ): Promise<unknown> {
+  const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+  if (req.media?.dataBase64) {
+    parts.push({
+      inlineData: {
+        mimeType: req.media.mimeType,
+        data: req.media.dataBase64
+      }
+    });
+  }
+  parts.push({ text: prompt });
 
   return httpJson<unknown>(geminiUrl(provider, `models/${model}:generateContent`), {
 
@@ -176,7 +192,7 @@ async function callGemini(
 
       systemInstruction: { parts: [{ text: req.system }] },
 
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
+      contents: [{ role: "user", parts }]
 
     },
 

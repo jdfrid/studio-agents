@@ -11,8 +11,57 @@ describe("Brief schemas", () => {
   it("rejects too short title", () => {
     expect(() => BriefInputSchema.parse({ title: "", sourceText: "x" })).toThrow();
   });
+  it("accepts an analysis-only reference video", () => {
+    const parsed = BriefInputSchema.parse({
+      title: "Reference",
+      sourceText: "Create an original explainer",
+      attachments: [
+        {
+          name: "inspiration.mp4",
+          mimeType: "video/mp4",
+          kind: "video",
+          role: "reference_video",
+          dataUrl: "data:video/mp4;base64,AAAA"
+        }
+      ],
+      creative: {
+        filmTemplate: "social_explainer",
+        communicationStyle: "הסברתי"
+      }
+    });
+    expect(parsed.attachments[0]?.role).toBe("reference_video");
+    expect(parsed.creative?.filmTemplate).toBe("social_explainer");
+  });
   it("brief output requires required fields", () => {
     expect(() => BriefOutputSchema.parse({})).toThrow();
+  });
+  it("keeps structured reference-video analysis in brief output", () => {
+    const parsed = BriefOutputSchema.parse({
+      title: "Original explainer",
+      summary: "An original production informed by pacing only",
+      targetAudience: "Families",
+      toneOfVoice: "Friendly",
+      style: "3D explainer",
+      durationSeconds: 30,
+      aspectRatio: "9:16",
+      language: "he",
+      brandConstraints: [],
+      visualDirection: "Original cast and setting",
+      musicDirection: "Light",
+      budgetMode: false,
+      renderProfile: "veo-multiclip",
+      referenceVideoAnalysis: {
+        summary: "Fast vertical explainer",
+        visualStyle: "Soft 3D",
+        colorPalette: "Warm",
+        shotRhythm: "Five-second beats",
+        cameraLanguage: "Medium shots and close-ups",
+        captionStyle: "Bold lower-center captions",
+        storyStructure: "Problem, checks, solution",
+        reusableDirections: ["Open with a visual problem"]
+      }
+    });
+    expect(parsed.referenceVideoAnalysis?.shotRhythm).toBe("Five-second beats");
   });
 });
 

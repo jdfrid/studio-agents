@@ -28,6 +28,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const [productFiles, setProductFiles] = useState<File[]>([]);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [voiceConsent, setVoiceConsent] = useState(false);
+  const [referenceVideoFile, setReferenceVideoFile] = useState<File | null>(null);
   const [insertFile, setInsertFile] = useState<File | null>(null);
   const [insertAtSeconds, setInsertAtSeconds] = useState(8);
   const [insertAudioSource, setInsertAudioSource] = useState<"clip" | "narration">("clip");
@@ -57,6 +58,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   }, [preferHeygenDub, visualFiles.length, productFiles.length, durationSeconds]);
 
   const MAX_VOICE_BYTES = 10 * 1024 * 1024;
+  const MAX_REFERENCE_VIDEO_BYTES = 15 * 1024 * 1024;
   const MAX_INSERT_BYTES = 40 * 1024 * 1024;
   const MAX_LOGO_BYTES = 5 * 1024 * 1024;
   const MAX_VISUAL_FILES = 8;
@@ -170,6 +172,10 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       setError("סרטון השילוב גדול מדי (מקסימום 40MB).");
       return;
     }
+    if (referenceVideoFile && referenceVideoFile.size > MAX_REFERENCE_VIDEO_BYTES) {
+      setError("סרטון ההשראה גדול מדי (מקסימום 15MB).");
+      return;
+    }
     if (logoFile && logoFile.size > MAX_LOGO_BYTES) {
       setError("קובץ הלוגו גדול מדי (מקסימום 5MB).");
       return;
@@ -193,7 +199,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         name: string;
         mimeType: string;
         kind: "image" | "video" | "audio";
-        role: "anchor" | "voice_clone" | "insert_clip" | "logo" | "product";
+        role: "anchor" | "voice_clone" | "insert_clip" | "reference_video" | "logo" | "product";
         dataUrl: string;
         insertAtSeconds?: number;
         audioSource?: "clip" | "narration";
@@ -223,6 +229,15 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           kind: "audio",
           role: "voice_clone",
           dataUrl: await fileToDataUrl(voiceFile)
+        });
+      }
+      if (referenceVideoFile) {
+        attachments.push({
+          name: referenceVideoFile.name,
+          mimeType: referenceVideoFile.type || "video/mp4",
+          kind: "video",
+          role: "reference_video",
+          dataUrl: await fileToDataUrl(referenceVideoFile)
         });
       }
       if (insertFile) {
@@ -415,6 +430,34 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           יש לי זכות להשתמש בקול הזה לשיבוט
         </label>
       ) : null}
+      <label className="file-row">
+        סרטון השראה (אופציונלי)
+        <input
+          type="file"
+          accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm"
+          onChange={(e) => setReferenceVideoFile(e.target.files?.[0] ?? null)}
+        />
+        <small className="muted">
+          המערכת תנתח את הסגנון, הצבעוניות, קצב החיתוכים, המצלמה ומבנה הסיפור. הסרטון לא ישולב בתוצר ולא יועתק.
+          עד 15MB.
+        </small>
+        {referenceVideoFile ? (
+          <span className="upload-status">
+            סרטון לניתוח: {referenceVideoFile.name}
+            <button
+              type="button"
+              className="link-btn"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setReferenceVideoFile(null);
+              }}
+            >
+              הסר
+            </button>
+          </span>
+        ) : null}
+      </label>
       <label className="file-row">
         שילוב סרטון קצר (אופציונלי)
         <input
@@ -687,7 +730,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
               <h4 className="advanced-section-title">{section.titleHe}</h4>
               <div className="advanced-grid">
                 {section.fields
-                  .filter((field) => field.key !== "preferHeygenDub" && field.key !== "filmTemplate")
+                  .filter((field) => field.key !== "preferHeygenDub")
                   .map((field) => (
                   <label key={field.key}>
                     {field.labelHe}
