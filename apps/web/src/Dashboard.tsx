@@ -70,23 +70,35 @@ export function Dashboard({
   return (
     <div className="dashboard">
       <header className="dash-header">
-        <div>
-          <h2>שלום{user?.name ? `, ${user.name}` : ""}</h2>
-          <p className="credits-badge">
-            {freeLeft > 0
-              ? freeLeft === 1
-                ? "נותר סרטון חינם אחד"
-                : `נותרו ${freeLeft} סרטונים חינם`
-              : `${formatCredits(credits)} קרדיטים זמינים`}
-          </p>
+        <div className="page-heading">
+          <p className="eyebrow">הסטודיו שלי</p>
+          <h1>שלום{user?.name ? `, ${user.name}` : ""}</h1>
+          <p className="muted">כל הסרטונים, הטיוטות ותהליכי היצירה שלכם במקום אחד.</p>
         </div>
-        <button type="button" className="primary" disabled={!canCreate} onClick={onNewVideo}>
-          + סרטון חדש
-        </button>
+        <div className="dash-header-actions">
+          <div className="credit-summary">
+            <span className="credit-summary-icon" aria-hidden>✦</span>
+            <span>
+              <small>יתרה זמינה</small>
+              <strong>
+                {freeLeft > 0
+                  ? freeLeft === 1
+                    ? "סרטון חינם אחד"
+                    : `${freeLeft} סרטונים חינם`
+                  : `${formatCredits(credits)} קרדיטים`}
+              </strong>
+            </span>
+          </div>
+          <button type="button" className="primary button-large" disabled={!canCreate} onClick={onNewVideo}>
+            <span aria-hidden>＋</span>
+            סרטון חדש
+          </button>
+        </div>
       </header>
 
       {freeLeft > 0 ? (
         <section className="billing-banner billing-banner-free">
+          <span className="banner-icon" aria-hidden>🎬</span>
           <p>
             {freeLeft === 1 ? (
               <>
@@ -103,14 +115,17 @@ export function Dashboard({
 
       {showPurchase ? (
         <section className="billing-banner">
-          <h3>רכישת קרדיטים</h3>
-          <p>אין מספיק קרדיטים ליצירת סרטון. בחר אחת מהאפשרויות:</p>
+          <div>
+            <p className="eyebrow">ממשיכים ליצור</p>
+            <h3>הקרדיטים נגמרו</h3>
+            <p>בחרו סרטון בודד או מסלול חודשי שמתאים לקצב שלכם.</p>
+          </div>
           <div className="stage-actions billing-actions">
             <button type="button" className="primary" disabled={busy !== null || !billingReady} onClick={() => void buy("payg")}>
-              {busy === "payg" ? "…" : "קנה סרטון — ₪30"}
+              {busy === "payg" ? "פותח תשלום…" : "סרטון בודד · ₪30"}
             </button>
             <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("subscription")}>
-              {busy === "subscription" ? "…" : "מנוי חודשי — ₪600"}
+              {busy === "subscription" ? "פותח תשלום…" : "30 סרטונים · ₪600"}
             </button>
           </div>
           {!billingReady ? (
@@ -133,15 +148,48 @@ export function Dashboard({
       ) : null}
 
       <section className="runs-grid">
-        <h3>הסרטונים שלי</h3>
-        {runs.length === 0 ? <p className="muted">עדיין לא יצרת סרטונים.</p> : null}
+        <div className="section-title-row">
+          <div>
+            <p className="eyebrow">הפרויקטים האחרונים</p>
+            <h2>הסרטונים שלי</h2>
+          </div>
+          <button type="button" className="button-secondary refresh-button" onClick={() => void refreshRuns()}>
+            <span aria-hidden>↻</span>
+            רענון
+          </button>
+        </div>
+        {runs.length === 0 ? (
+          <div className="empty-state">
+            <span className="empty-state-icon" aria-hidden>▶</span>
+            <h3>הסרטון הראשון מתחיל כאן</h3>
+            <p>תארו את הרעיון, צרפו תמונות והמערכת תיקח אתכם עד לקובץ המוכן.</p>
+            <button type="button" className="primary" disabled={!canCreate} onClick={onNewVideo}>
+              צרו סרטון ראשון
+            </button>
+          </div>
+        ) : null}
         <ul className="run-cards">
           {runs.map((r) => (
             <li key={r.id} className="run-card-row">
               <button type="button" className="run-card" onClick={() => onOpenRun(r.id)}>
-                <strong>{r.title}</strong>
-                <span className={`status-pill status-${r.status.toLowerCase()}`}>{statusHe(r.status)}</span>
-                <small>{new Date(r.updatedAt).toLocaleString("he-IL")}</small>
+                <span className="run-card-thumb" aria-hidden>
+                  <span>▶</span>
+                </span>
+                <span className="run-card-content">
+                  <span className="run-card-title-row">
+                    <strong>{r.title}</strong>
+                    <span className={`status-pill status-${r.status.toLowerCase()}`}>{statusHe(r.status)}</span>
+                  </span>
+                  <small>
+                    עודכן {new Date(r.updatedAt).toLocaleDateString("he-IL", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric"
+                    })}
+                    {r.currentStage ? ` · שלב ${r.currentStage}` : ""}
+                  </small>
+                </span>
+                <span className="run-card-arrow" aria-hidden>←</span>
               </button>
               <button
                 type="button"
@@ -158,9 +206,8 @@ export function Dashboard({
           ))}
         </ul>
       </section>
-
-      <button type="button" className="link-btn" onClick={() => void refresh()}>
-        רענן קרדיטים
+      <button type="button" className="link-btn dashboard-credit-refresh" onClick={() => void refresh()}>
+        רענון יתרת קרדיטים
       </button>
     </div>
   );
@@ -172,7 +219,7 @@ function formatCredits(n: number): string {
 
 function statusHe(status: string): string {
   const map: Record<string, string> = {
-    RUNNING: "רץ",
+    RUNNING: "בתהליך",
     COMPLETED: "הושלם",
     FAILED: "נכשל",
     AWAITING_APPROVAL: "ממתין",

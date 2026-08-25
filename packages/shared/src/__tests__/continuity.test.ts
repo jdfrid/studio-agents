@@ -60,7 +60,7 @@ describe("continuity", () => {
     expect(prompt).toContain("Man, 40s, navy jacket");
     expect(prompt).toContain("Forest trail");
     expect(prompt).toContain("Scene 2 of 3");
-    expect(prompt).toContain("EXACT same fictional characters");
+    expect(prompt).toContain("EXACT same characters");
   });
 
   it("applyContinuityToScript rewrites all scene prompts", () => {
@@ -70,7 +70,7 @@ describe("continuity", () => {
     });
     expect(out.characterBible.length).toBeGreaterThan(10);
     for (const scene of out.scenes) {
-      expect(scene.referenceImagePrompt).toContain("EXACT same fictional characters");
+      expect(scene.referenceImagePrompt).toContain("EXACT same characters");
       expect(scene.visualPrompt).toContain("Same cast & location");
     }
   });

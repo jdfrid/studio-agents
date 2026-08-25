@@ -59,25 +59,34 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
     <div className="run-view">
       <StageProgressClock run={run} />
       <header className="run-view-header">
-        <button type="button" className="link-btn" onClick={onBack}>
-          ← חזרה
+        <button type="button" className="button-secondary back-button" onClick={onBack}>
+          <span aria-hidden>→</span>
+          חזרה לסרטונים
         </button>
-        <h2>{run.brief.title}</h2>
-        <span className={`status-pill status-${run.status.toLowerCase()}`}>{statusLabelHe(run.status)}</span>
-        {run.status !== "COMPLETED" ? (
+        <div className="run-title-block">
+          <p className="eyebrow">פרויקט וידאו</p>
+          <div>
+            <h1>{run.brief.title}</h1>
+            <span className={`status-pill status-${run.status.toLowerCase()}`}>{statusLabelHe(run.status)}</span>
+          </div>
+        </div>
+        <div className="run-header-actions">
           <button type="button" className="link-btn run-delete-btn" disabled={deleting} onClick={() => void deleteThisRun()}>
-            {deleting ? "מוחק…" : "מחק תהליך"}
+            {deleting ? "מוחק…" : run.status !== "COMPLETED" ? "מחק תהליך" : "מחק"}
           </button>
-        ) : (
-          <button type="button" className="link-btn run-delete-btn" disabled={deleting} onClick={() => void deleteThisRun()}>
-            {deleting ? "מוחק…" : "מחק"}
-          </button>
-        )}
+        </div>
       </header>
 
       <RunSettingsSummary run={run} artifacts={artifacts} />
 
-      <ol className="progress-timeline progress-timeline-stack">
+      <section className="run-progress-section" aria-labelledby="run-progress-title">
+        <div className="section-title-row">
+          <div>
+            <p className="eyebrow">תהליך ההפקה</p>
+            <h2 id="run-progress-title">התקדמות הסרטון</h2>
+          </div>
+        </div>
+        <ol className="progress-timeline progress-timeline-stack">
         {STAGE_ORDER.map((stage) => {
           const s = run.stages.find((x) => x.stage === stage);
           const st = s?.status ?? "PENDING";
@@ -89,7 +98,8 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
             </li>
           );
         })}
-      </ol>
+        </ol>
+      </section>
 
       {scriptOutput?.scenes?.length ? (
         <VisualCorrectionsPanel runId={runId} scriptOutput={scriptOutput} runStatus={run.status} onSaved={() => void refresh()} />

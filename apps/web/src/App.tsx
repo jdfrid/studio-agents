@@ -75,19 +75,48 @@ function AppShell() {
   return (
     <div className="layout saas-layout">
       <header className="saas-header">
-        <strong className="brand">Prompt2Spot</strong>
-        <nav>
+        <button
+          type="button"
+          className="brand-lockup"
+          onClick={() => navigate({ view: "dashboard", runId: null })}
+          aria-label="Prompt2Spot — מעבר למסך הבית"
+        >
+          <span className="brand-mark" aria-hidden>
+            P2
+          </span>
+          <span className="brand-copy">
+            <strong className="brand">Prompt2Spot</strong>
+            <small>AI video studio</small>
+          </span>
+        </button>
+        <nav className="saas-nav" aria-label="ניווט ראשי">
           <button
             type="button"
             className={view === "dashboard" ? "nav-active" : ""}
             onClick={() => navigate({ view: "dashboard", runId: null })}
           >
+            <span aria-hidden>▦</span>
             הסרטונים שלי
+          </button>
+          <button
+            type="button"
+            className={view === "create" ? "nav-active" : ""}
+            disabled={!user.canCreateVideo}
+            onClick={() => navigate({ view: "create", runId: null })}
+          >
+            <span aria-hidden>＋</span>
+            יצירה חדשה
           </button>
         </nav>
         <div className="header-user">
-          {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="avatar" /> : null}
-          <span>{user.email}</span>
+          {user.avatarUrl ? (
+            <img src={user.avatarUrl} alt="" className="avatar" />
+          ) : (
+            <span className="avatar avatar-fallback" aria-hidden>
+              {(user.name || user.email || "P").slice(0, 1).toUpperCase()}
+            </span>
+          )}
+          <span className="header-user-email">{user.email}</span>
           <button type="button" className="link-btn" onClick={() => void logout()}>
             יציאה
           </button>

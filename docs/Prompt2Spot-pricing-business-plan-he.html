@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <title>Prompt2Spot — תמחור ותכנית עסקית</title>
+  <style>
+    @page { size: A4; margin: 16mm 15mm 17mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Noto Sans Hebrew", sans-serif;
+      color: #172033;
+      font-size: 10.5pt;
+      line-height: 1.5;
+      background: white;
+    }
+    h1 { font-size: 25pt; margin: 0 0 8px; color: #102e67; }
+    h2 {
+      font-size: 16pt;
+      margin: 24px 0 10px;
+      padding-bottom: 5px;
+      color: #173f7a;
+      border-bottom: 2px solid #d8e4f5;
+    }
+    h3 { font-size: 12.5pt; margin: 16px 0 6px; color: #1f4e8c; }
+    p { margin: 5px 0 10px; }
+    ul, ol { margin: 5px 0 10px; padding-right: 22px; }
+    li { margin: 3px 0; }
+    small, .small { font-size: 8.5pt; color: #5d6676; }
+    .cover {
+      min-height: 255mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      page-break-after: always;
+    }
+    .brand { color: #3975c6; font-weight: 700; letter-spacing: .4px; }
+    .subtitle { font-size: 15pt; color: #46566f; max-width: 155mm; }
+    .date { margin-top: 24px; color: #6b7482; }
+    .hero {
+      margin: 24px 0;
+      padding: 15px 17px;
+      background: #edf4ff;
+      border-right: 5px solid #3975c6;
+      border-radius: 4px;
+      font-size: 13pt;
+      font-weight: 700;
+    }
+    .summary-grid, .cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .card {
+      padding: 11px 13px;
+      border: 1px solid #d8dee8;
+      border-radius: 5px;
+      break-inside: avoid;
+    }
+    .card strong { display: block; font-size: 13pt; color: #173f7a; margin-bottom: 3px; }
+    .metric {
+      font-size: 21pt;
+      font-weight: 700;
+      color: #173f7a;
+      line-height: 1.1;
+    }
+    .label { color: #606b7a; font-size: 8.8pt; }
+    .warning {
+      margin: 12px 0;
+      padding: 10px 13px;
+      background: #fff5e5;
+      border-right: 4px solid #d28a14;
+      break-inside: avoid;
+    }
+    .success {
+      margin: 12px 0;
+      padding: 10px 13px;
+      background: #edf8f1;
+      border-right: 4px solid #2d8a57;
+      break-inside: avoid;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 9px 0 14px;
+      font-size: 9pt;
+      break-inside: avoid;
+    }
+    th {
+      background: #173f7a;
+      color: white;
+      text-align: right;
+      padding: 7px 6px;
+      font-weight: 700;
+    }
+    td { border: 1px solid #d8dee8; padding: 6px; vertical-align: top; }
+    tr:nth-child(even) td { background: #f7f9fc; }
+    .good { color: #207147; font-weight: 700; }
+    .bad { color: #a33b2f; font-weight: 700; }
+    .center { text-align: center; }
+    .ltr { direction: ltr; unicode-bidi: embed; }
+    .page-break { page-break-before: always; }
+    .avoid { break-inside: avoid; }
+    .footer-note {
+      margin-top: 22px;
+      padding-top: 8px;
+      border-top: 1px solid #d8dee8;
+      font-size: 8pt;
+      color: #697382;
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="brand">Prompt2Spot</div>
+    <h1>תמחור ותכנית עסקית</h1>
+    <p class="subtitle">מודל יחידת־כלכלה, חבילות מומלצות, נכונות השוק לשלם ותכנית חדירה ל־90 יום</p>
+    <div class="hero">
+      המלצה מרכזית: ₪49 לסרטון 30 שניות, מנויים של ₪199 / ₪549 / ₪1,190,
+      ותוסף lip-sync של ₪25 לכל 30 שניות.
+    </div>
+    <p class="date">אוגוסט 2026 · מסמך עבודה פנימי</p>
+  </section>
+
+  <h2>תקציר מנהלים</h2>
+  <p>
+    עלות הייצור הישירה שנמסרה היא כ־₪12 לסרטון רגיל של 30 שניות. לאחר רזרבה
+    לכשלים ורינדורים חוזרים ותפעול משתנה, עלות מלאה סבירה היא כ־₪16.4. תנועת
+    שפתיים באמצעות Kling Avatar מוסיפה כ־₪6 בעלות ספק, וכ־₪7.8 בעלות מלאה.
+  </p>
+  <div class="summary-grid">
+    <div class="card"><div class="metric">₪49</div><div class="label">מחיר מומלץ לסרטון בודד של 30 שנ׳</div></div>
+    <div class="card"><div class="metric">₪25</div><div class="label">תוסף lip-sync לכל 30 שנ׳</div></div>
+    <div class="card"><div class="metric">~54%</div><div class="label">מרווח תרומה בסרטון בודד רגיל</div></div>
+    <div class="card"><div class="metric">17</div><div class="label">לקוחות משוערים לנקודת איזון בתרחיש הבסיס</div></div>
+  </div>
+  <div class="warning">
+    <strong>החבילה הקיימת — ₪600 ל־30 סרטונים — אינה יציבה בניצול מלא.</strong>
+    לאחר מע״מ ועמלות נותרות כ־₪459, מול עלות מלאה של כ־₪493: מרווח שלילי של כ־8%.
+  </div>
+  <p>
+    השוק עשוי לשלם את המחירים המוצעים, אך בעיקר כאשר המוצר נמכר לעסקים
+    ולסוכנויות כ<strong>תוצאה עסקית מוכנה</strong>, ולא ככלי נוסף ליצירת AI.
+    לקוחות חובבים ישוו לכלים זולים וינסו לעשות לבד; לקוחות עסקיים ישוו לזמן,
+    לעריכה ידנית, לדיוק בעברית ולמספר סבבי התיקונים שנחסכו.
+  </p>
+
+  <h2>1. הנחות ומודל עלות</h2>
+  <table>
+    <thead><tr><th>מרכיב</th><th>סרטון רגיל 30 שנ׳</th><th>עם lip-sync</th><th>הערה</th></tr></thead>
+    <tbody>
+      <tr><td>ייצור בסיסי</td><td>₪12.00</td><td>₪12.00</td><td>וידאו, תמונות, TTS, טקסט ואחסון לפי נתוני המוצר</td></tr>
+      <tr><td>Kling Avatar</td><td>—</td><td>₪6.07</td><td><span class="ltr">$0.0562/sec × 30 × ₪3.6</span></td></tr>
+      <tr><td>רזרבת retry</td><td>₪1.44</td><td>₪2.17</td><td>12% מעלות הספק</td></tr>
+      <tr><td>תמיכה ותפעול משתנה</td><td>₪3.00</td><td>₪4.00</td><td>הקצאה ממוצעת לסרטון</td></tr>
+      <tr><td><strong>עלות מלאה</strong></td><td><strong>₪16.44</strong></td><td><strong>₪24.24</strong></td><td>לפני הוצאות קבועות</td></tr>
+    </tbody>
+  </table>
+  <p class="small">
+    תרחיש הבסיס כולל מע״מ 18% במחיר לצרכן, עמלת Lemon Squeezy משוערת של
+    7.5%–8% + $0.50, ועמלת payout בתוך שיעור הביטחון. העלות בפועל חייבת להתעדכן מלוג העלויות.
+  </p>
+
+  <h3>שלושה תרחישי סיכון</h3>
+  <table>
+    <thead><tr><th>תרחיש</th><th>עלות ישירה</th><th>רזרבת retry</th><th>תפעול</th><th>מתי להשתמש</th></tr></thead>
+    <tbody>
+      <tr><td>אופטימי</td><td>₪10.5</td><td>8%</td><td>₪2</td><td>לאחר יציבות ספקים ושיעור retry נמוך</td></tr>
+      <tr><td>בסיס</td><td>₪12</td><td>12%</td><td>₪3</td><td>תמחור שוטף מומלץ</td></tr>
+      <tr><td>שמרני</td><td>₪14</td><td>20%</td><td>₪5</td><td>תקופת השקה או איכות לא יציבה</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="page-break">2. מחירון מומלץ</h2>
+  <table>
+    <thead>
+      <tr><th>חבילה</th><th>מחיר כולל מע״מ</th><th>מכסה</th><th>מחיר מחירון לסרטון</th><th>מרווח בניצול 70%</th><th>מרווח בניצול מלא</th><th>קהל</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>סרטון בודד</td><td>₪49</td><td>1</td><td>₪49</td><td>~54%</td><td>~54%</td><td>התנסות וצורך חד־פעמי</td></tr>
+      <tr><td>Creator</td><td>₪199</td><td>5</td><td>₪39.8</td><td class="good">~62%</td><td class="good">~46%</td><td>עצמאים ועסקים קטנים</td></tr>
+      <tr><td>Business</td><td>₪549</td><td>15</td><td>₪36.6</td><td class="good">~59%</td><td>~41%</td><td>שיווק שוטף</td></tr>
+      <tr><td>Agency</td><td>₪1,190</td><td>30</td><td>₪39.7</td><td class="good">~62%</td><td class="good">~46%</td><td>סוכנויות ולקוחות מרובים</td></tr>
+    </tbody>
+  </table>
+  <div class="success">
+    <strong>lip-sync:</strong> תוסף ₪25 לכל מקטע של 30 שניות, או חבילת 10 תוספים
+    ב־₪199. העלות אינה נבלעת במנוי, כדי שמשתמשים רגילים לא יסבסדו משתמשי lip-sync.
+  </div>
+
+  <h3>תמחור לפי אורך</h3>
+  <ul>
+    <li>30 שניות = קרדיט אחד.</li>
+    <li>60 / 90 / 120 / 180 שניות = 2 / 3 / 4 / 6 קרדיטים.</li>
+    <li>כשל טכני של ספק: retry ללא חיוב.</li>
+    <li>שינוי יצירתי לאחר תוצאה תקינה: ויזואל מחדש 0.5 קרדיט; רינדור בלבד 0.25 קרדיט.</li>
+    <li>rollover מוגבל לחודש אחד ועד 50% מהמכסה; אין מסלול “ללא הגבלה”.</li>
+    <li>הנחה שנתית עד 10%, כדי לא למחוק את המרווח.</li>
+  </ul>
+
+  <h2>3. האם השוק ישלם?</h2>
+  <p>
+    <strong>כן, אך לא כל השוק.</strong> משתמש פרטי שרוצה להתנסות ב־AI יראה ₪49
+    כמחיר גבוה לעומת מנוי לכלי DIY. עסק שצריך סרטון מדויק בעברית, עם מוצר,
+    תסריט, קול ורינדור, עשוי לראות אותו כמחיר נמוך מאוד לעומת שעות עבודה או עורך וידאו.
+  </p>
+  <table>
+    <thead><tr><th>פלח</th><th>תגובה צפויה</th><th>נכונות לשלם</th><th>מסר נכון</th></tr></thead>
+    <tbody>
+      <tr><td>חובבי AI / משתמשים פרטיים</td><td>“אנסה לבד”</td><td>נמוכה</td><td>לא קהל היעד הראשוני</td></tr>
+      <tr><td>עצמאים ועסקים קטנים</td><td>ישלמו אם התוצאה מהירה ומוכנה לפרסום</td><td>בינונית–גבוהה</td><td>חיסכון בזמן ותוצאה בעברית</td></tr>
+      <tr><td>מנהלי שיווק</td><td>ישלמו על עקביות, מותג ותיקונים</td><td>גבוהה</td><td>תהליך חוזר, SLA ושקיפות עלות</td></tr>
+      <tr><td>סוכנויות</td><td>ישלמו אם ניתן לשרת כמה לקוחות ברווח</td><td>גבוהה</td><td>white-label, מכסה ו־workflow</td></tr>
+    </tbody>
+  </table>
+  <p>
+    התנאי הקריטי הוא איכות: אם הלקוח משלם ועדיין נדרש לבצע ניסיונות רבים,
+    הוא יעדיף כלי DIY. לכן אין להוריד מחיר אוטומטית כשאין המרה; תחילה בודקים
+    דוגמאות, אמון, זמן לתוצאה ושיעור תיקונים.
+  </p>
+
+  <h3>ניסוי נכונות לשלם — 30 יום</h3>
+  <ol>
+    <li>להציג סרטון ראשון ב־₪39 לקבוצת design partners מוגבלת.</li>
+    <li>להציג מחיר רגיל של ₪49 וחבילת 5 ב־₪199.</li>
+    <li>לא לתת סרטון מלא חינם; אפשר preview קצר או ממותג.</li>
+    <li>למדוד המרה לתשלום, רכישה חוזרת תוך 30 יום, מספר תיקונים וזמן שנחסך.</li>
+  </ol>
+  <div class="success">
+    <strong>ספי הצלחה:</strong> 10%–20% המרה לאחר צפייה בדוגמה; לפחות 25% רכישה
+    חוזרת; פחות מתיקון אחד לסרטון; והצהרת לקוח על חיסכון של שעה ומעלה.
+  </div>
+
+  <h2 class="page-break">4. מודל עסקי ונקודת איזון</h2>
+  <p>
+    תרחיש הבסיס מניח 50% לקוחות Creator, 35% Business ו־15% Agency, ניצול
+    מכסה של 70%, 50 לקוחות משלמים והוצאות קבועות של ₪3,500 בחודש.
+  </p>
+  <div class="summary-grid">
+    <div class="card"><div class="metric">₪23.5K</div><div class="label">MRR מחירון ב־50 לקוחות</div></div>
+    <div class="card"><div class="metric">₪18.0K</div><div class="label">MRR נטו ממע״מ ועמלות</div></div>
+    <div class="card"><div class="metric">~₪7.4K</div><div class="label">תרומה לאחר עלויות משתנות וקבועות</div></div>
+    <div class="card"><div class="metric">~17</div><div class="label">לקוחות לנקודת איזון</div></div>
+  </div>
+  <p>
+    המספר אינו כולל שכר מייסד מלא. כאשר העסק נדרש לממן שכר, שיווק ושירות
+    לקוחות קבועים, יש להזין אותם כהוצאה קבועה ולחשב מחדש. היעד התפעולי הוא
+    מרווח תרומה של לפחות 45% בתמהיל בפועל והתראה מתחת ל־35%.
+  </p>
+
+  <h3>מיקוד עסקי</h3>
+  <ul>
+    <li><strong>ICP:</strong> עסקים קטנים וסוכנויות בישראל שמייצרים 5–30 סרטוני מוצר וסושיאל בעברית בחודש.</li>
+    <li><strong>הבטחה:</strong> “מסר ותמונות נכנסים, סרטון עסקי בעברית יוצא”.</li>
+    <li><strong>בידול:</strong> תסריט, TTS עברי, תמונות מוצר, lower-thirds ורינדור בתהליך אחד.</li>
+    <li><strong>ערוצים:</strong> שותפי סוכנויות, דוגמאות לפי ענף ו־case studies מול עריכה ידנית.</li>
+  </ul>
+
+  <h3>יעדי KPI</h3>
+  <table>
+    <thead><tr><th>מדד</th><th>יעד</th><th>משמעות</th></tr></thead>
+    <tbody>
+      <tr><td>מרווח תרומה</td><td>≥45%</td><td>אחרי מע״מ, עמלות ועלויות משתנות</td></tr>
+      <tr><td>ניצול מכסות</td><td>55%–75%</td><td>איזון בין ערך ללקוח לרווחיות</td></tr>
+      <tr><td>Churn חודשי</td><td>&lt;5%</td><td>מוצר שנכנס לשגרת שיווק</td></tr>
+      <tr><td>Retry בתשלום ספק</td><td>&lt;10%</td><td>יציבות איכות ועלות</td></tr>
+      <tr><td>CAC payback</td><td>עד 3 חודשים</td><td>שיווק בר־מימון</td></tr>
+    </tbody>
+  </table>
+
+  <h2>5. תכנית Go-to-market ל־90 יום</h2>
+  <table>
+    <thead><tr><th>תקופה</th><th>מטרה</th><th>פעולות</th><th>שער החלטה</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>ימים 1–30</td>
+        <td>אימות נכונות לשלם</td>
+        <td>10 design partners בשלושה ענפים; גבייה בפועל של ₪39/₪49/₪199</td>
+        <td>5 לקוחות משלמים ו־50 סרטונים בעלות חציונית ≤₪12</td>
+      </tr>
+      <tr>
+        <td>ימים 31–60</td>
+        <td>חזרתיות והפניות</td>
+        <td>Case studies, referral לסוכנויות ומדידת retry, זמן וניצול</td>
+        <td>MRR ≥₪5,000; מרווח ≥40%; שלושה לקוחות חוזרים</td>
+      </tr>
+      <tr>
+        <td>ימים 61–90</td>
+        <td>ערוץ סוכנויות</td>
+        <td>Agency ב־₪1,190, onboarding מותג וחוזה שנתי בהנחה 10%</td>
+        <td>MRR ≥₪12,000; churn מוקדם &lt;8%; שתי סוכנויות</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>6. סיכונים ו־guardrails</h2>
+  <div class="cards">
+    <div class="card">
+      <strong>תנודת עלויות ספק</strong>
+      לנטר עלות אמיתית לכל ריצה ולעדכן מחירון אם ממוצע 30 שניות עובר ₪14 במשך שבועיים.
+    </div>
+    <div class="card">
+      <strong>לקוחות כבדים</strong>
+      מכסות, concurrency ו־rollover מוגבל. אין unlimited; מעל 30 סרטונים עוברים להצעה מותאמת.
+    </div>
+    <div class="card">
+      <strong>איכות ותיקונים</strong>
+      להפריד retry טכני מתיקון יצירתי ולמדוד שעות תמיכה לכל לקוח.
+    </div>
+    <div class="card">
+      <strong>מיסוי ותשלום</strong>
+      לאמת עם רו״ח את הצגת המחיר, המע״מ והטיפול של Merchant of Record.
+    </div>
+  </div>
+
+  <div class="footer-note">
+    מקורות והנחות: עלות מוצר שסופקה — כ־₪12 ל־30 שנ׳; Prompt2Spot משתמש בשער
+    ₪3.6/$; Kling Avatar $0.0562 לשנייה; Lemon Squeezy 5% + $0.50 עם תוספות
+    אפשריות לעסקאות בינלאומיות/מנויים; מע״מ ישראלי 18%. להשוואת שוק:
+    HeyGen Creator ו־Synthesia Starter מתחילים סביב $29 לחודש. המסמך הוא מודל
+    עסקי לצורך החלטה ואינו ייעוץ מס או חשבונאות.
+  </div>
+</body>
+</html>

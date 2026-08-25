@@ -280,7 +280,23 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
 
   return (
     <div className="create-form">
-      <h2>סרטון חדש</h2>
+      <header className="create-page-header">
+        <button type="button" className="button-secondary back-button" onClick={onCancel}>
+          <span aria-hidden>→</span>
+          חזרה
+        </button>
+        <div className="page-heading">
+          <p className="eyebrow">יצירה חדשה</p>
+          <h1>בואו נבנה את הסרטון הבא</h1>
+          <p className="muted">מתחילים מהרעיון. אפשר להשאיר את השאר למערכת או לדייק כל פרט.</p>
+        </div>
+      </header>
+      <div className="create-progress" aria-label="שלבי הגדרת הסרטון">
+        <span className="is-active"><i>1</i>רעיון</span>
+        <span><i>2</i>חומרים</span>
+        <span><i>3</i>מיתוג</span>
+        <span><i>4</i>הגדרות</span>
+      </div>
       {freeLeft > 0 ? (
         <p className="billing-banner-free create-free-note">
           {freeLeft === 1
@@ -311,6 +327,13 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         />
         <small className="muted">הנחיות מחייבות ליצירה — מה לשמור, מה לשנות, תנועות מצלמה וכו׳.</small>
       </label>
+      <div className="form-section-heading">
+        <span className="form-section-icon" aria-hidden>◫</span>
+        <div>
+          <h2>חומרי גלם</h2>
+          <p>אופציונלי — תמונות וקבצים יעזרו לשמור על המוצר, הדמות והקול שלכם.</p>
+        </div>
+      </div>
       <label className="file-row">
         תמונות דמויות / רקע (אופציונלי)
         <input
@@ -435,6 +458,13 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           </fieldset>
         </div>
       ) : null}
+      <div className="form-section-heading">
+        <span className="form-section-icon" aria-hidden>◎</span>
+        <div>
+          <h2>הפקה ובקרה</h2>
+          <p>בחרו את אורך הסרטון וכמה נקודות אישור תרצו בדרך.</p>
+        </div>
+      </div>
       <label>
         משך (שניות)
         <input
@@ -477,8 +507,13 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       </fieldset>
 
       <section className="branding-section" aria-label="מיתוג העסק">
-        <h3 className="branding-section-title">מיתוג העסק</h3>
-        <p className="muted branding-hint">יופיע בכרטיס הסיום — שם, סלוגן, קישור ולוגו, עם דיבוב קצר למותג.</p>
+        <div className="form-section-heading">
+          <span className="form-section-icon" aria-hidden>✦</span>
+          <div>
+            <h2 className="branding-section-title">מיתוג העסק</h2>
+            <p className="muted branding-hint">שם, סלוגן, קישור ולוגו שיופיעו בכרטיס הסיום.</p>
+          </div>
+        </div>
         <label>
           שם העסק
           <input
@@ -695,7 +730,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       ) : null}
 
       {error ? <p className="error-inline">{error}</p> : null}
-      <div className="stage-actions">
+      <div className="stage-actions create-actions">
         <button
           type="button"
           className="primary"
@@ -709,9 +744,10 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           }
           onClick={() => void submit()}
         >
-          {busy ? "יוצר…" : "התחל יצירה"}
+          {busy ? "מתחיל ליצור…" : "התחל יצירה"}
+          {!busy ? <span aria-hidden>←</span> : null}
         </button>
-        <button type="button" disabled={busy} onClick={onCancel}>
+        <button type="button" className="button-secondary" disabled={busy} onClick={onCancel}>
           ביטול
         </button>
       </div>
