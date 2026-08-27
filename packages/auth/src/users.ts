@@ -70,7 +70,6 @@ function toUserView(user: {
   name: string | null;
   avatarUrl: string | null;
   role: "USER" | "ADMIN";
-  locale: string;
   subscription: {
     planType: "PAYG" | "SUBSCRIPTION";
     status: string;
@@ -84,7 +83,6 @@ function toUserView(user: {
     name: user.name,
     avatarUrl: user.avatarUrl,
     role: user.role,
-    locale: user.locale,
     credits: 0,
     freeVideosRemaining: 0,
     canCreateVideo: false,

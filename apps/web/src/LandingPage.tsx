@@ -1,25 +1,29 @@
+import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext.js";
+import { LanguageSwitcher } from "./i18n/LanguageSwitcher.js";
 
 export function LandingPage() {
+  const { t, i18n } = useTranslation();
   const { login } = useAuth();
   return (
     <div className="landing">
       <header className="landing-header">
-        <a className="brand-lockup" href="/" aria-label="Prompt2Spot — דף הבית">
+        <a className="brand-lockup" href="/" aria-label={t("landing.homeLabel")}>
           <span className="brand-mark" aria-hidden>
             P2
           </span>
           <span className="brand-copy">
             <strong className="brand">Prompt2Spot</strong>
-            <small>AI video studio</small>
+            <small>{t("common.brandTagline")}</small>
           </span>
         </a>
-        <nav className="landing-nav" aria-label="ניווט באתר">
-          <a href="#how-it-works">איך זה עובד</a>
-          <a href="#pricing">מחירים</a>
+        <nav className="landing-nav" aria-label={t("landing.siteNav")}>
+          <a href="#how-it-works">{t("landing.howItWorks")}</a>
+          <a href="#pricing">{t("landing.pricing")}</a>
         </nav>
+        <LanguageSwitcher compact />
         <button type="button" className="button-secondary landing-login" onClick={login}>
-          כניסה
+          {t("landing.login")}
         </button>
       </header>
 
@@ -28,132 +32,131 @@ export function LandingPage() {
           <div className="landing-hero-copy">
             <p className="eyebrow">
               <span className="eyebrow-dot" aria-hidden />
-              סטודיו וידאו שלם, במקום אחד
+              {t("landing.eyebrow")}
             </p>
             <h1>
-              מרעיון לסרטון עסקי
-              <span> שמוכן לפרסום</span>
+              {t("landing.heroTitle")}
+              <span> {t("landing.heroTitleAccent")}</span>
             </h1>
             <p className="landing-tagline">
-              תארו את המטרה, העלו תמונות — ו־Prompt2Spot יוביל אתכם מתסריט וקול ועד ויזואל ורינדור.
-              בלי ללמוד חמישה כלי AI.
+              {t("landing.tagline")}
             </p>
             <div className="landing-hero-actions">
               <button type="button" className="primary landing-cta" onClick={login}>
-                צרו את הסרטון הראשון
-                <span aria-hidden>←</span>
+                {t("landing.firstVideo")}
+                <span aria-hidden>{i18n.dir() === "rtl" ? "←" : "→"}</span>
               </button>
               <a className="button-link" href="#how-it-works">
-                גלו איך זה עובד
+                {t("landing.discover")}
               </a>
             </div>
-            <ul className="landing-assurances" aria-label="יתרונות">
-              <li><span aria-hidden>✓</span> תהליך מודרך</li>
-              <li><span aria-hidden>✓</span> תמונות מוצר ודמויות</li>
-              <li><span aria-hidden>✓</span> מיתוג וכתוביות</li>
+            <ul className="landing-assurances" aria-label={t("landing.benefitsLabel")}>
+              <li><span aria-hidden>✓</span> {t("landing.guided")}</li>
+              <li><span aria-hidden>✓</span> {t("landing.productAndCharacters")}</li>
+              <li><span aria-hidden>✓</span> {t("landing.brandingAndCaptions")}</li>
             </ul>
           </div>
 
-          <div className="product-showcase" aria-label="תצוגה מקדימה של המערכת">
+          <div className="product-showcase" aria-label={t("landing.previewLabel")}>
             <div className="showcase-glow" />
             <div className="showcase-window">
               <div className="showcase-topbar">
-                <span className="showcase-brand"><i>P2</i> סרטון מוצר חדש</span>
-                <span className="showcase-status">בתהליך יצירה</span>
+                <span className="showcase-brand"><i>P2</i> {t("landing.showcase.newProductVideo")}</span>
+                <span className="showcase-status">{t("landing.showcase.creating")}</span>
               </div>
               <div className="showcase-body">
                 <div className="showcase-sidebar">
-                  <span className="showcase-nav-active">סקירה</span>
-                  <span>תסריט</span>
-                  <span>ויזואל</span>
-                  <span>רינדור</span>
+                  <span className="showcase-nav-active">{t("landing.showcase.overview")}</span>
+                  <span>{t("landing.showcase.script")}</span>
+                  <span>{t("landing.showcase.visual")}</span>
+                  <span>{t("landing.showcase.render")}</span>
                 </div>
                 <div className="showcase-content">
                   <div className="showcase-video">
                     <div className="showcase-video-art">
                       <span className="video-orbit orbit-one" />
                       <span className="video-orbit orbit-two" />
-                      <strong>הרעיון שלכם.<br />הסרטון שלכם.</strong>
+                      <strong>{t("landing.showcase.yourIdea")}<br />{t("landing.showcase.yourVideo")}</strong>
                       <span className="video-play" aria-hidden>▶</span>
                     </div>
                     <div className="showcase-progress"><span /></div>
                   </div>
                   <div className="showcase-steps">
-                    {["בריף", "תסריט", "קול", "ויזואל"].map((step) => (
+                    {[t("landing.showcase.brief"), t("landing.showcase.script"), t("landing.showcase.voice"), t("landing.showcase.visual")].map((step) => (
                       <span key={step}><i>✓</i>{step}</span>
                     ))}
-                    <span className="is-current"><i>5</i>רינדור</span>
+                    <span className="is-current"><i>5</i>{t("landing.showcase.render")}</span>
                   </div>
                 </div>
               </div>
             </div>
             <div className="showcase-float-card float-cost">
-              <span>הערכת עלות</span>
-              <strong>שקופה מראש</strong>
+              <span>{t("landing.showcase.costEstimate")}</span>
+              <strong>{t("landing.showcase.transparent")}</strong>
             </div>
             <div className="showcase-float-card float-ready">
               <span className="ready-icon" aria-hidden>✓</span>
-              <span><strong>הווידאו מוכן</strong><small>לצפייה והורדה</small></span>
+              <span><strong>{t("landing.showcase.ready")}</strong><small>{t("landing.showcase.watchAndDownload")}</small></span>
             </div>
           </div>
         </section>
 
-        <section className="landing-value-grid" aria-label="יכולות מרכזיות">
+        <section className="landing-value-grid" aria-label={t("landing.capabilitiesLabel")}>
           <article>
             <span className="feature-icon" aria-hidden>✦</span>
-            <div><h2>הכול בתהליך אחד</h2><p>בריף, תסריט, קול, תמונות, וידאו ואריזה סופית — בלי להעביר קבצים בין מערכות.</p></div>
+            <div><h2>{t("landing.features.oneFlowTitle")}</h2><p>{t("landing.features.oneFlowBody")}</p></div>
           </article>
           <article>
             <span className="feature-icon" aria-hidden>◫</span>
-            <div><h2>הנכסים שלכם במרכז</h2><p>העלו מוצר, דמות ולוגו כדי ליצור סרטון שמרגיש שייך לעסק שלכם.</p></div>
+            <div><h2>{t("landing.features.assetsTitle")}</h2><p>{t("landing.features.assetsBody")}</p></div>
           </article>
           <article>
             <span className="feature-icon" aria-hidden>◎</span>
-            <div><h2>שליטה כשצריך</h2><p>הפעילו אוטומטית או אשרו כל שלב. הוסיפו סנכרון שפתיים רק כשהרעיון דורש זאת.</p></div>
+            <div><h2>{t("landing.features.controlTitle")}</h2><p>{t("landing.features.controlBody")}</p></div>
           </article>
         </section>
 
         <section className="landing-process" id="how-it-works">
           <div className="section-heading">
-            <p className="eyebrow">פשוט להתחיל</p>
-            <h2>מספרים לנו מה צריך. המערכת בונה את ההפקה.</h2>
+            <p className="eyebrow">{t("landing.process.eyebrow")}</p>
+            <h2>{t("landing.process.title")}</h2>
           </div>
           <ol>
-            <li><span>01</span><div><h3>מגדירים את הסרטון</h3><p>מטרה, קהל, מסר, משך וסגנון.</p></div></li>
-            <li><span>02</span><div><h3>מוסיפים חומרי מותג</h3><p>תמונות מוצר, דמויות, קול ולוגו.</p></div></li>
-            <li><span>03</span><div><h3>מאשרים או רצים אוטומטית</h3><p>אתם בוחרים כמה שליטה להשאיר בדרך.</p></div></li>
-            <li><span>04</span><div><h3>מקבלים סרטון מוכן</h3><p>עם קול, כתוביות, מיתוג וקובץ סופי.</p></div></li>
+            <li><span>01</span><div><h3>{t("landing.process.defineTitle")}</h3><p>{t("landing.process.defineBody")}</p></div></li>
+            <li><span>02</span><div><h3>{t("landing.process.assetsTitle")}</h3><p>{t("landing.process.assetsBody")}</p></div></li>
+            <li><span>03</span><div><h3>{t("landing.process.approveTitle")}</h3><p>{t("landing.process.approveBody")}</p></div></li>
+            <li><span>04</span><div><h3>{t("landing.process.receiveTitle")}</h3><p>{t("landing.process.receiveBody")}</p></div></li>
           </ol>
         </section>
 
         <section className="landing-pricing" id="pricing">
           <div className="section-heading">
-            <p className="eyebrow">מחיר פשוט וברור</p>
-            <h2>מתחילים בסרטון אחד. גדלים כשמתאים.</h2>
+            <p className="eyebrow">{t("landing.plans.eyebrow")}</p>
+            <h2>{t("landing.plans.title")}</h2>
           </div>
           <div className="pricing-cards">
             <article className="price-card">
-              <span className="price-kicker">לנסות ולהתחיל</span>
-              <h3>סרטון בודד</h3>
-              <p className="price"><strong>₪30</strong><small>לסרטון</small></p>
+              <span className="price-kicker">{t("landing.plans.try")}</span>
+              <h3>{t("landing.plans.single")}</h3>
+              <p className="price"><strong>₪30</strong><small>{t("landing.plans.perVideo")}</small></p>
               <ul>
-                <li>קרדיט אחד לסרטון</li>
-                <li>גישה לכל תהליך היצירה</li>
-                <li>ללא התחייבות חודשית</li>
+                <li>{t("landing.plans.oneCredit")}</li>
+                <li>{t("landing.plans.fullAccess")}</li>
+                <li>{t("landing.plans.noCommitment")}</li>
               </ul>
-              <button type="button" onClick={login}>התחילו עכשיו</button>
+              <button type="button" onClick={login}>{t("landing.plans.startNow")}</button>
             </article>
             <article className="price-card featured">
-              <span className="popular-badge">הכי משתלם לעסקים</span>
-              <span className="price-kicker">ליצירה קבועה</span>
-              <h3>מנוי חודשי</h3>
-              <p className="price"><strong>₪600</strong><small>לחודש</small></p>
+              <span className="popular-badge">{t("landing.plans.popular")}</span>
+              <span className="price-kicker">{t("landing.plans.regular")}</span>
+              <h3>{t("landing.plans.monthly")}</h3>
+              <p className="price"><strong>₪600</strong><small>{t("landing.plans.perMonth")}</small></p>
               <ul>
-                <li>30 סרטונים בחודש</li>
-                <li>כ־₪20 לסרטון</li>
-                <li>מתאים לצוותים וסוכנויות</li>
+                <li>{t("landing.plans.videosPerMonth")}</li>
+                <li>{t("landing.plans.approxPerVideo")}</li>
+                <li>{t("landing.plans.teams")}</li>
               </ul>
-              <button type="button" className="primary" onClick={login}>התחילו ליצור</button>
+              <button type="button" className="primary" onClick={login}>{t("landing.plans.startCreating")}</button>
             </article>
           </div>
         </section>
@@ -164,7 +167,7 @@ export function LandingPage() {
           <span className="brand-mark" aria-hidden>P2</span>
           <strong>Prompt2Spot</strong>
         </div>
-        <p>מערכת AI להפקת סרטונים עסקיים — מרעיון ועד רינדור.</p>
+        <p>{t("landing.footer")}</p>
       </footer>
     </div>
   );

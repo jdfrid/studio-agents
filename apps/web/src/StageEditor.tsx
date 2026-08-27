@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { apiPatch, uploadStageArtifact } from "./api.js";
 import type { ProjectRunView, StageName } from "./types.js";
-import { FRAME_TYPE_LABELS_HE } from "@studio/shared";
-import { STAGE_LABELS } from "./StageOutputs.js";
 
 const EDITABLE_STAGES = new Set<StageName>(["brief", "script", "audio", "asset", "package", "render", "series"]);
 
@@ -27,16 +26,17 @@ function FileUploadField({
   busy?: boolean;
   onPick: (file: File) => Promise<void>;
 }) {
+  const { t } = useTranslation("run");
   const [status, setStatus] = useState<string>("");
 
   async function handleChange(file: File | undefined) {
     if (!file) return;
-    setStatus(`מעלה: ${file.name}…`);
+    setStatus(t("editor.uploading", { name: file.name }));
     try {
       await onPick(file);
-      setStatus(`✓ הועלה: ${file.name}`);
+      setStatus(t("editor.uploaded", { name: file.name }));
     } catch (err) {
-      setStatus(`שגיאה: ${(err as Error).message}`);
+      setStatus(t("editor.uploadError", { message: (err as Error).message }));
     }
   }
 
@@ -44,7 +44,7 @@ function FileUploadField({
     <div className="upload-row">
       <span>{label}</span>
       <label className="file-picker-btn">
-        {busy ? "מעלה…" : "בחר קובץ"}
+        {busy ? t("editor.uploadingShort") : t("editor.chooseFile")}
         <input
           type="file"
           accept={accept}
@@ -72,6 +72,7 @@ export function StageEditor({
   output: unknown;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation("run");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -106,19 +107,19 @@ export function StageEditor({
     <div className="stage-editor">
       {!open ? (
         <button type="button" className="link-btn" onClick={beginEdit}>
-          ערוך שלב
+          {t("editor.editStage")}
         </button>
       ) : (
         <div className="editor-panel">
-          <strong>עריכה ידנית — {STAGE_LABELS[stage] ?? stage}</strong>
+          <strong>{t("editor.manualEdit", { stage: t(`stages.${stage}`) })}</strong>
           <textarea className="editor-textarea" rows={14} value={draft} onChange={(e) => setDraft(e.target.value)} />
           {error ? <p className="error-inline">{error}</p> : null}
           <div className="stage-actions">
             <button type="button" className="primary" disabled={busy} onClick={() => void save()}>
-              {busy ? "..." : "שמור"}
+              {busy ? "..." : t("common.save")}
             </button>
             <button type="button" disabled={busy} onClick={() => setOpen(false)}>
-              ביטול
+              {t("common.cancel")}
             </button>
           </div>
         </div>
@@ -138,6 +139,7 @@ export function StageUploadControls({
   output: unknown;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation("run");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -163,10 +165,10 @@ export function StageUploadControls({
     const anchors = Array.isArray(data.visualAnchors) ? data.visualAnchors : [];
     return (
       <div className="upload-controls">
-        <strong>תמונות בסיס (cast / look)</strong>
-        <p className="muted upload-hint">תמונת עוגן אחת לכל הסרטון — לא חייבת להיות משויכת לסצנה.</p>
+        <strong>{t("editor.baseImages")}</strong>
+        <p className="muted upload-hint">{t("editor.baseImagesHint")}</p>
         <FileUploadField
-          label="תמונת בסיס / דמויות"
+          label={t("editor.baseCharacters")}
           accept="image/*,video/*"
           busy={busy}
           onPick={(file) => onFile(file, { type: "visualAnchor" })}
@@ -192,17 +194,17 @@ export function StageUploadControls({
     const perScene = Array.isArray(data.perScene) ? (data.perScene as Array<Record<string, unknown>>) : [];
     return (
       <div className="upload-controls">
-        <strong>העלאה ידנית</strong>
+        <strong>{t("editor.manualUpload")}</strong>
         {perScene.map((row) => (
           <FileUploadField
             key={String(row.sceneId)}
-            label={`קול · סצנה ${String(row.sceneId)}`}
+            label={t("editor.voiceScene", { scene: String(row.sceneId) })}
             accept="audio/*"
             busy={busy}
             onPick={(file) => onFile(file, { type: "voice", sceneId: String(row.sceneId) })}
           />
         ))}
-        <FileUploadField label="מוזיקה" accept="audio/*" busy={busy} onPick={(file) => onFile(file, { type: "music" })} />
+        <FileUploadField label={t("editor.music")} accept="audio/*" busy={busy} onPick={(file) => onFile(file, { type: "music" })} />
         {error ? <p className="error-inline">{error}</p> : null}
       </div>
     );
@@ -212,20 +214,20 @@ export function StageUploadControls({
     const perScene = Array.isArray(data.perScene) ? (data.perScene as Array<Record<string, unknown>>) : [];
     return (
       <div className="upload-controls">
-        <strong>הוספת ויזואל ידנית</strong>
+        <strong>{t("editor.addVisual")}</strong>
         <FileUploadField
-          label="תמונת בסיס לכל הסרטון"
+          label={t("editor.wholeVideoBase")}
           accept="image/*,video/*"
           busy={busy}
           onPick={(file) => onFile(file, { type: "visualAnchor" })}
         />
         {perScene.map((row) => (
           <div className="upload-scene" key={String(row.sceneId)}>
-            <span>סצנה {String(row.sceneId)} (אופציונלי)</span>
+            <span>{t("editor.optionalScene", { scene: String(row.sceneId) })}</span>
             {(["referenceFrame", "firstFrame", "lastFrame", "background"] as const).map((frameType) => (
               <FileUploadField
                 key={frameType}
-                label={FRAME_TYPE_LABELS_HE[frameType]}
+                label={t(`outputs.frames.${frameType}`)}
                 accept="image/*,video/*"
                 busy={busy}
                 onPick={(file) => onFile(file, { type: frameType, sceneId: String(row.sceneId) })}
@@ -242,17 +244,17 @@ export function StageUploadControls({
     const perScene = Array.isArray(data.perScene) ? (data.perScene as Array<Record<string, unknown>>) : [];
     return (
       <div className="upload-controls">
-        <strong>החלפת clip ידנית</strong>
+        <strong>{t("editor.replaceClip")}</strong>
         {perScene.map((row) => (
           <FileUploadField
             key={String(row.sceneId)}
-            label={`סצנה ${String(row.sceneId)}`}
+            label={t("common.scene", { number: String(row.sceneId) })}
             accept="video/*"
             busy={busy}
             onPick={(file) => onFile(file, { type: "sceneClip", sceneId: String(row.sceneId) })}
           />
         ))}
-        <FileUploadField label="סרטון סופי" accept="video/*" busy={busy} onPick={(file) => onFile(file, { type: "final" })} />
+        <FileUploadField label={t("editor.finalVideo")} accept="video/*" busy={busy} onPick={(file) => onFile(file, { type: "final" })} />
         {error ? <p className="error-inline">{error}</p> : null}
       </div>
     );
@@ -295,6 +297,7 @@ export function BriefQuickEditor({
   output: unknown;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation("run");
   if (!output || typeof output !== "object") return null;
   const data = output as Record<string, unknown>;
   const [fields, setFields] = useState({
@@ -312,7 +315,7 @@ export function BriefQuickEditor({
       await apiPatch<ProjectRunView>(`/runs/${runId}/stages/brief/output`, { ...data, ...fields });
       onSaved();
     } catch (err) {
-      window.alert((err as Error).message || "שמירת הבריף נכשלה");
+      window.alert((err as Error).message || t("editor.quickSaveError"));
     } finally {
       setBusy(false);
     }
@@ -321,23 +324,23 @@ export function BriefQuickEditor({
   return (
     <div className="quick-editor">
       <label>
-        סיכום
+        {t("editor.summary")}
         <textarea rows={2} value={fields.summary} onChange={(e) => setFields({ ...fields, summary: e.target.value })} />
       </label>
       <label>
-        כיוון ויזואלי
+        {t("editor.visualDirection")}
         <textarea rows={2} value={fields.visualDirection} onChange={(e) => setFields({ ...fields, visualDirection: e.target.value })} />
       </label>
       <label>
-        כיוון מוזיקה
+        {t("editor.musicDirection")}
         <textarea rows={2} value={fields.musicDirection} onChange={(e) => setFields({ ...fields, musicDirection: e.target.value })} />
       </label>
       <label>
-        טון
+        {t("editor.tone")}
         <input value={fields.toneOfVoice} onChange={(e) => setFields({ ...fields, toneOfVoice: e.target.value })} />
       </label>
       <button type="button" className="primary" disabled={busy} onClick={() => void save()}>
-        {busy ? "..." : "שמור והמשך"}
+        {busy ? "..." : t("editor.saveContinue")}
       </button>
     </div>
   );

@@ -68,7 +68,6 @@ export async function getAdminUsers(limit = 100) {
       email: u.email,
       name: u.name,
       role: u.role,
-      locale: u.locale,
       credits,
       freeVideosLimit: u.freeVideosLimit,
       freeVideosAllowance,
@@ -113,7 +112,6 @@ export async function getAdminUserPnl(userId: string) {
       email: user.email,
       name: user.name,
       role: user.role,
-      locale: user.locale,
       credits,
       freeVideosLimit: user.freeVideosLimit,
       freeVideosAllowance,
@@ -157,7 +155,6 @@ export async function updateAdminUser(userId: string, patch: AdminUserUpdate) {
     data: {
       ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.role !== undefined ? { role: body.role } : {}),
-      ...(body.locale !== undefined ? { locale: body.locale } : {}),
       ...(body.freeVideosLimit !== undefined ? { freeVideosLimit: body.freeVideosLimit } : {})
     },
     include: { subscription: true }
@@ -172,7 +169,6 @@ export async function updateAdminUser(userId: string, patch: AdminUserUpdate) {
     email: user.email,
     name: user.name,
     role: user.role,
-    locale: user.locale,
     freeVideosLimit: user.freeVideosLimit,
     freeVideosAllowance,
     freeVideosRemaining,

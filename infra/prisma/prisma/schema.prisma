@@ -70,7 +70,6 @@ model User {
   avatarUrl String?
   role      UserRole @default(USER)
   tenantId  String   @unique
-  locale    String   @default("he")
   /// Per-user free video quota. null = use platform freeVideosPerUser; 0 = none; N = N free runs.
   freeVideosLimit Int?
   lastLoginAt DateTime?
@@ -380,5 +379,74 @@ model PlatformSettings {
   geminiVideoModel     String?
   freeVideosPerUser    Int      @default(0)
   updatedAt            DateTime @updatedAt
+}
+
+model CreativeField {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  sectionKey  String
+  kind        String
+  sortOrder   Int
+  active      Boolean  @default(true)
+  isRequired  Boolean  @default(false)
+  isProtected Boolean  @default(false)
+  config      Json     @default("{}")
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  translations CreativeFieldTranslation[]
+  options      CreativeOption[]
+
+  @@index([deletedAt, active, sortOrder])
+  @@index([sectionKey, sortOrder])
+}
+
+model CreativeFieldTranslation {
+  fieldId      String
+  locale       String
+  label        String
+  sectionLabel String
+  helpText     String?
+  placeholder  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  field CreativeField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@id([fieldId, locale])
+  @@index([locale])
+}
+
+model CreativeOption {
+  id        String   @id @default(cuid())
+  fieldId   String
+  code      String
+  value     String
+  sortOrder Int
+  active    Boolean  @default(true)
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  field        CreativeField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  translations CreativeOptionTranslation[]
+
+  @@unique([fieldId, code])
+  @@unique([fieldId, value])
+  @@index([fieldId, deletedAt, active, sortOrder])
+}
+
+model CreativeOptionTranslation {
+  optionId  String
+  locale    String
+  label     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  option CreativeOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@id([optionId, locale])
+  @@index([locale])
 }
 

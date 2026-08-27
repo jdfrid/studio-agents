@@ -42,7 +42,6 @@ export const UserViewSchema = z.object({
   name: z.string().nullable(),
   avatarUrl: z.string().nullable(),
   role: UserRoleSchema,
-  locale: z.string(),
   credits: z.number(),
   freeVideosRemaining: z.number(),
   canCreateVideo: z.boolean(),

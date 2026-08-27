@@ -1,3 +1,5 @@
+import type { Locale } from "./localization.js";
+
 /** Normalized Gemini usageMetadata from generateContent responses. */
 export type GeminiUsageMetadata = {
   promptTokenCount: number;
@@ -113,14 +115,14 @@ function readCount(obj: Record<string, unknown>, camel: string, snake: string): 
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-export function pricingSourceLabel(source: CostPricingSource | undefined): string {
+export function pricingSourceLabel(source: CostPricingSource | undefined, locale: Locale = "he"): string {
   switch (source) {
     case "usage_metadata":
-      return "מדוד (tokens)";
+      return locale === "en" ? "Measured (tokens)" : "מדוד (tokens)";
     case "request_params":
-      return "Veo params";
+      return locale === "en" ? "Veo parameters" : "Veo params";
     case "estimate":
-      return "משוער";
+      return locale === "en" ? "Estimated" : "משוער";
     default:
       return "—";
   }

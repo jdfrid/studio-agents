@@ -1,12 +1,11 @@
 import { useMemo } from "react";
-import { STAGE_ORDER, statusLabelHe } from "@studio/shared";
-import { STAGE_LABELS } from "./StageOutputs.js";
+import { useTranslation } from "react-i18next";
+import { STAGE_ORDER } from "@studio/shared";
 import type { ProjectRunView, StageName } from "./types.js";
 
 const R = 54;
 const CX = 64;
 const CY = 64;
-const STROKE = 8;
 const CIRC = 2 * Math.PI * R;
 
 type StageTone = "pending" | "queued" | "running" | "awaiting" | "completed" | "failed";
@@ -33,13 +32,14 @@ function stageStatus(run: ProjectRunView, stage: StageName): string {
 }
 
 export function StageProgressClock({ run }: { run: ProjectRunView }) {
+  const { t } = useTranslation("run");
   const stages = useMemo(
     () =>
       STAGE_ORDER.map((stage, index) => {
         const status = stageStatus(run, stage);
-        return { stage, index, status, tone: toneFor(status), label: STAGE_LABELS[stage] };
+        return { stage, index, status, tone: toneFor(status), label: t(`stages.${stage}`) };
       }),
-    [run]
+    [run, t]
   );
 
   const completed = stages.filter((s) => s.tone === "completed").length;
@@ -54,12 +54,12 @@ export function StageProgressClock({ run }: { run: ProjectRunView }) {
   const activeAngle = active ? -90 + ((active.index + 0.5) / stages.length) * 360 : handAngle;
 
   const centerLabel = allDone
-    ? "הושלם"
+    ? t("progress.complete")
     : failed
-      ? "שגיאה"
+      ? t("progress.error")
       : active
         ? active.label
-        : "ממתין";
+        : t("progress.waiting");
 
   const percent = Math.round(progress * 100);
 
@@ -67,7 +67,7 @@ export function StageProgressClock({ run }: { run: ProjectRunView }) {
     <aside
       className={`stage-progress-clock${isBusy ? " is-busy" : ""}${allDone ? " is-done" : ""}${failed ? " is-failed" : ""}`}
       aria-live="polite"
-      aria-label={`התקדמות הריצה: ${percent}%, שלב נוכחי ${centerLabel}`}
+      aria-label={t("progress.aria", { percent, stage: centerLabel })}
     >
       <div className="stage-progress-clock-face">
         <svg viewBox="0 0 128 128" className="stage-progress-clock-svg" aria-hidden>
@@ -114,7 +114,7 @@ export function StageProgressClock({ run }: { run: ProjectRunView }) {
           <li key={s.stage} className={`spc-legend-${s.tone}`}>
             <span className="spc-legend-dot" aria-hidden />
             <span className="spc-legend-label">{s.label}</span>
-            <span className="spc-legend-status">{statusLabelHe(s.status)}</span>
+            <span className="spc-legend-status">{t(`statuses.${s.status}`, { defaultValue: s.status })}</span>
           </li>
         ))}
       </ul>

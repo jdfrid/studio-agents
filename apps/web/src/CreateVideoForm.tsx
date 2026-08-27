@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
+import { useCreativeCatalog } from "./creativeCatalog.js";
 import type { ProjectRunView } from "./types.js";
 import {
   CREATIVE_FIELD_SECTIONS,
@@ -12,41 +14,39 @@ import {
   predictRenderProfileId,
   profileToProductionCostConfig,
   type ApprovalMode,
-  type CreativeOptions
+  type CreativeOptions,
+  type Locale
 } from "@studio/shared";
 
-const VIDEO_GOALS = [
-  "פרסום מוצר",
-  "פרסום שירות",
-  "תדמית עסקית",
-  "רשתות חברתיות",
-  "הסבר או הדרכה",
-  "הזמנה לאירוע",
-  "אחר"
-] as const;
-
-const DESIRED_ACTIONS = [
-  "לקנות",
-  "להיכנס לאתר",
-  "להשאיר פרטים",
-  "ליצור קשר",
-  "ללמוד ולהבין",
-  "לזכור את המותג",
-  "ללא פעולה מוגדרת"
-] as const;
-
-const MOOD_OPTIONS = [
-  "מקצועי ואמין",
-  "יוקרתי",
-  "מרגש",
-  "צעיר ואנרגטי",
-  "נקי ומודרני",
-  "דרמטי",
-  "רגוע",
-  "אחר"
+const VIDEO_GOALS = ["product", "service", "brand", "social", "explainer", "event", "other"] as const;
+const DESIRED_ACTIONS = ["buy", "visit_site", "submit_details", "contact", "learn", "remember_brand", "none"] as const;
+const MOOD_OPTIONS = ["professional", "luxury", "emotional", "energetic", "modern", "dramatic", "calm", "other"] as const;
+const LEGACY_GOALS: Record<string, (typeof VIDEO_GOALS)[number]> = {
+  "פרסום מוצר": "product", "פרסום שירות": "service", "תדמית עסקית": "brand", "רשתות חברתיות": "social",
+  "הסבר או הדרכה": "explainer", "הזמנה לאירוע": "event", "אחר": "other"
+};
+const LEGACY_ACTIONS: Record<string, (typeof DESIRED_ACTIONS)[number]> = {
+  "לקנות": "buy", "להיכנס לאתר": "visit_site", "להשאיר פרטים": "submit_details", "ליצור קשר": "contact",
+  "ללמוד ולהבין": "learn", "לזכור את המותג": "remember_brand", "ללא פעולה מוגדרת": "none"
+};
+const LEGACY_MOODS: Record<string, (typeof MOOD_OPTIONS)[number]> = {
+  "מקצועי ואמין": "professional", "יוקרתי": "luxury", "מרגש": "emotional", "צעיר ואנרגטי": "energetic",
+  "נקי ומודרני": "modern", "דרמטי": "dramatic", "רגוע": "calm", "אחר": "other"
+};
+const CONTENT_LANGUAGES = [
+  ["he", "Hebrew"],
+  ["en", "English"],
+  ["ar", "Arabic"],
+  ["ru", "Russian"],
+  ["fr", "French"],
+  ["es", "Spanish"],
+  ["yi", "Yiddish"]
 ] as const;
 
 export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: ProjectRunView) => void; onCancel: () => void }) {
+  const { t, i18n } = useTranslation("createVideo");
+  const uiLocale: Locale = i18n.resolvedLanguage?.startsWith("en") ? "en" : "he";
+  const catalog = useCreativeCatalog(uiLocale);
   const { user } = useAuth();
   const canCreate = user?.canCreateVideo ?? false;
   const freeLeft = user?.freeVideosRemaining ?? 0;
@@ -82,21 +82,24 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     karaokeCaptions: "on",
     preferHeygenDub: "off"
   });
+  const [catalogSelections, setCatalogSelections] = useState<Record<string, string | number>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const preferHeygenDub = creative.preferHeygenDub === "on";
-  const heygenNeedsAnchor = preferHeygenDub && visualFiles.length === 0;
+  const lipSyncRequested = narrationMode === "lip_sync" || creative.preferHeygenDub === "on";
+  const heygenNeedsAnchor = lipSyncRequested && visualFiles.length === 0;
+  const contentLocale = languageCodeFromCreative(creative) === "en" ? "en" : "he";
+  const contentT = i18n.getFixedT(contentLocale, "createVideo");
   const costEstimate = useMemo(() => {
     const profileId = predictRenderProfileId({
-      preferLipSync: preferHeygenDub,
+      preferLipSync: lipSyncRequested,
       hasPhotoPlates: visualFiles.length > 0 || productFiles.length > 0
     });
     return estimateRunCost(
       { budgetMode: true, durationSeconds },
       profileToProductionCostConfig(getRenderProfile(profileId))
     );
-  }, [preferHeygenDub, visualFiles.length, productFiles.length, durationSeconds]);
+  }, [lipSyncRequested, visualFiles.length, productFiles.length, durationSeconds]);
 
   const MAX_VOICE_BYTES = 10 * 1024 * 1024;
   const MAX_REFERENCE_VIDEO_BYTES = 15 * 1024 * 1024;
@@ -151,6 +154,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         durationSeconds?: number;
         approvalMode?: ApprovalMode;
         creative?: CreativeOptions;
+        catalogSelections?: Record<string, string | number>;
         businessName?: string;
         slogan?: string;
         websiteUrl?: string;
@@ -160,16 +164,24 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       setInstructions(draft.instructions ?? "");
       setExclusions(draft.exclusions ?? "");
       setShowExclusions(Boolean(draft.exclusions));
-      setVideoGoal(draft.videoGoal ?? "");
-      setDesiredAction(draft.desiredAction ?? "");
+      setVideoGoal(draft.videoGoal ? (LEGACY_GOALS[draft.videoGoal] ?? draft.videoGoal) : "");
+      setDesiredAction(draft.desiredAction ? (LEGACY_ACTIONS[draft.desiredAction] ?? draft.desiredAction) : "");
       setTargetAudience(draft.targetAudience ?? "");
-      setMoods(Array.isArray(draft.moods) ? draft.moods.slice(0, 2) : []);
+      setMoods(Array.isArray(draft.moods) ? draft.moods.slice(0, 2).map((mood) => LEGACY_MOODS[mood] ?? mood) : []);
       setPlatform(draft.platform ?? "instagram_reels");
       setNarrationMode(draft.narrationMode ?? "voiceover");
       setMusicMode(draft.musicMode ?? "auto");
       if (draft.durationSeconds) setDurationSeconds(draft.durationSeconds);
       if (draft.approvalMode) setApprovalMode(draft.approvalMode);
-      if (draft.creative) setCreative(draft.creative);
+      if (draft.creative) {
+        setCreative({
+          ...draft.creative,
+          ...(draft.creative.language
+            ? { language: languageCodeFromCreative(draft.creative) ?? draft.creative.language }
+            : {})
+        });
+      }
+      if (draft.catalogSelections) setCatalogSelections(draft.catalogSelections);
       setBusinessName(draft.businessName ?? "");
       setSlogan(draft.slogan ?? "");
       setWebsiteUrl(draft.websiteUrl ?? "");
@@ -195,6 +207,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         durationSeconds,
         approvalMode,
         creative,
+        catalogSelections,
         businessName,
         slogan,
         websiteUrl
@@ -218,6 +231,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     durationSeconds,
     approvalMode,
     creative,
+    catalogSelections,
     businessName,
     slogan,
     websiteUrl
@@ -231,14 +245,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     for (const file of Array.from(incoming)) {
       if (!file.type.startsWith("image/")) continue;
       if (file.size > MAX_VISUAL_BYTES) {
-        setError(`תמונת דמות גדולה מדי (מקסימום 5MB): ${file.name}`);
+        setError(t("validation.characterTooLarge", { name: file.name }));
         continue;
       }
       if (next.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
         continue;
       }
       if (next.length >= MAX_VISUAL_FILES) {
-        setError(`ניתן להעלות עד ${MAX_VISUAL_FILES} תמונות דמויות.`);
+        setError(t("validation.characterLimit", { count: MAX_VISUAL_FILES }));
         break;
       }
       next.push(file);
@@ -255,14 +269,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     for (const file of Array.from(incoming)) {
       if (!file.type.startsWith("image/")) continue;
       if (file.size > MAX_VISUAL_BYTES) {
-        setError(`תמונת מוצר גדולה מדי (מקסימום 5MB): ${file.name}`);
+        setError(t("validation.productTooLarge", { name: file.name }));
         continue;
       }
       if (next.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
         continue;
       }
       if (next.length >= MAX_VISUAL_FILES) {
-        setError(`ניתן להעלות עד ${MAX_VISUAL_FILES} תמונות מוצר.`);
+        setError(t("validation.productLimit", { count: MAX_VISUAL_FILES }));
         break;
       }
       next.push(file);
@@ -322,43 +336,43 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
 
   async function submit() {
     if (!canCreate) {
-      setError("אין מספיק קרדיטים ליצירת סרטון. רכוש קרדיטים או השתמש בסרטון החינמי מהדשבורד.");
+      setError(t("validation.noCredits"));
       return;
     }
     if (!title.trim() || !prompt.trim() || !videoGoal) {
-      setError("יש למלא כותרת, לבחור מטרת סרטון ולתאר את הסרטון.");
+      setError(t("validation.required"));
       return;
     }
     if (voiceFile && !voiceConsent) {
-      setError("יש לאשר שיש לך זכות להשתמש בקול לפני שיבוט.");
+      setError(t("validation.voiceConsent"));
       return;
     }
     if (voiceFile && voiceFile.size > MAX_VOICE_BYTES) {
-      setError("קובץ הקול גדול מדי (מקסימום 10MB).");
+      setError(t("validation.voiceSize"));
       return;
     }
     if (insertFile && insertFile.size > MAX_INSERT_BYTES) {
-      setError("סרטון השילוב גדול מדי (מקסימום 40MB).");
+      setError(t("validation.insertSize"));
       return;
     }
     if (referenceVideoFile && referenceVideoFile.size > MAX_REFERENCE_VIDEO_BYTES) {
-      setError("סרטון ההשראה גדול מדי (מקסימום 15MB).");
+      setError(t("validation.referenceSize"));
       return;
     }
     if (logoFile && logoFile.size > MAX_LOGO_BYTES) {
-      setError("קובץ הלוגו גדול מדי (מקסימום 5MB).");
+      setError(t("validation.logoSize"));
       return;
     }
-    if (preferHeygenDub && visualFiles.length === 0) {
-      setError("לדיבוב HeyGen נדרשת לפחות תמונת דמות אחת.");
+    if (lipSyncRequested && visualFiles.length === 0) {
+      setError(t("validation.anchorRequired"));
       return;
     }
     if (visualFiles.length > MAX_VISUAL_FILES) {
-      setError(`ניתן להעלות עד ${MAX_VISUAL_FILES} תמונות דמויות.`);
+      setError(t("validation.characterLimit", { count: MAX_VISUAL_FILES }));
       return;
     }
     if (visualFiles.some((f) => f.size > MAX_VISUAL_BYTES)) {
-      setError("אחת מתמונות הדמויות גדולה מדי (מקסימום 5MB לקובץ).");
+      setError(t("validation.characterAnyTooLarge"));
       return;
     }
     setBusy(true);
@@ -432,11 +446,36 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       const creativeWithBasics: CreativeOptions = {
         ...creative,
         videoOrientation: platform === "youtube" || platform === "website" ? "landscape" : "portrait",
-        preferHeygenDub: narrationMode === "lip_sync" ? "on" : (creative.preferHeygenDub ?? "off"),
+        preferHeygenDub: lipSyncRequested ? "on" : "off",
         ...(musicMode === "calm" ? { musicTempo: "איטי" } : {}),
         ...(musicMode === "energetic" ? { musicTempo: "מהיר" } : {})
       };
-      const creativePayload = Object.keys(creativeWithBasics).length > 0 ? creativeWithBasics : undefined;
+      const creativeRecord = creativeWithBasics as Record<string, unknown>;
+      const creativeWithCodes = Object.fromEntries(
+        Object.entries(creativeRecord).map(([key, value]) => {
+          const managed = catalog.byKey.get(key);
+          const option = managed?.options.find(
+            (candidate) => candidate.value === String(value) || candidate.code === String(value)
+          );
+          return [key, option?.code ?? value];
+        })
+      ) as CreativeOptions;
+      const creativePayload = Object.keys(creativeWithCodes).length > 0 ? creativeWithCodes : undefined;
+      const creativeCatalogSnapshot = catalog.fields.flatMap((field) => {
+        const selected = creativeRecord[field.key] ?? catalogSelections[field.key];
+        if (selected == null || selected === "") return [];
+        const option = field.options.find(
+          (candidate) => candidate.value === String(selected) || candidate.code === String(selected)
+        );
+        return [
+          {
+            fieldKey: field.key,
+            fieldLabel: field.label,
+            ...(option ? { optionCode: option.code, optionLabel: option.label } : {}),
+            value: typeof selected === "number" ? selected : String(selected)
+          }
+        ];
+      });
       const brandingPayload =
         businessName.trim() || slogan.trim() || websiteUrl.trim()
           ? {
@@ -449,11 +488,11 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         brief: {
           title,
           sourceText: [
-            videoGoal ? `מטרת הסרטון: ${videoGoal}` : "",
+            videoGoal ? contentT("brief.goal", { value: contentT(`goals.${videoGoal}`) }) : "",
             prompt.trim(),
-            desiredAction ? `הפעולה הרצויה מהצופה: ${desiredAction}` : "",
-            moods.length ? `אווירה נדרשת: ${moods.join(", ")}` : "",
-            `פלטפורמת יעד: ${platform}`
+            desiredAction ? contentT("brief.action", { value: contentT(`actions.${desiredAction}`) }) : "",
+            moods.length ? contentT("brief.mood", { value: moods.map((mood) => contentT(`moods.${mood}`)).join(", ") }) : "",
+            contentT("brief.platform", { value: contentT(`platforms.${platform}`) })
           ]
             .filter(Boolean)
             .join("\n"),
@@ -462,12 +501,12 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 instructions: [
                   instructions.trim(),
                   narrationMode === "none"
-                    ? "ללא קריינות או דיבור; להשתמש במוזיקה ובטקסט על המסך בלבד."
+                    ? contentT("brief.noNarration")
                     : narrationMode === "dialogue"
-                      ? "להעדיף שיחה טבעית בין הדמויות במקום קריינות חיצונית."
+                      ? contentT("brief.dialogue")
                       : "",
-                  musicMode === "none" ? "ללא מוזיקת רקע." : "",
-                  exclusions.trim() ? `מה אסור להציג בסרטון: ${exclusions.trim()}` : ""
+                  musicMode === "none" ? contentT("brief.noMusic") : "",
+                  exclusions.trim() ? contentT("brief.exclusions", { value: exclusions.trim() }) : ""
                 ]
                   .filter(Boolean)
                   .join("\n")
@@ -481,6 +520,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           approvalMode,
           attachments,
           ...(creativePayload ? { creative: creativePayload } : {}),
+          ...(creativeCatalogSnapshot.length ? { creativeCatalogSnapshot } : {}),
           ...(brandingPayload ? { branding: brandingPayload } : {})
         }
       });
@@ -494,8 +534,28 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     }
   }
 
+  const builtInKeys = new Set(
+    CREATIVE_FIELD_SECTIONS.flatMap((section) => section.fields.map((field) => String(field.key)))
+  );
   const fieldsFor = (sectionId: string) =>
-    CREATIVE_FIELD_SECTIONS.find((section) => section.id === sectionId)?.fields ?? [];
+    (CREATIVE_FIELD_SECTIONS.find((section) => section.id === sectionId)?.fields ?? []).map((field) => {
+      const managed = catalog.byKey.get(String(field.key));
+      if (!managed) return field;
+      return {
+        ...field,
+        labelHe: managed.label,
+        options:
+          field.kind === "select"
+            ? managed.options.map((option) => ({
+                value: option.value,
+                code: option.code,
+                labelHe: option.label,
+                labelEn: option.label
+              }))
+            : field.options
+      };
+    });
+  const customCatalogFields = catalog.fields.filter((field) => !builtInKeys.has(field.key));
   const basicKeys = new Set<keyof CreativeOptions>([
     "videoOrientation",
     "language",
@@ -506,28 +566,28 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const advancedGroups = [
     {
       id: "format",
-      title: "פורמט וקהל",
-      description: "קצב, סגנון תקשורת והרחבות לפורמט",
+      title: t("advanced.groups.format.title"),
+      description: t("advanced.groups.format.description"),
       fields: fieldsFor("envelope").filter((field) => !basicKeys.has(field.key))
     },
     {
       id: "visual-style",
-      title: "סגנון חזותי",
-      description: "עיצוב, צבעוניות, מציאותיות, לוגו ותאורה",
+      title: t("advanced.groups.visualStyle.title"),
+      description: t("advanced.groups.visualStyle.description"),
       fields: [...fieldsFor("brief"), ...fieldsFor("visual").filter((field) => field.key === "lighting")].filter(
         (field) => !basicKeys.has(field.key)
       )
     },
     {
       id: "script",
-      title: "תסריט וסצנות",
-      description: "מיקום, דמויות, לבוש, פעולה והבעה",
+      title: t("advanced.groups.script.title"),
+      description: t("advanced.groups.script.description"),
       fields: fieldsFor("script")
     },
     {
       id: "voice",
-      title: "קריינות ודיבור",
-      description: "קול, מבטא, סגנון ומהירות דיבור",
+      title: t("advanced.groups.voice.title"),
+      description: t("advanced.groups.voice.description"),
       fields: [
         ...fieldsFor("dubbing"),
         ...fieldsFor("render").filter((field) => field.key === "preferHeygenDub")
@@ -535,14 +595,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     },
     {
       id: "music",
-      title: "מוזיקה וסאונד",
-      description: "קצב, עוצמה והתאמה לסצנות",
+      title: t("advanced.groups.music.title"),
+      description: t("advanced.groups.music.description"),
       fields: fieldsFor("music")
     },
     {
       id: "camera",
-      title: "צילום ועריכה",
-      description: "מצלמה, תנועה, אפקטים, מעברים וטקסט על המסך",
+      title: t("advanced.groups.camera.title"),
+      description: t("advanced.groups.camera.description"),
       fields: [
         ...fieldsFor("visual").filter((field) => field.key !== "lighting"),
         ...fieldsFor("render").filter(
@@ -552,9 +612,9 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     }
   ];
   const requiredMissing = [
-    !title.trim() ? "כותרת" : "",
-    !videoGoal ? "מטרה" : "",
-    !prompt.trim() ? "תיאור" : ""
+    !title.trim() ? t("summary.titleField") : "",
+    !videoGoal ? t("summary.goalField") : "",
+    !prompt.trim() ? t("summary.descriptionField") : ""
   ].filter(Boolean);
   const requiredComplete = 3 - requiredMissing.length;
   const estimatedMinutesMin = Math.max(4, Math.ceil(durationSeconds / 15) * 2);
@@ -568,54 +628,54 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     Number(Boolean(logoFile));
 
   return (
-    <div className="create-form">
+    <div className="create-form" dir={i18n.dir()}>
       <header className="create-page-header">
         <button type="button" className="button-secondary back-button" onClick={onCancel}>
-          <span aria-hidden>→</span>
-          חזרה
+          <span aria-hidden>{i18n.dir() === "rtl" ? "→" : "←"}</span>
+          {t("create.back")}
         </button>
         <div className="page-heading">
-          <p className="eyebrow">יצירה חדשה</p>
-          <h1>בואו נבנה את הסרטון הבא</h1>
-          <p className="muted">תארו את הרעיון, בחרו סגנון והעלו חומרים. את שאר ההגדרות נכין עבורכם.</p>
-          <small className="draft-status">{draftSavedAt ? "נשמר אוטומטית לפני רגע" : "שמירה אוטומטית פעילה"}</small>
+          <p className="eyebrow">{t("create.eyebrow")}</p>
+          <h1>{t("create.title")}</h1>
+          <p className="muted">{t("create.subtitle")}</p>
+          <small className="draft-status">{draftSavedAt ? t("create.draftSaved") : t("create.draftActive")}</small>
         </div>
       </header>
-      <nav className="create-progress" aria-label="שלבי הגדרת הסרטון">
-        <span className="is-active"><i>1</i>רעיון וסגנון</span>
-        <span><i>2</i>תסריט וסצנות</span>
-        <span><i>3</i>קול ומוזיקה</span>
-        <span><i>4</i>סקירה ויצירה</span>
+      <nav className="create-progress" aria-label={t("progress.aria")}>
+        <span className="is-active"><i>1</i>{t("progress.idea")}</span>
+        <span><i>2</i>{t("progress.script")}</span>
+        <span><i>3</i>{t("progress.audio")}</span>
+        <span><i>4</i>{t("progress.review")}</span>
       </nav>
       {freeLeft > 0 ? (
         <p className="credit-info-line">
           <span aria-hidden>✦</span>
-          {freeLeft === 1 ? "סרטון חינם אחד זמין" : `${freeLeft} סרטונים חינם זמינים`}
-          <small>הסרטון הנוכחי לא יפחית מהקרדיטים.</small>
+          {t("credits.free", { count: freeLeft })}
+          <small>{t("credits.noCharge")}</small>
         </p>
       ) : null}
       <section className="create-topic-card" aria-labelledby="video-details-heading">
         <div className="form-section-heading">
           <span className="form-section-icon" aria-hidden>✦</span>
           <div>
-            <h2 id="video-details-heading">פרטי הסרטון</h2>
-            <p>שלושה פרטים מספיקים כדי להתחיל. אפשר לדייק את השאר רק אם צריך.</p>
+            <h2 id="video-details-heading">{t("details.heading")}</h2>
+            <p>{t("details.help")}</p>
           </div>
         </div>
 
         <label className="field-block">
-          כותרת הסרטון <span className="required-mark">חובה</span>
+          {t("details.title")} <span className="required-mark">{t("common.required")}</span>
           <input
             value={title}
             maxLength={200}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="לדוגמה: מבצע קיץ למוצרי היוקרה של Luxy"
+            placeholder={t("details.titlePlaceholder")}
           />
           {title.length > 170 ? <small className="field-counter">{title.length}/200</small> : null}
         </label>
 
         <fieldset className="choice-fieldset">
-          <legend>מה מטרת הסרטון? <span className="required-mark">חובה</span></legend>
+          <legend>{t("details.goal")} <span className="required-mark">{t("common.required")}</span></legend>
           <div className="choice-chips">
             {VIDEO_GOALS.map((goal) => (
               <button
@@ -624,50 +684,50 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 className={videoGoal === goal ? "is-selected" : ""}
                 onClick={() => setVideoGoal(goal)}
               >
-                {goal}
+                {t(`goals.${goal}`)}
               </button>
             ))}
           </div>
         </fieldset>
 
         <label className="field-block">
-          על מה הסרטון? <span className="required-mark">חובה</span>
+          {t("details.subject")} <span className="required-mark">{t("common.required")}</span>
           <textarea
             rows={6}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder={
-              videoGoal === "פרסום מוצר"
-                ? "מהו המוצר, מה היתרון המרכזי שלו ומה תרצו שהצופה יעשה?"
-                : videoGoal === "פרסום שירות"
-                  ? "איזה שירות אתם מציעים, למי הוא מתאים ואיזו בעיה הוא פותר?"
-                  : "תארו בקצרה את המסר, האנשים, המקום והתוצאה הרצויה."
+              videoGoal === "product"
+                ? t("details.subjectProduct")
+                : videoGoal === "service"
+                  ? t("details.subjectService")
+                  : t("details.subjectDefault")
             }
           />
         </label>
 
         <div className="common-fields-grid">
           <label className="field-block">
-            למי הסרטון מיועד? <span className="optional-mark">לא חובה</span>
+            {t("details.audience")} <span className="optional-mark">{t("common.optional")}</span>
             <input
               value={targetAudience}
               onChange={(e) => setTargetAudience(e.target.value)}
-              placeholder="לדוגמה: בעלי עסקים קטנים המחפשים פתרון פשוט"
+              placeholder={t("details.audiencePlaceholder")}
             />
           </label>
           <label className="field-block">
-            מה תרצו שהצופה יעשה? <span className="optional-mark">לא חובה</span>
+            {t("details.action")} <span className="optional-mark">{t("common.optional")}</span>
             <select value={desiredAction} onChange={(e) => setDesiredAction(e.target.value)}>
-              <option value="">המערכת תציע פעולה מתאימה</option>
+              <option value="">{t("details.actionAuto")}</option>
               {DESIRED_ACTIONS.map((action) => (
-                <option key={action} value={action}>{action}</option>
+                <option key={action} value={action}>{t(`actions.${action}`)}</option>
               ))}
             </select>
           </label>
         </div>
 
         <fieldset className="choice-fieldset">
-          <legend>אווירה וסגנון <span className="optional-mark">עד שתי אפשרויות</span></legend>
+          <legend>{t("details.mood")} <span className="optional-mark">{t("details.moodLimit")}</span></legend>
           <div className="choice-chips">
             {MOOD_OPTIONS.map((mood) => (
               <button
@@ -677,33 +737,33 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 aria-pressed={moods.includes(mood)}
                 onClick={() => toggleMood(mood)}
               >
-                {mood}
+                {t(`moods.${mood}`)}
               </button>
             ))}
           </div>
-          <small className="field-help">ניישם את האווירה בצבעים, במוזיקה, בקצב, בקריינות ובצילום.</small>
+          <small className="field-help">{t("details.moodHelp")}</small>
         </fieldset>
 
         <label className="field-block">
-          דברים שחשוב להקפיד עליהם <span className="optional-mark">לא חובה</span>
+          {t("details.instructions")} <span className="optional-mark">{t("common.optional")}</span>
           <textarea
             rows={3}
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
-            placeholder="לדוגמה: להשתמש רק בצבעי המותג, להזכיר משלוח חינם, לשמור על לבוש זהה."
+            placeholder={t("details.instructionsPlaceholder")}
           />
         </label>
         <button type="button" className="inline-disclosure" onClick={() => setShowExclusions((value) => !value)}>
-          {showExclusions ? "הסתר דברים שלא יופיעו" : "+ הוסף דברים שלא יופיעו בסרטון"}
+          {showExclusions ? t("details.hideExclusions") : t("details.addExclusions")}
         </button>
         {showExclusions ? (
           <label className="field-block">
-            מה לא להציג?
+            {t("details.exclusions")}
             <textarea
               rows={3}
               value={exclusions}
               onChange={(e) => setExclusions(e.target.value)}
-              placeholder="לדוגמה: ללא אנשים, ללא הומור, ללא טקסט שנוצר בתוך התמונה."
+              placeholder={t("details.exclusionsPlaceholder")}
             />
           </label>
         ) : null}
@@ -712,14 +772,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         <div className="form-section-heading">
           <span className="form-section-icon" aria-hidden>◫</span>
           <div>
-            <h2 id="materials-heading">חומרי גלם <span className="optional-mark">לא חובה</span></h2>
-            <p>העלו הכול במקום אחד. המערכת תזהה את סוג הקובץ ותוכלו לדייק את השימוש בהמשך.</p>
+            <h2 id="materials-heading">{t("materials.heading")} <span className="optional-mark">{t("common.optional")}</span></h2>
+            <p>{t("materials.help")}</p>
           </div>
         </div>
         <label className="unified-upload-zone">
           <span className="upload-zone-icon" aria-hidden>↑</span>
-          <strong>גררו לכאן תמונות, סרטונים, לוגו או קובץ קול</strong>
-          <small>או לחצו לבחירת מספר קבצים</small>
+          <strong>{t("materials.drop")}</strong>
+          <small>{t("materials.choose")}</small>
           <input
             type="file"
             accept="image/*,video/mp4,video/webm,video/quicktime,audio/*"
@@ -731,16 +791,16 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           />
         </label>
         <p className="materials-classification-note">
-          סיווג אוטומטי זמין. אם קובץ מיועד לתפקיד אחר, השתמשו בבחירה המתאימה למטה.
+          {t("materials.classification")}
         </p>
         <details className="material-role-details">
           <summary>
-            <span>ניהול וסיווג חומרי הגלם</span>
-            <strong>{materialCount ? `${materialCount} קבצים הועלו` : "בחירה ידנית לפי תפקיד"}</strong>
+            <span>{t("materials.manage")}</span>
+            <strong>{materialCount ? t("materials.uploaded", { count: materialCount }) : t("materials.manual")}</strong>
           </summary>
           <div className="material-role-body">
       <label className="file-row">
-        תמונות דמויות / רקע (אופציונלי)
+        {t("materials.characters")}
         <input
           type="file"
           accept="image/*"
@@ -751,26 +811,26 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           }}
         />
         <small className="muted">
-          עד {MAX_VISUAL_FILES} תמונות — תמונה 1 = דמות א׳, תמונה 2 = דמות ב׳. הן ישמשו כזהות הפנים בסרטון (לא רק השראה כללית).
+          {t("materials.charactersHelp", { count: MAX_VISUAL_FILES })}
         </small>
       </label>
       {visualFiles.length ? (
         <ul className="visual-files-list">
           {visualPreviewUrls.map((item, index) => (
             <li key={`${item.name}-${index}`} className="visual-file-item">
-              <img src={item.url} alt="" className="visual-file-thumb" />
+              <img src={item.url} alt={t("materials.characterAlt", { name: item.name })} className="visual-file-thumb" />
               <span className="visual-file-name" title={item.name}>
                 {item.name}
               </span>
               <button type="button" className="link-btn" onClick={() => removeVisualFile(index)}>
-                הסר
+                {t("common.remove")}
               </button>
             </li>
           ))}
         </ul>
       ) : null}
       <label className="file-row">
-        תמונות מוצר / B-roll (אופציונלי)
+        {t("materials.products")}
         <input
           type="file"
           accept="image/*"
@@ -781,26 +841,26 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           }}
         />
         <small className="muted">
-          עד {MAX_VISUAL_FILES} תמונות מוצר — יישמרו כצלחות נעולות בסרטון (בלי להמציא מכשיר אחר). מומלץ לסרט תדמית B2B.
+          {t("materials.productsHelp", { count: MAX_VISUAL_FILES })}
         </small>
       </label>
       {productFiles.length ? (
         <ul className="visual-files-list">
           {productPreviewUrls.map((item, index) => (
             <li key={`product-${item.name}-${index}`} className="visual-file-item">
-              <img src={item.url} alt="" className="visual-file-thumb" />
+              <img src={item.url} alt={t("materials.productAlt", { name: item.name })} className="visual-file-thumb" />
               <span className="visual-file-name" title={item.name}>
                 {item.name}
               </span>
               <button type="button" className="link-btn" onClick={() => removeProductFile(index)}>
-                הסר
+                {t("common.remove")}
               </button>
             </li>
           ))}
         </ul>
       ) : null}
       <label className="file-row">
-        שיבוט קול (אופציונלי)
+        {t("materials.voice")}
         <input
           type="file"
           accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/mp4,audio/m4a,.mp3,.wav,.m4a"
@@ -811,29 +871,28 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           }}
         />
         <small className="muted">
-          דגימה ברורה של כ־30–120 שניות, בלי רעש רקע. הדיבוב בסרטון יוקרא בקול הזה.
+          {t("materials.voiceHelp")}
         </small>
       </label>
       {voiceFile ? (
         <label className="consent-row">
           <input type="checkbox" checked={voiceConsent} onChange={(e) => setVoiceConsent(e.target.checked)} />
-          יש לי זכות להשתמש בקול הזה לשיבוט
+          {t("materials.voiceConsent")}
         </label>
       ) : null}
       <label className="file-row">
-        סרטון השראה (אופציונלי)
+        {t("materials.reference")}
         <input
           type="file"
           accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm"
           onChange={(e) => setReferenceVideoFile(e.target.files?.[0] ?? null)}
         />
         <small className="muted">
-          המערכת תנתח את הסגנון, הצבעוניות, קצב החיתוכים, המצלמה ומבנה הסיפור. הסרטון לא ישולב בתוצר ולא יועתק.
-          עד 15MB.
+          {t("materials.referenceHelp")}
         </small>
         {referenceVideoFile ? (
           <span className="upload-status">
-            סרטון לניתוח: {referenceVideoFile.name}
+            {t("materials.referenceSelected", { name: referenceVideoFile.name })}
             <button
               type="button"
               className="link-btn"
@@ -843,24 +902,24 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 setReferenceVideoFile(null);
               }}
             >
-              הסר
+              {t("common.remove")}
             </button>
           </span>
         ) : null}
       </label>
       <label className="file-row">
-        שילוב סרטון קצר (אופציונלי)
+        {t("materials.insert")}
         <input
           type="file"
           accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm"
           onChange={(e) => setInsertFile(e.target.files?.[0] ?? null)}
         />
-        <small className="muted">קטע של כמה שניות שיושתל בתוך הסרטון עם מעבר חלק.</small>
+        <small className="muted">{t("materials.insertHelp")}</small>
       </label>
       {insertFile ? (
         <div className="insert-clip-options">
           <label>
-            מיקום פריצה (שניות מתחילת הסרטון)
+            {t("materials.insertAt")}
             <input
               type="number"
               min={0}
@@ -871,14 +930,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
             />
           </label>
           <fieldset className="approval-fieldset">
-            <legend>קול בסרטון המשולב</legend>
+            <legend>{t("materials.insertAudio")}</legend>
             <label>
               <input
                 type="radio"
                 checked={insertAudioSource === "clip"}
                 onChange={() => setInsertAudioSource("clip")}
               />
-              מהסרטון המקורי
+              {t("materials.originalAudio")}
             </label>
             <label>
               <input
@@ -886,7 +945,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 checked={insertAudioSource === "narration"}
                 onChange={() => setInsertAudioSource("narration")}
               />
-              בלי קול מהמקור (רק הקריינות שלנו סביב)
+              {t("materials.narrationAudio")}
             </label>
           </fieldset>
         </div>
@@ -898,12 +957,12 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         <div className="form-section-heading">
           <span className="form-section-icon" aria-hidden>◎</span>
           <div>
-            <h2 id="basic-settings-heading">הגדרות בסיסיות</h2>
-            <p>הבחירות הנפוצות שמשפיעות על אורך הסרטון, הפורמט והחוויה.</p>
+            <h2 id="basic-settings-heading">{t("basic.heading")}</h2>
+            <p>{t("basic.help")}</p>
           </div>
         </div>
         <fieldset className="choice-fieldset duration-picker">
-          <legend>משך הסרטון</legend>
+          <legend>{t("basic.duration")}</legend>
           <div className="choice-chips">
             {[15, 30, 45, 60].map((seconds) => (
               <button
@@ -912,11 +971,11 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 className={durationSeconds === seconds ? "is-selected" : ""}
                 onClick={() => setDurationSeconds(seconds)}
               >
-                {seconds} שנ׳ {seconds === 30 ? <small>מומלץ</small> : null}
+                {t("common.secondsShort", { count: seconds })} {seconds === 30 ? <small>{t("common.recommended")}</small> : null}
               </button>
             ))}
             <label className={![15, 30, 45, 60].includes(durationSeconds) ? "custom-duration is-selected" : "custom-duration"}>
-              מותאם
+              {t("common.custom")}
               <input
                 type="number"
                 min={5}
@@ -926,90 +985,83 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
               />
             </label>
           </div>
-          <small className="field-help">משך ארוך יותר יגדיל את מספר הסצנות, זמן הייצור והעלות.</small>
+          <small className="field-help">{t("basic.durationHelp")}</small>
         </fieldset>
 
         <div className="common-fields-grid common-fields-grid-three">
           <label className="field-block">
-            פלטפורמה
+            {t("basic.platform")}
             <select value={platform} onChange={(e) => setPlatform(e.target.value)}>
-              <option value="instagram_reels">Instagram Reels</option>
-              <option value="tiktok">TikTok</option>
-              <option value="youtube_shorts">YouTube Shorts</option>
-              <option value="linkedin">LinkedIn</option>
-              <option value="youtube">YouTube לרוחב</option>
-              <option value="website">אתר / מצגת</option>
-            </select>
-          </label>
-          <label className="field-block">
-            שפה
-            <select
-              value={String(creative.language ?? "עברית")}
-              onChange={(e) => setCreativeField("language", e.target.value as never)}
-            >
-              {["עברית", "אנגלית", "ערבית", "רוסית", "צרפתית", "ספרדית", "יידיש"].map((language) => (
-                <option key={language} value={language}>{language}</option>
+              {["instagram_reels", "tiktok", "youtube_shorts", "linkedin", "youtube", "website"].map((code) => (
+                <option key={code} value={code}>{t(`platforms.${code}`)}</option>
               ))}
             </select>
           </label>
           <label className="field-block">
-            סוג הסרטון
+            {t("basic.contentLanguage")}
+            <select
+              value={String(creative.language ?? "he")}
+              onChange={(e) => setCreativeField("language", e.target.value as never)}
+            >
+              {CONTENT_LANGUAGES.map(([value, labelKey]) => (
+                <option key={value} value={value}>{t(`languages.${labelKey}`)}</option>
+              ))}
+            </select>
+            <small className="field-help">{t("basic.contentLanguageHelp")}</small>
+          </label>
+          <label className="field-block">
+            {t("basic.filmType")}
             <select
               value={String(creative.filmTemplate ?? "social_explainer")}
               onChange={(e) => setCreativeField("filmTemplate", e.target.value as never)}
             >
-              <option value="social_explainer">סרטון הסברה לרשתות</option>
-              <option value="product_demo">הדגמת מוצר</option>
-              <option value="testimonial">סיפור לקוח</option>
-              <option value="public_service_explainer">שירות ציבורי</option>
-              <option value="corporate_product">סרט מוצר B2B</option>
+              {["social_explainer", "product_demo", "testimonial", "public_service_explainer", "corporate_product"].map((code) => (
+                <option key={code} value={code}>{t(`filmTypes.${code}`)}</option>
+              ))}
             </select>
           </label>
           <label className="field-block">
-            דיבור
+            {t("basic.narration")}
             <select value={narrationMode} onChange={(e) => setNarrationMode(e.target.value)}>
-              <option value="voiceover">קריינות חיצונית</option>
-              <option value="dialogue">שיחה בין דמויות</option>
-              <option value="lip_sync">דמות מדברת עם סנכרון שפתיים</option>
-              <option value="none">ללא דיבור</option>
+              {["voiceover", "dialogue", "lip_sync", "none"].map((code) => (
+                <option key={code} value={code}>{t(`narration.${code}`)}</option>
+              ))}
             </select>
           </label>
           <label className="field-block">
-            מוזיקה
+            {t("basic.music")}
             <select value={musicMode} onChange={(e) => setMusicMode(e.target.value)}>
-              <option value="auto">אוטומטית לפי האווירה</option>
-              <option value="calm">רגועה</option>
-              <option value="energetic">אנרגטית</option>
-              <option value="none">ללא מוזיקה</option>
+              {["auto", "calm", "energetic", "none"].map((code) => (
+                <option key={code} value={code}>{t(`music.${code}`)}</option>
+              ))}
             </select>
           </label>
           <label className="field-block">
-            כתוביות
+            {t("basic.captions")}
             <select
               value={String(creative.karaokeCaptions ?? "on")}
               onChange={(e) => setCreativeField("karaokeCaptions", e.target.value as never)}
             >
-              <option value="on">כתוביות פעילות</option>
-              <option value="off">ללא כתוביות</option>
+              <option value="on">{t("captions.on")}</option>
+              <option value="off">{t("captions.off")}</option>
             </select>
           </label>
         </div>
 
         <details className="cost-details">
           <summary>
-            <span>עלות משוערת</span>
-            <strong>{freeLeft > 0 ? "סרטון חינם" : "קרדיט אחד"}</strong>
+            <span>{t("cost.heading")}</span>
+            <strong>{freeLeft > 0 ? t("credits.freeVideo") : t("credits.oneCredit")}</strong>
           </summary>
-          <p title={`${costEstimate.videoModelDisplay} · $${costEstimate.perSecondUsd.toFixed(3)}/s`}>
-            עלות הפקה משוערת למערכת: {formatCostNis(costEstimate.nis)} · {costEstimate.videoProviderLabel} · כ־
-            {costEstimate.veoSeconds} שניות וידאו.
+          <p title={t("cost.tooltip", { model: costEstimate.videoModelDisplay, rate: costEstimate.perSecondUsd.toFixed(3) })}>
+            {t("cost.system", { cost: formatCostNis(costEstimate.nis), provider: costEstimate.videoProviderLabel, seconds: costEstimate.veoSeconds })}
           </p>
         </details>
       <fieldset className="approval-fieldset approval-card-picker">
-        <legend>מצב יצירה</legend>
+        <legend>{t("approval.heading")}</legend>
         <label>
           <input type="radio" checked={approvalMode === "auto"} onChange={() => setApprovalMode("auto")} />
-          <span><strong>יצירה אוטומטית</strong><small>המערכת תכין את הסרטון המלא לפי ההגדרות. · שליטה בסיסית</small></span>
+          <span><strong>{t("approval.autoTitle")}</strong><small>{t("approval.autoHelp")}</small></span>
         </label>
         <label>
           <input
@@ -1017,11 +1069,11 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
             checked={approvalMode === "auto_until_render"}
             onChange={() => setApprovalMode("auto_until_render")}
           />
-          <span><strong>תסריט וסקיצה לפני יצירה — מומלץ</strong><small>תראו את התסריט, הסצנות והקריינות לפני הרינדור. · שליטה מאוזנת</small></span>
+          <span><strong>{t("approval.previewTitle")}</strong><small>{t("approval.previewHelp")}</small></span>
         </label>
         <label>
           <input type="radio" checked={approvalMode === "manual"} onChange={() => setApprovalMode("manual")} />
-          <span><strong>אישור בכל שלב</strong><small>מתאים למי שרוצה שליטה מלאה בתהליך. · שליטה מרבית</small></span>
+          <span><strong>{t("approval.manualTitle")}</strong><small>{t("approval.manualHelp")}</small></span>
         </label>
       </fieldset>
       </section>
@@ -1029,37 +1081,37 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       <details className="branding-section optional-disclosure">
         <summary>
           <span className="form-section-icon" aria-hidden>✦</span>
-          <span><strong>מיתוג העסק</strong><small>שם, סלוגן, אתר ולוגו — רק אם הסרטון מייצג מותג</small></span>
-          <span className="disclosure-status">{businessName || logoFile ? "הוגדר" : "לא חובה"}</span>
+          <span><strong>{t("branding.heading")}</strong><small>{t("branding.summaryHelp")}</small></span>
+          <span className="disclosure-status">{businessName || logoFile ? t("branding.configured") : t("branding.optional")}</span>
         </summary>
         <div className="optional-disclosure-body">
         <div className="form-section-heading">
           <span className="form-section-icon" aria-hidden>✦</span>
           <div>
-            <h2 className="branding-section-title">מיתוג העסק</h2>
-            <p className="muted branding-hint">שם, סלוגן, קישור ולוגו שיופיעו בכרטיס הסיום.</p>
+            <h2 className="branding-section-title">{t("branding.heading")}</h2>
+            <p className="muted branding-hint">{t("branding.help")}</p>
           </div>
         </div>
         <label>
-          שם העסק
+          {t("branding.businessName")}
           <input
             value={businessName}
             onChange={(e) => setBusinessName(e.target.value)}
-            placeholder="למשל: קפה הבוקר"
+            placeholder={t("branding.businessPlaceholder")}
             maxLength={120}
           />
         </label>
         <label>
-          סלוגן
+          {t("branding.slogan")}
           <input
             value={slogan}
             onChange={(e) => setSlogan(e.target.value)}
-            placeholder="משפט קצר שמלווה את המותג"
+            placeholder={t("branding.sloganPlaceholder")}
             maxLength={200}
           />
         </label>
         <label>
-          קישור לאתר / דף נחיתה
+          {t("branding.website")}
           <input
             type="url"
             value={websiteUrl}
@@ -1070,22 +1122,23 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           />
         </label>
         <label className="file-row">
-          לוגו
+          {t("branding.logo")}
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
             onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
           />
-          <small className="muted">תמונה שקופה או רקע כהה עובדת הכי טוב בכרטיס הסיום.</small>
+          <small className="muted">{t("branding.logoHelp")}</small>
         </label>
         {showBrandingPreview ? (
           <div
             className={`branding-preview branding-preview-${previewAspect === "16:9" ? "landscape" : "portrait"}`}
             aria-live="polite"
+            aria-label={t("branding.previewAria")}
           >
             <div className="branding-preview-inner">
               {logoPreviewUrl ? (
-                <img src={logoPreviewUrl} alt="" className="branding-preview-logo" />
+                <img src={logoPreviewUrl} alt={t("branding.logoAlt", { name: businessName || t("branding.businessName") })} className="branding-preview-logo" />
               ) : (
                 <div className="branding-preview-logo-placeholder" aria-hidden />
               )}
@@ -1108,14 +1161,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       >
         <summary>
           <span className="form-section-icon" aria-hidden>⚙</span>
-          <span><strong>הגדרות מתקדמות</strong><small>שליטה מקצועית בסגנון, תסריט, קול, צילום ועריכה</small></span>
-          <span className="disclosure-status">לא חובה</span>
+          <span><strong>{t("advanced.heading")}</strong><small>{t("advanced.summaryHelp")}</small></span>
+          <span className="disclosure-status">{t("common.optional")}</span>
         </summary>
         <div className="advanced-panel">
           <div className="advanced-presets-head">
             <div>
-              <h3>תבניות סגנון מהירות</h3>
-              <p>בחירה אחת תעדכן מספר הגדרות מקצועיות יחד.</p>
+              <h3>{t("advanced.presetsHeading")}</h3>
+              <p>{t("advanced.presetsHelp")}</p>
             </div>
           </div>
           <div className="advanced-presets preset-cards">
@@ -1130,10 +1183,10 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                   pace: "אנרגטי",
                   karaokeCaptions: "on"
                 }));
-                setVideoGoal("פרסום מוצר");
+                setVideoGoal("product");
               }}
             >
-              <strong>פרסומת מוצר</strong><small>מוצר, יתרונות וקריאה לפעולה</small>
+              <strong>{t("advanced.presets.product.title")}</strong><small>{t("advanced.presets.product.help")}</small>
             </button>
             <button
               type="button"
@@ -1150,7 +1203,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 }));
               }}
             >
-              <strong>B2B מקצועי</strong><small>בעיה, מוצר, יתרונות ו־CTA</small>
+              <strong>{t("advanced.presets.b2b.title")}</strong><small>{t("advanced.presets.b2b.help")}</small>
             </button>
             <button
               type="button"
@@ -1162,7 +1215,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 speechStyle: "שיחתי"
               }))}
             >
-              <strong>סיפור אישי</strong><small>בעיה, חוויה ושינוי</small>
+              <strong>{t("advanced.presets.personal.title")}</strong><small>{t("advanced.presets.personal.help")}</small>
             </button>
             <button
               type="button"
@@ -1174,7 +1227,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 lowerThirds: "on"
               }))}
             >
-              <strong>חדשות ועדכון</strong><small>מגיש, כותרות ומסר ברור</small>
+              <strong>{t("advanced.presets.news.title")}</strong><small>{t("advanced.presets.news.help")}</small>
             </button>
             <button
               type="button"
@@ -1191,7 +1244,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 }));
               }}
             >
-              <strong>סרטון לרשתות</strong><small>Hook מהיר, הסבר ופעולה</small>
+              <strong>{t("advanced.presets.social.title")}</strong><small>{t("advanced.presets.social.help")}</small>
             </button>
           </div>
 
@@ -1222,9 +1275,11 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                         value={String(creative[field.key] ?? "")}
                         onChange={(event) => setCreativeField(field.key, (event.target.value || "") as never)}
                       >
-                        <option value="">אוטומטי — לפי הבריף והאווירה</option>
+                        <option value="">{t("advanced.auto")}</option>
                         {(field.options ?? []).map((option) => (
-                          <option key={option.value} value={option.value}>{option.labelHe}</option>
+                          <option key={option.value} value={option.value}>
+                            {option.labelHe}
+                          </option>
                         ))}
                       </select>
                     )}
@@ -1232,35 +1287,82 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
                 ))}
                 {group.id === "voice" && (narrationMode === "lip_sync" || visualFiles.length > 0) ? (
                   <p className={heygenNeedsAnchor ? "error-inline accordion-note" : "muted accordion-note"}>
-                    סנכרון שפתיים דורש תמונת דמות ומוסיף עלות רינדור. ברירת המחדל היא אוטומטית.
+                    {t("advanced.lipSyncHelp")}
                   </p>
                 ) : null}
               </div>
             </details>
           ))}
+          {customCatalogFields.length ? (
+            <details className="advanced-accordion">
+              <summary>
+                <span>
+                  <strong>{customCatalogFields[0]?.sectionLabel ?? t("advanced.heading")}</strong>
+                  <small>{t("advanced.hint")}</small>
+                </span>
+                <span aria-hidden>⌄</span>
+              </summary>
+              <div className="advanced-grid">
+                {customCatalogFields.map((field) => (
+                  <label key={field.id}>
+                    {field.label}
+                    {field.kind === "number" ? (
+                      <input
+                        type="number"
+                        min={typeof field.config.min === "number" ? field.config.min : undefined}
+                        max={typeof field.config.max === "number" ? field.config.max : undefined}
+                        step={typeof field.config.step === "number" ? field.config.step : 1}
+                        placeholder={field.placeholder}
+                        value={catalogSelections[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCatalogSelections((current) => ({
+                            ...current,
+                            [field.key]: event.target.value ? Number(event.target.value) : ""
+                          }))
+                        }
+                      />
+                    ) : (
+                      <select
+                        value={catalogSelections[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCatalogSelections((current) => ({ ...current, [field.key]: event.target.value }))
+                        }
+                      >
+                        <option value="">{t("advanced.auto")}</option>
+                        {field.options.map((option) => (
+                          <option key={option.id} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    )}
+                    {field.helpText ? <small className="field-help">{field.helpText}</small> : null}
+                  </label>
+                ))}
+              </div>
+            </details>
+          ) : null}
         </div>
       </details>
 
       {error ? <p className="error-inline">{error}</p> : null}
       <div className="stage-actions create-actions">
         <div className="creation-summary-metrics">
-          <span><small>עלות</small><strong>{freeLeft > 0 ? "סרטון חינם" : "קרדיט אחד"}</strong></span>
-          <span><small>זמן משוער</small><strong>{estimatedMinutesMin}–{estimatedMinutesMax} דקות</strong></span>
+          <span><small>{t("summary.cost")}</small><strong>{freeLeft > 0 ? t("credits.freeVideo") : t("credits.oneCredit")}</strong></span>
+          <span><small>{t("summary.time")}</small><strong>{t("summary.minutes", { min: estimatedMinutesMin, max: estimatedMinutesMax })}</strong></span>
           <span className={requiredComplete === 3 ? "is-ready" : ""}>
-            <small>סטטוס מילוי</small>
-            <strong>{requiredComplete === 3 ? "מוכן ליצירת סקיצה" : `חסר: ${requiredMissing.join(", ")}`}</strong>
+            <small>{t("summary.status")}</small>
+            <strong>{requiredComplete === 3 ? t("summary.ready") : t("summary.missing", { fields: requiredMissing.join(", ") })}</strong>
           </span>
         </div>
         <div className="creation-summary-actions">
           <button type="button" className="button-secondary" onClick={() => setDraftSavedAt(new Date())}>
-            שמירת טיוטה
+            {t("summary.saveDraft")}
           </button>
           <details className="creation-summary-popover">
-            <summary>תצוגת סיכום</summary>
+            <summary>{t("summary.preview")}</summary>
             <div>
-              <strong>{title || "ללא כותרת"}</strong>
-              <span>{videoGoal || "לא נבחרה מטרה"} · {durationSeconds} שנ׳ · {platform}</span>
-              <span>{targetAudience || "קהל יעד אוטומטי"} · {moods.join(", ") || "אווירה אוטומטית"}</span>
+              <strong>{title || t("summary.untitled")}</strong>
+              <span>{videoGoal ? t(`goals.${videoGoal}`) : t("summary.noGoal")} · {t("common.secondsShort", { count: durationSeconds })} · {t(`platforms.${platform}`)}</span>
+              <span>{targetAudience || t("summary.autoAudience")} · {moods.length ? moods.map((mood) => t(`moods.${mood}`)).join(", ") : t("summary.autoMood")}</span>
             </div>
           </details>
         <button
@@ -1277,8 +1379,8 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           }
           onClick={() => void submit()}
         >
-          {busy ? "מכין תסריט וסקיצה…" : "יצירת תסריט וסקיצה"}
-          {!busy ? <span aria-hidden>←</span> : null}
+          {busy ? t("summary.creating") : t("summary.create")}
+          {!busy ? <span aria-hidden>{i18n.dir() === "rtl" ? "←" : "→"}</span> : null}
         </button>
         </div>
       </div>

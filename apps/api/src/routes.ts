@@ -1,6 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { StageNameSchema, CreateRunRequestSchema, CheckoutRequestSchema } from "@studio/shared";
+import {
+  StageNameSchema,
+  CreateRunRequestSchema,
+  CheckoutRequestSchema,
+  CreativeActivePatchSchema,
+  CreativeFieldCreateSchema,
+  CreativeFieldUpdateSchema,
+  CreativeOptionCreateSchema,
+  CreativeOptionUpdateSchema,
+  CreativeReorderSchema
+} from "@studio/shared";
 import {
   approveStage,
   alignDubbingToVisual,
@@ -17,7 +27,21 @@ import {
   updateStageOutput,
   uploadStageArtifact
 } from "@studio/orchestrator";
-import { prisma } from "@studio/infra-prisma";
+import {
+  createCreativeField,
+  createCreativeOption,
+  deleteCreativeField,
+  deleteCreativeOption,
+  getAdminCreativeCatalog,
+  getCreativeCatalog,
+  prisma,
+  reorderCreativeFields,
+  reorderCreativeOptions,
+  setCreativeFieldActive,
+  setCreativeOptionActive,
+  updateCreativeField,
+  updateCreativeOption
+} from "@studio/infra-prisma";
 import { checkGeminiCapabilities, geminiModels } from "@studio/providers";
 import {
   buildProductionCostConfig,
@@ -30,8 +54,7 @@ import {
   registerAuthRoutes,
   requireAuth,
   requireAdmin,
-  authPlugin,
-  resolveSession
+  authPlugin
 } from "@studio/auth";
 import {
   assertCanStartRun,
@@ -65,6 +88,10 @@ export async function registerRoutes(app: FastifyInstance) {
   await registerAuthRoutes(app);
 
   app.get("/health", async () => ({ ok: true }));
+  app.get("/config/creative-catalog", async (request) => {
+    const { locale } = z.object({ locale: z.enum(["he", "en"]).default("he") }).parse(request.query);
+    return { locale, fields: await getCreativeCatalog(locale) };
+  });
 
   // Browser / Lemon "ping" uses GET — real webhooks are POST with signature.
   app.get("/billing/webhooks/lemonsqueezy", async () => ({
@@ -527,6 +554,58 @@ export async function registerRoutes(app: FastifyInstance) {
     adminRoutes.patch("/settings", async (request) => {
       const body = PlatformSettingsPatchSchema.parse(request.body);
       return updatePlatformSettings(body);
+    });
+
+    adminRoutes.get("/creative-catalog", async () => getAdminCreativeCatalog());
+    adminRoutes.post("/creative-catalog/fields", async (request) => {
+      await createCreativeField(CreativeFieldCreateSchema.parse(request.body));
+      return getAdminCreativeCatalog();
+    });
+    adminRoutes.patch("/creative-catalog/fields/:id", async (request) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      await updateCreativeField(id, CreativeFieldUpdateSchema.parse(request.body));
+      return getAdminCreativeCatalog();
+    });
+    adminRoutes.patch("/creative-catalog/fields/:id/active", async (request) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const { active } = CreativeActivePatchSchema.parse(request.body);
+      await setCreativeFieldActive(id, active);
+      return getAdminCreativeCatalog();
+    });
+    adminRoutes.delete("/creative-catalog/fields/:id", async (request) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      await deleteCreativeField(id);
+      return getAdminCreativeCatalog();
+    });
+    adminRoutes.post("/creative-catalog/fields/reorder", async (request) => {
+      await reorderCreativeFields(CreativeReorderSchema.parse(request.body).ids);
+      return getAdminCreativeCatalog();
+    });
+    adminRoutes.post("/creative-catalog/fields/:fieldId/options", async (request) => {
+      const { fieldId } = z.object({ fieldId: z.string() }).parse(request.params);
+      await createCreativeOption(fieldId, CreativeOptionCreateSchema.parse(request.body));
+      return getAdminCreativeCatalog();
+    });
+    adminRoutes.patch("/creative-catalog/options/:id", async (request) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      await updateCreativeOption(id, CreativeOptionUpdateSchema.parse(request.body));
+      return getAdminCreativeCatalog();
+    });
+    adminRoutes.patch("/creative-catalog/options/:id/active", async (request) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const { active } = CreativeActivePatchSchema.parse(request.body);
+      await setCreativeOptionActive(id, active);
+      return getAdminCreativeCatalog();
+    });
+    adminRoutes.delete("/creative-catalog/options/:id", async (request) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      await deleteCreativeOption(id);
+      return getAdminCreativeCatalog();
+    });
+    adminRoutes.post("/creative-catalog/fields/:fieldId/options/reorder", async (request) => {
+      const { fieldId } = z.object({ fieldId: z.string() }).parse(request.params);
+      await reorderCreativeOptions(fieldId, CreativeReorderSchema.parse(request.body).ids);
+      return getAdminCreativeCatalog();
     });
   },
     { prefix: "/admin" }

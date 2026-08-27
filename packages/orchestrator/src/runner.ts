@@ -23,8 +23,7 @@ import {
   recordStageOutput,
   recordStageStart,
   setRunStatus,
-  shouldWaitForApproval,
-  maybeAutoApprove
+  shouldWaitForApproval
 } from "./runService.js";
 import { fromPrismaStage, toPrismaStage } from "./stageMap.js";
 

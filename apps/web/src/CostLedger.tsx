@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import {
 
   activityTypeLabel,
@@ -16,13 +18,10 @@ import {
 
   type CostPricingSource,
 
-  type RenderProfileId,
-
-  type StageName
+  type RenderProfileId
 
 } from "@studio/shared";
 
-import { STAGE_LABELS } from "./StageOutputs.js";
 
 
 
@@ -90,33 +89,33 @@ function readTokenCounts(event: CostEventView): { input?: number; output?: numbe
 
 
 
-function formatUnits(event: CostEventView, renderProfileId?: RenderProfileId | null): string {
+function formatUnits(event: CostEventView, t: TFunction<"run">, locale: "he" | "en", renderProfileId?: RenderProfileId | null): string {
 
   switch (event.unit) {
 
     case "veo_seconds":
 
-      return `${event.billedUnits}s ${videoSecondsUnitLabel(renderProfileId ?? "veo-multiclip")}`;
+      return t("costs.units.videoSeconds", { count: event.billedUnits, unit: videoSecondsUnitLabel(renderProfileId ?? "veo-multiclip", locale) });
 
     case "tokens":
 
-      return `${Math.round(event.billedUnits).toLocaleString()} tokens`;
+      return t("costs.units.tokens", { count: Math.round(event.billedUnits).toLocaleString(locale === "he" ? "he-IL" : "en-US") });
 
     case "image_call":
 
-      return "1 תמונה";
+      return t("costs.units.image");
 
     case "text_call":
 
-      return "1 קריאת text";
+      return t("costs.units.text");
 
     case "tts_call":
 
-      return `${Math.round(event.billedUnits)} תווים`;
+      return t("costs.units.characters", { count: Math.round(event.billedUnits) });
 
     case "music_seconds":
 
-      return `${event.billedUnits}s מוזיקה`;
+      return t("costs.units.music", { count: event.billedUnits });
 
     case "bytes": {
 
@@ -136,7 +135,7 @@ function formatUnits(event: CostEventView, renderProfileId?: RenderProfileId | n
 
 
 
-function summaryRows(summary: CostEventSummary, renderProfileId?: RenderProfileId | null): Array<{ label: string; nis: number; count: number }> {
+function summaryRows(summary: CostEventSummary, locale: "he" | "en", renderProfileId?: RenderProfileId | null): Array<{ label: string; nis: number; count: number }> {
 
   const order: CostActivityType[] = [
 
@@ -164,7 +163,7 @@ function summaryRows(summary: CostEventSummary, renderProfileId?: RenderProfileI
 
       if (!row || row.count === 0) return null;
 
-      return { label: activityTypeLabel(type, renderProfileId), nis: row.nis, count: row.count };
+      return { label: activityTypeLabel(type, renderProfileId, locale), nis: row.nis, count: row.count };
 
     })
 
@@ -181,6 +180,8 @@ export function CostLedger({
   ledger: CostLedgerResponse | null;
   renderProfileId?: RenderProfileId | null;
 }) {
+  const { t, i18n } = useTranslation("run");
+  const locale = i18n.resolvedLanguage?.startsWith("en") ? "en" : "he";
 
   if (!ledger || ledger.events.length === 0) {
 
@@ -188,9 +189,9 @@ export function CostLedger({
 
       <section className="cost-ledger cost-ledger-empty">
 
-        <h3>לוג עלויות</h3>
+        <h3>{t("costs.title")}</h3>
 
-        <p className="muted">אין עדיין רשומות עלות לריצה זו. אירועים יופיעו כששלבי ה-pipeline רצים.</p>
+        <p className="muted">{t("costs.empty")}</p>
 
       </section>
 
@@ -202,8 +203,8 @@ export function CostLedger({
 
   const { events, summary } = ledger;
 
-  const breakdown = summaryRows(summary, renderProfileId);
-  const videoUnit = videoSecondsUnitLabel(renderProfileId ?? "veo-multiclip");
+  const breakdown = summaryRows(summary, locale, renderProfileId);
+  const videoUnit = videoSecondsUnitLabel(renderProfileId ?? "veo-multiclip", locale);
 
   const measuredCount = events.filter((e) => readPricingSource(e) === "usage_metadata").length;
 
@@ -217,11 +218,11 @@ export function CostLedger({
 
       <header className="cost-ledger-head">
 
-        <h3>לוג עלויות (לפי usageMetadata / תערифון Google)</h3>
+        <h3>{t("costs.detailedTitle")}</h3>
 
         <p className="cost-ledger-total">
 
-          סה״כ: <strong>{formatCostNis(summary.totalNis)}</strong>
+          {t("costs.total")}: <strong>{formatCostNis(summary.totalNis)}</strong>
 
           <span className="muted"> · ${summary.totalUsd.toFixed(2)}</span>
 
@@ -231,15 +232,15 @@ export function CostLedger({
 
       <p className="cost-ledger-note muted">
 
-        {measuredCount > 0 ? `${measuredCount} שורות מדודות (tokens מ-Gemini)` : null}
+        {measuredCount > 0 ? t("costs.measuredRows", { count: measuredCount }) : null}
 
         {measuredCount > 0 && estimateCount > 0 ? " · " : null}
 
-        {estimateCount > 0 ? `${estimateCount} שורות משוערות (fallback)` : null}
+        {estimateCount > 0 ? t("costs.estimatedRows", { count: estimateCount }) : null}
 
-        {measuredCount === 0 && estimateCount === 0 ? `${videoUnit} לפי פרמטרי בקשה (שניות × מודל).` : null}
+        {measuredCount === 0 && estimateCount === 0 ? t("costs.requestParams", { unit: videoUnit }) : null}
 
-        {" "}שורות charged=no מוצגות כ-₪0.
+        {" "}{t("costs.freeRows")}
 
       </p>
 
@@ -269,23 +270,23 @@ export function CostLedger({
 
             <tr>
 
-              <th>תאריך/שעה</th>
+              <th>{t("costs.columns.date")}</th>
 
-              <th>שלב</th>
+              <th>{t("costs.columns.stage")}</th>
 
-              <th>attempt</th>
+              <th>{t("costs.columns.attempt")}</th>
 
-              <th>פעילות</th>
+              <th>{t("costs.columns.activity")}</th>
 
-              <th>מודל</th>
+              <th>{t("costs.columns.model")}</th>
 
-              <th>מקור</th>
+              <th>{t("costs.columns.source")}</th>
 
-              <th>tokens</th>
+              <th>{t("costs.columns.tokens")}</th>
 
-              <th title="משך קריאת וידאו בלבד">זמן רינדור</th>
+              <th title={t("costs.columns.renderTimeTitle")}>{t("costs.columns.renderTime")}</th>
 
-              <th>יחידות</th>
+              <th>{t("costs.columns.units")}</th>
 
               <th>₪</th>
 
@@ -307,7 +308,7 @@ export function CostLedger({
 
                   <td>{new Date(event.startedAt).toLocaleString()}</td>
 
-                  <td>{STAGE_LABELS[event.stage as StageName] ?? event.stage}</td>
+                  <td>{t(`stages.${event.stage}`, { defaultValue: event.stage })}</td>
 
                   <td>
 
@@ -325,7 +326,7 @@ export function CostLedger({
 
                   <td>
 
-                    {activityTypeLabel(event.activityType, renderProfileId)}
+                    {activityTypeLabel(event.activityType, renderProfileId, locale)}
 
                     {event.sceneId ? (
 
@@ -351,7 +352,7 @@ export function CostLedger({
 
                     <span className={`cost-source cost-source-${source ?? "unknown"}`}>
 
-                      {pricingSourceLabel(source)}
+                      {pricingSourceLabel(source, locale)}
 
                     </span>
 
@@ -385,13 +386,13 @@ export function CostLedger({
                       : "—"}
                   </td>
 
-                  <td>{formatUnits(event, renderProfileId)}</td>
+                  <td>{formatUnits(event, t, locale, renderProfileId)}</td>
 
                   <td>
 
                     <strong>{formatCostNis(event.costNis)}</strong>
 
-                    {event.charged === "no" ? <small className="muted"> (לא חויב)</small> : null}
+                    {event.charged === "no" ? <small className="muted"> ({t("costs.notCharged")})</small> : null}
 
                   </td>
 

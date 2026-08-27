@@ -86,13 +86,16 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
       anchorReferences.push(ref);
 
       if (!anchorReference) {
-
-        chainReference = ref;
-
         anchorReference = ref;
-
       }
 
+    }
+
+    // A single uploaded person can be used directly as the locked cast plate.
+    // With multiple people, leave the chain empty so scene 1 generates one
+    // composite plate from every uploaded face; later scenes reuse that plate.
+    if (anchorReferences.length === 1) {
+      chainReference = anchorReferences[0]!;
     }
 
     const productPaths = Array.from(new Set((input.visualProductGcsPaths ?? []).filter(Boolean)));

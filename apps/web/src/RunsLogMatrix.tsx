@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { apiGet } from "./api.js";
-import { STAGE_LABELS } from "./StageOutputs.js";
 import {
   COST_ACTIVITY_ORDER,
   STAGE_ORDER,
-  activityTypeLabel,
   formatCostNis,
   formatDurationMs,
   getRenderProfile,
@@ -23,8 +23,8 @@ function renderProfileLabel(id: string | null): string {
   }
 }
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("he-IL", {
+function formatDateTime(iso: string, locale: string): string {
+  return new Date(iso).toLocaleString(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "2-digit",
@@ -47,6 +47,8 @@ function stageCell(run: RunLogEntry, stageName: (typeof STAGE_ORDER)[number]) {
 }
 
 export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) => void }) {
+  const { t, i18n } = useTranslation("run");
+  const locale = i18n.resolvedLanguage ?? i18n.language;
   const [data, setData] = useState<RunLogMatrixResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -70,7 +72,7 @@ export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) =>
   }, []);
 
   if (loading && !data) {
-    return <p className="muted">טוען לוג ריצות…</p>;
+    return <p className="muted">{t("runsLog.loading")}</p>;
   }
 
   if (error && !data) {
@@ -83,47 +85,49 @@ export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) =>
     <section className="runs-log-panel">
       <header className="runs-log-head">
         <div>
-          <h2>לוג ריצות ועלויות</h2>
+          <h2>{t("runsLog.title")}</h2>
           <p className="muted">
-            {runs.length} ריצות · סה״כ {formatCostNis(data?.totals.nis ?? 0)} · ${(data?.totals.usd ?? 0).toFixed(2)}
+            {t("runsLog.summary", {
+              count: runs.length,
+              nis: formatCostNis(data?.totals.nis ?? 0),
+              usd: new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(data?.totals.usd ?? 0)
+            })}
             {" · "}
-            <span className="runs-log-hint">
-              סה״כ זמן = סכום עבודת השלבים (בלי המתנה לאישור) · זמן מוצג רק לרינדור · עמודות עלות לכל שלב ומרכיב
-            </span>
+            <span className="runs-log-hint">{t("runsLog.hint")}</span>
           </p>
         </div>
         <button type="button" onClick={() => void refresh()} disabled={loading}>
-          {loading ? "מרענן…" : "רענון"}
+          {t(loading ? "common.refreshing" : "common.refresh")}
         </button>
       </header>
 
       {runs.length === 0 ? (
-        <p className="muted">אין ריצות עדיין.</p>
+        <p className="muted">{t("runsLog.empty")}</p>
       ) : (
         <div className="runs-log-table-wrap">
           <table className="runs-log-table">
             <thead>
               <tr>
-                <th className="sticky-col">תאריך</th>
-                <th className="sticky-col-2">כותרת</th>
-                <th>סטטוס</th>
-                <th>פרופיל</th>
-                <th title="סכום זמני העבודה של השלבים — לא כולל המתנה לאישור ידני">סה״כ זמן עבודה</th>
-                <th>סה״כ ₪</th>
-                <th className="render-highlight-head">רינדור · זמן</th>
-                <th className="render-highlight-head">רינדור · ₪</th>
+                <th className="sticky-col">{t("runsLog.columns.date")}</th>
+                <th className="sticky-col-2">{t("runsLog.columns.title")}</th>
+                <th>{t("runsLog.columns.status")}</th>
+                <th>{t("runsLog.columns.profile")}</th>
+                <th title={t("runsLog.columns.totalTimeTitle")}>{t("runsLog.columns.totalTime")}</th>
+                <th>{t("runsLog.columns.totalCost")}</th>
+                <th className="render-highlight-head">{t("runsLog.columns.renderTime")}</th>
+                <th className="render-highlight-head">{t("runsLog.columns.renderCost")}</th>
                 {STAGE_ORDER.map((stage) => (
                   <th
                     key={stage}
                     className={`group-head${stage === "render" ? " render-stage-group" : ""}`}
-                    title={`${STAGE_LABELS[stage]} — עלות בלבד`}
+                    title={t("runsLog.columns.stageCostTitle", { stage: t(`stages.${stage}`) })}
                   >
-                    {STAGE_LABELS[stage]} · ₪
+                    {t("runsLog.columns.stageCost", { stage: t(`stages.${stage}`) })}
                   </th>
                 ))}
                 {COST_ACTIVITY_ORDER.map((type) => (
                   <th key={type} className="activity-head" title={type}>
-                    {activityTypeLabel(type)}
+                    {activityLabel(t, type)}
                   </th>
                 ))}
               </tr>
@@ -132,14 +136,16 @@ export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) =>
               {runs.map((run) => {
                 const render = stageCell(run, "render");
                 return (
-                  <tr key={run.id} className="runs-log-row" onClick={() => onSelectRun(run.id)} title="לחץ לפתיחת הריצה">
-                    <td className="sticky-col mono">{formatDateTime(run.createdAt)}</td>
+                  <tr key={run.id} className="runs-log-row" onClick={() => onSelectRun(run.id)} title={t("runsLog.openRun")}>
+                    <td className="sticky-col mono">{formatDateTime(run.createdAt, locale)}</td>
                     <td className="sticky-col-2 title-cell">{run.title}</td>
                     <td>
-                      <span className={`badge badge-${run.status.toLowerCase()}`}>{run.status}</span>
+                      <span className={`badge badge-${run.status.toLowerCase()}`}>
+                        {t(`statuses.${run.status}`, { defaultValue: run.status })}
+                      </span>
                     </td>
                     <td className="profile-cell">{renderProfileLabel(run.renderProfile)}</td>
-                    <td className="mono" title="סכום זמני העבודה בכל השלבים">
+                    <td className="mono" title={t("runsLog.stageTimes")}>
                       {formatDurationMs(run.totalDurationMs)}
                     </td>
                     <td className="cost-cell">{costCell(run.totalNis)}</td>
@@ -173,4 +179,9 @@ export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) =>
       )}
     </section>
   );
+}
+
+function activityLabel(t: TFunction<"run">, type: CostActivityType): string {
+  const provider = type === "veo_video" ? "Veo" : "";
+  return t(`costs.activities.${type}`, { provider });
 }

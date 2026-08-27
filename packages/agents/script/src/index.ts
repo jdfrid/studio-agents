@@ -274,7 +274,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         title: `${String(src.title ?? "Beat")} (cont.)`,
         narration: String(src.narration ?? "").trim()
           ? String(src.narration)
-          : "מַמְשִׁיכִים אֶת הַשִּׂיחָה בְּאוֹתוֹ מָקוֹם.",
+          : paddedNarrationFallback(contentLang),
         speaker: (rawScenes.length % 2 === 0 ? "a" : "b") as "a" | "b"
       });
     }
@@ -403,6 +403,25 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     return output;
   }
 };
+
+function paddedNarrationFallback(contentLanguage: string): string {
+  switch (contentLanguage) {
+    case "en":
+      return "We continue the conversation in the same place.";
+    case "yi":
+      return "מ׳גייט ווײַטער מיטן שמועס אויפֿן זעלבן אָרט.";
+    case "fr":
+      return "Nous poursuivons la conversation au même endroit.";
+    case "ar":
+      return "نُوَاصِلُ الحِوَارَ فِي المَكَانِ نَفْسِهِ.";
+    case "ru":
+      return "Мы продолжаем разговор в том же месте.";
+    case "es":
+      return "Continuamos la conversación en el mismo lugar.";
+    default:
+      return "מַמְשִׁיכִים אֶת הַשִּׂיחָה בְּאוֹתוֹ מָקוֹם.";
+  }
+}
 
 function resolveSceneAudioPolicy(
   policy: string | undefined,

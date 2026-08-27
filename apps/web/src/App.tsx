@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AuthProvider, useAuth } from "./AuthContext.js";
 import { LandingPage } from "./LandingPage.js";
 import { Dashboard } from "./Dashboard.js";
 import { CreateVideoForm } from "./CreateVideoForm.js";
 import { RunView } from "./RunView.js";
 import type { ProjectRunView } from "./types.js";
+import { LanguageSwitcher } from "./i18n/LanguageSwitcher.js";
 import "./styles.css";
 
 type View = "landing" | "dashboard" | "create" | "run";
@@ -31,6 +33,7 @@ function pathFor(loc: AppLocation): string {
 }
 
 function AppShell() {
+  const { t } = useTranslation();
   const { user, loading, logout } = useAuth();
   const initial = parseLocation();
   const [view, setView] = useState<View>(initial.view === "landing" ? "dashboard" : initial.view);
@@ -69,7 +72,7 @@ function AppShell() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  if (loading) return <p className="muted center">טוען…</p>;
+  if (loading) return <p className="muted center">{t("shell.loading")}</p>;
   if (!user) return <LandingPage />;
 
   return (
@@ -79,24 +82,24 @@ function AppShell() {
           type="button"
           className="brand-lockup"
           onClick={() => navigate({ view: "dashboard", runId: null })}
-          aria-label="Prompt2Spot — מעבר למסך הבית"
+          aria-label={t("shell.homeLabel")}
         >
           <span className="brand-mark" aria-hidden>
             P2
           </span>
           <span className="brand-copy">
             <strong className="brand">Prompt2Spot</strong>
-            <small>AI video studio</small>
+            <small>{t("common.brandTagline")}</small>
           </span>
         </button>
-        <nav className="saas-nav" aria-label="ניווט ראשי">
+        <nav className="saas-nav" aria-label={t("shell.primaryNav")}>
           <button
             type="button"
             className={view === "dashboard" ? "nav-active" : ""}
             onClick={() => navigate({ view: "dashboard", runId: null })}
           >
             <span aria-hidden>▦</span>
-            הסרטונים שלי
+            {t("shell.myVideos")}
           </button>
           <button
             type="button"
@@ -105,10 +108,11 @@ function AppShell() {
             onClick={() => navigate({ view: "create", runId: null })}
           >
             <span aria-hidden>＋</span>
-            יצירה חדשה
+            {t("shell.newCreation")}
           </button>
         </nav>
         <div className="header-user">
+          <LanguageSwitcher compact />
           {user.avatarUrl ? (
             <img src={user.avatarUrl} alt="" className="avatar" />
           ) : (
@@ -118,7 +122,7 @@ function AppShell() {
           )}
           <span className="header-user-email">{user.email}</span>
           <button type="button" className="link-btn" onClick={() => void logout()}>
-            יציאה
+            {t("shell.logout")}
           </button>
         </div>
       </header>

@@ -7,11 +7,11 @@ import { AdminDashboardPanel, AdminUsersPanel, AdminSettingsPanel } from "./Admi
 import { CostLedger, type CostLedgerResponse } from "./CostLedger.js";
 import { CostIndicator } from "./CostIndicator.js";
 import { RunsLogMatrix } from "./RunsLogMatrix.js";
+import { CreativeCatalogPanel } from "./CreativeCatalogPanel.js";
 import type { ArtifactRow, ProjectRunView, RunSummary, StageName } from "./types.js";
 import {
   STAGE_ORDER,
   estimateRunCost,
-  formatCostNis,
   getRenderProfile,
   profileToProductionCostConfig,
   statusLabelHe,
@@ -20,7 +20,7 @@ import {
   type UserView
 } from "@studio/shared";
 
-type AppView = "runs" | "users" | "log" | "settings";
+type AppView = "runs" | "users" | "log" | "settings" | "catalog";
 
 export function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -31,7 +31,6 @@ export function App() {
   const [costConfig, setCostConfig] = useState<ProductionCostConfig | null>(null);
   const [costLedger, setCostLedger] = useState<CostLedgerResponse | null>(null);
   const [view, setView] = useState<AppView>("runs");
-  const [error, setError] = useState("");
 
   useEffect(() => {
     void apiGet<UserView>("/auth/me")
@@ -101,10 +100,15 @@ export function App() {
           <button type="button" className={view === "settings" ? "nav-active" : ""} onClick={() => setView("settings")}>
             הגדרות
           </button>
+          <button type="button" className={view === "catalog" ? "nav-active" : ""} onClick={() => setView("catalog")}>
+            שדות ואפשרויות
+          </button>
         </nav>
       </header>
       <AdminDashboardPanel />
-      {view === "settings" ? (
+      {view === "catalog" ? (
+        <CreativeCatalogPanel />
+      ) : view === "settings" ? (
         <AdminSettingsPanel />
       ) : view === "log" ? (
         <RunsLogMatrix onSelectRun={(id) => { setSelectedId(id); setView("runs"); }} />
@@ -163,7 +167,6 @@ export function App() {
           </section>
         </main>
       )}
-      {error ? <div className="error-banner">{error}</div> : null}
     </div>
   );
 }

@@ -6,7 +6,6 @@ type AdminUser = {
   email: string;
   name: string | null;
   role: string;
-  locale: string;
   credits: number;
   freeVideosLimit: number | null;
   freeVideosAllowance: number;
@@ -28,7 +27,6 @@ type UserPnl = {
     email: string;
     name: string | null;
     role: string;
-    locale: string;
     credits: number;
     freeVideosLimit: number | null;
     freeVideosAllowance: number;
@@ -47,7 +45,6 @@ type UserPnl = {
 type UserEditForm = {
   name: string;
   role: "USER" | "ADMIN";
-  locale: string;
   /** empty string = platform default; otherwise integer */
   freeVideosLimit: string;
 };
@@ -266,7 +263,7 @@ export function AdminUsersPanel() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [pnl, setPnl] = useState<UserPnl | null>(null);
-  const [edit, setEdit] = useState<UserEditForm>({ name: "", role: "USER", locale: "he", freeVideosLimit: "" });
+  const [edit, setEdit] = useState<UserEditForm>({ name: "", role: "USER", freeVideosLimit: "" });
   const [adjust, setAdjust] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -290,7 +287,6 @@ export function AdminUsersPanel() {
         setEdit({
           name: data.user.name ?? "",
           role: data.user.role as "USER" | "ADMIN",
-          locale: data.user.locale,
           freeVideosLimit: data.user.freeVideosLimit == null ? "" : String(data.user.freeVideosLimit)
         });
       })
@@ -315,7 +311,6 @@ export function AdminUsersPanel() {
       await apiPatch(`/admin/users/${selected}`, {
         name: edit.name.trim() || null,
         role: edit.role,
-        locale: edit.locale.trim() || "he",
         freeVideosLimit
       });
       await reloadUsers();
@@ -402,10 +397,6 @@ export function AdminUsersPanel() {
                 <option value="USER">משתמש</option>
                 <option value="ADMIN">מנהל</option>
               </select>
-            </label>
-            <label>
-              שפה
-              <input value={edit.locale} onChange={(e) => setEdit({ ...edit, locale: e.target.value })} />
             </label>
             <label>
               מכסת סרטונים חינם

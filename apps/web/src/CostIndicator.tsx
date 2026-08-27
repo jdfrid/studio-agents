@@ -1,7 +1,8 @@
 import type { RunCostEstimate, CostEventSummary, CostActivityType, RenderProfileId } from "@studio/shared";
 import { activityTypeLabel, formatCostNis, videoSecondsUnitLabel } from "@studio/shared";
+import { useTranslation } from "react-i18next";
 
-function ledgerBreakdownRows(summary: CostEventSummary, renderProfileId?: RenderProfileId | null): Array<{ label: string; nis: number; usd: number; count: number }> {
+function ledgerBreakdownRows(summary: CostEventSummary, locale: "he" | "en", renderProfileId?: RenderProfileId | null): Array<{ label: string; nis: number; usd: number; count: number }> {
   const order: CostActivityType[] = [
     "veo_video",
     "gemini_image",
@@ -15,7 +16,7 @@ function ledgerBreakdownRows(summary: CostEventSummary, renderProfileId?: Render
     .map((type) => {
       const row = summary.byActivity[type];
       if (!row || row.count === 0) return null;
-      return { label: activityTypeLabel(type, renderProfileId), nis: row.nis, usd: row.usd, count: row.count };
+      return { label: activityTypeLabel(type, renderProfileId, locale), nis: row.nis, usd: row.usd, count: row.count };
     })
     .filter((row): row is { label: string; nis: number; usd: number; count: number } => row != null);
 }
@@ -40,11 +41,13 @@ export function CostIndicator({
   ledgerSummary?: CostEventSummary | null;
   renderProfileId?: RenderProfileId | null;
 }) {
+  const { t, i18n } = useTranslation("run");
+  const locale = i18n.resolvedLanguage?.startsWith("en") ? "en" : "he";
   const level = estimate.isExpensive ? "expensive" : estimate.nis <= 5 ? "cheap" : "moderate";
   const briefDur = briefDurationSeconds ?? estimate.briefDurationSeconds;
   const showActual = actualCostNis != null && actualCostNis > 0;
-  const ledgerRows = ledgerSummary ? ledgerBreakdownRows(ledgerSummary, renderProfileId ?? estimate.renderProfileId) : [];
-  const videoUnit = videoSecondsUnitLabel(renderProfileId ?? estimate.renderProfileId);
+  const ledgerRows = ledgerSummary ? ledgerBreakdownRows(ledgerSummary, locale, renderProfileId ?? estimate.renderProfileId) : [];
+  const videoUnit = videoSecondsUnitLabel(renderProfileId ?? estimate.renderProfileId, locale);
   const modelDisplay = estimate.videoModelDisplay ?? estimate.videoModel;
   const showLedgerBreakdown = showActual && ledgerRows.length > 0;
   const attemptKeys = ledgerSummary
@@ -59,24 +62,25 @@ export function CostIndicator({
       <div className="cost-indicator-head">
         <span className="cost-indicator-amount">{formatCostNis(showActual ? actualCostNis! : estimate.nis)}</span>
         <span className="cost-indicator-sub">
-          {showActual ? "עלות בפועל (Cost Ledger)" : "משוער לפני ריצה (תערифון)"}
+          {showActual ? t("costs.actual") : t("costs.estimated")}
         </span>
       </div>
       {multiAttempt && showActual ? (
         <p className="cost-indicator-warning">
-          יותר מניסיון אחד בריצה — ייתכן חיוב כפול על Kling/Veo (למשל כשל concat או retry). Rerun על render משתמש מחדש בקליפים קיימים.
+          {t("costs.retryWarning")}
         </p>
       ) : null}
       {showActual && Math.abs(actualCostNis! - estimate.nis) > 0.5 ? (
         <p className="cost-indicator-actual-length muted">
-          הערכה לפני ריצה (ריצה אחת): {formatCostNis(estimate.nis)}
-          {multiAttempt ? <> · {attemptKeys.length} attempts בריצה זו</> : null}
+          {t("costs.preRunEstimate", { amount: formatCostNis(estimate.nis) })}
+          {multiAttempt ? <> · {t("costs.attempts", { count: attemptKeys.length })}</> : null}
         </p>
       ) : null}
       {briefDur != null ? (
         <p className="cost-indicator-actual-length">
-          אורך וידאו בפועל: <strong>{estimate.veoSeconds}s</strong> ({estimate.sceneCount} סצנות × {estimate.bucket}s · {videoUnit})
-          {briefDur !== estimate.veoSeconds ? <> · brief: {briefDur}s</> : null}
+          {t("costs.actualLength")}{" "}
+          <strong>{t("costs.actualLengthDetails", { seconds: estimate.veoSeconds, scenes: estimate.sceneCount, bucket: estimate.bucket, unit: videoUnit })}</strong>
+          {briefDur !== estimate.veoSeconds ? <> · {t("costs.briefLength", { seconds: briefDur })}</> : null}
         </p>
       ) : null}
       {estimate.warning ? <p className="cost-indicator-warning">{estimate.warning}</p> : null}
@@ -84,44 +88,44 @@ export function CostIndicator({
         showLedgerBreakdown ? (
           <ul className="cost-indicator-breakdown">
             <li className="muted">
-              <strong>פירוט בפועל (Cost Ledger):</strong>
+              <strong>{t("costs.actualBreakdown")}</strong>
             </li>
             {ledgerRows.map((row) => (
               <li key={row.label}>
-                <strong>{row.label}:</strong> {formatCostNis(row.nis)} · ${row.usd.toFixed(2)} ({row.count} שורות)
+                <strong>{row.label}:</strong> {formatCostNis(row.nis)} · ${row.usd.toFixed(2)} ({t("costs.rows", { count: row.count })})
               </li>
             ))}
             <li>
-              <strong>מודל:</strong> <code>{modelDisplay}</code>
+              <strong>{t("costs.model")}:</strong> <code>{modelDisplay}</code>
             </li>
           </ul>
         ) : (
           <ul className="cost-indicator-breakdown">
             <li className="muted">
-              <strong>הערכה לריצה אחת (לפני ריצה):</strong>
+              <strong>{t("costs.estimateBreakdown")}</strong>
             </li>
             <li>
-              <strong>{estimate.videoProviderLabel}:</strong> {estimate.veoTierLabel} · {estimate.sceneCount} סצנות × {estimate.bucket}s ={" "}
+              <strong>{estimate.videoProviderLabel}:</strong> {estimate.veoTierLabel} · {estimate.sceneCount} × {estimate.bucket}s ={" "}
               <strong>{estimate.veoSeconds}s</strong> (~${estimate.veoUsd.toFixed(2)})
             </li>
             <li>
-              <strong>תמונות:</strong> {estimate.imageCalls} קריאות (~${estimate.imageUsd.toFixed(2)})
+              <strong>{t("costs.images")}:</strong> {t("costs.calls", { count: estimate.imageCalls })} (~${estimate.imageUsd.toFixed(2)})
             </li>
             <li>
               <strong>TTS + text:</strong> ~${(estimate.ttsUsd + estimate.textUsd).toFixed(2)}
             </li>
             <li>
-              <strong>מודל:</strong> <code>{modelDisplay}</code>
+              <strong>{t("costs.model")}:</strong> <code>{modelDisplay}</code>
             </li>
             <li>
-              <strong>מצב:</strong> {estimate.label}
+              <strong>{t("costs.mode")}:</strong> {estimate.label}
             </li>
           </ul>
         )
       ) : null}
       {estimate.isExpensive ? (
         <p className="cost-indicator-danger">
-          ריצה אחת עלולה לעלות כ-{formatCostNis(estimate.nis)}. ודא שיש מספיק יתרה ב-Google Cloud לפני שממשיכים.
+          {t("costs.expensive", { amount: formatCostNis(estimate.nis) })}
         </p>
       ) : null}
     </div>
@@ -137,11 +141,12 @@ export function CostConfirmCheckbox({
   onChange: (value: boolean) => void;
   estimate: RunCostEstimate;
 }) {
+  const { t } = useTranslation("run");
   if (!estimate.isExpensive) return null;
   return (
     <label className="cost-confirm-row">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      אני מבין/ה שריצה זו עלולה לעלות {formatCostNis(estimate.nis)} ומאשר/ת להמשיך
+      {t("costs.confirmExpensive", { amount: formatCostNis(estimate.nis) })}
     </label>
   );
 }

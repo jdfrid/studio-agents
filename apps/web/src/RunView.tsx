@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { apiDelete, apiGet, apiPost } from "./api.js";
-import { STAGE_LABELS, StageOutputView } from "./StageOutputs.js";
+import { StageOutputView } from "./StageOutputs.js";
 import { StageProgressClock } from "./StageProgressClock.js";
 import { VisualCorrectionsPanel } from "./VisualCorrectionsPanel.js";
 import { StageErrorView } from "./StageErrorView.js";
@@ -9,12 +10,13 @@ import {
   STAGE_ORDER,
   formatCreativeConstraints,
   getRenderProfile,
-  isRenderProfileId,
-  statusLabelHe
+  isRenderProfileId
 } from "@studio/shared";
 import type { ArtifactRow, ProjectRunView, StageName } from "./types.js";
+import { formatDateTime } from "./i18n/format.js";
 
 export function RunView({ runId, onBack }: { runId: string; onBack: () => void }) {
+  const { t, i18n } = useTranslation("run");
   const [run, setRun] = useState<ProjectRunView | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactRow[]>([]);
   const [error, setError] = useState("");
@@ -31,7 +33,7 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
 
   async function deleteThisRun() {
     if (!run) return;
-    if (!window.confirm(`למחוק את «${run.brief.title}»? התהליך ייעצר ולא ימשיך לנסות.`)) return;
+    if (!window.confirm(t("run.deleteConfirm", { title: run.brief.title }))) return;
     setDeleting(true);
     try {
       await apiDelete(`/runs/${run.id}`);
@@ -49,7 +51,7 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
     return () => window.clearInterval(t);
   }, [runId]);
 
-  if (!run) return <p className="muted">{error || "טוען…"}</p>;
+  if (!run) return <p className="muted">{error || t("common.loading")}</p>;
 
   const scriptOutput = run.stages.find((s) => s.stage === "script")?.output as
     | { characterBible?: string; visualCorrections?: string; scenes?: Array<{ id: string; order: number; title: string }> }
@@ -60,19 +62,19 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
       <StageProgressClock run={run} />
       <header className="run-view-header">
         <button type="button" className="button-secondary back-button" onClick={onBack}>
-          <span aria-hidden>→</span>
-          חזרה לסרטונים
+          <span aria-hidden>{i18n.dir() === "rtl" ? "→" : "←"}</span>
+          {t("run.back")}
         </button>
         <div className="run-title-block">
-          <p className="eyebrow">פרויקט וידאו</p>
+          <p className="eyebrow">{t("run.projectEyebrow")}</p>
           <div>
             <h1>{run.brief.title}</h1>
-            <span className={`status-pill status-${run.status.toLowerCase()}`}>{statusLabelHe(run.status)}</span>
+            <span className={`status-pill status-${run.status.toLowerCase()}`}>{t(`statuses.${run.status}`, { defaultValue: run.status })}</span>
           </div>
         </div>
         <div className="run-header-actions">
           <button type="button" className="link-btn run-delete-btn" disabled={deleting} onClick={() => void deleteThisRun()}>
-            {deleting ? "מוחק…" : run.status !== "COMPLETED" ? "מחק תהליך" : "מחק"}
+            {deleting ? t("run.deleting") : run.status !== "COMPLETED" ? t("run.deleteProcess") : t("run.delete")}
           </button>
         </div>
       </header>
@@ -82,8 +84,8 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
       <section className="run-progress-section" aria-labelledby="run-progress-title">
         <div className="section-title-row">
           <div>
-            <p className="eyebrow">תהליך ההפקה</p>
-            <h2 id="run-progress-title">התקדמות הסרטון</h2>
+            <p className="eyebrow">{t("run.productionEyebrow")}</p>
+            <h2 id="run-progress-title">{t("run.progressTitle")}</h2>
           </div>
         </div>
         <ol className="progress-timeline progress-timeline-stack">
@@ -93,8 +95,8 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
           return (
             <li key={stage} className={`timeline-step step-${st.toLowerCase()}`}>
               <span className="step-dot" />
-              <span className="step-label">{STAGE_LABELS[stage]}</span>
-              <span className="step-status">{statusLabelHe(st)}</span>
+              <span className="step-label">{t(`stages.${stage}`)}</span>
+              <span className="step-status">{t(`statuses.${st}`, { defaultValue: st })}</span>
             </li>
           );
         })}
@@ -123,6 +125,7 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
 }
 
 function AlignDubbingPanel({ run, onDone }: { run: ProjectRunView; onDone: () => void }) {
+  const { t } = useTranslation("run");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const scriptDone = run.stages.some((s) => s.stage === "script" && (s.status === "COMPLETED" || s.status === "AWAITING_APPROVAL"));
@@ -135,7 +138,7 @@ function AlignDubbingPanel({ run, onDone }: { run: ProjectRunView; onDone: () =>
   if (!scriptDone || !afterVisual || !runIdle) return null;
 
   async function align() {
-    if (!window.confirm("לכתוב מחדש את הדיבוב לפי הסצנות הוויזואליות ולהריץ TTS מחדש? קליפי הווידאו יישמרו אם הפרומפטים לא השתנו.")) {
+    if (!window.confirm(t("run.dubbing.confirm"))) {
       return;
     }
     setBusy(true);
@@ -153,12 +156,12 @@ function AlignDubbingPanel({ run, onDone }: { run: ProjectRunView; onDone: () =>
   return (
     <section className="visual-corrections-panel">
       <header className="panel-header">
-        <h3>התאמת דיבוב</h3>
+        <h3>{t("run.dubbing.title")}</h3>
       </header>
-      <p className="muted">כתיבה מחדש של הקריינות לפי התיאור הוויזואלי של כל סצנה, ואז דיבוב TTS מחדש (בלי לייצר קליפים מחדש כשאין שינוי בפרומפט).</p>
+      <p className="muted">{t("run.dubbing.description")}</p>
       {error ? <p className="error">{error}</p> : null}
       <button type="button" className="primary" disabled={busy} onClick={() => void align()}>
-        {busy ? "מתאים…" : "התאם דיבוב לוויזואל"}
+        {busy ? t("run.dubbing.busy") : t("run.dubbing.action")}
       </button>
     </section>
   );
@@ -179,6 +182,7 @@ function UserStageCard({
   artifacts: ArtifactRow[];
   onAction: () => void;
 }) {
+  const { t } = useTranslation("run");
   const s = run.stages.find((x) => x.stage === stage);
   const status = s?.status ?? "PENDING";
   const [busy, setBusy] = useState(false);
@@ -226,11 +230,11 @@ function UserStageCard({
         <span className="stage-collapse-chevron" aria-hidden>
           ▾
         </span>
-        <strong>{STAGE_LABELS[stage]}</strong>
-        <span className={`badge badge-${status.toLowerCase()}`}>{statusLabelHe(status)}</span>
+        <strong>{t(`stages.${stage}`)}</strong>
+        <span className={`badge badge-${status.toLowerCase()}`}>{t(`statuses.${status}`, { defaultValue: status })}</span>
       </summary>
       <div className="stage-collapse-body">
-        {!hasBody ? <p className="muted">אין תוכן להצגה בשלב זה עדיין.</p> : null}
+        {!hasBody ? <p className="muted">{t("run.noStageContent")}</p> : null}
         {s?.error ? <StageErrorView error={s.error} /> : null}
         {showOutput ? (
           <>
@@ -242,12 +246,12 @@ function UserStageCard({
         <div className="stage-actions">
           {status === "AWAITING_APPROVAL" ? (
             <button type="button" className="primary" disabled={busy} onClick={() => void approve()}>
-              {busy ? "…" : "אשר והמשך"}
+              {busy ? "…" : t("run.approveContinue")}
             </button>
           ) : null}
           {status === "FAILED" ? (
             <button type="button" className="primary" disabled={busy} onClick={() => void rerun()}>
-              {busy ? "מריץ…" : "הפעל מחדש את השלב"}
+              {busy ? t("run.rerunning") : t("run.rerunStage")}
             </button>
           ) : null}
         </div>
@@ -257,6 +261,8 @@ function UserStageCard({
 }
 
 function RunSettingsSummary({ run, artifacts }: { run: ProjectRunView; artifacts: ArtifactRow[] }) {
+  const { t, i18n } = useTranslation("run");
+  const locale = i18n.resolvedLanguage?.startsWith("en") ? "en" : "he";
   const brief = run.brief;
   const briefOut = run.stages.find((s) => s.stage === "brief")?.output as
     | {
@@ -277,15 +283,20 @@ function RunSettingsSummary({ run, artifacts }: { run: ProjectRunView; artifacts
       ? briefOut.renderProfile
       : null);
   const profile = profileId ? getRenderProfile(profileId) : null;
-  const creativeLines = formatCreativeConstraints(brief.creative);
+  const creativeLines = [
+    ...formatCreativeConstraints(brief.creative, locale),
+    ...(brief.creativeCatalogSnapshot ?? []).map(
+      (selection) => `${selection.fieldLabel}: ${selection.optionLabel ?? String(selection.value)}`
+    )
+  ];
   const startedAt = run.createdAt;
   const endedAt = runEndedAt(run);
   const approvalLabel =
     brief.approvalMode === "manual"
-      ? "אישור בכל שלב"
+      ? t("run.settings.approvalManual")
       : brief.approvalMode === "auto_until_render"
-        ? "עצירה לפני סרטון סופי"
-        : "אוטומטי";
+        ? t("run.settings.approvalBeforeRender")
+        : t("run.settings.approvalAutomatic");
 
   const inputBranding = brief.branding ?? null;
   const outputBranding = briefOut?.branding ?? null;
@@ -297,72 +308,78 @@ function RunSettingsSummary({ run, artifacts }: { run: ProjectRunView; artifacts
     (logoGcs ? artifacts.find((a) => a.gcsPath === logoGcs) : undefined);
 
   const attachmentLines = (brief.attachments ?? []).map((att) => {
-    const role =
+    const roleKey =
       att.role === "voice_clone"
-        ? "שיבוט קול"
+        ? "voice_clone"
         : att.role === "insert_clip"
-          ? `שילוב סרטון${att.insertAtSeconds != null ? ` @${att.insertAtSeconds}ש׳` : ""}`
+          ? "insert_clip"
           : att.role === "reference_video"
-            ? "סרטון השראה — לניתוח בלבד"
+            ? "reference_video"
             : att.role === "product"
-              ? "תמונת מוצר"
+              ? "product"
               : att.role === "logo"
-                ? "לוגו"
-                : "תמונת דמות / השראה";
+                ? "logo"
+                : "character";
+    const role = t(`run.settings.attachmentRoles.${roleKey}`, {
+      time:
+        roleKey === "insert_clip" && att.insertAtSeconds != null
+          ? t("run.settings.insertedAt", { seconds: att.insertAtSeconds })
+          : ""
+    });
     return `${role}: ${att.name}`;
   });
 
   return (
     <section className="run-settings-summary">
-      <h3>סיכום ההגדרות</h3>
+      <h3>{t("run.settings.title")}</h3>
       <dl className="run-settings-grid">
         <div>
-          <dt>מודל רינדור</dt>
-          <dd>{profile ? profile.labelHe : "ברירת מחדל של המערכת"}</dd>
+          <dt>{t("run.settings.renderModel")}</dt>
+          <dd>{profile ? (locale === "he" ? profile.labelHe : profile.label) : t("run.settings.systemDefault")}</dd>
         </div>
         <div>
-          <dt>התחלה</dt>
-          <dd>{formatDateTimeHe(startedAt)}</dd>
+          <dt>{t("run.settings.started")}</dt>
+          <dd>{formatDateTime(startedAt)}</dd>
         </div>
         <div>
-          <dt>סיום</dt>
-          <dd>{endedAt ? formatDateTimeHe(endedAt) : run.status === "COMPLETED" ? formatDateTimeHe(run.updatedAt) : "עדיין רץ…"}</dd>
+          <dt>{t("run.settings.ended")}</dt>
+          <dd>{endedAt ? formatDateTime(endedAt) : run.status === "COMPLETED" ? formatDateTime(run.updatedAt) : t("run.settings.stillRunning")}</dd>
         </div>
         <div>
-          <dt>משך מבוקש</dt>
-          <dd>{brief.durationSeconds} שניות</dd>
+          <dt>{t("run.settings.requestedDuration")}</dt>
+          <dd>{t("common.seconds", { count: brief.durationSeconds })}</dd>
         </div>
         <div>
-          <dt>יחס תמונה</dt>
+          <dt>{t("run.settings.aspectRatio")}</dt>
           <dd>
-            {brief.aspectRatio === "16:9" ? "לרוחב (16:9)" : brief.aspectRatio === "1:1" ? "ריבוע" : "לאורך (9:16)"}
+            {brief.aspectRatio === "16:9" ? t("run.settings.landscape") : brief.aspectRatio === "1:1" ? t("run.settings.square") : t("run.settings.portrait")}
           </dd>
         </div>
         <div>
-          <dt>מצב יצירה</dt>
+          <dt>{t("run.settings.creationMode")}</dt>
           <dd>{approvalLabel}</dd>
         </div>
         {briefOut?.ttsVoiceName ? (
           <div>
-            <dt>קול TTS</dt>
+            <dt>{t("run.settings.ttsVoice")}</dt>
             <dd>{briefOut.ttsVoiceName}</dd>
           </div>
         ) : null}
       </dl>
 
       <div className="run-settings-block">
-        <strong>תיאור</strong>
+        <strong>{t("run.settings.description")}</strong>
         <p>{brief.sourceText}</p>
       </div>
       {brief.instructions?.trim() ? (
         <div className="run-settings-block">
-          <strong>הוראות</strong>
+          <strong>{t("run.settings.instructions")}</strong>
           <p>{brief.instructions}</p>
         </div>
       ) : null}
       {businessName || slogan || logoArtifact ? (
         <div className="run-settings-block run-branding-block">
-          <strong>מיתוג העסק</strong>
+          <strong>{t("run.settings.branding")}</strong>
           <div className="run-branding-row">
             {logoArtifact ? <RunLogoThumb artifactId={logoArtifact.id} /> : null}
             <div>
@@ -374,7 +391,7 @@ function RunSettingsSummary({ run, artifacts }: { run: ProjectRunView; artifacts
       ) : null}
       {creativeLines.length ? (
         <div className="run-settings-block">
-          <strong>מתקדם</strong>
+          <strong>{t("run.settings.advanced")}</strong>
           <ul>
             {creativeLines.map((line) => (
               <li key={line}>{line}</li>
@@ -384,7 +401,7 @@ function RunSettingsSummary({ run, artifacts }: { run: ProjectRunView; artifacts
       ) : null}
       {attachmentLines.length ? (
         <div className="run-settings-block">
-          <strong>קבצים שצורפו</strong>
+          <strong>{t("run.settings.attachments")}</strong>
           <ul>
             {attachmentLines.map((line) => (
               <li key={line}>{line}</li>
@@ -422,13 +439,4 @@ function runEndedAt(run: ProjectRunView): string | null {
     .filter((t): t is string => Boolean(t))
     .sort();
   return times[times.length - 1] ?? run.updatedAt;
-}
-
-function formatDateTimeHe(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("he-IL", {
-    dateStyle: "short",
-    timeStyle: "medium"
-  });
 }

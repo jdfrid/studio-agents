@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { apiDelete, apiGet, apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
+import { formatDate, formatNumber } from "./i18n/format.js";
 
 type RunSummary = {
   id: string;
@@ -17,6 +19,7 @@ export function Dashboard({
   onNewVideo: () => void;
   onOpenRun: (id: string) => void;
 }) {
+  const { t, i18n } = useTranslation();
   const { user, refresh } = useAuth();
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -36,13 +39,13 @@ export function Dashboard({
   }, []);
 
   async function deleteRun(id: string, title: string) {
-    if (!window.confirm(`למחוק את «${title}»? התהליך ייעצר ולא ימשיך לנסות שוב.`)) return;
+    if (!window.confirm(t("dashboard.deleteConfirm", { title }))) return;
     setDeletingId(id);
     try {
       await apiDelete(`/runs/${id}`);
       await refreshRuns();
     } catch (err) {
-      window.alert((err as Error).message || "מחיקה נכשלה");
+      window.alert((err as Error).message || t("dashboard.deleteFailed"));
     } finally {
       setDeletingId(null);
     }
@@ -55,7 +58,7 @@ export function Dashboard({
       const { checkoutUrl } = await apiPost<{ checkoutUrl: string }>("/billing/checkout", { plan });
       window.location.href = checkoutUrl;
     } catch (err) {
-      setPurchaseError((err as Error).message || "לא ניתן לפתוח דף תשלום כרגע.");
+      setPurchaseError((err as Error).message || t("dashboard.purchaseError"));
     } finally {
       setBusy(null);
     }
@@ -71,27 +74,25 @@ export function Dashboard({
     <div className="dashboard">
       <header className="dash-header">
         <div className="page-heading">
-          <p className="eyebrow">הסטודיו שלי</p>
-          <h1>שלום{user?.name ? `, ${user.name}` : ""}</h1>
-          <p className="muted">כל הסרטונים, הטיוטות ותהליכי היצירה שלכם במקום אחד.</p>
+          <p className="eyebrow">{t("dashboard.studio")}</p>
+          <h1>{t("dashboard.hello")}{user?.name ? `, ${user.name}` : ""}</h1>
+          <p className="muted">{t("dashboard.description")}</p>
         </div>
         <div className="dash-header-actions">
           <div className="credit-summary">
             <span className="credit-summary-icon" aria-hidden>✦</span>
             <span>
-              <small>יתרה זמינה</small>
+              <small>{t("dashboard.availableBalance")}</small>
               <strong>
                 {freeLeft > 0
-                  ? freeLeft === 1
-                    ? "סרטון חינם אחד"
-                    : `${freeLeft} סרטונים חינם`
-                  : `${formatCredits(credits)} קרדיטים`}
+                  ? t("dashboard.freeVideos", { count: freeLeft })
+                  : t("dashboard.credits", { count: formatNumber(credits) })}
               </strong>
             </span>
           </div>
           <button type="button" className="primary button-large" disabled={!canCreate} onClick={onNewVideo}>
             <span aria-hidden>＋</span>
-            סרטון חדש
+            {t("dashboard.newVideo")}
           </button>
         </div>
       </header>
@@ -100,15 +101,7 @@ export function Dashboard({
         <section className="billing-banner billing-banner-free">
           <span className="banner-icon" aria-hidden>🎬</span>
           <p>
-            {freeLeft === 1 ? (
-              <>
-                יש לך <strong>סרטון חינם אחד</strong>. לחץ &quot;סרטון חדש&quot; כדי להתחיל.
-              </>
-            ) : (
-              <>
-                יש לך <strong>{freeLeft} סרטונים חינם</strong>. לחץ &quot;סרטון חדש&quot; כדי להתחיל.
-              </>
-            )}
+            <Trans i18nKey="dashboard.freeBanner" count={freeLeft} components={{ strong: <strong /> }} />
           </p>
         </section>
       ) : null}
@@ -116,32 +109,32 @@ export function Dashboard({
       {showPurchase ? (
         <section className="billing-banner">
           <div>
-            <p className="eyebrow">ממשיכים ליצור</p>
-            <h3>הקרדיטים נגמרו</h3>
-            <p>בחרו סרטון בודד או מסלול חודשי שמתאים לקצב שלכם.</p>
+            <p className="eyebrow">{t("dashboard.continueCreating")}</p>
+            <h3>{t("dashboard.outOfCredits")}</h3>
+            <p>{t("dashboard.choosePlan")}</p>
           </div>
           <div className="stage-actions billing-actions">
             <button type="button" className="primary" disabled={busy !== null || !billingReady} onClick={() => void buy("payg")}>
-              {busy === "payg" ? "פותח תשלום…" : "סרטון בודד · ₪30"}
+              {busy === "payg" ? t("dashboard.openingPayment") : t("dashboard.singlePrice")}
             </button>
             <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("subscription")}>
-              {busy === "subscription" ? "פותח תשלום…" : "30 סרטונים · ₪600"}
+              {busy === "subscription" ? t("dashboard.openingPayment") : t("dashboard.subscriptionPrice")}
             </button>
           </div>
           {!billingReady ? (
-            <p className="muted billing-note">מערכת התשלומים בהגדרה — נסה שוב בקרוב או פנה לתמיכה.</p>
+            <p className="muted billing-note">{t("dashboard.billingUnavailable")}</p>
           ) : null}
           {purchaseError ? <p className="error-inline">{purchaseError}</p> : null}
         </section>
       ) : credits >= 1 ? (
         <section className="billing-banner billing-banner-compact">
-          <p>יש לך קרדיטים — אפשר ליצור סרטון חדש.</p>
+          <p>{t("dashboard.haveCredits")}</p>
           <div className="stage-actions">
             <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("payg")}>
-              {busy === "payg" ? "…" : "+ קנה עוד סרטון"}
+              {busy === "payg" ? "…" : t("dashboard.buyAnother")}
             </button>
             <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("subscription")}>
-              {busy === "subscription" ? "…" : "מנוי חודשי"}
+              {busy === "subscription" ? "…" : t("dashboard.monthlySubscription")}
             </button>
           </div>
         </section>
@@ -150,21 +143,21 @@ export function Dashboard({
       <section className="runs-grid">
         <div className="section-title-row">
           <div>
-            <p className="eyebrow">הפרויקטים האחרונים</p>
-            <h2>הסרטונים שלי</h2>
+            <p className="eyebrow">{t("dashboard.recentProjects")}</p>
+            <h2>{t("dashboard.myVideos")}</h2>
           </div>
           <button type="button" className="button-secondary refresh-button" onClick={() => void refreshRuns()}>
             <span aria-hidden>↻</span>
-            רענון
+            {t("dashboard.refresh")}
           </button>
         </div>
         {runs.length === 0 ? (
           <div className="empty-state">
             <span className="empty-state-icon" aria-hidden>▶</span>
-            <h3>הסרטון הראשון מתחיל כאן</h3>
-            <p>תארו את הרעיון, צרפו תמונות והמערכת תיקח אתכם עד לקובץ המוכן.</p>
+            <h3>{t("dashboard.emptyTitle")}</h3>
+            <p>{t("dashboard.emptyBody")}</p>
             <button type="button" className="primary" disabled={!canCreate} onClick={onNewVideo}>
-              צרו סרטון ראשון
+              {t("dashboard.createFirst")}
             </button>
           </div>
         ) : null}
@@ -178,18 +171,16 @@ export function Dashboard({
                 <span className="run-card-content">
                   <span className="run-card-title-row">
                     <strong>{r.title}</strong>
-                    <span className={`status-pill status-${r.status.toLowerCase()}`}>{statusHe(r.status)}</span>
+                    <span className={`status-pill status-${r.status.toLowerCase()}`}>
+                      {t(`dashboard.statuses.${r.status}`, { defaultValue: r.status })}
+                    </span>
                   </span>
                   <small>
-                    עודכן {new Date(r.updatedAt).toLocaleDateString("he-IL", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric"
-                    })}
-                    {r.currentStage ? ` · שלב ${r.currentStage}` : ""}
+                    {t("dashboard.updated", { date: formatDate(r.updatedAt) })}
+                    {r.currentStage ? ` · ${t("dashboard.stage", { stage: r.currentStage })}` : ""}
                   </small>
                 </span>
-                <span className="run-card-arrow" aria-hidden>←</span>
+                <span className="run-card-arrow" aria-hidden>{i18n.dir() === "rtl" ? "←" : "→"}</span>
               </button>
               <button
                 type="button"
@@ -200,31 +191,15 @@ export function Dashboard({
                   void deleteRun(r.id, r.title);
                 }}
               >
-                {deletingId === r.id ? "מוחק…" : "מחק"}
+                {deletingId === r.id ? t("dashboard.deleting") : t("dashboard.delete")}
               </button>
             </li>
           ))}
         </ul>
       </section>
       <button type="button" className="link-btn dashboard-credit-refresh" onClick={() => void refresh()}>
-        רענון יתרת קרדיטים
+        {t("dashboard.refreshCredits")}
       </button>
     </div>
   );
-}
-
-function formatCredits(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
-}
-
-function statusHe(status: string): string {
-  const map: Record<string, string> = {
-    RUNNING: "בתהליך",
-    COMPLETED: "הושלם",
-    FAILED: "נכשל",
-    AWAITING_APPROVAL: "ממתין",
-    DRAFT: "טיוטה",
-    CANCELLED: "בוטל"
-  };
-  return map[status] ?? status;
 }

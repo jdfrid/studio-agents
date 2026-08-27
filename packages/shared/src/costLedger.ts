@@ -3,7 +3,13 @@ import { DEFAULT_USD_TO_ILS, veoGenerateAudio, veoPerSecondUsd } from "./budget.
 import type { CostPricingSource, GeminiUsageMetadata } from "./geminiPricing.js";
 import { priceFromUsageMetadata } from "./geminiPricing.js";
 import type { RenderProfileId } from "./renderProfiles.js";
-import { getRenderProfile, profileVideoPerSecondUsd, videoProviderShortLabel } from "./renderProfiles.js";
+import {
+  getRenderProfile,
+  profileVideoPerSecondUsd,
+  videoProviderShortLabel,
+  videoProviderShortLabelForLocale
+} from "./renderProfiles.js";
+import type { Locale } from "./localization.js";
 
 export type { CostPricingSource } from "./geminiPricing.js";
 
@@ -130,7 +136,11 @@ export function priceGeminiTts(_charCount = 0): { usd: number; billedUnits: numb
   return { usd: GEMINI_TTS_CALL_USD, billedUnits: 1, unit: "tts_call" };
 }
 
-export function priceGeminiMusic(durationSeconds: number): { usd: number; billedUnits: number; unit: CostBilledUnit } {
+export function priceGeminiMusic(durationSeconds: number): {
+  usd: number;
+  billedUnits: number;
+  unit: CostBilledUnit;
+} {
   const seconds = Math.max(1, durationSeconds);
   return { usd: seconds * GEMINI_MUSIC_PER_SECOND_USD, billedUnits: seconds, unit: "music_seconds" };
 }
@@ -140,7 +150,11 @@ export function priceGcsUpload(bytes: number): { usd: number; billedUnits: numbe
   return { usd: gb * GCS_UPLOAD_USD_PER_GB, billedUnits: bytes, unit: "bytes" };
 }
 
-export function priceGcsStorageDaily(bytes: number): { usd: number; billedUnits: number; unit: CostBilledUnit } {
+export function priceGcsStorageDaily(bytes: number): {
+  usd: number;
+  billedUnits: number;
+  unit: CostBilledUnit;
+} {
   const gb = bytes / (1024 * 1024 * 1024);
   return { usd: gb * GCS_STORAGE_USD_PER_GB_DAY, billedUnits: bytes, unit: "bytes" };
 }
@@ -176,7 +190,11 @@ export function computeCostAmounts(
   let usd = 0;
   switch (activityType) {
     case "veo_video":
-      usd = priceVeoScene(options.model ?? "veo-3.1-fast-generate-preview", billedUnits, options.generateAudio).usd;
+      usd = priceVeoScene(
+        options.model ?? "veo-3.1-fast-generate-preview",
+        billedUnits,
+        options.generateAudio
+      ).usd;
       break;
     case "gemini_image":
       usd = priceGeminiImage().usd;
@@ -201,12 +219,17 @@ export function computeCostAmounts(
   return { costUsd: usd, costNis: usdToNis(usd, rate), charged };
 }
 
-export function activityTypeLabel(type: CostActivityType, renderProfileId?: RenderProfileId | null): string {
+export function activityTypeLabel(
+  type: CostActivityType,
+  renderProfileId?: RenderProfileId | null,
+  locale: Locale = "he"
+): string {
   switch (type) {
     case "veo_video":
       if (renderProfileId) {
         try {
           const profile = getRenderProfile(renderProfileId);
+          if (locale === "en") return `${videoProviderShortLabelForLocale(profile, "en")} video`;
           if (profile.provider === "kling") return "Kling וידאו";
           if (profile.provider === "heygen") return "HeyGen וידאו";
           if (profile.provider === "fal") return `${videoProviderShortLabel(profile)} וידאו`;
@@ -214,19 +237,19 @@ export function activityTypeLabel(type: CostActivityType, renderProfileId?: Rend
           /* ignore invalid profile id */
         }
       }
-      return "Veo וידאו";
+      return locale === "en" ? "Veo video" : "Veo וידאו";
     case "gemini_tts":
       return "Gemini TTS";
     case "gemini_image":
-      return "Gemini תמונה";
+      return locale === "en" ? "Gemini image" : "Gemini תמונה";
     case "gemini_text":
       return "Gemini text";
     case "gemini_music":
-      return "Gemini מוזיקה";
+      return locale === "en" ? "Gemini music" : "Gemini מוזיקה";
     case "gcs_upload":
-      return "GCS העלאה";
+      return locale === "en" ? "GCS upload" : "GCS העלאה";
     case "gcs_storage":
-      return "GCS אחסון (יומי)";
+      return locale === "en" ? "GCS storage (daily)" : "GCS אחסון (יומי)";
   }
 }
 

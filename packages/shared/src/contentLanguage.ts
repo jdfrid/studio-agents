@@ -38,11 +38,11 @@ export function normalizeContentLanguage(code?: string | null): string {
 
   // Yiddish before Hebrew — both use Hebrew letters; "אידיש" must not fall through to he.
 
-  if (lower.startsWith("yi") || looksLikeYiddishLabel(raw)) return "yi";
+  if (lower.startsWith("yi") || lower.includes("yiddish") || looksLikeYiddishLabel(raw)) return "yi";
 
-  if (lower.startsWith("he") || raw.includes("עבר")) return "he";
+  if (lower.startsWith("he") || lower.includes("hebrew") || raw.includes("עבר")) return "he";
 
-  if (lower.startsWith("en") || raw.includes("אנגל")) return "en";
+  if (lower.startsWith("en") || lower.includes("english") || raw.includes("אנגל")) return "en";
 
   if (lower.startsWith("fr") || raw.includes("צרפ")) return "fr";
 
@@ -165,6 +165,9 @@ export function resolveContentLanguage(input: {
   const creative = String(input.creativeLanguage ?? "").trim();
 
   if (creative) {
+    const normalizedCreative = normalizeContentLanguage(creative);
+
+    if (["he", "en", "fr", "ar", "ru", "es", "yi"].includes(normalizedCreative)) return normalizedCreative;
 
     if (looksLikeYiddishLabel(creative)) return "yi";
 
@@ -184,7 +187,11 @@ export function resolveContentLanguage(input: {
 
   const accent = String(input.creativeAccent ?? "").trim();
 
-  if (accent && looksLikeYiddishLabel(accent)) return "yi";
+  if (accent) {
+    const normalizedAccent = normalizeContentLanguage(accent);
+
+    if (["he", "en", "fr", "ar", "ru", "es", "yi"].includes(normalizedAccent)) return normalizedAccent;
+  }
 
   if (input.language?.trim()) return normalizeContentLanguage(input.language);
 

@@ -291,10 +291,9 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       const sceneOuts: MulticlipSceneOut[] = new Array(orderedScenes.length);
       let nextSceneIndex = 0;
       const workers = Array.from({ length: beatConcurrency }, async () => {
-        while (true) {
+        while (nextSceneIndex < orderedScenes.length) {
           const i = nextSceneIndex;
           nextSceneIndex += 1;
-          if (i >= orderedScenes.length) return;
           sceneOuts[i] = await renderMulticlipScene(orderedScenes[i]!);
         }
       });

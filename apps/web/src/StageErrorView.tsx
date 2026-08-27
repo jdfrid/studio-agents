@@ -1,19 +1,8 @@
 import { parseStageError, type GeminiErrorKind } from "@studio/shared";
-
-function kindLabel(kind: GeminiErrorKind): string {
-  switch (kind) {
-    case "rate_limit":
-      return "מגבלת קצב / מכסה זמנית";
-    case "billing_quota":
-      return "יתרה / תשלום";
-    case "auth":
-      return "הרשאות";
-    default:
-      return "שגיאה";
-  }
-}
+import { useTranslation } from "react-i18next";
 
 export function StageErrorView({ error }: { error: string | null }) {
+  const { t } = useTranslation("run");
   if (!error) return null;
   const parsed = parseStageError(error);
   const friendly = parsed.friendly || error;
@@ -24,20 +13,18 @@ export function StageErrorView({ error }: { error: string | null }) {
       <p className="stage-error-friendly">{friendly}</p>
       {parsed.kind !== "unknown" ? (
         <p className="stage-error-kind muted">
-          <strong>סוג:</strong> {kindLabel(parsed.kind)}
-          {parsed.httpStatus != null ? <> · קוד HTTP {parsed.httpStatus}</> : null}
+          <strong>{t("stageError.type")}:</strong> {t(`stageError.kinds.${parsed.kind as GeminiErrorKind}`)}
+          {parsed.httpStatus != null ? <> · {t("stageError.httpCode", { code: parsed.httpStatus })}</> : null}
           {parsed.quotaHint ? <> · {parsed.quotaHint}</> : null}
         </p>
       ) : null}
       {showRaw ? (
         <details className="stage-error-raw">
-          <summary>פירוט טכני מהספק</summary>
+          <summary>{t("stageError.technicalDetails")}</summary>
           <pre>{parsed.raw}</pre>
         </details>
       ) : (
-        <p className="stage-error-kind muted">
-          פירוט טכני מלא לא נשמר בריצה זו — הרץ מחדש את השלב אחרי עדכון השרת לקבלת פרטים מלאים.
-        </p>
+        <p className="stage-error-kind muted">{t("stageError.missingDetails")}</p>
       )}
     </div>
   );

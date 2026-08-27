@@ -82,6 +82,19 @@ export const BriefInputSchema = z.object({
   approvalMode: z.enum(["manual", "auto", "auto_until_render"]).default("auto"),
   /** Optional advanced creative controls from the user form. */
   creative: CreativeOptionsSchema.optional(),
+  /** Localized catalog snapshot preserves custom/admin-managed selections for historical runs and prompts. */
+  creativeCatalogSnapshot: z
+    .array(
+      z.object({
+        fieldKey: z.string().max(100),
+        fieldLabel: z.string().max(200),
+        optionCode: z.string().max(120).optional(),
+        optionLabel: z.string().max(200).optional(),
+        value: z.union([z.string().max(500), z.number()])
+      })
+    )
+    .max(100)
+    .optional(),
   /** Optional business branding (name + slogan; logo via attachments role=logo). */
   branding: BriefBrandingInputSchema.optional()
 });

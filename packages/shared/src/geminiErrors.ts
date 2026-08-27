@@ -1,3 +1,5 @@
+import type { Locale } from "./localization.js";
+
 export type GeminiErrorKind = "billing_quota" | "rate_limit" | "auth" | "unknown";
 
 export type StageErrorRecord = {
@@ -70,9 +72,38 @@ export function classifyGeminiError(raw: string, httpStatus?: number): GeminiErr
   return "unknown";
 }
 
-export function userFacingGeminiError(raw: string, httpStatus?: number): string | null {
+export function userFacingGeminiError(
+  raw: string,
+  httpStatus?: number,
+  locale: Locale = "he"
+): string | null {
   const kind = classifyGeminiError(raw, httpStatus);
   const provider = detectExternalProvider(raw);
+  if (locale === "en") {
+    if (kind === "billing_quota") {
+      if (provider === "heygen") {
+        return "Your HeyGen account is out of credits. Buy credits in HeyGen Billing, then retry the render stage, or create a video with lip sync turned off.";
+      }
+      if (provider === "fal") {
+        return "Your fal.ai account is out of credits. Add funds in the fal dashboard, then retry the render stage.";
+      }
+      return "Google AI Studio Prepay credits are depleted. Buy credits under the project’s Billing / Prepay settings, then retry the stage.";
+    }
+    if (kind === "rate_limit") {
+      if (provider === "heygen")
+        return "HeyGen is temporarily rate-limiting requests. Wait a few minutes, then retry the render stage.";
+      if (/\bveo\b|predictlongrunning|generatevideos|video.*generation/i.test(raw)) {
+        return "Gemini Veo is temporarily rate-limited (HTTP 429). Automatic retries are attempted; if they all fail, wait a few minutes and retry the stage.";
+      }
+      return "Gemini is temporarily rate-limiting requests (HTTP 429). Wait a minute or two, then retry the stage.";
+    }
+    if (kind === "auth") {
+      return provider === "heygen"
+        ? "The HeyGen API key is missing or invalid. Verify HEYGEN_API_KEY on the server."
+        : "Gemini API authorization failed. Verify the API key and that billing is connected to the project.";
+    }
+    return null;
+  }
   switch (kind) {
     case "billing_quota":
       if (provider === "heygen") {
@@ -128,7 +159,11 @@ function detectExternalProvider(raw: string): "heygen" | "fal" | "gemini" | null
   // HeyGen-specific error code (Google does not use this exact code string).
   if (lower.includes("insufficient_credit") || lower.includes("purchase credit packs")) return "heygen";
   if (lower.includes("fal.ai") || lower.includes("fal.media") || lower.includes("fal-ai")) return "fal";
-  if (lower.includes("generativelanguage.googleapis.com") || lower.includes("gemini") || lower.includes("veo")) {
+  if (
+    lower.includes("generativelanguage.googleapis.com") ||
+    lower.includes("gemini") ||
+    lower.includes("veo")
+  ) {
     return "gemini";
   }
   return null;
@@ -168,19 +203,20 @@ export function buildStageErrorRecord(error: unknown): string {
 
 function deriveFromApiRaw(
   raw: string,
-  httpStatus?: number | null
+  httpStatus?: number | null,
+  locale: Locale = "he"
 ): Pick<ParsedStageError, "friendly" | "kind" | "httpStatus" | "quotaHint"> {
   const status = httpStatus ?? extractHttpStatus(null, raw) ?? undefined;
   const classifyInput = status != null ? `${status} ${raw}` : raw;
   return {
-    friendly: formatApiErrorMessage(classifyInput) || raw.slice(0, 600),
+    friendly: formatApiErrorMessage(classifyInput, locale) || raw.slice(0, 600),
     kind: classifyGeminiError(classifyInput, status),
     httpStatus: status ?? null,
     quotaHint: extractQuotaHint(raw)
   };
 }
 
-export function parseStageError(stored: string | null | undefined): ParsedStageError {
+export function parseStageError(stored: string | null | undefined, locale: Locale = "he"): ParsedStageError {
   if (!stored?.trim()) {
     return { friendly: "", raw: null, kind: "unknown" };
   }
@@ -190,7 +226,7 @@ export function parseStageError(stored: string | null | undefined): ParsedStageE
       const raw =
         parsed.raw && looksLikeApiRaw(parsed.raw) && parsed.raw !== parsed.friendly ? parsed.raw : null;
       if (raw) {
-        return { ...deriveFromApiRaw(raw, parsed.httpStatus), raw };
+        return { ...deriveFromApiRaw(raw, parsed.httpStatus, locale), raw };
       }
       return {
         friendly: parsed.friendly,
@@ -204,10 +240,10 @@ export function parseStageError(stored: string | null | undefined): ParsedStageE
     /* legacy plain-text error */
   }
   if (looksLikeApiRaw(stored)) {
-    return { ...deriveFromApiRaw(stored), raw: stored };
+    return { ...deriveFromApiRaw(stored, undefined, locale), raw: stored };
   }
   return {
-    friendly: formatApiErrorMessage(stored),
+    friendly: formatApiErrorMessage(stored, locale),
     raw: null,
     kind: classifyGeminiError(stored),
     httpStatus: extractHttpStatus(null, stored)
@@ -215,8 +251,8 @@ export function parseStageError(stored: string | null | undefined): ParsedStageE
 }
 
 /** Friendly text for banners — handles legacy plain strings and JSON records. */
-export function stageErrorFriendly(stored: string | null | undefined): string {
-  const parsed = parseStageError(stored);
+export function stageErrorFriendly(stored: string | null | undefined, locale: Locale = "he"): string {
+  const parsed = parseStageError(stored, locale);
   return parsed.friendly || stored || "";
 }
 
@@ -225,7 +261,7 @@ export function isBillingQuotaError(stored: string | null | undefined): boolean 
 }
 
 /** Strip secrets and map Gemini billing/quota errors to readable Hebrew. */
-export function formatApiErrorMessage(raw: string): string {
+export function formatApiErrorMessage(raw: string, locale: Locale = "he"): string {
   const sanitized = sanitizeApiErrorText(raw);
 
   let httpStatus: number | undefined;
@@ -240,28 +276,45 @@ export function formatApiErrorMessage(raw: string): string {
   const probe = `${body} ${jsonMessage ?? ""}`;
   const lower = probe.toLowerCase();
   if (lower.includes("input token count exceeds") || lower.includes("maximum number of tokens allowed")) {
-    return "הבקשה ל-Gemini גדולה מדי (חריגת מגבלת טוקנים). בדרך כלל בגלל קובץ קול/וידאו שצורף בטעות לפרומפט — עדכן את השרת לגרסה האחרונה והפעל מחדש את שלב הביריף.";
+    return locale === "en"
+      ? "The Gemini request is too large (token limit exceeded), usually because audio or video was attached to the prompt by mistake. Update the server and retry the brief stage."
+      : "הבקשה ל-Gemini גדולה מדי (חריגת מגבלת טוקנים). בדרך כלל בגלל קובץ קול/וידאו שצורף בטעות לפרומפט — עדכן את השרת לגרסה האחרונה והפעל מחדש את שלב הביריף.";
   }
   if (
-    (lower.includes("wan") || lower.includes("hailuo") || lower.includes("kling") || lower.includes("heygen")) &&
+    (lower.includes("wan") ||
+      lower.includes("hailuo") ||
+      lower.includes("kling") ||
+      lower.includes("heygen")) &&
     (lower.includes("not found") || lower.includes("predictlongrunning") || lower.includes("not supported"))
   ) {
-    return "מודל Wan/Kling/Hailuo/HeyGen הוגדר בטעות כמודל Veo של Gemini. באדמין → הגדרות: נקה את שדה «וידאו (Veo)» (או שים veo-3.1-fast-generate-preview), ובחר את הפרופיל הנכון למעלה. ל-HeyGen ודא ש-HEYGEN_API_KEY מוגדר; ל-fal ודא ש-FAL_API_KEY מוגדר.";
+    return locale === "en"
+      ? "A Wan/Kling/Hailuo/HeyGen model was configured as a Gemini Veo model. Clear the Video (Veo) model setting or use veo-3.1-fast-generate-preview, then select the correct render profile."
+      : "מודל Wan/Kling/Hailuo/HeyGen הוגדר בטעות כמודל Veo של Gemini. באדמין → הגדרות: נקה את שדה «וידאו (Veo)» (או שים veo-3.1-fast-generate-preview), ובחר את הפרופיל הנכון למעלה. ל-HeyGen ודא ש-HEYGEN_API_KEY מוגדר; ל-fal ודא ש-FAL_API_KEY מוגדר.";
   }
   if (lower.includes("no audio inline data") || lower.includes("finishreason=other")) {
     if (lower.includes("yiddish") || lower.includes("yi")) {
-      return "Gemini TTS לא הצליח להפיק אודיו ליידיש (finishReason=OTHER). נסה משפטי דיבוב קצרים יותר, או בחר שפה עברית עם מבטא יידיש — ואז הפעל מחדש את שלב האודיו.";
+      return locale === "en"
+        ? "Gemini TTS could not generate Yiddish audio (finishReason=OTHER). Try shorter dubbing lines or Hebrew with a Yiddish accent, then retry the audio stage."
+        : "Gemini TTS לא הצליח להפיק אודיו ליידיש (finishReason=OTHER). נסה משפטי דיבוב קצרים יותר, או בחר שפה עברית עם מבטא יידיש — ואז הפעל מחדש את שלב האודיו.";
     }
-    return "Gemini TTS לא החזיר אודיו (finishReason=OTHER). לרוב בגלל טקסט/שפה/קול לא נתמכים. נסה לשנות סגנון קול או לקצר את הדיבוב, והפעל מחדש את שלב האודיו.";
+    return locale === "en"
+      ? "Gemini TTS returned no audio (finishReason=OTHER), usually because the text, language, or voice is unsupported. Change the voice style or shorten the narration, then retry the audio stage."
+      : "Gemini TTS לא החזיר אודיו (finishReason=OTHER). לרוב בגלל טקסט/שפה/קול לא נתמכים. נסה לשנות סגנון קול או לקצר את הדיבוב, והפעל מחדש את שלב האודיו.";
   }
   if (lower.includes("failed to download")) {
     if (lower.includes("403") || lower.includes("expired")) {
-      return "לא ניתן להוריד קובץ מ-Google Cloud Storage. ודא ש-GCS_CREDENTIALS_FILE תקין בשרת, ואז הרץ מחדש את שלב הרינדור.";
+      return locale === "en"
+        ? "A file could not be downloaded from Google Cloud Storage. Verify GCS_CREDENTIALS_FILE on the server, then retry the render stage."
+        : "לא ניתן להוריד קובץ מ-Google Cloud Storage. ודא ש-GCS_CREDENTIALS_FILE תקין בשרת, ואז הרץ מחדש את שלב הרינדור.";
     }
-    return `שגיאה בהורדת קובץ מהאחסון: ${sanitized.slice(0, 220)}`;
+    return locale === "en"
+      ? `Storage download failed: ${sanitized.slice(0, 220)}`
+      : `שגיאה בהורדת קובץ מהאחסון: ${sanitized.slice(0, 220)}`;
   }
   if (lower.includes("issue with the audio") || lower.includes("audio for your prompt")) {
-    return "Veo נכשל בגלל בקשת דיבור/מוזיקה בפרומפט הווידאו (ענף האודיו של Google). הקול מגיע מ-TTS נפרד — אחרי עדכון השרת הפרומפטים מנוקים אוטומטית; הפעל מחדש את שלב הרינדור (וודא GEMINI_VEO_AUDIO=0).";
+    return locale === "en"
+      ? "Veo failed because the video prompt requested speech or music. Audio is supplied separately by TTS; update the server, ensure GEMINI_VEO_AUDIO=0, and retry rendering."
+      : "Veo נכשל בגלל בקשת דיבור/מוזיקה בפרומפט הווידאו (ענף האודיו של Google). הקול מגיע מ-TTS נפרד — אחרי עדכון השרת הפרומפטים מנוקים אוטומטית; הפעל מחדש את שלב הרינדור (וודא GEMINI_VEO_AUDIO=0).";
   }
   if (
     lower.includes("real people") ||
@@ -269,7 +322,9 @@ export function formatApiErrorMessage(raw: string): string {
     lower.includes("likenesses") ||
     lower.includes("likeness")
   ) {
-    return "Veo לא מאפשר יצירת וידאו עם שמות או דמיון לדמויות/סלבריטאים אמיתיים. הסר אזכורים כאלה מהבריף, מהסקריפט או מהתמונות, ואז הרץ מחדש את שלב הסקריפט והרינדור.";
+    return locale === "en"
+      ? "Veo does not allow videos that name or resemble real public figures or celebrities. Remove those references, then rerun the script and render stages."
+      : "Veo לא מאפשר יצירת וידאו עם שמות או דמיון לדמויות/סלבריטאים אמיתיים. הסר אזכורים כאלה מהבריף, מהסקריפט או מהתמונות, ואז הרץ מחדש את שלב הסקריפט והרינדור.";
   }
   if (
     lower.includes("content policy") ||
@@ -277,9 +332,11 @@ export function formatApiErrorMessage(raw: string): string {
     lower.includes("blocked by gemini") ||
     lower.includes("rai media filtered")
   ) {
-    return "הווידאו נחסם על ידי מדיניות התוכן של Google (Veo). נסה לשנות את הפרומпт או את התמונות ולהריץ מחדש.";
+    return locale === "en"
+      ? "Google Veo blocked the video under its content policy. Change the prompt or images, then retry."
+      : "הווידאו נחסם על ידי מדיניות התוכן של Google (Veo). נסה לשנות את הפרומпט או את התמונות ולהריץ מחדש.";
   }
-  const friendly = userFacingGeminiError(probe, httpStatus);
+  const friendly = userFacingGeminiError(probe, httpStatus, locale);
   if (friendly) return friendly;
 
   if (jsonMessage) return jsonMessage.slice(0, 600);

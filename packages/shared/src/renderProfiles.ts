@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Locale } from "./localization.js";
 export const RenderProfileIdSchema = z.enum([
   "veo-multiclip",
   "veo-extend",
@@ -258,6 +259,11 @@ export function predictRenderProfileId(input: {
 export function getRenderProfile(id: RenderProfileId): RenderProfile {
   return RENDER_PROFILES[id];
 }
+/** Localized end-user label without changing the legacy label/labelHe fields. */
+export function renderProfileLabel(profile: RenderProfile | RenderProfileId, locale: Locale = "he"): string {
+  const resolved = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  return locale === "en" ? resolved.label : resolved.labelHe;
+}
 export function isRenderProfileId(value: string): value is RenderProfileId {
   return RenderProfileIdSchema.safeParse(value).success;
 }
@@ -276,7 +282,9 @@ export function defaultRenderProfileId(): RenderProfileId {
   if (veoMode === "extend") return "veo-extend";
   return "veo-multiclip";
 }
-export function resolveRenderProfile(brief?: { renderProfile?: RenderProfileId | string | null } | null): RenderProfile {
+export function resolveRenderProfile(
+  brief?: { renderProfile?: RenderProfileId | string | null } | null
+): RenderProfile {
   const requested = brief?.renderProfile;
   if (typeof requested === "string" && isRenderProfileId(requested)) {
     return getRenderProfile(requested);
@@ -305,7 +313,9 @@ export type RenderProfileSnapshot = {
   resolvedAt: string;
   envDefault: RenderProfileId;
 };
-export function buildRenderProfileSnapshot(brief?: { renderProfile?: RenderProfileId | string | null } | null): RenderProfileSnapshot {
+export function buildRenderProfileSnapshot(
+  brief?: { renderProfile?: RenderProfileId | string | null } | null
+): RenderProfileSnapshot {
   const profile = resolveRenderProfile(brief);
   return {
     profileId: profile.id,
@@ -367,23 +377,53 @@ export function videoProviderShortLabel(profile: RenderProfile | RenderProfileId
   return "Veo";
 }
 /** Model id shown in cost UI — Gemini video model or fal Kling endpoint. */
-export function videoModelDisplay(profile: RenderProfile | RenderProfileId, geminiVideoModel?: string): string {
+export function videoModelDisplay(
+  profile: RenderProfile | RenderProfileId,
+  geminiVideoModel?: string
+): string {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   if (p.falModel) return p.falModel;
   if (p.provider === "kling") return KLING_VIDEO_MODEL;
   if (p.provider === "heygen") return HEYGEN_VIDEO_MODEL;
   return geminiVideoModel ?? process.env.GEMINI_VIDEO_MODEL ?? "veo-3.1-fast-generate-preview";
 }
-export function budgetModeCheckboxLabel(profile: RenderProfile | RenderProfileId): string {
+export function budgetModeCheckboxLabel(
+  profile: RenderProfile | RenderProfileId,
+  locale: Locale = "he"
+): string {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   const clip = p.capabilities.beatSeconds;
   if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen") {
-    return `מצב חסכון (פחות סצנות, ${clip}s לסצנה, reference frame)`;
+    return locale === "en"
+      ? `Budget mode (fewer scenes, ${clip}s per scene, reference frame)`
+      : `מצב חסכון (פחות סצנות, ${clip}s לסצנה, reference frame)`;
   }
-  return `מצב חסכון (פחות סצנות, Veo ${clip}s, בלי first/last frames)`;
+  return locale === "en"
+    ? `Budget mode (fewer scenes, Veo ${clip}s, no first/last frames)`
+    : `מצב חסכון (פחות סצנות, Veo ${clip}s, בלי first/last frames)`;
 }
-export function videoSecondsUnitLabel(profile: RenderProfile | RenderProfileId): string {
-  return videoProviderShortLabel(profile);
+export function videoSecondsUnitLabel(
+  profile: RenderProfile | RenderProfileId,
+  locale: Locale = "en"
+): string {
+  return videoProviderShortLabelForLocale(profile, locale);
+}
+export function videoProviderShortLabelForLocale(
+  profile: RenderProfile | RenderProfileId,
+  locale: Locale = "en"
+): string {
+  if (locale === "en") return videoProviderShortLabel(profile);
+  const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  if (p.provider === "kling") return "קלינג";
+  if (p.provider === "heygen") return "הייג׳ן";
+  if (p.id === "kling-avatar-i2v") return "קלינג אווטאר";
+  if (p.id === "wan-i2v") return "ואן";
+  if (p.id === "hailuo-i2v") return "האילואו";
+  if (p.id === "seedance-mini-i2v") return "סידנס מיני";
+  if (p.id === "seedance-fast-i2v") return "סידנס פאסט";
+  if (p.id === "seedance-i2v") return "סידנס";
+  if (p.id === "luma-ray-i2v") return "לומה ריי";
+  return p.strategy === "extend" ? "ויאו (הארכה)" : "ויאו";
 }
 export function usesFalVideoProvider(profile: RenderProfile | RenderProfileId): boolean {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;

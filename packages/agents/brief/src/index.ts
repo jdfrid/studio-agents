@@ -11,6 +11,7 @@ import {
   geminiVoiceNameFromCreative,
   defaultGeminiVoiceForLanguage,
   languageCodeFromCreative,
+  normalizeCreativeOptions,
   normalizeContentLanguage,
   resolveContentLanguage,
   resolveRenderProfile,
@@ -27,6 +28,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
   inputSchema: BriefInputSchema,
   outputSchema: BriefOutputSchema,
   async run(ctx, input) {
+    const creative = input.creative ? normalizeCreativeOptions(input.creative) : undefined;
     await ctx.log.log("brief_start", "Brief Agent started", { title: input.title });
     await ctx.artifacts.save({
       runId: ctx.runId,
@@ -41,9 +43,9 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     if (!provider) throw new NoProviderConfiguredError("GEMINI");
 
     const contentLang = resolveContentLanguage({
-      language: languageCodeFromCreative(input.creative) ?? input.language,
-      creativeLanguage: input.creative?.language,
-      creativeAccent: input.creative?.accent,
+      language: languageCodeFromCreative(creative) ?? input.language,
+      creativeLanguage: creative?.language,
+      creativeAccent: creative?.accent,
       title: input.title,
       sourceText: input.sourceText,
       instructions: input.instructions
@@ -82,7 +84,13 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       2
     );
 
-    const creativeLines = formatCreativeConstraints(input.creative);
+    const creativeLines = [
+      ...formatCreativeConstraints(creative),
+      ...(input.creativeCatalogSnapshot ?? []).map(
+        (selection) =>
+          `${selection.fieldLabel}: ${selection.optionLabel ?? String(selection.value)}`
+      )
+    ];
     const referenceVideo = (input.attachments ?? []).find((att) => att.role === "reference_video");
     let referenceVideoAnalysis: ReferenceVideoAnalysis | null = null;
     if (referenceVideo && provider.type === "GEMINI") {
@@ -357,7 +365,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     const instructionsBlock = instructions
       ? `\nUser instructions (MUST follow — do / don't):\n${instructions}`
       : "";
-    const langFromCreative = languageCodeFromCreative(input.creative);
+    const langFromCreative = languageCodeFromCreative(creative);
     // Creative / form language wins over LLM guess (models often return "he" for Yiddish).
     const resolvedLanguage = normalizeContentLanguage(
       langFromCreative ?? contentLang ?? input.language ?? parsed.language
@@ -370,7 +378,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         ? websiteUrlRaw
         : `https://${websiteUrlRaw}`
       : "";
-    const creativeLogoPlacement = input.creative?.logoPlacement;
+    const creativeLogoPlacement = creative?.logoPlacement;
     const hasBusinessBrand = Boolean(businessName || slogan || logoAsset || websiteUrl);
     let logoPlacement: NonNullable<BriefOutput["branding"]>["logoPlacement"] | undefined;
     if (hasBusinessBrand) {
@@ -422,19 +430,19 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       title: parsed.title ?? input.title,
       summary: parsed.summary ?? "",
       targetAudience:
-        input.creative?.targetAudience?.trim() ||
+        creative?.targetAudience?.trim() ||
         parsed.targetAudience ||
         input.targetAudience ||
         "",
-      toneOfVoice: [parsed.toneOfVoice ?? "", input.creative?.communicationStyle, input.creative?.speechStyle]
+      toneOfVoice: [parsed.toneOfVoice ?? "", creative?.communicationStyle, creative?.speechStyle]
         .filter(Boolean)
         .join("; "),
       style:
-        [parsed.style ?? input.style ?? "", input.creative?.designStyle, input.creative?.pace]
+        [parsed.style ?? input.style ?? "", creative?.designStyle, creative?.pace]
           .filter(Boolean)
           .join("; ") || "",
       durationSeconds: parsed.durationSeconds ?? input.durationSeconds,
-      aspectRatio: aspectRatioFromCreative(input.creative) ?? parsed.aspectRatio ?? input.aspectRatio,
+      aspectRatio: aspectRatioFromCreative(creative) ?? parsed.aspectRatio ?? input.aspectRatio,
       language: resolvedLanguage,
       ...(instructions ? { instructions } : {}),
       brandConstraints: [
@@ -459,9 +467,9 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       }${referenceDirectionBlock ? `\n${referenceDirectionBlock}` : ""}`.trim(),
       musicDirection: [
         parsed.musicDirection ?? "",
-        input.creative?.musicTempo ? `tempo: ${input.creative.musicTempo}` : "",
-        input.creative?.musicVolumePercent != null
-          ? `music volume ~${input.creative.musicVolumePercent}% under voice`
+        creative?.musicTempo ? `tempo: ${creative.musicTempo}` : "",
+        creative?.musicVolumePercent != null
+          ? `music volume ~${creative.musicVolumePercent}% under voice`
           : ""
       ]
         .filter(Boolean)
@@ -474,7 +482,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
           input.attachments.some((a) => a.role === "product" || a.role === "anchor");
         const falOk = Boolean(process.env.FAL_API_KEY?.trim());
         // Lip-sync toggle → cheap Kling Avatar on fal (HeyGen only if fal missing).
-        if (creativeFlagOn(input.creative, "preferHeygenDub")) {
+        if (creativeFlagOn(creative, "preferHeygenDub")) {
           return falOk ? "kling-avatar-i2v" : "heygen-i2v";
         }
         // Character or product photos need image→video; Veo Fast ignores reference frames.
@@ -490,8 +498,8 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       referenceVideoAnalysis,
       branding: brandingOut,
       ttsVoiceName:
-        geminiVoiceNameFromCreative(input.creative) ?? defaultGeminiVoiceForLanguage(resolvedLanguage),
-      ...(input.creative ? { creative: input.creative } : {})
+        geminiVoiceNameFromCreative(creative) ?? defaultGeminiVoiceForLanguage(resolvedLanguage),
+      ...(creative ? { creative } : {})
     };
 
     await ctx.artifacts.save({

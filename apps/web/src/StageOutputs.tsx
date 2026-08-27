@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { apiGet } from "./api.js";
 import type { ArtifactRow, StageName } from "./types.js";
-import { videoPromptLabelHe, artifactKindLabelHe, FRAME_TYPE_LABELS_HE, formatApiErrorMessage, type RenderProfileId } from "@studio/shared";
+import { formatApiErrorMessage, type RenderProfileId } from "@studio/shared";
 
 const STAGE_LABELS: Record<StageName, string> = {
   brief: "בריף",
@@ -53,59 +55,60 @@ export function StageOutputView({
   }
 }
 
-function languageLabelHe(code: unknown): string {
+function languageCode(code: unknown): string {
   const c = String(code ?? "").toLowerCase();
-  if (c.startsWith("he")) return "עברית";
-  if (c.startsWith("en")) return "אנגלית";
-  if (c.startsWith("fr")) return "צרפתית";
-  if (c.startsWith("ar")) return "ערבית";
-  if (c.startsWith("ru")) return "רוסית";
-  if (c.startsWith("es")) return "ספרדית";
-  if (c.startsWith("yi")) return "יידיש";
+  for (const language of ["he", "en", "fr", "ar", "ru", "es", "yi"]) {
+    if (c.startsWith(language)) return language;
+  }
   return c || "—";
 }
 
 function BriefOutputView({ data }: { data: Record<string, unknown> }) {
+  const { t } = useTranslation("run");
   return (
     <div className="stage-output">
-      <Field label="כותרת" value={data.title} />
-      <Field label="סיכום" value={data.summary} />
-      <Field label="קהל יעד" value={data.targetAudience} />
-      <Field label="טון" value={data.toneOfVoice} />
-      <Field label="סגנון" value={data.style} />
-      <Field label="כיוון ויזואלי" value={data.visualDirection} />
-      <Field label="כיוון מוזיקה" value={data.musicDirection} />
-      {data.callToAction ? <Field label="קריאה לפעולה" value={data.callToAction} /> : null}
+      <Field label={t("outputs.fields.title")} value={data.title} />
+      <Field label={t("outputs.fields.summary")} value={data.summary} />
+      <Field label={t("outputs.fields.targetAudience")} value={data.targetAudience} />
+      <Field label={t("outputs.fields.tone")} value={data.toneOfVoice} />
+      <Field label={t("outputs.fields.style")} value={data.style} />
+      <Field label={t("outputs.fields.visualDirection")} value={data.visualDirection} />
+      <Field label={t("outputs.fields.musicDirection")} value={data.musicDirection} />
+      {data.callToAction ? <Field label={t("outputs.fields.callToAction")} value={data.callToAction} /> : null}
       <small className="muted">
-        משך: {String(data.durationSeconds ?? "?")} שניות · יחס: {String(data.aspectRatio ?? "?")} · שפה:{" "}
-        {languageLabelHe(data.language)}
+        {t("outputs.durationRatioLanguage", {
+          duration: String(data.durationSeconds ?? "?"),
+          ratio: String(data.aspectRatio ?? "?"),
+          language: t(`outputs.languages.${languageCode(data.language)}`, { defaultValue: languageCode(data.language) })
+        })}
       </small>
     </div>
   );
 }
 
 function ScriptOutputView({ data, renderProfileId }: { data: Record<string, unknown>; renderProfileId?: RenderProfileId | null }) {
+  const { t } = useTranslation("run");
   const scenes = Array.isArray(data.scenes) ? (data.scenes as Array<Record<string, unknown>>) : [];
-  const promptLabel = videoPromptLabelHe(renderProfileId ?? "veo-multiclip");
+  const promptLabel = renderProfileId ? t("outputs.motionPrompt", { provider: renderProfileId }) : t("outputs.videoPrompt");
   return (
     <div className="stage-output">
-      <Field label="רקע ויזואלי" value={data.backgroundVisualPrompt} />
-      <Field label="תיאור דמויות (נעול)" value={data.characterBible} />
-      {data.visualCorrections ? <Field label="תיקונים ויזואליים" value={data.visualCorrections} /> : null}
-      <Field label="פרומпт מוזיקה" value={data.musicPrompt} />
+      <Field label={t("outputs.fields.backgroundVisual")} value={data.backgroundVisualPrompt} />
+      <Field label={t("outputs.fields.characterBible")} value={data.characterBible} />
+      {data.visualCorrections ? <Field label={t("outputs.fields.visualCorrections")} value={data.visualCorrections} /> : null}
+      <Field label={t("outputs.fields.musicPrompt")} value={data.musicPrompt} />
       <div className="scene-list">
         {scenes.map((scene) => (
           <article className="scene-mini" key={String(scene.id)}>
             <strong>
-              סצנה {(Number(scene.order) ?? 0) + 1}: {String(scene.title ?? "")}
+              {t("common.scene", { number: (Number(scene.order) ?? 0) + 1 })}: {String(scene.title ?? "")}
             </strong>
             <p>{String(scene.narration ?? "")}</p>
             <details className="tech-prompt">
-              <summary className="muted">{promptLabel} (טכני)</summary>
+              <summary className="muted">{t("outputs.technical", { label: promptLabel })}</summary>
               <small className="muted">{String(scene.veoPrompt ?? "—")}</small>
               {scene.referenceImagePrompt ? (
                 <small className="muted">
-                  תמונת עוגן:{" "}
+                  {t("outputs.anchorImage")}:{" "}
                   {String(scene.referenceImagePrompt).length > 200
                     ? `${String(scene.referenceImagePrompt).slice(0, 200)}…`
                     : String(scene.referenceImagePrompt)}
@@ -128,6 +131,7 @@ function AudioOutputView({
   artifacts: ArtifactRow[];
   onOpenArtifact: OpenArtifact;
 }) {
+  const { t, i18n } = useTranslation("run");
   const perScene = Array.isArray(data.perScene) ? (data.perScene as Array<Record<string, unknown>>) : [];
   const music = (data.music ?? {}) as Record<string, unknown>;
   const musicArtifact = artifacts.find((a) => a.kind === "music_track");
@@ -137,25 +141,25 @@ function AudioOutputView({
         const artifact = artifacts.find((a) => a.id === row.voiceArtifactId);
         return (
           <article className="scene-mini" key={String(row.sceneId)}>
-            <strong>קול · סצנה {index + 1}</strong>
+            <strong>{t("outputs.voiceScene", { number: index + 1 })}</strong>
             {artifact ? (
               <ArtifactPlayer artifact={artifact} onOpenArtifact={onOpenArtifact} />
             ) : row.voiceError ? (
-              <small className="error-inline">{localizeProviderError(String(row.voiceError))}</small>
+              <small className="error-inline">{localizeProviderError(String(row.voiceError), t, i18n.resolvedLanguage?.startsWith("en") ? "en" : "he")}</small>
             ) : (
-              <small className="muted">אין קובץ קול</small>
+              <small className="muted">{t("outputs.noVoice")}</small>
             )}
           </article>
         );
       })}
       <article className="scene-mini">
-        <strong>מוזיקה</strong>
+        <strong>{t("outputs.music")}</strong>
         {music.unavailableReason ? (
-          <p className="warn-inline">מוזיקה לא זמינה: {String(music.unavailableReason)}</p>
+          <p className="warn-inline">{t("outputs.musicUnavailable", { reason: String(music.unavailableReason) })}</p>
         ) : musicArtifact ? (
           <ArtifactPlayer artifact={musicArtifact} onOpenArtifact={onOpenArtifact} />
         ) : (
-          <small className="muted">{music.artifactId ? "מוזיקה נוצרה" : "ללא מוזיקה"}</small>
+          <small className="muted">{music.artifactId ? t("outputs.musicCreated") : t("outputs.noMusic")}</small>
         )}
       </article>
     </div>
@@ -169,15 +173,16 @@ function AssetOutputView({
   data: Record<string, unknown>;
   onOpenArtifact: OpenArtifact;
 }) {
+  const { t } = useTranslation("run");
   const perScene = Array.isArray(data.perScene) ? (data.perScene as Array<Record<string, unknown>>) : [];
   return (
     <div className="stage-output asset-grid asset-grid-stack">
       {perScene.map((row, index) => (
         <article className="scene-mini" key={String(row.sceneId)}>
-          <strong>סצנה {index + 1}</strong>
-          <FramePreview label={FRAME_TYPE_LABELS_HE.referenceFrame} frame={row.referenceFrame} onOpenArtifact={onOpenArtifact} />
-          <FramePreview label={FRAME_TYPE_LABELS_HE.firstFrame} frame={row.firstFrame} onOpenArtifact={onOpenArtifact} />
-          <FramePreview label={FRAME_TYPE_LABELS_HE.lastFrame} frame={row.lastFrame} onOpenArtifact={onOpenArtifact} />
+          <strong>{t("common.scene", { number: index + 1 })}</strong>
+          <FramePreview label={t("outputs.frames.referenceFrame")} frame={row.referenceFrame} onOpenArtifact={onOpenArtifact} />
+          <FramePreview label={t("outputs.frames.firstFrame")} frame={row.firstFrame} onOpenArtifact={onOpenArtifact} />
+          <FramePreview label={t("outputs.frames.lastFrame")} frame={row.lastFrame} onOpenArtifact={onOpenArtifact} />
         </article>
       ))}
     </div>
@@ -191,21 +196,22 @@ function PackageOutputView({
   data: Record<string, unknown>;
   onOpenArtifact: OpenArtifact;
 }) {
+  const { t } = useTranslation("run");
   const timeline = Array.isArray(data.timeline) ? (data.timeline as Array<Record<string, unknown>>) : [];
   return (
     <div className="stage-output">
       {typeof data.manifestSignedUrl === "string" ? (
-        <MediaLink label="מניפסט" url={data.manifestSignedUrl} />
+        <MediaLink label={t("outputs.manifest")} url={data.manifestSignedUrl} />
       ) : null}
       {typeof data.instructionsGcsPath === "string" ? (
-        <small className="muted">הוראות: {String(data.instructionsGcsPath)}</small>
+        <small className="muted">{t("outputs.instructions", { path: String(data.instructionsGcsPath) })}</small>
       ) : null}
       <table className="timeline-table">
         <thead>
           <tr>
             <th>#</th>
-            <th>כותרת</th>
-            <th>זמן</th>
+            <th>{t("outputs.tableTitle")}</th>
+            <th>{t("outputs.tableTime")}</th>
           </tr>
         </thead>
         <tbody>
@@ -214,7 +220,7 @@ function PackageOutputView({
               <td>{Number(row.order) + 1}</td>
               <td>{String(row.title ?? "")}</td>
               <td>
-                {Number(row.startSecond)}–{Number(row.endSecond)} שנ׳
+                {t("outputs.secondsShort", { start: Number(row.startSecond), end: Number(row.endSecond) })}
               </td>
             </tr>
           ))}
@@ -224,12 +230,12 @@ function PackageOutputView({
         const voice = row.voice as Record<string, unknown> | undefined;
         const url = voice?.signedUrl;
         return typeof url === "string" ? (
-          <SignedMedia key={`voice-${String(row.sceneId)}`} label={`קול ${String(row.title)}`} url={url} mimeType="audio/mpeg" />
+          <SignedMedia key={`voice-${String(row.sceneId)}`} label={t("outputs.voiceTitle", { title: String(row.title) })} url={url} mimeType="audio/mpeg" />
         ) : null;
       })}
       {typeof data.instructionsArtifactId === "string" ? (
         <button type="button" onClick={() => void onOpenArtifact(data.instructionsArtifactId as string)}>
-          פתח הוראות
+          {t("outputs.openInstructions")}
         </button>
       ) : null}
     </div>
@@ -245,11 +251,12 @@ function RenderOutputView({
   artifacts: ArtifactRow[];
   onOpenArtifact: OpenArtifact;
 }) {
+  const { t } = useTranslation("run");
   const finalUrl = typeof data.finalSignedUrl === "string" ? data.finalSignedUrl : null;
   const clipArtifacts = artifacts.filter((a) => a.kind === "scene_rendered_clip" || a.kind === "final_video");
   return (
     <div className="stage-output">
-      {finalUrl ? <SignedMedia label="סרטון סופי" url={finalUrl} mimeType="video/mp4" /> : null}
+      {finalUrl ? <SignedMedia label={t("outputs.finalVideo")} url={finalUrl} mimeType="video/mp4" /> : null}
       {clipArtifacts.map((a) => (
         <ArtifactPlayer key={a.id} artifact={a} onOpenArtifact={onOpenArtifact} />
       ))}
@@ -264,35 +271,36 @@ function SeriesOutputView({
   data: Record<string, unknown>;
   onOpenArtifact: OpenArtifact;
 }) {
+  const { t } = useTranslation("run");
   const url = typeof data.finalSignedUrl === "string" ? data.finalSignedUrl : null;
   return (
     <div className="stage-output">
       {url ? (
-        <SignedMedia label={data.passthrough ? "סרטון סופי (מרינדור)" : "סרטון סדרה"} url={url} mimeType="video/mp4" />
+        <SignedMedia label={data.passthrough ? t("outputs.finalFromRender") : t("outputs.seriesVideo")} url={url} mimeType="video/mp4" />
       ) : null}
       {data.finalArtifactId ? (
         <button type="button" onClick={() => void onOpenArtifact(String(data.finalArtifactId))}>
-          פתח קובץ סופי
+          {t("outputs.openFinal")}
         </button>
       ) : null}
     </div>
   );
 }
 
-function localizeProviderError(message: string): string {
+function localizeProviderError(message: string, t: TFunction<"run">, locale: "he" | "en"): string {
   if (/שיבוט קול לא מוגדר|ELEVENLABS/i.test(message)) {
-    return "שיבוט קול לא מוגדר בשרת — יש להגדיר ELEVENLABS_API_KEY.";
+    return t("outputs.errors.voiceClone");
   }
   if (/no audio inline data|finishReason=OTHER/i.test(message)) {
-    return formatApiErrorMessage(message);
+    return formatApiErrorMessage(message, locale);
   }
   if (/enqueue_failed|locked by another worker/i.test(message)) {
-    return "המשימה נעולה בתור העיבוד. המתן מעט או הרץ מחדש את השלב.";
+    return t("outputs.errors.locked");
   }
   if (/Path .* not found|HTTP 404/i.test(message)) {
-    return "שירות הרינדור לא מצא את המודל המבוקש. בדוק את הגדרות המודל באדמין והרץ מחדש.";
+    return t("outputs.errors.modelMissing");
   }
-  return formatApiErrorMessage(message);
+  return formatApiErrorMessage(message, locale);
 }
 
 function Field({ label, value }: { label: string; value: unknown }) {
@@ -433,7 +441,9 @@ function ArtifactPlayer({
   artifact: ArtifactRow;
   onOpenArtifact: OpenArtifact;
 }) {
+  const { t } = useTranslation("run");
   const [url, setUrl] = useState<string | null>(null);
+  const label = t(`outputs.artifacts.${artifact.kind}`, { defaultValue: artifact.kind });
   useEffect(() => {
     let active = true;
     void apiGet<{ url: string }>(`/artifacts/${artifact.id}/signed-url`)
@@ -450,9 +460,9 @@ function ArtifactPlayer({
   if (!url) {
     return (
         <button type="button" className="link-btn" onClick={() => void onOpenArtifact(artifact.id)}>
-        {artifactKindLabelHe(artifact.kind)}
+        {label}
       </button>
     );
   }
-  return <SignedMedia label={artifactKindLabelHe(artifact.kind)} url={url} mimeType={artifact.mimeType} />;
+  return <SignedMedia label={label} url={url} mimeType={artifact.mimeType} />;
 }

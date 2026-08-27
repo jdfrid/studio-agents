@@ -39,7 +39,7 @@ export function closeTruncatedJson(json: string): string {
       /* continue repair */
     }
     attempt = attempt.replace(/,\s*"[^"]*"\s*:\s*"[^"]*$/s, "");
-    attempt = attempt.replace(/,\s*"[^"]*"\s*:\s*[^,\]\}]+$/s, "");
+    attempt = attempt.replace(/,\s*"[^"]*"\s*:\s*[^,\]}]+$/s, "");
     attempt = attempt.replace(/,\s*"[^"]*"\s*$/s, "");
     attempt = attempt.replace(/,\s*$/s, "");
     attempt = stripTrailingCommas(attempt);

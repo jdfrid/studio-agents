@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Locale } from "./localization.js";
 
 /** Optional advanced creative controls for the create-video form. */
 export const CreativeOptionsSchema = z
@@ -48,7 +49,13 @@ export const CreativeOptionsSchema = z
     lowerThirds: z.enum(["on", "off"]).optional(),
     /** Structured film template for script planning. */
     filmTemplate: z
-      .enum(["corporate_product", "social_explainer", "public_service_explainer", "product_demo", "testimonial"])
+      .enum([
+        "corporate_product",
+        "social_explainer",
+        "public_service_explainer",
+        "product_demo",
+        "testimonial"
+      ])
       .optional()
   })
   .strict();
@@ -58,8 +65,10 @@ export type CreativeOptions = z.infer<typeof CreativeOptionsSchema>;
 export type CreativeFieldDef = {
   key: keyof CreativeOptions;
   labelHe: string;
+  /** English display label; optional only for source compatibility with older consumers. */
+  labelEn?: string;
   kind: "select" | "number";
-  options?: Array<{ value: string; labelHe: string }>;
+  options?: Array<{ value: string; labelHe: string; labelEn?: string; code?: string }>;
   min?: number;
   max?: number;
   step?: number;
@@ -78,6 +87,8 @@ export type CreativeFieldSectionId =
 export type CreativeFieldSection = {
   id: CreativeFieldSectionId;
   titleHe: string;
+  /** English display title; optional only for source compatibility with older consumers. */
+  titleEn?: string;
   fields: CreativeFieldDef[];
 };
 
@@ -698,19 +709,452 @@ const LABEL_BY_KEY = Object.fromEntries(CREATIVE_FIELD_DEFS.map((f) => [f.key, f
   string
 >;
 
-/** Flatten selected creative options into prompt-friendly Hebrew lines for the brief agent. */
-export function formatCreativeConstraints(creative?: CreativeOptions | null): string[] {
+const SECTION_TITLE_EN: Record<CreativeFieldSectionId, string> = {
+  envelope: "Program setup",
+  brief: "Brief",
+  script: "Script",
+  dubbing: "Dubbing",
+  music: "Music",
+  visual: "Images and visuals",
+  render: "Rendering"
+};
+
+const FIELD_LABEL_EN: Record<keyof CreativeOptions, string> = {
+  language: "Language",
+  targetAudience: "Target audience",
+  communicationStyle: "Communication style",
+  pace: "Pace",
+  designStyle: "Design / animation style",
+  colorPalette: "Color palette",
+  lighting: "Lighting",
+  realism: "Realism",
+  location: "Location",
+  timeOfDay: "Time of day",
+  weather: "Weather",
+  characterType: "Character type",
+  ageGroup: "Age group",
+  wardrobe: "Wardrobe",
+  expression: "Expression",
+  action: "Action",
+  shotType: "Shot type",
+  cameraAngle: "Camera angle",
+  cameraMovement: "Camera movement",
+  motionSpeed: "Motion speed",
+  sceneTransition: "Scene transition",
+  transitionSeconds: "Transition speed (seconds)",
+  effects: "Effects",
+  accent: "Language and accent",
+  voiceGender: "Narration voice",
+  voiceType: "Voice style",
+  speechStyle: "Speaking style",
+  speechSpeed: "Speaking speed",
+  musicTempo: "Music tempo",
+  musicVolumePercent: "Music volume (%)",
+  musicSync: "Sync to scene pace",
+  logoPlacement: "Logo",
+  videoOrientation: "Video orientation",
+  karaokeCaptions: "Captions",
+  sideWatermark: "Side watermark",
+  preferHeygenDub: "Lip sync (Kling Avatar)",
+  lowerThirds: "Lower thirds",
+  filmTemplate: "Video structure"
+};
+
+/** Shared option translations. Keyed by the existing Hebrew display label/value. */
+const OPTION_LABEL_EN_BY_HE: Record<string, string> = {
+  עברית: "Hebrew",
+  אנגלית: "English",
+  צרפתית: "French",
+  יידיש: "Yiddish",
+  אידיש: "Yiddish",
+  ערבית: "Arabic",
+  רוסית: "Russian",
+  ספרדית: "Spanish",
+  ילדים: "Children",
+  צעירים: "Young adults",
+  משפחות: "Families",
+  "בעלי עסקים": "Business owners",
+  תורמים: "Donors",
+  "לקוחות קיימים": "Existing customers",
+  מקצועי: "Professional",
+  מרגש: "Emotional",
+  דרמטי: "Dramatic",
+  קליל: "Light",
+  יוקרתי: "Premium",
+  חדשותי: "News-style",
+  ידידותי: "Friendly",
+  הסברתי: "Explanatory",
+  חינוכי: "Educational",
+  "שיחתי וטבעי": "Conversational and natural",
+  "משכנע ומכירתי": "Persuasive and sales-focused",
+  אמפתי: "Empathetic",
+  הומוריסטי: "Humorous",
+  "מעורר השראה": "Inspirational",
+  "ישיר ותכליתי": "Direct and focused",
+  "שירות ציבורי": "Public service",
+  "סיפור אישי": "Personal story",
+  איטי: "Slow",
+  רגוע: "Calm",
+  בינוני: "Medium",
+  מהיר: "Fast",
+  אנרגטי: "Energetic",
+  מודרני: "Modern",
+  מינימליסטי: "Minimalist",
+  טכנולוגי: "Technology",
+  צבעוני: "Colorful",
+  מסורתי: "Traditional",
+  קומיקס: "Comic book",
+  קריקטורה: "Cartoon caricature",
+  ילדותי: "Child-friendly",
+  "דמויות לגו": "LEGO characters",
+  "אנימציה תלת־ממד": "3D animation",
+  "סגנון פיקסאר": "Pixar-style",
+  אנימה: "Anime",
+  "איור וקטורי": "Vector illustration",
+  "סטופ־מושן": "Stop motion",
+  "חדשות אולפן": "Studio news",
+  "סרט מוצר B2B (תדמית)": "B2B product film",
+  "אנימציה תלת־ממד משפחתית": "Family-friendly 3D animation",
+  "אנימציה דו־ממד": "2D animation",
+  "סרט קולנועי": "Cinematic film",
+  דוקומנטרי: "Documentary",
+  "UGC אותנטי / צילום טלפון": "Authentic UGC / phone video",
+  "לייף סטייל": "Lifestyle",
+  "סרטון הסברה": "Explainer video",
+  "הדגמת מוצר": "Product demonstration",
+  "קליימיישן / פלסטלינה": "Claymation",
+  "גזירי נייר": "Paper cutout",
+  "איור איזומטרי": "Isometric illustration",
+  רטרו: "Retro",
+  סוריאליסטי: "Surreal",
+  "עריכת מגזין יוקרתית": "Premium editorial",
+  "צבעי מותג": "Brand colors",
+  "צבעים חמים": "Warm colors",
+  "צבעים קרים": "Cool colors",
+  "שחור־לבן": "Black and white",
+  "פסטל ילדותי": "Child-friendly pastel",
+  "קומיקס בוהק": "Bright comic colors",
+  "פסטל רך": "Soft pastel",
+  "קונטרסט גבוה": "High contrast",
+  "צבעוניות טבעית": "Natural colors",
+  "גוונים אדמתיים": "Earth tones",
+  ניאון: "Neon",
+  "כהה קולנועית": "Dark cinematic",
+  "טורקיז וכתום קולנועי": "Cinematic teal and orange",
+  מונוכרומטית: "Monochrome",
+  "צבעי יסוד": "Primary colors",
+  "בהירה ונקייה": "Bright and clean",
+  מציאותי: "Realistic",
+  "חצי־מציאותי": "Semi-realistic",
+  מאויר: "Illustrated",
+  מופשט: "Abstract",
+  "תלת־ממד מצויר": "Cartoon 3D",
+  "קריקטורה מוגזמת": "Exaggerated caricature",
+  פוטוריאליסטי: "Photorealistic",
+  "היפר־ריאליסטי": "Hyper-realistic",
+  "תלת־ממד ריאליסטי": "Realistic 3D",
+  "תלת־ממד מסוגנן": "Stylized 3D",
+  "איור דו־ממד": "2D illustration",
+  "צילום UGC טבעי": "Natural UGC footage",
+  "דוקומנטרי טבעי": "Natural documentary",
+  "סינמטי מסוגנן": "Stylized cinematic",
+  "סרטון הסברה לרשתות": "Social media explainer",
+  "הסברה / שירות ציבורי": "Public-service explainer",
+  "בעיה → הדגמת מוצר → פתרון": "Problem → product demo → solution",
+  "עדות / סיפור לקוח": "Testimonial / customer story",
+  "סרט מוצר B2B": "B2B product film",
+  ללא: "None",
+  קבוע: "Always",
+  "רק בסיום": "End only",
+  "פתיח וסיום": "Opening and ending",
+  משרד: "Office",
+  בית: "Home",
+  רחוב: "Street",
+  טבע: "Nature",
+  חנות: "Store",
+  סטודיו: "Studio",
+  "רקע נקי": "Clean background",
+  "אולפן חדשות": "News studio",
+  יום: "Day",
+  לילה: "Night",
+  זריחה: "Sunrise",
+  שקיעה: "Sunset",
+  שמש: "Sunny",
+  גשם: "Rain",
+  שלג: "Snow",
+  ערפל: "Fog",
+  "ללא השפעה": "No effect",
+  לקוח: "Customer",
+  עובד: "Employee",
+  "בעל עסק": "Business owner",
+  קריין: "Narrator",
+  מומחה: "Expert",
+  "דמות מצוירת": "Animated character",
+  "דמות לגו": "LEGO character",
+  "ילד / ילדה": "Child",
+  הורה: "Parent",
+  מורה: "Teacher",
+  תלמיד: "Student",
+  "רופא / מטפל": "Doctor / therapist",
+  "משפיען / יוצר תוכן": "Influencer / creator",
+  מגיש: "Presenter",
+  "קמע מותג": "Brand mascot",
+  משפחה: "Family",
+  זוג: "Couple",
+  צוות: "Team",
+  "ללא דמות — מוצר בלבד": "No character — product only",
+  ילד: "Child",
+  צעיר: "Young",
+  מבוגר: "Adult",
+  קשיש: "Senior",
+  יומיומי: "Casual",
+  עסקי: "Business",
+  רשמי: "Formal",
+  "צבעוני ילדותי": "Colorful and child-friendly",
+  "קז׳ואל אלגנטי": "Smart casual",
+  ספורטיבי: "Sporty",
+  "מדי עבודה": "Workwear",
+  "מדים רפואיים": "Medical uniform",
+  אופנתי: "Fashionable",
+  עתידני: "Futuristic",
+  "בגדי בית": "Homewear",
+  "זהה לתמונת המקור": "Match source image",
+  שמחה: "Happy",
+  רצינות: "Serious",
+  הפתעה: "Surprised",
+  ביטחון: "Confident",
+  התרגשות: "Excited",
+  דאגה: "Concerned",
+  בלבול: "Confused",
+  הקלה: "Relieved",
+  אמפתיה: "Empathetic",
+  התלהבות: "Enthusiastic",
+  אמון: "Trusting",
+  סקרנות: "Curious",
+  רוגע: "Relaxed",
+  נחישות: "Determined",
+  "טבעית ועדינה": "Natural and subtle",
+  הליכה: "Walking",
+  דיבור: "Speaking",
+  עבודה: "Working",
+  "שימוש במוצר": "Using the product",
+  הצבעה: "Pointing",
+  "השוואת מוצרים": "Comparing products",
+  הדגמה: "Demonstrating",
+  "בדיקה / בחינה": "Inspecting",
+  בחירה: "Choosing",
+  "פתיחת אריזה": "Unboxing",
+  הרכבה: "Assembling",
+  "שיחה בין דמויות": "Character conversation",
+  "הצגת נתון": "Presenting a fact",
+  "לפני ואחרי": "Before and after",
+  "פתרון בעיה": "Solving a problem",
+  "צילום מוצר בלבד": "Product-only shot",
+  זכר: "Male",
+  נקבה: "Female",
+  "עברית ישראלית": "Israeli Hebrew",
+  "אנגלית אמריקאית": "American English",
+  "אנגלית בריטית": "British English",
+  עמוק: "Deep",
+  סמכותי: "Authoritative",
+  "חם ונעים": "Warm and pleasant",
+  "רך ומרגיע": "Soft and soothing",
+  "טבעי ולא פרסומי": "Natural, not commercial",
+  "מספר סיפורים": "Storyteller",
+  "רשמי / ממלכתי": "Formal / official",
+  רדיופוני: "Radio-style",
+  "קרוב ואישי": "Close and personal",
+  פרסומי: "Commercial",
+  משכנע: "Persuasive",
+  "מהיר לרשתות": "Fast social-media style",
+  "שירות ציבורי / ממלכתי": "Public service / official",
+  איטית: "Slow",
+  רגילה: "Normal",
+  מהירה: "Fast",
+  אוטומטית: "Automatic",
+  ידנית: "Manual",
+  טבעית: "Natural",
+  אולפן: "Studio",
+  קולנועית: "Cinematic",
+  בהירה: "Bright",
+  דרמטית: "Dramatic",
+  תקריב: "Close-up",
+  "צילום בינוני": "Medium shot",
+  "צילום רחב": "Wide shot",
+  "צילום עליון": "Top shot",
+  "בגובה העיניים": "Eye level",
+  מלמעלה: "High angle",
+  מלמטה: "Low angle",
+  "זווית צד": "Side angle",
+  סטטי: "Static",
+  "זום פנימה": "Zoom in",
+  "זום החוצה": "Zoom out",
+  מעקב: "Tracking",
+  סיבוב: "Orbit",
+  "תנועה אופקית": "Pan",
+  בינונית: "Medium",
+  חלקיקים: "Particles",
+  אור: "Light",
+  צל: "Shadow",
+  עשן: "Smoke",
+  נצנוץ: "Sparkle",
+  "הדגשת מוצר": "Product highlight",
+  "ללא אפקטים": "No effects",
+  "עומק שדה": "Depth of field",
+  בוקה: "Bokeh",
+  "קרני אור": "Light rays",
+  פרלקסה: "Parallax",
+  "גרפיקה בתנועה": "Motion graphics",
+  "אייקונים מרחפים": "Floating icons",
+  "קווי מהירות": "Speed lines",
+  "גליץ׳ דיגיטלי": "Digital glitch",
+  "פילם גריין": "Film grain",
+  "הילוך איטי": "Slow motion",
+  "טיים־לאפס": "Time-lapse",
+  "מסך מפוצל": "Split screen",
+  חיתוך: "Cut",
+  דהייה: "Fade",
+  החלקה: "Slide",
+  זום: "Zoom",
+  הבזק: "Flash",
+  "מעבר תואם תנועה": "Match-motion transition",
+  "כן — הצג כתוביות": "On — show captions",
+  "לא — בלי כתוביות": "Off — no captions",
+  פעיל: "On",
+  כבוי: "Off",
+  "פעיל — כותרת סצנה / מוצר": "On — scene / product title",
+  "כבוי — דיבוב TTS על וידאו (מומלץ)": "Off — TTS dubbing over video (recommended)",
+  "פעיל — סנכרון שפתיים דרך fal (~$0.056/ש׳)": "On — lip sync via fal (~$0.056/s)",
+  "לאורך (אנכי)": "Portrait",
+  "לרוחב (אופקי)": "Landscape"
+};
+
+function stableOptionCode(key: keyof CreativeOptions, value: string, labelEn: string): string {
+  if (/^[a-z][a-z0-9_]*$/i.test(value)) return value.toLowerCase();
+  const slug = labelEn
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (slug) return slug;
+  let hash = 2166136261;
+  for (const char of value) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return `${key}_${(hash >>> 0).toString(36)}`;
+}
+
+for (const section of CREATIVE_FIELD_SECTIONS) {
+  section.titleEn = SECTION_TITLE_EN[section.id];
+  for (const field of section.fields) {
+    field.labelEn = FIELD_LABEL_EN[field.key];
+    for (const option of field.options ?? []) {
+      option.labelEn =
+        OPTION_LABEL_EN_BY_HE[option.labelHe] ??
+        OPTION_LABEL_EN_BY_HE[option.value] ??
+        (/^[\x20-\x7E]+$/.test(option.labelHe) ? option.labelHe : option.value);
+      option.code = stableOptionCode(field.key, option.value, option.labelEn);
+    }
+  }
+}
+
+export function creativeSectionTitle(
+  section: CreativeFieldSection | CreativeFieldSectionId,
+  locale: Locale = "he"
+): string {
+  const resolved =
+    typeof section === "string"
+      ? CREATIVE_FIELD_SECTIONS.find((candidate) => candidate.id === section)
+      : section;
+  if (!resolved) return String(section);
+  return locale === "en" ? (resolved.titleEn ?? SECTION_TITLE_EN[resolved.id]) : resolved.titleHe;
+}
+
+export function creativeFieldLabel(key: keyof CreativeOptions, locale: Locale = "he"): string {
+  return locale === "en" ? (FIELD_LABEL_EN[key] ?? String(key)) : (LABEL_BY_KEY[key] ?? String(key));
+}
+
+export function normalizeCreativeOptionValue(key: keyof CreativeOptions, value: string): string {
+  const field = CREATIVE_FIELD_DEFS.find((candidate) => candidate.key === key);
+  const option = field?.options?.find(
+    (candidate) =>
+      candidate.value === value ||
+      candidate.code === value ||
+      candidate.labelHe === value ||
+      candidate.labelEn?.toLowerCase() === value.toLowerCase()
+  );
+  return option?.value ?? value;
+}
+
+export function creativeOptionLabel(
+  key: keyof CreativeOptions,
+  value: string,
+  locale: Locale = "he"
+): string {
+  const normalized = normalizeCreativeOptionValue(key, value);
+  const field = CREATIVE_FIELD_DEFS.find((candidate) => candidate.key === key);
+  const option = field?.options?.find((candidate) => candidate.value === normalized);
+  if (!option) return value;
+  return locale === "en" ? (option.labelEn ?? option.value) : option.labelHe;
+}
+
+/** Returns a shallow normalized copy suitable for older pipeline consumers. */
+export function normalizeCreativeOptions(creative: CreativeOptions): CreativeOptions {
+  const normalized = { ...creative };
+  for (const [key, value] of Object.entries(normalized)) {
+    if (typeof value === "string") {
+      (normalized as Record<string, unknown>)[key] = normalizeCreativeOptionValue(
+        key as keyof CreativeOptions,
+        value
+      );
+    }
+  }
+  return normalized;
+}
+
+export function getCreativeFieldSections(
+  locale: Locale = "he"
+): Array<
+  CreativeFieldSection & {
+    title: string;
+    fields: Array<
+      CreativeFieldDef & {
+        label: string;
+        options?: Array<NonNullable<CreativeFieldDef["options"]>[number] & { label: string }>;
+      }
+    >;
+  }
+> {
+  return CREATIVE_FIELD_SECTIONS.map((section) => ({
+    ...section,
+    title: creativeSectionTitle(section, locale),
+    fields: section.fields.map((field) => ({
+      ...field,
+      label: creativeFieldLabel(field.key, locale),
+      options: field.options?.map((option) => ({
+        ...option,
+        label: locale === "en" ? (option.labelEn ?? option.value) : option.labelHe
+      }))
+    }))
+  }));
+}
+
+/** Flatten selected creative options into prompt-friendly localized lines for agents and UI. */
+export function formatCreativeConstraints(
+  creative?: CreativeOptions | null,
+  locale: Locale = "he"
+): string[] {
   if (!creative) return [];
   const lines: string[] = [];
   for (const [key, value] of Object.entries(creative)) {
     if (value == null || value === "") continue;
-    const label = LABEL_BY_KEY[key as keyof CreativeOptions] ?? key;
+    const creativeKey = key as keyof CreativeOptions;
+    const normalizedValue = normalizeCreativeOptionValue(creativeKey, String(value));
+    const displayValue = creativeOptionLabel(creativeKey, String(value), locale);
+    const label = creativeFieldLabel(creativeKey, locale);
     if (key === "musicVolumePercent") {
-      lines.push(`${label}: ${value}% מתחת לקריינות`);
+      lines.push(`${label}: ${value}% ${locale === "he" ? "מתחת לקריינות" : "under narration"}`);
       continue;
     }
     if (key === "musicSync") {
-      lines.push(`${label}: ${value === "auto" ? "אוטומטית" : "ידנית"}`);
+      lines.push(`${label}: ${displayValue}`);
       continue;
     }
     if (key === "logoPlacement") {
@@ -720,19 +1164,36 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
         end_only: "רק בסיום",
         open_and_end: "פתיח וסיום"
       };
-      lines.push(`${label}: ${map[String(value)] ?? value}`);
+      lines.push(`${label}: ${locale === "he" ? (map[normalizedValue] ?? displayValue) : displayValue}`);
       continue;
     }
     if (key === "voiceGender") {
-      lines.push(`${label}: ${value === "male" ? "זכר" : "נקבה"}`);
+      lines.push(`${label}: ${displayValue}`);
       continue;
     }
     if (key === "videoOrientation") {
-      lines.push(`${label}: ${value === "landscape" ? "לרוחב (16:9)" : "לאורך (9:16)"}`);
+      lines.push(
+        `${label}: ${
+          normalizedValue === "landscape"
+            ? locale === "he"
+              ? "לרוחב (16:9)"
+              : "Landscape (16:9)"
+            : locale === "he"
+              ? "לאורך (9:16)"
+              : "Portrait (9:16)"
+        }`
+      );
       continue;
     }
-    if (key === "karaokeCaptions" || key === "sideWatermark" || key === "preferHeygenDub" || key === "lowerThirds") {
-      lines.push(`${label}: ${value === "on" ? "פעיל" : "כבוי"}`);
+    if (
+      key === "karaokeCaptions" ||
+      key === "sideWatermark" ||
+      key === "preferHeygenDub" ||
+      key === "lowerThirds"
+    ) {
+      lines.push(
+        `${label}: ${locale === "he" ? (normalizedValue === "on" ? "פעיל" : "כבוי") : normalizedValue === "on" ? "On" : "Off"}`
+      );
       continue;
     }
     if (key === "filmTemplate") {
@@ -743,7 +1204,7 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
         product_demo: "בעיה → הדגמת מוצר → יתרונות → פתרון → CTA",
         testimonial: "בעיה אישית → חוויה → שינוי → המלצה"
       };
-      lines.push(`${label}: ${map[String(value)] ?? value}`);
+      lines.push(`${label}: ${locale === "he" ? (map[normalizedValue] ?? displayValue) : displayValue}`);
       continue;
     }
     if (key === "designStyle") {
@@ -754,7 +1215,8 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
         "דמויות לגו": "LEGO minifigure characters, brick-built world",
         "אנימציה תלת־ממד": "stylized 3D CGI animation",
         "סגנון פיקסאר": "Pixar-style 3D characters, expressive eyes",
-        "אנימציה תלת־ממד משפחתית": "premium family-friendly stylized 3D animation, rounded expressive characters",
+        "אנימציה תלת־ממד משפחתית":
+          "premium family-friendly stylized 3D animation, rounded expressive characters",
         "אנימציה דו־ממד": "clean 2D animation with readable shapes and controlled motion",
         "סרט קולנועי": "cinematic commercial, deliberate composition, shallow depth and motivated camera",
         דוקומנטרי: "natural documentary photography, observational camera and authentic moments",
@@ -771,14 +1233,16 @@ export function formatCreativeConstraints(creative?: CreativeOptions | null): st
         אנימה: "anime style, clean line art",
         "איור וקטורי": "flat vector illustration",
         "סטופ־מושן": "stop-motion clay/puppet look",
-        "חדשות אולפן": "TV news studio desk and plain backdrop — no wall maps, globes, tickers, or graphics overlays",
-        "סרט מוצר B2B": "corporate B2B product film — clean product hero shots, office/secure facility, professional VO pacing"
+        "חדשות אולפן":
+          "TV news studio desk and plain backdrop — no wall maps, globes, tickers, or graphics overlays",
+        "סרט מוצר B2B":
+          "corporate B2B product film — clean product hero shots, office/secure facility, professional VO pacing"
       };
-      const hint = styleHints[String(value)];
-      lines.push(hint ? `${label}: ${value} (${hint})` : `${label}: ${value}`);
+      const hint = styleHints[normalizedValue];
+      lines.push(hint ? `${label}: ${displayValue} (${hint})` : `${label}: ${displayValue}`);
       continue;
     }
-    lines.push(`${label}: ${value}`);
+    lines.push(`${label}: ${displayValue}`);
   }
   return lines;
 }

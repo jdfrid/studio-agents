@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { apiPost } from "./api.js";
 import type { ProjectRunView } from "./types.js";
 import { correctionCreditCost } from "@studio/shared";
-import { correctionLabel, formatCredits } from "./creditsUi.js";
 
 type ScriptScene = {
   id: string;
@@ -25,6 +25,7 @@ export function VisualCorrectionsPanel({
   runStatus?: string;
   onSaved: () => void;
 }) {
+  const { t, i18n } = useTranslation("run");
   const [open, setOpen] = useState(false);
   const [characterBible, setCharacterBible] = useState(String(scriptOutput.characterBible ?? ""));
   const [corrections, setCorrections] = useState(String(scriptOutput.visualCorrections ?? ""));
@@ -42,8 +43,12 @@ export function VisualCorrectionsPanel({
 
   async function apply(rerunFrom: "asset" | "render" | null) {
     if (isCompleted && rerunFrom) {
-      const label = correctionLabel(rerunFrom);
-      if (label && !window.confirm(`${label}. להמשיך?`)) return;
+      const action = t(rerunFrom === "asset" ? "corrections.regenerateVisuals" : "corrections.rerender");
+      const label = t("corrections.creditNotice", {
+        action,
+        credits: formatCredits(correctionCreditCost(rerunFrom), i18n.resolvedLanguage)
+      });
+      if (label && !window.confirm(t("corrections.confirmation", { label }))) return;
     }
     setBusy(true);
     setError("");
@@ -71,38 +76,40 @@ export function VisualCorrectionsPanel({
 
   const assetCost = isCompleted ? correctionCreditCost("asset") : 0;
   const renderCost = isCompleted ? correctionCreditCost("render") : 0;
+  const assetCredits = formatCredits(assetCost, i18n.resolvedLanguage);
+  const renderCredits = formatCredits(renderCost, i18n.resolvedLanguage);
 
   return (
     <section className="visual-corrections-panel">
       <header className="panel-header">
-        <h3>תיקונים ויזואליים</h3>
+        <h3>{t("corrections.title")}</h3>
         <button type="button" className="link-btn" onClick={() => setOpen((v) => !v)}>
-          {open ? "סגור" : "פתח"}
+          {t(open ? "common.close" : "common.open")}
         </button>
       </header>
       {!open ? (
-        <p className="muted">שנה מראה דמויות (שיער, כובע, לבוש) והפעל מחדש.</p>
+        <p className="muted">{t("corrections.collapsed")}</p>
       ) : (
         <>
           <label>
-            תיאור דמויות
+            {t("corrections.characterDescription")}
             <textarea rows={3} value={characterBible} onChange={(e) => setCharacterBible(e.target.value)} />
           </label>
           <label>
-            תיקונים
+            {t("corrections.corrections")}
             <textarea
               rows={2}
               value={corrections}
               onChange={(e) => setCorrections(e.target.value)}
-              placeholder="בלי שער מצח, עם כובע…"
+              placeholder={t("corrections.placeholder")}
             />
           </label>
           {scenes.length > 0 ? (
             <details className="scene-overrides">
-              <summary>תיקון לפי סצנה</summary>
+              <summary>{t("corrections.byScene")}</summary>
               {scenes.map((scene) => (
                 <label key={scene.id}>
-                  סצנה {scene.order + 1}: {scene.title}
+                  {t("common.scene", { number: scene.order + 1 })}: {scene.title}
                   <textarea
                     rows={2}
                     value={sceneOverrides[scene.id] ?? ""}
@@ -113,26 +120,32 @@ export function VisualCorrectionsPanel({
             </details>
           ) : null}
           {isCompleted ? (
-            <p className="muted">
-              אחרי סרטון מוכן: ויזואל מחדש = {formatCredits(correctionCreditCost("asset"))} קרדיט (תמונות),
-              רינדור מחדש = {formatCredits(correctionCreditCost("render"))} קרדיט (וידאו בלבד). סרטון חינמי —
-              תיקונים ללא עלות. שמור רק שומר הערות בלי להריץ מחדש.
-            </p>
+            <p className="muted">{t("corrections.completedHint", { assetCredits, renderCredits })}</p>
           ) : null}
           {error ? <p className="error-inline">{error}</p> : null}
           <div className="stage-actions">
             <button type="button" disabled={busy} onClick={() => void apply(null)}>
-              שמור
+              {t("common.save")}
             </button>
             <button type="button" className="primary" disabled={busy} onClick={() => void apply("asset")}>
-              {busy ? "…" : assetCost > 0 ? `ויזואל מחדש (${formatCredits(assetCost)} קרדיט)` : "ויזואל מחדש"}
+              {busy
+                ? "…"
+                : assetCost > 0
+                  ? t("corrections.withCredits", { action: t("corrections.regenerateVisuals"), credits: assetCredits })
+                  : t("corrections.regenerateVisuals")}
             </button>
             <button type="button" disabled={busy} onClick={() => void apply("render")}>
-              {renderCost > 0 ? `רינדור מחדש (${formatCredits(renderCost)} קרדיט)` : "רינדור מחדש"}
+              {renderCost > 0
+                ? t("corrections.withCredits", { action: t("corrections.rerender"), credits: renderCredits })
+                : t("corrections.rerender")}
             </button>
           </div>
         </>
       )}
     </section>
   );
+}
+
+function formatCredits(value: number, language?: string): string {
+  return new Intl.NumberFormat(language, { maximumFractionDigits: 2 }).format(value);
 }
