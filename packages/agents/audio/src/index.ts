@@ -9,10 +9,15 @@ import {
 import {
   AudioInputSchema,
   AudioOutputSchema,
+  ProviderError,
   type Agent,
   type AudioInput,
   type AudioOutput
 } from "@studio/shared";
+
+type SpeechResult =
+  | Awaited<ReturnType<typeof geminiSynthesizeSpeech>>
+  | Awaited<ReturnType<typeof synthesizeSpeech>>;
 
 export const audioAgent: Agent<AudioInput, AudioOutput> = {
   name: "audio",
@@ -57,6 +62,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
     try {
       const perScene: AudioOutput["perScene"] = [];
       let lastVoiceError: string | null = null;
+      let lastVoiceFailure: unknown = null;
       for (const scene of input.scenes) {
         if (
           (!useClonedVoice && !defaultTts) ||
@@ -76,38 +82,54 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           continue;
         }
         try {
-          const audio =
-            useClonedVoice && elevenApiKey && clonedVoiceId
-              ? await synthesizeSpeech(
-                  {
-                    id: "env-elevenlabs",
-                    type: "TTS",
-                    provider: "elevenlabs",
-                    priority: 0,
-                    config: { model: "eleven_multilingual_v2" },
-                    secret: elevenApiKey
-                  },
-                  { text: scene.narration, language: input.language, voice: clonedVoiceId }
-                )
-              : defaultTts!.type === "GEMINI"
-                ? await geminiSynthesizeSpeech(
-                    defaultTts!,
-                    {
-                      text: scene.narration,
-                      language: input.language,
-                      ...((scene.voiceName || input.voiceName)
-                        ? { voiceName: scene.voiceName || input.voiceName }
-                        : {}),
-                      ...(input.voiceStyle ? { style: input.voiceStyle } : {})
-                    },
-                    async (event) => {
-                      await ctx.cost.record({ ...event, sceneId: scene.sceneId });
-                    }
-                  )
-                : await synthesizeSpeech(defaultTts!, {
-                    text: scene.narration,
-                    language: input.language
-                  });
+          let audio: SpeechResult;
+          if (useClonedVoice && elevenApiKey && clonedVoiceId) {
+            audio = await synthesizeSpeech(
+              {
+                id: "env-elevenlabs",
+                type: "TTS",
+                provider: "elevenlabs",
+                priority: 0,
+                config: { model: "eleven_multilingual_v2" },
+                secret: elevenApiKey
+              },
+              { text: scene.narration, language: input.language, voice: clonedVoiceId }
+            );
+          } else if (defaultTts?.type === "GEMINI") {
+            const primaryTts = defaultTts;
+            try {
+              audio = await geminiSynthesizeSpeech(
+                primaryTts,
+                {
+                  text: scene.narration,
+                  language: input.language,
+                  ...((scene.voiceName || input.voiceName)
+                    ? { voiceName: scene.voiceName || input.voiceName }
+                    : {}),
+                  ...(input.voiceStyle ? { style: input.voiceStyle } : {})
+                },
+                async (event) => {
+                  await ctx.cost.record({ ...event, sceneId: scene.sceneId });
+                }
+              );
+            } catch (primaryError) {
+              if (!ttsProvider || ttsProvider.id === primaryTts.id) throw primaryError;
+              await ctx.log.log("audio_tts_fallback", "Gemini TTS failed; trying fallback TTS provider", {
+                sceneId: scene.sceneId,
+                provider: ttsProvider.provider,
+                primaryError: primaryError instanceof Error ? primaryError.message : String(primaryError)
+              });
+              audio = await synthesizeSpeech(ttsProvider, {
+                text: scene.narration,
+                language: input.language
+              });
+            }
+          } else {
+            audio = await synthesizeSpeech(defaultTts!, {
+              text: scene.narration,
+              language: input.language
+            });
+          }
           const voiceExt = audio.mimeType.includes("wav")
             ? "wav"
             : audio.mimeType.includes("mpeg")
@@ -142,6 +164,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           lastVoiceError = message;
+          lastVoiceFailure = error;
           await ctx.log.log("audio_voice_failed", "TTS failed for scene", {
             sceneId: scene.sceneId,
             error: message
@@ -161,11 +184,27 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
       }
 
       const scenesNeedingVoice = input.scenes.filter(
-        (scene) => scene.audioPolicy !== "veo_native_audio" && scene.audioPolicy !== "muted"
+        (scene) =>
+          scene.audioPolicy !== "veo_native_audio" &&
+          scene.audioPolicy !== "muted" &&
+          Boolean(String(scene.narration ?? "").trim())
       );
       const voicedCount = perScene.filter((row) => row.voiceArtifactId).length;
       if (scenesNeedingVoice.length > 0 && voicedCount === 0) {
-        throw new Error(`TTS failed for all scenes${lastVoiceError ? `: ${lastVoiceError}` : ""}`);
+        throw new ProviderError(
+          `TTS failed for all scenes${lastVoiceError ? `: ${lastVoiceError}` : ""}`,
+          {
+            provider:
+              lastVoiceFailure && typeof lastVoiceFailure === "object" && "provider" in lastVoiceFailure
+                ? String((lastVoiceFailure as { provider?: unknown }).provider ?? defaultTts?.provider ?? "tts")
+                : String(defaultTts?.provider ?? "tts"),
+            cause: lastVoiceFailure,
+            metadata: {
+              sceneCount: scenesNeedingVoice.length,
+              fallbackConfigured: Boolean(ttsProvider && ttsProvider.id !== gemini?.id)
+            }
+          }
+        );
       }
 
       let musicOut: AudioOutput["music"] = {

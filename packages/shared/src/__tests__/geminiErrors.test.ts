@@ -55,6 +55,23 @@ describe("buildStageErrorRecord", () => {
     expect(parsed.friendly).toContain("מגבלת קצב");
   });
 
+  it("preserves a raw provider response through an aggregate TTS error", () => {
+    const raw = `429 {"error":{"code":429,"message":"quota exceeded","status":"RESOURCE_EXHAUSTED"}}`;
+    const providerFailure = new ProviderError("Gemini TTS failed", {
+      provider: "gemini",
+      metadata: { status: 429, raw }
+    });
+    const aggregateFailure = new ProviderError("TTS failed for all scenes", {
+      provider: "gemini",
+      cause: providerFailure,
+      metadata: { sceneCount: 3 }
+    });
+
+    const parsed = parseStageError(buildStageErrorRecord(aggregateFailure));
+    expect(parsed.raw).toContain("RESOURCE_EXHAUSTED");
+    expect(parsed.kind).toBe("rate_limit");
+  });
+
   it("parses legacy plain-text errors", () => {
     const legacy = "נגמרו קרדיטים ב-Google AI Studio";
     const parsed = parseStageError(legacy);
