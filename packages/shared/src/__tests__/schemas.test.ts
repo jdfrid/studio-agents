@@ -57,6 +57,24 @@ describe("Brief schemas", () => {
     expect(parsed.creative?.subtitlePosition).toBe("top");
     expect(parsed.creative?.subtitleEffect).toBe("background");
   });
+  it("normalizes subtitle rotation codes emitted by the initial catalog-backed form", () => {
+    const parsed = BriefInputSchema.parse({
+      title: "Styled captions",
+      sourceText: "Keep accepting requests from the deployed web bundle",
+      creative: { subtitleRotation: "tilt_left" },
+      creativeCatalogSnapshot: [
+        {
+          fieldKey: "subtitleRotation",
+          fieldLabel: "Caption angle",
+          optionCode: "tilt_left",
+          optionLabel: "Tilt left",
+          value: "-8"
+        }
+      ]
+    });
+    expect(parsed.creative?.subtitleRotation).toBe("-8");
+    expect(parsed.creativeCatalogSnapshot?.[0]?.value).toBe("-8");
+  });
   it("keeps structured reference-video analysis in brief output", () => {
     const parsed = BriefOutputSchema.parse({
       title: "Original explainer",

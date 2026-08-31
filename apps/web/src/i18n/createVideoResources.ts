@@ -376,7 +376,8 @@ export const en = {
     productTooLarge: "Product image is too large (maximum 5 MB): {{name}}",
     characterLimit: "You can upload up to {{count}} character images.",
     productLimit: "You can upload up to {{count}} product images.",
-    characterAnyTooLarge: "One of the character images is too large (maximum 5 MB per file)."
+    characterAnyTooLarge: "One of the character images is too large (maximum 5 MB per file).",
+    server: "Some settings could not be submitted: {{detail}}"
   },
   brief: {
     goal: "Video goal: {{value}}",
@@ -523,7 +524,8 @@ export const he = {
     referenceSize: "סרטון ההשראה גדול מדי (מקסימום 15MB).", logoSize: "קובץ הלוגו גדול מדי (מקסימום 5MB).",
     anchorRequired: "לסנכרון שפתיים נדרשת לפחות תמונת דמות אחת.", characterTooLarge: "תמונת דמות גדולה מדי (מקסימום 5MB): {{name}}",
     productTooLarge: "תמונת מוצר גדולה מדי (מקסימום 5MB): {{name}}", characterLimit: "ניתן להעלות עד {{count}} תמונות דמויות.",
-    productLimit: "ניתן להעלות עד {{count}} תמונות מוצר.", characterAnyTooLarge: "אחת מתמונות הדמויות גדולה מדי (מקסימום 5MB לקובץ)."
+    productLimit: "ניתן להעלות עד {{count}} תמונות מוצר.", characterAnyTooLarge: "אחת מתמונות הדמויות גדולה מדי (מקסימום 5MB לקובץ).",
+    server: "לא ניתן לשלוח חלק מההגדרות: {{detail}}"
   },
   brief: {
     goal: "מטרת הסרטון: {{value}}", action: "הפעולה הרצויה מהצופה: {{value}}", mood: "אווירה נדרשת: {{value}}",

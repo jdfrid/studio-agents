@@ -4,6 +4,7 @@ import sensible from "@fastify/sensible";
 import { ZodError } from "zod";
 import { refreshPlatformSettingsCache } from "@studio/billing";
 import { registerRoutes } from "./routes.js";
+import { apiValidationError } from "./validationError.js";
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? "info" },
@@ -30,9 +31,11 @@ const corsOrigin = process.env.CORS_ORIGINS?.split(",").map((s) => s.trim()) ?? 
 await app.register(cors, { origin: corsOrigin, credentials: true });
 await app.register(sensible);
 
-app.setErrorHandler((error, _request, reply) => {
+app.setErrorHandler((error, request, reply) => {
   if (error instanceof ZodError) {
-    reply.code(400).send({ error: "validation_error", details: error.flatten() });
+    const response = apiValidationError(error);
+    request.log.warn({ validationIssues: response.details.issues }, "request validation failed");
+    reply.code(400).send(response);
     return;
   }
   app.log.error(error);

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 import { useCreativeCatalog } from "./creativeCatalog.js";
+import { creativePayloadForRequest } from "./creativePayload.js";
 import type { ProjectRunView } from "./types.js";
 import {
   CREATIVE_FIELD_SECTIONS,
@@ -451,16 +452,10 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         ...(musicMode === "energetic" ? { musicTempo: "מהיר" } : {})
       };
       const creativeRecord = creativeWithBasics as Record<string, unknown>;
-      const creativeWithCodes = Object.fromEntries(
-        Object.entries(creativeRecord).map(([key, value]) => {
-          const managed = catalog.byKey.get(key);
-          const option = managed?.options.find(
-            (candidate) => candidate.value === String(value) || candidate.code === String(value)
-          );
-          return [key, option?.code ?? value];
-        })
-      ) as CreativeOptions;
-      const creativePayload = Object.keys(creativeWithCodes).length > 0 ? creativeWithCodes : undefined;
+      // Built-in creative values are the shared schema's wire format. Catalog codes
+      // belong in the historical snapshot only; they can differ (for example,
+      // subtitleRotation "-8" has the stable catalog code "tilt_left").
+      const creativePayload = creativePayloadForRequest(creativeWithBasics);
       const catalogSnapshot = catalog.fields.flatMap((field) => {
         const selected = creativeRecord[field.key] ?? catalogSelections[field.key];
         if (selected == null || selected === "") return [];
@@ -554,7 +549,11 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       onCreated(run);
     } catch (err) {
       const e = err as Error & { code?: string };
-      setError(e.message);
+      setError(
+        e.code === "validation_error"
+          ? t("validation.server", { detail: e.message.replace(/^Invalid request:\s*/i, "") })
+          : e.message
+      );
     } finally {
       setBusy(false);
     }

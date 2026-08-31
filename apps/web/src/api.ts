@@ -9,17 +9,20 @@ async function throwApiError(res: Response): Promise<never> {
   const text = await res.text();
   let message = text;
   let code: string | undefined;
+  let details: unknown;
   try {
-    const json = JSON.parse(text) as { error?: string; message?: string; code?: string };
+    const json = JSON.parse(text) as { error?: string; message?: string; code?: string; details?: unknown };
     if (typeof json.message === "string") message = json.message;
     else if (typeof json.error === "string") message = json.error;
     code = json.code;
+    details = json.details;
   } catch {
     // keep raw
   }
-  const err = new Error(message) as Error & { code?: string; status?: number };
+  const err = new Error(message) as Error & { code?: string; status?: number; details?: unknown };
   err.code = code;
   err.status = res.status;
+  err.details = details;
   throw err;
 }
 

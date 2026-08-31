@@ -1,6 +1,18 @@
 import { z } from "zod";
 import type { Locale } from "./localization.js";
 
+const SubtitleRotationSchema = z.preprocess(
+  (value) =>
+    value === "tilt_left"
+      ? "-8"
+      : value === "straight"
+        ? "0"
+        : value === "tilt_right"
+          ? "8"
+          : value,
+  z.enum(["-8", "0", "8"])
+);
+
 /** Optional advanced creative controls for the create-video form. */
 export const CreativeOptionsSchema = z
   .object({
@@ -45,7 +57,8 @@ export const CreativeOptionsSchema = z
     subtitlePosition: z.enum(["top", "middle", "bottom"]).optional(),
     subtitleSize: z.enum(["small", "medium", "large"]).optional(),
     subtitleFont: z.enum(["noto_sans", "noto_serif", "dejavu_sans"]).optional(),
-    subtitleRotation: z.enum(["-8", "0", "8"]).optional(),
+    /** Also accepts catalog codes emitted by the first subtitle-controls web deployment. */
+    subtitleRotation: SubtitleRotationSchema.optional(),
     subtitleEffect: z.enum(["none", "outline", "shadow", "background"]).optional(),
     /** Vertical side watermark along the film. */
     sideWatermark: z.enum(["on", "off"]).optional(),
