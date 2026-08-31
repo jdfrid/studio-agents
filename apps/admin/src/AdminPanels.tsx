@@ -62,7 +62,9 @@ type Dashboard = {
 export function AdminDashboardPanel() {
   const [dash, setDash] = useState<Dashboard | null>(null);
   useEffect(() => {
-    void apiGet<Dashboard>("/admin/dashboard").then(setDash).catch(() => setDash(null));
+    void apiGet<Dashboard>("/admin/dashboard")
+      .then(setDash)
+      .catch(() => setDash(null));
   }, []);
   if (!dash) return <p className="muted">טוען KPI…</p>;
   return (
@@ -95,7 +97,9 @@ export function AdminSettingsPanel() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    void apiGet<PlatformSettingsView>("/admin/settings").then(setSettings).catch(() => setSettings(null));
+    void apiGet<PlatformSettingsView>("/admin/settings")
+      .then(setSettings)
+      .catch(() => setSettings(null));
   }, []);
 
   async function save() {
@@ -128,13 +132,20 @@ export function AdminSettingsPanel() {
   return (
     <section className="admin-settings">
       <h3>הגדרות מערכת</h3>
-      <p className="muted">שינויים חלים על סרטונים חדשים. עדכון אחרון: {new Date(settings.updatedAt).toLocaleString("he-IL")}</p>
+      <p className="muted">
+        שינויים חלים על סרטונים חדשים. עדכון אחרון: {new Date(settings.updatedAt).toLocaleString("he-IL")}
+      </p>
 
       <label>
         מודל רינדור ללקוחות
         <select
           value={settings.defaultRenderProfile}
-          onChange={(e) => setSettings({ ...settings, defaultRenderProfile: e.target.value as PlatformSettingsView["defaultRenderProfile"] })}
+          onChange={(e) =>
+            setSettings({
+              ...settings,
+              defaultRenderProfile: e.target.value as PlatformSettingsView["defaultRenderProfile"]
+            })
+          }
         >
           {profiles.map((p) => (
             <option key={p.id} value={p.id}>
@@ -180,15 +191,15 @@ export function AdminSettingsPanel() {
           />
         </label>
         <label>
-          וידאו (Veo בלבד)
+          וידאו (Gemini Omni / Veo)
           <input
             value={settings.geminiVideoModel ?? ""}
-            placeholder="veo-3.1-fast-generate-preview"
+            placeholder="gemini-omni-1.1-flash-preview"
             onChange={(e) => setSettings({ ...settings, geminiVideoModel: e.target.value || null })}
           />
           <small className="muted">
-            רק מזהה Veo של Google (למשל veo-3.1-fast-generate-preview). לא לכתוב כאן Wan/Kling/Hailuo —
-            אותם בוחרים ב«מודל רינדור ללקוחות» למעלה (דורש FAL_API_KEY).
+            מזהה וידאו של Google: Gemini Omni 1.1 Flash (Preview) או Veo. ספקי Wan/Kling/Hailuo נבחרים ב«מודל
+            רינדור ללקוחות» למעלה (דורש FAL_API_KEY).
           </small>
         </label>
       </fieldset>
@@ -207,7 +218,8 @@ export function AdminSettingsPanel() {
           }}
         />
         <small className="muted">
-          0 = בלי סרטונים חינם כברירת מחדל. אפשר לדרוס לכל משתמש בנפרד במסך «משתמשים» (למשל 100 לבדיקות שלך, 2 לאחרים).
+          0 = בלי סרטונים חינם כברירת מחדל. אפשר לדרוס לכל משתמש בנפרד במסך «משתמשים» (למשל 100 לבדיקות שלך, 2
+          לאחרים).
         </small>
       </label>
 
@@ -223,6 +235,7 @@ export function AdminSettingsPanel() {
 
 type PlatformSettingsView = {
   defaultRenderProfile:
+    | "omni-multiclip"
     | "veo-multiclip"
     | "veo-extend"
     | "kling-i2v"
@@ -245,7 +258,8 @@ type PlatformSettingsView = {
 
 function listRenderProfiles() {
   return [
-    { id: "veo-multiclip" as const, label: "Veo Fast — multiclip (זול, ברירת מחדל)" },
+    { id: "omni-multiclip" as const, label: "Gemini Omni 1.1 Flash — ברירת מחדל (~$0.10/ש׳)" },
+    { id: "veo-multiclip" as const, label: "Veo Fast — multiclip (היסטורי)" },
     { id: "wan-i2v" as const, label: "Wan 2.7 — זול (מתמונה, ~$0.10/ש׳ @720p)" },
     { id: "kling-avatar-i2v" as const, label: "Kling Avatar — סנכרון שפתיים (~$0.056/ש׳)" },
     { id: "hailuo-i2v" as const, label: "Hailuo — זול (מתמונה)" },
@@ -371,9 +385,7 @@ export function AdminUsersPanel() {
               <td>{u.credits}</td>
               <td>
                 {u.freeVideosRemaining}/{u.freeVideosAllowance}
-                {u.freeVideosLimit == null ? (
-                  <small className="muted"> (ברירת מחדל)</small>
-                ) : null}
+                {u.freeVideosLimit == null ? <small className="muted"> (ברירת מחדל)</small> : null}
               </td>
               <td>{u.lastLoginIp ?? "—"}</td>
               <td>{formatWhen(u.lastLoginAt)}</td>
@@ -393,7 +405,10 @@ export function AdminUsersPanel() {
             </label>
             <label>
               תפקיד
-              <select value={edit.role} onChange={(e) => setEdit({ ...edit, role: e.target.value as "USER" | "ADMIN" })}>
+              <select
+                value={edit.role}
+                onChange={(e) => setEdit({ ...edit, role: e.target.value as "USER" | "ADMIN" })}
+              >
                 <option value="USER">משתמש</option>
                 <option value="ADMIN">מנהל</option>
               </select>
@@ -420,12 +435,14 @@ export function AdminUsersPanel() {
               {busy ? "שומר…" : "שמור שינויים"}
             </button>
           </div>
-          {message ? <p className={message.includes("בהצלחה") ? "muted" : "error-inline"}>{message}</p> : null}
+          {message ? (
+            <p className={message.includes("בהצלחה") ? "muted" : "error-inline"}>{message}</p>
+          ) : null}
 
           <h4>קרדיטים ו-P&amp;L</h4>
           <p>
-            הכנסות ₪{pnl.revenueNis.toFixed(0)} · עלות ₪{pnl.costNis.toFixed(0)} · רווח ₪{pnl.marginNis.toFixed(0)} · קרדיטים{" "}
-            {pnl.user.credits}
+            הכנסות ₪{pnl.revenueNis.toFixed(0)} · עלות ₪{pnl.costNis.toFixed(0)} · רווח ₪
+            {pnl.marginNis.toFixed(0)} · קרדיטים {pnl.user.credits}
           </p>
           <label>
             התאמת קרדיטים (+/-)

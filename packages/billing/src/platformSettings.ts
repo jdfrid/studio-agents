@@ -22,7 +22,7 @@ function envDefaultRenderProfile(): RenderProfileId {
   if (fromEnv && isRenderProfileId(fromEnv)) return fromEnv;
   const veoMode = process.env.GEMINI_VEO_MODE?.trim().toLowerCase();
   if (veoMode === "extend") return "veo-extend";
-  return "veo-multiclip";
+  return "omni-multiclip";
 }
 
 function rowToView(row: {
@@ -35,7 +35,9 @@ function rowToView(row: {
   freeVideosPerUser: number;
   updatedAt: Date;
 }): PlatformSettingsView {
-  const profile = isRenderProfileId(row.defaultRenderProfile) ? row.defaultRenderProfile : envDefaultRenderProfile();
+  const profile = isRenderProfileId(row.defaultRenderProfile)
+    ? row.defaultRenderProfile
+    : envDefaultRenderProfile();
   return {
     defaultRenderProfile: profile,
     geminiTextModel: row.geminiTextModel,

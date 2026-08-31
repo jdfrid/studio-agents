@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Locale } from "./localization.js";
 export const RenderProfileIdSchema = z.enum([
+  "omni-multiclip",
   "veo-multiclip",
   "veo-extend",
   "kling-i2v",
@@ -14,7 +15,7 @@ export const RenderProfileIdSchema = z.enum([
   "luma-ray-i2v"
 ]);
 export type RenderProfileId = z.infer<typeof RenderProfileIdSchema>;
-export type VideoProviderName = "veo" | "kling" | "fal" | "heygen" | "runway" | "shotstack";
+export type VideoProviderName = "omni" | "veo" | "kling" | "fal" | "heygen" | "runway" | "shotstack";
 export type RenderStrategy = "multiclip" | "extend";
 /** Target beat length for script/narration in extend / kling profiles. */
 export const VEO_EXTEND_BEAT_SECONDS = 10;
@@ -46,10 +47,25 @@ export type RenderProfile = {
   capabilities: RenderProfileCapabilities;
 };
 export const RENDER_PROFILES: Record<RenderProfileId, RenderProfile> = {
+  "omni-multiclip": {
+    id: "omni-multiclip",
+    label: "Gemini Omni 1.1 Flash — default",
+    labelHe: "Gemini Omni 1.1 Flash — ברירת מחדל",
+    provider: "omni",
+    strategy: "multiclip",
+    costTier: "cheap",
+    capabilities: {
+      referenceImage: true,
+      extend: false,
+      nativeAudio: false,
+      maxClipSeconds: 10,
+      beatSeconds: 6
+    }
+  },
   "veo-multiclip": {
     id: "veo-multiclip",
     label: "Veo Fast — multiclip",
-    labelHe: "Veo Fast — זול (ברירת מחדל)",
+    labelHe: "Veo Fast — זול (היסטורי)",
     provider: "veo",
     strategy: "multiclip",
     costTier: "cheap",
@@ -280,7 +296,7 @@ export function defaultRenderProfileId(): RenderProfileId {
   if (fromEnv && isRenderProfileId(fromEnv)) return fromEnv;
   const veoMode = process.env.GEMINI_VEO_MODE?.trim().toLowerCase();
   if (veoMode === "extend") return "veo-extend";
-  return "veo-multiclip";
+  return "omni-multiclip";
 }
 export function resolveRenderProfile(
   brief?: { renderProfile?: RenderProfileId | string | null } | null
@@ -329,6 +345,7 @@ export function buildRenderProfileSnapshot(
 }
 /** Rough USD per generated video second for cost estimates (720p-class, fal list prices). */
 export function profileVideoPerSecondUsd(profile: RenderProfile, veoModelPerSecond = 0.08): number {
+  if (profile.provider === "omni") return 0.1;
   if (profile.provider === "heygen") return 0.12;
   if (profile.id === "kling-avatar-i2v") return 0.0562;
   if (profile.provider === "kling") return 0.09;
@@ -356,11 +373,13 @@ export function resolveRenderProfileId(id?: RenderProfileId | string | null): Re
 export function videoPromptLabel(profile: RenderProfile | RenderProfileId): string {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen") return "Motion";
+  if (p.provider === "omni") return "Gemini Omni";
   return "Veo";
 }
 /** Short provider name for cost / approve buttons. */
 export function videoProviderShortLabel(profile: RenderProfile | RenderProfileId): string {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  if (p.provider === "omni") return "Gemini Omni";
   if (p.provider === "kling") return "Kling";
   if (p.provider === "heygen") return "HeyGen";
   if (p.provider === "fal") {
@@ -385,7 +404,12 @@ export function videoModelDisplay(
   if (p.falModel) return p.falModel;
   if (p.provider === "kling") return KLING_VIDEO_MODEL;
   if (p.provider === "heygen") return HEYGEN_VIDEO_MODEL;
-  return geminiVideoModel ?? process.env.GEMINI_VIDEO_MODEL ?? "veo-3.1-fast-generate-preview";
+  if (p.provider === "omni") {
+    const configured = geminiVideoModel ?? process.env.GEMINI_VIDEO_MODEL;
+    return configured?.toLowerCase().includes("omni") ? configured : "gemini-omni-1.1-flash-preview";
+  }
+  const configured = geminiVideoModel ?? process.env.GEMINI_VIDEO_MODEL;
+  return configured?.toLowerCase().includes("veo") ? configured : "veo-3.1-fast-generate-preview";
 }
 export function budgetModeCheckboxLabel(
   profile: RenderProfile | RenderProfileId,
@@ -393,6 +417,11 @@ export function budgetModeCheckboxLabel(
 ): string {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   const clip = p.capabilities.beatSeconds;
+  if (p.provider === "omni") {
+    return locale === "en"
+      ? `Budget mode (fewer scenes, Gemini Omni ${clip}s, optional reference image)`
+      : `מצב חסכון (פחות סצנות, Gemini Omni ${clip}s, תמונת reference אופציונלית)`;
+  }
   if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen") {
     return locale === "en"
       ? `Budget mode (fewer scenes, ${clip}s per scene, reference frame)`
@@ -414,6 +443,7 @@ export function videoProviderShortLabelForLocale(
 ): string {
   if (locale === "en") return videoProviderShortLabel(profile);
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  if (p.provider === "omni") return "ג׳מיני אומני";
   if (p.provider === "kling") return "קלינג";
   if (p.provider === "heygen") return "הייג׳ן";
   if (p.id === "kling-avatar-i2v") return "קלינג אווטאר";

@@ -3,6 +3,7 @@ import { ProviderError } from "@studio/shared";
 import { httpBytes, httpJson } from "../http.js";
 import { geminiDownloadReference } from "./files.js";
 import { geminiApiKey, geminiBaseUrl, geminiModels, geminiUrl } from "./common.js";
+import { GEMINI_VIDEO_FALLBACK_MODEL, isGeminiVeoModelId } from "./common.js";
 import { withGeminiRateLimitRetry } from "./rateLimitRetry.js";
 import { veoGenerateAudio, veoResolution, veoSupportsNativeAudio } from "@studio/shared";
 import { notChargedFromMessage, type GeminiUsageReporter } from "./usage.js";
@@ -28,6 +29,7 @@ export interface GeminiVeoRequest {
   prompt: string;
   aspectRatio: "9:16" | "16:9";
   durationBucket: "4" | "6" | "8";
+  durationSeconds?: number;
   referenceImageUrl?: string | null;
   referenceImage?: GeminiInlineMedia | null;
   firstFrameUrl?: string | null;
@@ -37,6 +39,8 @@ export interface GeminiVeoRequest {
   extendVideoHandle?: string | null;
   /** When false, Veo renders silent video (TTS/mix handled downstream). Default false unless veo_native_audio. */
   generateAudio?: boolean;
+  /** Internal endpoint-safe override used by explicit Veo profiles and Omni fallback. */
+  modelOverride?: string;
 }
 
 export interface GeminiVeoOperation {
@@ -56,7 +60,8 @@ export async function geminiGenerateVeoVideo(
   hooks?: GeminiVeoHooks | ((operation: GeminiVeoOperation) => Promise<void> | void)
 ): Promise<GeminiVeoOperation> {
   const normalized = normalizeVeoHooks(hooks);
-  const configuredModel = geminiModels(provider).video;
+  const requestedModel = req.modelOverride ?? geminiModels(provider).video;
+  const configuredModel = isGeminiVeoModelId(requestedModel) ? requestedModel : GEMINI_VIDEO_FALLBACK_MODEL;
   if (provider.config.mock === true || process.env.GEMINI_MOCK === "1") {
     await reportVeoUsage(normalized.onUsage, req, configuredModel, 0, "yes");
     return {
@@ -90,7 +95,7 @@ export async function geminiGenerateVeoVideo(
 
 function veoModelFallbackChain(model: string): string[] {
   if (model.includes("lite")) {
-    return [model, "veo-3.1-fast-generate-preview"];
+    return [model, GEMINI_VIDEO_FALLBACK_MODEL];
   }
   return [model];
 }
@@ -116,14 +121,17 @@ async function runVeoGeneration(
   const queued = await withGeminiRateLimitRetry(
     "veo.predictLongRunning",
     () =>
-      httpJson<{ name?: string; operationName?: string }>(geminiUrl(provider, `models/${model}:predictLongRunning`), {
-        method: "POST",
-        body: {
-          instances: [instance],
-          parameters: buildVeoParameters(req, model)
-        },
-        timeoutMs: 120_000
-      }),
+      httpJson<{ name?: string; operationName?: string }>(
+        geminiUrl(provider, `models/${model}:predictLongRunning`),
+        {
+          method: "POST",
+          body: {
+            instances: [instance],
+            parameters: buildVeoParameters(req, model)
+          },
+          timeoutMs: 120_000
+        }
+      ),
     async (info) => {
       await hooks.onRateLimitWait?.({
         attempt: info.attempt,
@@ -142,7 +150,10 @@ async function runVeoGeneration(
 
   const operationName = queued.name ?? queued.operationName;
   if (!operationName) {
-    throw new ProviderError("Gemini Veo did not return an operation name", { provider: "gemini", metadata: { model } });
+    throw new ProviderError("Gemini Veo did not return an operation name", {
+      provider: "gemini",
+      metadata: { model }
+    });
   }
 
   await hooks.onPoll?.({ operationName, model, status: "queued" });
@@ -209,7 +220,9 @@ async function runVeoGeneration(
   });
 }
 
-function normalizeVeoHooks(hooks?: GeminiVeoHooks | ((operation: GeminiVeoOperation) => Promise<void> | void)): GeminiVeoHooks {
+function normalizeVeoHooks(
+  hooks?: GeminiVeoHooks | ((operation: GeminiVeoOperation) => Promise<void> | void)
+): GeminiVeoHooks {
   if (typeof hooks === "function") return { onPoll: hooks };
   return hooks ?? {};
 }
@@ -350,18 +363,23 @@ async function downloadGeminiVideo(
   let url: string;
   if (target.fileName) {
     const name = target.fileName.replace(/^\/+/, "");
-    const path = name.startsWith("files/") ? `${name}:download?alt=media` : `files/${name}:download?alt=media`;
+    const path = name.startsWith("files/")
+      ? `${name}:download?alt=media`
+      : `files/${name}:download?alt=media`;
     url = geminiUrl(provider, path);
   } else if (target.uri) {
-    url = target.uri.startsWith("http://") || target.uri.startsWith("https://")
-      ? target.uri
-      : resolveGeminiResourceUrl(provider, target.uri);
+    url =
+      target.uri.startsWith("http://") || target.uri.startsWith("https://")
+        ? target.uri
+        : resolveGeminiResourceUrl(provider, target.uri);
   } else {
     throw new Error("No Veo download target");
   }
 
   // Google recommends x-goog-api-key header; also try query key as fallback.
-  const urlWithoutKey = url.replace(/([?&])key=[^&]*(&)?/g, (_, sep, tail) => (tail ? sep : "")).replace(/[?&]$/, "");
+  const urlWithoutKey = url
+    .replace(/([?&])key=[^&]*(&)?/g, (_, sep, tail) => (tail ? sep : ""))
+    .replace(/[?&]$/, "");
   try {
     return await httpBytes(urlWithoutKey, {
       headers: { "x-goog-api-key": apiKey },
@@ -444,7 +462,9 @@ function extractVideoPayload(response: Record<string, unknown>): ExtractedVideoP
     if (fromSample) return fromSample;
   }
 
-  const legacyGenerated = (response.generatedVideos ?? response.generated_videos ?? []) as Array<Record<string, unknown>>;
+  const legacyGenerated = (response.generatedVideos ?? response.generated_videos ?? []) as Array<
+    Record<string, unknown>
+  >;
   for (const item of legacyGenerated) {
     const fromLegacy = videoPayloadFromRecord((item.video ?? item) as Record<string, unknown>);
     if (fromLegacy) return fromLegacy;

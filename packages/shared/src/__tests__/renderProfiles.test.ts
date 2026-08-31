@@ -9,6 +9,13 @@ import {
 } from "../renderProfiles.js";
 
 describe("resolveRenderProfile", () => {
+  it("registers Omni as the ordinary default profile", () => {
+    const profile = getRenderProfile("omni-multiclip");
+    expect(profile.provider).toBe("omni");
+    expect(profile.capabilities.referenceImage).toBe(true);
+    expect(profileVideoPerSecondUsd(profile)).toBe(0.1);
+  });
+
   it("uses brief.renderProfile when set", () => {
     const profile = resolveRenderProfile({ renderProfile: "veo-extend" });
     expect(profile.id).toBe("veo-extend");
@@ -67,6 +74,10 @@ describe("predictRenderProfileId", () => {
 
   it("picks wan when photos are present", () => {
     expect(predictRenderProfileId({ hasPhotoPlates: true })).toBe("wan-i2v");
+  });
+
+  it("preserves an explicitly selected historical Veo profile", () => {
+    expect(predictRenderProfileId({ briefRenderProfile: "veo-multiclip" })).toBe("veo-multiclip");
   });
 });
 

@@ -1,6 +1,13 @@
 import type { VeoDurationBucket } from "./schemas/script.js";
 import type { RenderProfileId } from "./renderProfiles.js";
-import { defaultRenderProfileId, getRenderProfile, profileVeoMode, profileVideoPerSecondUsd, videoModelDisplay as renderProfileVideoModelDisplay, videoProviderShortLabel } from "./renderProfiles.js";
+import {
+  defaultRenderProfileId,
+  getRenderProfile,
+  profileVeoMode,
+  profileVideoPerSecondUsd,
+  videoModelDisplay as renderProfileVideoModelDisplay,
+  videoProviderShortLabel
+} from "./renderProfiles.js";
 
 export const DEFAULT_USD_TO_ILS = 3.6;
 /** Runs above this NIS show a blocking confirmation. */
@@ -51,7 +58,10 @@ export function planSceneLayout(
   budget: boolean,
   config?: Partial<ProductionCostConfig>
 ): { sceneCount: number; clipSeconds: number; totalVideoSeconds: number; veoMode: GeminiVeoMode } {
-  const profile = getRenderProfile(config?.renderProfileId ?? defaultRenderProfileId());
+  const inferredProfileId =
+    config?.renderProfileId ??
+    (config?.videoModel?.toLowerCase().includes("veo") ? "veo-multiclip" : defaultRenderProfileId());
+  const profile = getRenderProfile(inferredProfileId);
   const mode = profileVeoMode(profile);
 
   if (profile.strategy === "extend") {
@@ -69,8 +79,7 @@ export function planSceneLayout(
   if (profile.provider === "kling" || profile.provider === "fal" || profile.provider === "heygen") {
     const beatSeconds = profile.capabilities.beatSeconds;
     const sceneCount = Math.max(1, Math.ceil(durationSeconds / beatSeconds));
-    const clipSeconds =
-      profile.provider === "heygen" ? beatSeconds : profile.capabilities.maxClipSeconds;
+    const clipSeconds = profile.provider === "heygen" ? beatSeconds : profile.capabilities.maxClipSeconds;
     return {
       sceneCount,
       clipSeconds: beatSeconds,
@@ -121,7 +130,8 @@ export function isCorporateProductFilm(brief: {
 export type AssetGenerationMode = "full" | "reference_only" | "shared_reference";
 
 export function assetGenerationMode(budget: boolean, override?: AssetGenerationMode): AssetGenerationMode {
-  if (override === "shared_reference" || override === "reference_only" || override === "full") return override;
+  if (override === "shared_reference" || override === "reference_only" || override === "full")
+    return override;
   const mode = process.env.ASSET_MODE;
   if (mode === "shared_reference" || mode === "reference_only" || mode === "full") return mode;
   return budget ? "reference_only" : "full";
@@ -166,6 +176,7 @@ export function veoSupportsNativeAudio(model: string): boolean {
 }
 
 export function veoPerSecondUsd(model: string, generateAudio = true): number {
+  if (model.toLowerCase().includes("gemini-omni")) return 0.1;
   const tier = veoModelTier(model);
   if (tier === "lite") return 0.05;
   if (tier === "fast") return generateAudio ? 0.1 : 0.08;
@@ -234,10 +245,13 @@ export function estimateRunCost(
   config?: Partial<ProductionCostConfig>
 ): RunCostEstimate {
   const budget = input.budgetMode;
-  const videoModel = config?.videoModel ?? process.env.GEMINI_VIDEO_MODEL ?? "veo-3.1-fast-generate-preview";
+  const videoModel = config?.videoModel ?? process.env.GEMINI_VIDEO_MODEL ?? "gemini-omni-1.1-flash-preview";
   const usdToIls = config?.usdToIls ?? DEFAULT_USD_TO_ILS;
   const generateAudio = config?.veoGenerateAudio ?? veoGenerateAudio();
-  const profile = getRenderProfile(config?.renderProfileId ?? defaultRenderProfileId());
+  const inferredProfileId =
+    config?.renderProfileId ??
+    (config?.videoModel?.toLowerCase().includes("veo") ? "veo-multiclip" : defaultRenderProfileId());
+  const profile = getRenderProfile(inferredProfileId);
   const perSecond = profileVideoPerSecondUsd(profile, veoPerSecondUsd(videoModel, generateAudio));
   const tier = veoModelTier(videoModel);
 
@@ -261,7 +275,8 @@ export function estimateRunCost(
   }
 
   const mode = assetGenerationMode(budget, config?.assetMode);
-  const imageCalls = mode === "shared_reference" ? 1 : mode === "reference_only" ? sceneCount : sceneCount * 3;
+  const imageCalls =
+    mode === "shared_reference" ? 1 : mode === "reference_only" ? sceneCount : sceneCount * 3;
   const veoUsd = veoSeconds * perSecond;
   const imageUsd = imageCalls * 0.04;
   const ttsUsd = sceneCount * 0.015;
@@ -277,7 +292,10 @@ export function estimateRunCost(
     warning = "מצב רגיל — יותר סצנות ויותר תמונות. הפעל מצב חסכון להוזלה.";
   } else if (budget && nis >= EXPENSIVE_RUN_NIS) {
     warning =
-      profile.provider === "kling" || profile.provider === "fal" || profile.provider === "heygen"
+      profile.provider === "omni" ||
+      profile.provider === "kling" ||
+      profile.provider === "fal" ||
+      profile.provider === "heygen"
         ? "עלות גבוהה מהצפוי — בדוק פרופיל הרינדור ומספר הסצנות."
         : "עלות גבוהה מהצפוי — בדוק את מודל Veo בשרת.";
   }
@@ -295,7 +313,10 @@ export function estimateRunCost(
     videoModel,
     veoTier: tier,
     veoTierLabel:
-      profile.provider === "kling" || profile.provider === "fal" || profile.provider === "heygen"
+      profile.provider === "omni" ||
+      profile.provider === "kling" ||
+      profile.provider === "fal" ||
+      profile.provider === "heygen"
         ? videoProviderLabel
         : veoModelLabel(tier),
     veoUsd,
@@ -319,8 +340,19 @@ export function estimateRunCostUsd(input: {
   durationSeconds: number;
   videoModel?: string;
 }): { veoSeconds: number; sceneCount: number; bucket: number; usd: number; label: string } {
-  const est = estimateRunCost(input, input.videoModel ? { videoModel: input.videoModel, veoGenerateAudio: veoGenerateAudio(), usdToIls: DEFAULT_USD_TO_ILS } : undefined);
-  return { veoSeconds: est.veoSeconds, sceneCount: est.sceneCount, bucket: est.bucket, usd: est.usd, label: est.label };
+  const est = estimateRunCost(
+    input,
+    input.videoModel
+      ? { videoModel: input.videoModel, veoGenerateAudio: veoGenerateAudio(), usdToIls: DEFAULT_USD_TO_ILS }
+      : undefined
+  );
+  return {
+    veoSeconds: est.veoSeconds,
+    sceneCount: est.sceneCount,
+    bucket: est.bucket,
+    usd: est.usd,
+    label: est.label
+  };
 }
 
 export function formatCostNis(nis: number): string {

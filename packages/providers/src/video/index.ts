@@ -3,6 +3,7 @@ import { ProviderError, usesFalVideoProvider, usesHeygenVideoProvider } from "@s
 import { createFalI2vBeatGenerator } from "./falI2v.js";
 import { createHeygenBeatGenerator } from "./heygen.js";
 import { createKlingBeatGenerator } from "./kling.js";
+import { createOmniBeatGenerator } from "./omni.js";
 import type { VideoBeatGenerator } from "./types.js";
 import { createVeoBeatGenerator } from "./veo.js";
 
@@ -11,8 +12,12 @@ export { createVeoBeatGenerator, resolveExtendHandle } from "./veo.js";
 export { createKlingBeatGenerator } from "./kling.js";
 export { createFalI2vBeatGenerator } from "./falI2v.js";
 export { createHeygenBeatGenerator } from "./heygen.js";
+export { createOmniBeatGenerator } from "./omni.js";
 
-export function getVideoBeatGenerator(profile: RenderProfile, credential: ProviderCredentialView): VideoBeatGenerator {
+export function getVideoBeatGenerator(
+  profile: RenderProfile,
+  credential: ProviderCredentialView
+): VideoBeatGenerator {
   if (usesFalVideoProvider(profile)) {
     return profile.provider === "kling"
       ? createKlingBeatGenerator(profile, credential)
@@ -20,6 +25,9 @@ export function getVideoBeatGenerator(profile: RenderProfile, credential: Provid
   }
   if (usesHeygenVideoProvider(profile)) {
     return createHeygenBeatGenerator(profile, credential);
+  }
+  if (profile.provider === "omni") {
+    return createOmniBeatGenerator(profile, credential);
   }
   if (profile.provider === "veo") {
     return createVeoBeatGenerator(profile, credential);
@@ -29,4 +37,3 @@ export function getVideoBeatGenerator(profile: RenderProfile, credential: Provid
     metadata: { profileId: profile.id }
   });
 }
-

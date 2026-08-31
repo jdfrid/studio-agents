@@ -42,4 +42,26 @@ describe("Gemini provider helpers", () => {
     expect(result.operationName).toContain("scene-1");
     expect(result.videoBytes?.toString()).toContain("mock video");
   });
+
+  it("keeps explicit Veo generation on the Veo endpoint-safe fallback model", async () => {
+    const result = await geminiGenerateVeoVideo(
+      {
+        ...mockProvider,
+        config: {
+          ...mockProvider.config,
+          models: {
+            ...(mockProvider.config.models as Record<string, string>),
+            video: "gemini-omni-1.1-flash-preview"
+          }
+        }
+      },
+      {
+        sceneId: "scene-veo",
+        prompt: "legacy Veo profile",
+        aspectRatio: "16:9",
+        durationBucket: "6"
+      }
+    );
+    expect(result.model).toBe("veo-3.1-fast-generate-preview");
+  });
 });

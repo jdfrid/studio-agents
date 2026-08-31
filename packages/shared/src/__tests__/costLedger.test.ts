@@ -14,6 +14,11 @@ describe("costLedger", () => {
     expect(usd).toBeCloseTo(0.32, 2);
   });
 
+  it("prices Gemini Omni 720p video at $0.10/sec", () => {
+    const { usd } = priceVeoScene("gemini-omni-1.1-flash-preview", 8, false);
+    expect(usd).toBeCloseTo(0.8, 2);
+  });
+
   it("prices Kling/fal model at kling rate not Veo unknown tier", () => {
     const { usd } = priceVeoScene("fal-ai/kling-video/v2.1/standard/image-to-video", 10, false);
     expect(usd).toBeCloseTo(0.9, 2);

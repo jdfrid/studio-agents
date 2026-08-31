@@ -230,6 +230,7 @@ export function activityTypeLabel(
         try {
           const profile = getRenderProfile(renderProfileId);
           if (locale === "en") return `${videoProviderShortLabelForLocale(profile, "en")} video`;
+          if (profile.provider === "omni") return "Gemini Omni וידאו";
           if (profile.provider === "kling") return "Kling וידאו";
           if (profile.provider === "heygen") return "HeyGen וידאו";
           if (profile.provider === "fal") return `${videoProviderShortLabel(profile)} וידאו`;

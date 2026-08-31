@@ -10,46 +10,88 @@ export interface GeminiModelConfig {
   video: string;
 }
 
+export const DEFAULT_GEMINI_VIDEO_MODEL = "gemini-omni-1.1-flash-preview";
+export const GEMINI_VIDEO_FALLBACK_MODEL = "veo-3.1-fast-generate-preview";
+
 export function geminiApiKey(provider?: ProviderCredentialView | null): string {
   const key = provider?.secret ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
   if (!key) {
-    throw new ProviderError("Gemini API key is missing. Configure ProviderCredential(type=GEMINI) or GEMINI_API_KEY.", {
-      provider: "gemini"
-    });
+    throw new ProviderError(
+      "Gemini API key is missing. Configure ProviderCredential(type=GEMINI) or GEMINI_API_KEY.",
+      {
+        provider: "gemini"
+      }
+    );
   }
   return key;
 }
 
 export function geminiBaseUrl(provider?: ProviderCredentialView | null): string {
-  return String(provider?.config.baseUrl ?? process.env.GEMINI_API_BASE_URL ?? "https://generativelanguage.googleapis.com/v1beta");
+  return String(
+    provider?.config.baseUrl ??
+      process.env.GEMINI_API_BASE_URL ??
+      "https://generativelanguage.googleapis.com/v1beta"
+  );
 }
 
 export function geminiModels(provider?: ProviderCredentialView | null): GeminiModelConfig {
   const models = (provider?.config.models ?? {}) as Partial<GeminiModelConfig>;
   const platform = getPlatformSettingsSync();
   return {
-    text: pickModel(models.text, provider?.config.textModel, platform.geminiTextModel, process.env.GEMINI_TEXT_MODEL, "gemini-3.5-flash"),
-    tts: pickModel(models.tts, provider?.config.ttsModel, platform.geminiTtsModel, process.env.GEMINI_TTS_MODEL, "gemini-2.5-flash-preview-tts"),
-    image: pickModel(models.image, provider?.config.imageModel, platform.geminiImageModel, process.env.GEMINI_IMAGE_MODEL, "gemini-3.1-flash-image"),
-    music: pickModel(models.music, provider?.config.musicModel, platform.geminiMusicModel, process.env.GEMINI_MUSIC_MODEL, "lyria-3-clip-preview"),
+    text: pickModel(
+      models.text,
+      provider?.config.textModel,
+      platform.geminiTextModel,
+      process.env.GEMINI_TEXT_MODEL,
+      "gemini-3.5-flash"
+    ),
+    tts: pickModel(
+      models.tts,
+      provider?.config.ttsModel,
+      platform.geminiTtsModel,
+      process.env.GEMINI_TTS_MODEL,
+      "gemini-2.5-flash-preview-tts"
+    ),
+    image: pickModel(
+      models.image,
+      provider?.config.imageModel,
+      platform.geminiImageModel,
+      process.env.GEMINI_IMAGE_MODEL,
+      "gemini-3.1-flash-image"
+    ),
+    music: pickModel(
+      models.music,
+      provider?.config.musicModel,
+      platform.geminiMusicModel,
+      process.env.GEMINI_MUSIC_MODEL,
+      "lyria-3-clip-preview"
+    ),
     video: pickModel(
       models.video,
       provider?.config.videoModel,
       platform.geminiVideoModel,
       process.env.GEMINI_VIDEO_MODEL,
-      "veo-3.1-fast-generate-preview",
-      isValidGeminiVeoModelId
+      DEFAULT_GEMINI_VIDEO_MODEL,
+      isValidGeminiVideoModelId
     )
   };
 }
 
-/** Reject fal/Wan/Kling labels accidentally pasted into the Gemini Veo model field. */
-export function isValidGeminiVeoModelId(model: string): boolean {
+/** Accept supported Google video model families; reject external provider labels. */
+export function isValidGeminiVideoModelId(model: string): boolean {
   const m = model.trim().toLowerCase();
   if (!m) return false;
   if (/wan|hailuo|kling|minimax|fal-ai|heygen|runway|shotstack|seedance|luma|bytedance/.test(m)) return false;
-  if (m.includes(" ") && !m.startsWith("veo")) return false;
-  return m.includes("veo") || m.includes("generate");
+  if (m.includes(" ")) return false;
+  return isGeminiOmniModelId(m) || isGeminiVeoModelId(m);
+}
+
+export function isGeminiOmniModelId(model: string): boolean {
+  return /^gemini-omni(?:-[\w.]+)*-flash-preview$/i.test(model.trim());
+}
+
+export function isGeminiVeoModelId(model: string): boolean {
+  return /^veo-[\w.-]+$/i.test(model.trim());
 }
 
 function pickModel(
@@ -60,7 +102,12 @@ function pickModel(
   fallback: string,
   validate?: (model: string) => boolean
 ): string {
-  const candidates = [fromModels, typeof fromConfig === "string" ? fromConfig : undefined, fromPlatform ?? undefined, fromEnv];
+  const candidates = [
+    fromModels,
+    typeof fromConfig === "string" ? fromConfig : undefined,
+    fromPlatform ?? undefined,
+    fromEnv
+  ];
   for (const value of candidates) {
     const trimmed = value?.trim();
     if (!trimmed) continue;
@@ -72,7 +119,11 @@ function pickModel(
 
 export function isGeminiProvider(provider?: ProviderCredentialView | null): boolean {
   if (!provider) return false;
-  return provider.type === "GEMINI" || provider.provider.toLowerCase().includes("gemini") || provider.provider.toLowerCase().includes("google");
+  return (
+    provider.type === "GEMINI" ||
+    provider.provider.toLowerCase().includes("gemini") ||
+    provider.provider.toLowerCase().includes("google")
+  );
 }
 
 export function geminiUrl(provider: ProviderCredentialView | null | undefined, path: string): string {
@@ -86,7 +137,8 @@ export function extractInlineData(
   response: unknown,
   preferredPrefix?: string
 ): { data: Buffer; mimeType: string } | null {
-  const candidates = (response as { candidates?: Array<{ content?: { parts?: unknown[] } }> }).candidates ?? [];
+  const candidates =
+    (response as { candidates?: Array<{ content?: { parts?: unknown[] } }> }).candidates ?? [];
   for (const candidate of candidates) {
     const parts = candidate.content?.parts ?? [];
     for (const part of parts) {
@@ -112,8 +164,12 @@ export function extractInlineData(
 }
 
 export function extractText(response: unknown): string {
-  const candidates = (response as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }).candidates ?? [];
-  return candidates.flatMap((c) => c.content?.parts?.map((p) => p.text ?? "") ?? []).join("").trim();
+  const candidates =
+    (response as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }).candidates ?? [];
+  return candidates
+    .flatMap((c) => c.content?.parts?.map((p) => p.text ?? "") ?? [])
+    .join("")
+    .trim();
 }
 
 /** Summarize why generateContent returned no usable inline payload (common with image-only modality). */
@@ -163,7 +219,9 @@ export interface GeminiCapabilities {
 
 export function checkGeminiCapabilities(provider: ProviderCredentialView | null): GeminiCapabilities {
   const models = geminiModels(provider);
-  const apiKeyConfigured = Boolean(provider?.secret ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY);
+  const apiKeyConfigured = Boolean(
+    provider?.secret ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY
+  );
   const configured = (provider?.config.capabilities ?? {}) as Record<string, boolean>;
   const musicDisabled = configured.music === false || process.env.GEMINI_LYRIA_ENABLED === "0";
   const missingKey = apiKeyConfigured ? undefined : "Gemini API key is not configured.";

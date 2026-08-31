@@ -188,12 +188,16 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         }
 
         const referenceSource =
-          scene.referenceFrame?.gcsPath || scene.referenceFrame?.signedUrl ? scene.referenceFrame : scene.background;
+          scene.referenceFrame?.gcsPath || scene.referenceFrame?.signedUrl
+            ? scene.referenceFrame
+            : scene.background;
         const [referenceImage, firstFrame, lastFrame, voiceAudio] = await Promise.all([
           loadMediaBytes(ctx.storage, referenceSource),
           loadMediaBytes(ctx.storage, scene.firstFrame),
           loadMediaBytes(ctx.storage, scene.lastFrame),
-          usesLipSyncVideoProvider(renderProfile) ? loadMediaBytes(ctx.storage, scene.voice) : Promise.resolve(null)
+          usesLipSyncVideoProvider(renderProfile)
+            ? loadMediaBytes(ctx.storage, scene.voice)
+            : Promise.resolve(null)
         ]);
         const wantNativeAudio =
           scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1";
@@ -216,7 +220,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           voiceAudio
         };
         let result: VideoBeatResult;
-        if (renderProfile.provider === "veo") {
+        if (renderProfile.provider === "veo" || renderProfile.provider === "omni") {
           result = await withVeoInflightGate(
             {
               applySceneGap: veoPaidCalls > 0,
@@ -242,7 +246,9 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
             error: result.error ?? null
           }
         ];
-        await saveBeatOperationArtifact(ctx, scene, promptHash, result, renderProfile, { extendsPrevious: false });
+        await saveBeatOperationArtifact(ctx, scene, promptHash, result, renderProfile, {
+          extendsPrevious: false
+        });
 
         const rawPath = path.join(dir, `scene-${scene.order}-raw.mp4`);
         await writeFile(rawPath, result.videoBytes);
@@ -317,7 +323,13 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       let assembledPath = concatPath;
       let totalDurationSeconds = perScene.reduce((sum, s) => sum + s.durationSeconds, 0);
       if (input.videoInsert?.gcsPath) {
-        const spliced = await spliceExternalInsert(assembledPath, input.videoInsert, dir, dimensions, ctx.storage);
+        const spliced = await spliceExternalInsert(
+          assembledPath,
+          input.videoInsert,
+          dir,
+          dimensions,
+          ctx.storage
+        );
         assembledPath = spliced.path;
         totalDurationSeconds = spliced.durationSeconds;
         await ctx.log.log("render_video_insert", "External clip spliced into film", {
@@ -447,13 +459,10 @@ async function renderExtendChain(
       isFirst ? loadMediaBytes(ctx.storage, scene.lastFrame) : Promise.resolve(null)
     ]);
 
-    const wantNativeAudio =
-      scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1";
+    const wantNativeAudio = scene.audioPolicy === "veo_native_audio" && process.env.GEMINI_VEO_AUDIO === "1";
     const beatReq: VideoBeatRequest = {
       sceneId: scene.sceneId,
-      prompt: wantNativeAudio
-        ? scene.veoPrompt
-        : sanitizeVeoPromptForExternalAudio(scene.veoPrompt),
+      prompt: wantNativeAudio ? scene.veoPrompt : sanitizeVeoPromptForExternalAudio(scene.veoPrompt),
       aspectRatio: input.aspectRatio === "16:9" ? "16:9" : "9:16",
       durationBucket: scene.durationBucket,
       durationSeconds: scene.durationSeconds,
@@ -464,7 +473,7 @@ async function renderExtendChain(
       generateAudio: wantNativeAudio
     };
     let result: VideoBeatResult;
-    if (renderProfile.provider === "veo") {
+    if (renderProfile.provider === "veo" || renderProfile.provider === "omni") {
       result = await withVeoInflightGate(
         {
           applySceneGap: veoPaidCalls > 0,
@@ -491,7 +500,9 @@ async function renderExtendChain(
       error: result.error ?? null
     });
 
-    await saveBeatOperationArtifact(ctx, scene, promptHash, result, renderProfile, { extendsPrevious: !isFirst });
+    await saveBeatOperationArtifact(ctx, scene, promptHash, result, renderProfile, {
+      extendsPrevious: !isFirst
+    });
 
     extendHandle = result.extendHandle ?? result.operationName;
     lastResult = result;
@@ -549,7 +560,13 @@ async function renderExtendChain(
   let assembledPath = finalized.path;
   let totalDurationSecondsOut = totalDurationSeconds;
   if (input.videoInsert?.gcsPath) {
-    const spliced = await spliceExternalInsert(assembledPath, input.videoInsert, dir, dimensions, ctx.storage);
+    const spliced = await spliceExternalInsert(
+      assembledPath,
+      input.videoInsert,
+      dir,
+      dimensions,
+      ctx.storage
+    );
     assembledPath = spliced.path;
     totalDurationSecondsOut = spliced.durationSeconds;
     await ctx.log.log("render_video_insert", "External clip spliced into extend film", {
@@ -642,7 +659,11 @@ function resolveHeygenCredential(): ProviderCredentialView | null {
   };
 }
 
-function buildBeatHooks(ctx: AgentContext, scene: SceneTimelineEntry, renderProfileId?: string): VideoBeatHooks {
+function buildBeatHooks(
+  ctx: AgentContext,
+  scene: SceneTimelineEntry,
+  renderProfileId?: string
+): VideoBeatHooks {
   return {
     onPoll: async (operation) => {
       await ctx.log.log("video_operation_status", "Video operation status", {
@@ -801,7 +822,11 @@ async function mixExtendTimelineAudio(
 
 function shouldUseVoice(scene: SceneTimelineEntry): boolean {
   const policy = scene.audioPolicy ?? "gemini_tts_plus_music";
-  return policy !== "muted" && policy !== "veo_native_audio" && Boolean(scene.voice.gcsPath || scene.voice.signedUrl);
+  return (
+    policy !== "muted" &&
+    policy !== "veo_native_audio" &&
+    Boolean(scene.voice.gcsPath || scene.voice.signedUrl)
+  );
 }
 
 type MediaRef = { gcsPath?: string | null; signedUrl?: string | null };
@@ -925,7 +950,19 @@ function fitVoiceToVideoFilter(voiceDur: number, videoDur: number): string {
 
 async function stripAudio(videoPath: string, dir: string): Promise<string> {
   const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-silent.mp4`);
-  await runFfmpeg(["-i", videoPath, "-map", "0:v:0", "-c:v", "copy", "-an", "-movflags", "+faststart", "-y", out]);
+  await runFfmpeg([
+    "-i",
+    videoPath,
+    "-map",
+    "0:v:0",
+    "-c:v",
+    "copy",
+    "-an",
+    "-movflags",
+    "+faststart",
+    "-y",
+    out
+  ]);
   return out;
 }
 
@@ -1222,9 +1259,9 @@ function shouldUseBusinessEndCard(branding: BriefBrandingOutput | null | undefin
   if (branding.logoPlacement === "none") return false;
   return Boolean(
     branding.businessName?.trim() ||
-      branding.slogan?.trim() ||
-      branding.websiteUrl?.trim() ||
-      branding.logo?.gcsPath
+    branding.slogan?.trim() ||
+    branding.websiteUrl?.trim() ||
+    branding.logo?.gcsPath
   );
 }
 
@@ -1250,7 +1287,13 @@ async function createBusinessEndCardClip(
   const hasLogo = Boolean(branding.logo?.gcsPath);
   const voiceDur = Number(brandVoice?.durationSeconds);
   const cardSeconds = brandVoice?.gcsPath
-    ? Math.min(8, Math.max(BRANDING_END_CARD_WITH_VOICE_SECONDS, Number.isFinite(voiceDur) && voiceDur > 0 ? voiceDur + 0.4 : BRANDING_END_CARD_WITH_VOICE_SECONDS))
+    ? Math.min(
+        8,
+        Math.max(
+          BRANDING_END_CARD_WITH_VOICE_SECONDS,
+          Number.isFinite(voiceDur) && voiceDur > 0 ? voiceDur + 0.4 : BRANDING_END_CARD_WITH_VOICE_SECONDS
+        )
+      )
     : BRANDING_END_CARD_SECONDS;
 
   let logoLocal: string | null = null;
@@ -1370,7 +1413,11 @@ async function createBusinessEndCardClip(
   return endClip;
 }
 
-async function createEndCardClip(dir: string, dimensions: VideoDimensions, lastFramePath: string): Promise<string> {
+async function createEndCardClip(
+  dir: string,
+  dimensions: VideoDimensions,
+  lastFramePath: string
+): Promise<string> {
   const endClip = path.join(dir, `end-card-${nanoid(4)}.mp4`);
   const branded = resolveBrandingOutroImage();
   const sourceImage = branded ?? lastFramePath;
@@ -1535,9 +1582,7 @@ async function burnKaraokeAndWatermark(
 
     if (wantMark) {
       const mark =
-        input.branding?.businessName?.trim() ||
-        input.branding?.slogan?.trim() ||
-        "prompt2spot.com";
+        input.branding?.businessName?.trim() || input.branding?.slogan?.trim() || "prompt2spot.com";
       const font = resolveDrawtextFont();
       const fontOpt = font ? `:fontfile='${escapeFfmpegPath(font)}'` : "";
       const size = Math.max(18, Math.round(Math.min(dimensions.width, dimensions.height) * 0.028));
@@ -1557,7 +1602,9 @@ async function burnKaraokeAndWatermark(
       const ySub = yTitle + titleSize + Math.round(barH * 0.08);
       for (const scene of input.timeline) {
         if (scene.sceneKind === "title_card") continue;
-        const title = String(scene.title ?? "").trim().slice(0, 48);
+        const title = String(scene.title ?? "")
+          .trim()
+          .slice(0, 48);
         if (!title) continue;
         const start = Math.max(0, scene.startSecond);
         const end = Math.min(scene.endSecond, start + 2.8);
@@ -1732,7 +1779,11 @@ function normalizeVideoFilter(width: number, height: number): string {
 }
 
 /** Join normalized clips — scales each input so Kling/Veo dimension mismatches cannot break concat. */
-async function concatClipsHardCut(prepared: string[], outputPath: string, dimensions: VideoDimensions): Promise<void> {
+async function concatClipsHardCut(
+  prepared: string[],
+  outputPath: string,
+  dimensions: VideoDimensions
+): Promise<void> {
   const n = prepared.length;
   const vf = normalizeVideoFilter(dimensions.width, dimensions.height);
   const parts: string[] = [];
@@ -1779,11 +1830,7 @@ async function concatClipsHardCut(prepared: string[], outputPath: string, dimens
     ]);
   } catch (error) {
     const listPath = path.join(path.dirname(outputPath), `concat-fallback-${nanoid(4)}.txt`);
-    await writeFile(
-      listPath,
-      prepared.map((p) => `file '${p.replace(/\\/g, "/")}'`).join("\n"),
-      "utf8"
-    );
+    await writeFile(listPath, prepared.map((p) => `file '${p.replace(/\\/g, "/")}'`).join("\n"), "utf8");
     await runFfmpeg([
       "-f",
       "concat",
@@ -1830,7 +1877,8 @@ async function concatClipsWithXfade(
   const normalized = await Promise.all(
     clipPaths.map(async (clipPath, index) => {
       if (await probeHasAudio(clipPath)) return clipPath;
-      return (await finalizeSceneClip(clipPath, path.dirname(clipPath), `xfade-audio-${index}`, dimensions)).path;
+      return (await finalizeSceneClip(clipPath, path.dirname(clipPath), `xfade-audio-${index}`, dimensions))
+        .path;
     })
   );
 
@@ -1842,14 +1890,7 @@ async function concatClipsWithXfade(
 
   for (let i = 1; i < normalized.length; i += 1) {
     const stepOut = path.join(dir, `xfade-merge-${i}-${nanoid(4)}.mp4`);
-    await mergeTwoClipsWithXfade(
-      currentPath,
-      normalized[i]!,
-      currentDur,
-      durations[i]!,
-      fade,
-      stepOut
-    );
+    await mergeTwoClipsWithXfade(currentPath, normalized[i]!, currentDur, durations[i]!, fade, stepOut);
     currentPath = stepOut;
     currentDur = currentDur + durations[i]! - fade;
   }

@@ -18,7 +18,7 @@ describe("shared localization helpers", () => {
     expect(statusLabel("RUNNING")).toBe("רץ");
     expect(statusLabel("RUNNING", "en")).toBe("Running");
     expect(artifactKindLabel("final_video", "en")).toBe("Final video");
-    expect(renderProfileLabel("veo-multiclip", "he")).toContain("ברירת מחדל");
+    expect(renderProfileLabel("omni-multiclip", "he")).toContain("ברירת מחדל");
     expect(renderProfileLabel("veo-multiclip", "en")).toContain("multiclip");
     expect(activityTypeLabel("gemini_image")).toBe("Gemini תמונה");
     expect(activityTypeLabel("gemini_image", undefined, "en")).toBe("Gemini image");

@@ -371,7 +371,7 @@ model Series {
 // Singleton platform-wide defaults (models, billing promos).
 model PlatformSettings {
   id                   String   @id @default("platform")
-  defaultRenderProfile String   @default("veo-multiclip")
+  defaultRenderProfile String   @default("omni-multiclip")
   geminiTextModel      String?
   geminiTtsModel       String?
   geminiImageModel     String?
