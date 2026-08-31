@@ -41,6 +41,12 @@ export const CreativeOptionsSchema = z
     videoOrientation: z.enum(["portrait", "landscape"]).optional(),
     /** Burn karaoke-style Hebrew captions (default on when "on"). */
     karaokeCaptions: z.enum(["on", "off"]).optional(),
+    /** Safe, renderer-owned subtitle styling choices (never raw FFmpeg/ASS fragments). */
+    subtitlePosition: z.enum(["top", "middle", "bottom"]).optional(),
+    subtitleSize: z.enum(["small", "medium", "large"]).optional(),
+    subtitleFont: z.enum(["noto_sans", "noto_serif", "dejavu_sans"]).optional(),
+    subtitleRotation: z.enum(["-8", "0", "8"]).optional(),
+    subtitleEffect: z.enum(["none", "outline", "shadow", "background"]).optional(),
     /** Vertical side watermark along the film. */
     sideWatermark: z.enum(["on", "off"]).optional(),
     /** Prefer HeyGen lip-sync render profile for dubbing. */
@@ -672,6 +678,57 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
         ]
       },
       {
+        key: "subtitlePosition",
+        labelHe: "מיקום כתוביות",
+        kind: "select",
+        options: [
+          { value: "top", labelHe: "למעלה" },
+          { value: "middle", labelHe: "במרכז" },
+          { value: "bottom", labelHe: "למטה" }
+        ]
+      },
+      {
+        key: "subtitleSize",
+        labelHe: "גודל כתוביות",
+        kind: "select",
+        options: [
+          { value: "small", labelHe: "קטן" },
+          { value: "medium", labelHe: "בינוני" },
+          { value: "large", labelHe: "גדול" }
+        ]
+      },
+      {
+        key: "subtitleFont",
+        labelHe: "גופן כתוביות",
+        kind: "select",
+        options: [
+          { value: "noto_sans", labelHe: "Noto Sans — נקי" },
+          { value: "noto_serif", labelHe: "Noto Serif — קלאסי" },
+          { value: "dejavu_sans", labelHe: "DejaVu Sans — פשוט" }
+        ]
+      },
+      {
+        key: "subtitleRotation",
+        labelHe: "זווית כתוביות",
+        kind: "select",
+        options: [
+          { value: "-8", labelHe: "נטייה שמאלה" },
+          { value: "0", labelHe: "ישר" },
+          { value: "8", labelHe: "נטייה ימינה" }
+        ]
+      },
+      {
+        key: "subtitleEffect",
+        labelHe: "אפקט טקסט",
+        kind: "select",
+        options: [
+          { value: "none", labelHe: "ללא אפקט" },
+          { value: "outline", labelHe: "קו מתאר" },
+          { value: "shadow", labelHe: "צל" },
+          { value: "background", labelHe: "רקע כהה" }
+        ]
+      },
+      {
         key: "sideWatermark",
         labelHe: "ווטרמארק צדדי",
         kind: "select",
@@ -754,6 +811,11 @@ const FIELD_LABEL_EN: Record<keyof CreativeOptions, string> = {
   logoPlacement: "Logo",
   videoOrientation: "Video orientation",
   karaokeCaptions: "Captions",
+  subtitlePosition: "Caption position",
+  subtitleSize: "Caption size",
+  subtitleFont: "Caption font",
+  subtitleRotation: "Caption angle",
+  subtitleEffect: "Text effect",
   sideWatermark: "Side watermark",
   preferHeygenDub: "Lip sync (Kling Avatar)",
   lowerThirds: "Lower thirds",
@@ -1026,7 +1088,21 @@ const OPTION_LABEL_EN_BY_HE: Record<string, string> = {
   "כבוי — דיבוב TTS על וידאו (מומלץ)": "Off — TTS dubbing over video (recommended)",
   "פעיל — סנכרון שפתיים דרך fal (~$0.056/ש׳)": "On — lip sync via fal (~$0.056/s)",
   "לאורך (אנכי)": "Portrait",
-  "לרוחב (אופקי)": "Landscape"
+  "לרוחב (אופקי)": "Landscape",
+  למעלה: "Top",
+  במרכז: "Middle",
+  למטה: "Bottom",
+  קטן: "Small",
+  גדול: "Large",
+  "Noto Sans — נקי": "Noto Sans — clean",
+  "Noto Serif — קלאסי": "Noto Serif — classic",
+  "DejaVu Sans — פשוט": "DejaVu Sans — simple",
+  "נטייה שמאלה": "Tilt left",
+  ישר: "Straight",
+  "נטייה ימינה": "Tilt right",
+  "ללא אפקט": "No effect",
+  "קו מתאר": "Outline",
+  "רקע כהה": "Dark background"
 };
 
 function stableOptionCode(key: keyof CreativeOptions, value: string, labelEn: string): string {

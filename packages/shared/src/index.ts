@@ -5,6 +5,7 @@ export * from "./schemas/audio.js";
 export * from "./schemas/asset.js";
 export * from "./schemas/package.js";
 export * from "./schemas/render.js";
+export * from "./schemas/subtitleStyle.js";
 export * from "./schemas/series.js";
 export * from "./schemas/artifact.js";
 export * from "./schemas/run.js";

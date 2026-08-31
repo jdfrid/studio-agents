@@ -251,6 +251,11 @@ export const en = {
       musicSync: "Synchronize with scene pacing",
       logoPlacement: "Logo",
       karaokeCaptions: "Captions",
+      subtitlePosition: "Caption position",
+      subtitleSize: "Caption size",
+      subtitleFont: "Caption font",
+      subtitleRotation: "Caption angle",
+      subtitleEffect: "Text effect",
       sideWatermark: "Side watermark",
       preferHeygenDub: "Lip movement (Kling Avatar)",
       lowerThirds: "Lower thirds",
@@ -326,6 +331,11 @@ export const en = {
     },
     fieldOptions: {
       karaokeCaptions: { on: "Yes — show captions", off: "No — no captions" },
+      subtitlePosition: { top: "Top", middle: "Middle", bottom: "Bottom" },
+      subtitleSize: { small: "Small", medium: "Medium", large: "Large" },
+      subtitleFont: { noto_sans: "Noto Sans — clean", noto_serif: "Noto Serif — classic", dejavu_sans: "DejaVu Sans — simple" },
+      subtitleRotation: { "-8": "Tilt left", "0": "Straight", "8": "Tilt right" },
+      subtitleEffect: { none: "None", outline: "Outline", shadow: "Shadow", background: "Dark background" },
       sideWatermark: { on: "On", off: "Off" },
       lowerThirds: { on: "On — scene / product title", off: "Off" },
       preferHeygenDub: {
@@ -474,6 +484,8 @@ export const he = {
       transitionSeconds: "מהירות מעבר (שניות)", effects: "אפקטים", accent: "שפה ומבטא", voiceGender: "קול קריינות",
       voiceType: "סגנון קול", speechStyle: "סגנון דיבור", speechSpeed: "מהירות דיבור", musicTempo: "קצב מוזיקה",
       musicVolumePercent: "עוצמת מוזיקה (%)", musicSync: "התאמה לקצב הסצנות", logoPlacement: "לוגו", karaokeCaptions: "כתוביות",
+      subtitlePosition: "מיקום כתוביות", subtitleSize: "גודל כתוביות", subtitleFont: "גופן כתוביות",
+      subtitleRotation: "זווית כתוביות", subtitleEffect: "אפקט טקסט",
       sideWatermark: "ווטרמארק צדדי", preferHeygenDub: "תנועות שפתיים (Kling Avatar)", lowerThirds: "כותרות תחתונות (lower third)",
       filmTemplate: "מבנה הסרטון"
     },
@@ -485,6 +497,11 @@ export const he = {
     },
     fieldOptions: {
       karaokeCaptions: { on: "כן — הצג כתוביות", off: "לא — בלי כתוביות" },
+      subtitlePosition: { top: "למעלה", middle: "במרכז", bottom: "למטה" },
+      subtitleSize: { small: "קטן", medium: "בינוני", large: "גדול" },
+      subtitleFont: { noto_sans: "Noto Sans — נקי", noto_serif: "Noto Serif — קלאסי", dejavu_sans: "DejaVu Sans — פשוט" },
+      subtitleRotation: { "-8": "נטייה שמאלה", "0": "ישר", "8": "נטייה ימינה" },
+      subtitleEffect: { none: "ללא", outline: "קו מתאר", shadow: "צל", background: "רקע כהה" },
       sideWatermark: { on: "פעיל", off: "כבוי" },
       lowerThirds: { on: "פעיל — כותרת סצנה / מוצר", off: "כבוי" },
       preferHeygenDub: {

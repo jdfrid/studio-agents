@@ -461,7 +461,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         })
       ) as CreativeOptions;
       const creativePayload = Object.keys(creativeWithCodes).length > 0 ? creativeWithCodes : undefined;
-      const creativeCatalogSnapshot = catalog.fields.flatMap((field) => {
+      const catalogSnapshot = catalog.fields.flatMap((field) => {
         const selected = creativeRecord[field.key] ?? catalogSelections[field.key];
         if (selected == null || selected === "") return [];
         const option = field.options.find(
@@ -476,6 +476,32 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           }
         ];
       });
+      // The database catalog can lag a deployment. Snapshot selected built-ins
+      // from the shared definitions as well so new controls remain reproducible.
+      const missingBuiltInSnapshot = CREATIVE_FIELD_SECTIONS.flatMap((section) =>
+        section.fields.flatMap((field) => {
+          if (catalog.byKey.has(String(field.key))) return [];
+          const selected = creativeRecord[String(field.key)];
+          if (selected == null || selected === "") return [];
+          const option = field.options?.find(
+            (candidate) => candidate.value === String(selected) || candidate.code === String(selected)
+          );
+          return [
+            {
+              fieldKey: String(field.key),
+              fieldLabel: uiLocale === "en" ? (field.labelEn ?? field.labelHe) : field.labelHe,
+              ...(option
+                ? {
+                    optionCode: option.code,
+                    optionLabel: uiLocale === "en" ? (option.labelEn ?? option.labelHe) : option.labelHe
+                  }
+                : {}),
+              value: typeof selected === "number" ? selected : String(selected)
+            }
+          ];
+        })
+      );
+      const creativeCatalogSnapshot = [...catalogSnapshot, ...missingBuiltInSnapshot];
       const brandingPayload =
         businessName.trim() || slogan.trim() || websiteUrl.trim()
           ? {
@@ -540,7 +566,16 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const fieldsFor = (sectionId: string) =>
     (CREATIVE_FIELD_SECTIONS.find((section) => section.id === sectionId)?.fields ?? []).map((field) => {
       const managed = catalog.byKey.get(String(field.key));
-      if (!managed) return field;
+      if (!managed) {
+        return {
+          ...field,
+          labelHe: uiLocale === "en" ? (field.labelEn ?? field.labelHe) : field.labelHe,
+          options: field.options?.map((option) => ({
+            ...option,
+            labelHe: uiLocale === "en" ? (option.labelEn ?? option.labelHe) : option.labelHe
+          }))
+        };
+      }
       return {
         ...field,
         labelHe: managed.label,

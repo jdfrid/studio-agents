@@ -13,6 +13,7 @@ import {
   buildKaraokeAss,
   buildTitleCardAss,
   getRenderProfile,
+  resolveSubtitleStyle,
   sanitizeVeoPromptForExternalAudio,
   usesFalVideoProvider,
   usesHeygenVideoProvider,
@@ -28,7 +29,8 @@ import {
   type RenderOutput,
   type RenderProfile,
   type RenderSceneResult,
-  type SceneTimelineEntry
+  type SceneTimelineEntry,
+  type SubtitleStyle
 } from "@studio/shared";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile, readFile, rm, stat } from "node:fs/promises";
@@ -377,6 +379,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           strategy: renderProfile.strategy,
           endCard: input.branding && shouldUseBusinessEndCard(input.branding) ? "business" : "Prompt2Spot",
           branding: input.branding ?? null,
+          subtitleStyle: input.karaokeCaptions ? resolveSubtitleStyle(input.subtitleStyle) : null,
           videoInsert: input.videoInsert
             ? {
                 insertAtSeconds: input.videoInsert.insertAtSeconds,
@@ -614,6 +617,7 @@ async function renderExtendChain(
       strategy: renderProfile.strategy,
       endCard: input.branding && shouldUseBusinessEndCard(input.branding) ? "business" : "Prompt2Spot",
       branding: input.branding ?? null,
+      subtitleStyle: input.karaokeCaptions ? resolveSubtitleStyle(input.subtitleStyle) : null,
       videoInsert: input.videoInsert
         ? {
             insertAtSeconds: input.videoInsert.insertAtSeconds,
@@ -1244,6 +1248,24 @@ function resolveDrawtextFont(): string | null {
   return null;
 }
 
+function resolveSubtitleFont(fontId?: SubtitleStyle["font"]): string | null {
+  const byId = {
+    noto_sans: [
+      "/usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf",
+      "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf"
+    ],
+    noto_serif: [
+      "/usr/share/fonts/truetype/noto/NotoSerifHebrew-Regular.ttf",
+      "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf"
+    ],
+    dejavu_sans: ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
+  } as const;
+  for (const candidate of byId[fontId ?? "dejavu_sans"]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return resolveDrawtextFont();
+}
+
 function escapeDrawtext(text: string): string {
   return text
     .replace(/\\/g, "\\\\")
@@ -1469,7 +1491,10 @@ function assFontNameFromPath(fontPath: string | null): string {
   const base = path.basename(fontPath).toLowerCase();
   if (base.includes("dejavu")) return "DejaVu Sans";
   if (base.includes("liberation")) return "Liberation Sans";
-  if (base.includes("noto")) return "Noto Sans";
+  if (base.includes("notoserif")) return "Noto Serif Hebrew";
+  if (base.includes("notonaskh")) return "Noto Naskh Arabic";
+  if (base.includes("noto") && base.includes("arabic")) return "Noto Sans Arabic";
+  if (base.includes("noto")) return "Noto Sans Hebrew";
   if (base.includes("segoe")) return "Segoe UI";
   if (base.includes("arial")) return "Arial";
   return "Arial";
@@ -1565,11 +1590,14 @@ async function burnKaraokeAndWatermark(
         }))
       );
       if (cues.length) {
-        const font = resolveDrawtextFont();
+        const font = resolveSubtitleFont(input.subtitleStyle?.font);
         const ass = buildKaraokeAss(cues, {
           fontName: assFontNameFromPath(font),
           language: input.language,
-          rtl: undefined
+          rtl: undefined,
+          style: input.subtitleStyle,
+          width: dimensions.width,
+          height: dimensions.height
         });
         assPath = path.join(dir, `karaoke-${nanoid(4)}.ass`);
         await writeFile(assPath, ass, "utf8");

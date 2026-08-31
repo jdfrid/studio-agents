@@ -9,6 +9,7 @@ import {
   geminiDialogueVoicePair,
   nextStage,
   resolveRenderProfile,
+  resolveSubtitleStyle,
   type AgentContext,
   type StageName
 } from "@studio/shared";
@@ -303,6 +304,11 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         } | null;
         creative?: {
           karaokeCaptions?: string;
+          subtitlePosition?: "top" | "middle" | "bottom";
+          subtitleSize?: "small" | "medium" | "large";
+          subtitleFont?: "noto_sans" | "noto_serif" | "dejavu_sans";
+          subtitleRotation?: "-8" | "0" | "8";
+          subtitleEffect?: "none" | "outline" | "shadow" | "background";
           sideWatermark?: string;
           preferHeygenDub?: string;
           lowerThirds?: string;
@@ -334,6 +340,13 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
             : null,
         language: briefData.language ?? briefInput.language ?? "he",
         karaokeCaptions,
+        subtitleStyle: resolveSubtitleStyle({
+          ...(creative?.subtitlePosition ? { position: creative.subtitlePosition } : {}),
+          ...(creative?.subtitleSize ? { size: creative.subtitleSize } : {}),
+          ...(creative?.subtitleFont ? { font: creative.subtitleFont } : {}),
+          ...(creative?.subtitleRotation ? { rotation: creative.subtitleRotation } : {}),
+          ...(creative?.subtitleEffect ? { effect: creative.subtitleEffect } : {})
+        }),
         sideWatermark,
         lowerThirds
       };

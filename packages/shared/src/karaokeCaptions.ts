@@ -1,3 +1,5 @@
+import { resolveSubtitleStyle, type SubtitleStyle } from "./schemas/subtitleStyle.js";
+
 /**
  * Estimate word-level karaoke timings from narration + scene window.
  * Durations are proportional to character length (good enough until ASR).
@@ -106,24 +108,46 @@ function assTime(seconds: number): string {
 
 /**
  * Build ASS with karaoke {\k} tags.
- * RTL (he/ar/yi): reverse word order for karaoke highlight + wrap with RLE so punctuation stays correct.
+ * RTL text stays in logical/speaking order. libass/FriBidi lays it out from the
+ * right edge; directional isolates protect embedded Latin text and numbers.
  */
 export function buildKaraokeAss(
   lines: KaraokeLineCue[],
-  opts?: { fontName?: string; rtl?: boolean; language?: string | null }
+  opts?: {
+    fontName?: string;
+    rtl?: boolean;
+    language?: string | null;
+    style?: SubtitleStyle | null;
+    width?: number;
+    height?: number;
+  }
 ): string {
   const font = opts?.fontName ?? "Arial";
   const rtl = opts?.rtl ?? isRtlContentLanguage(opts?.language);
+  const style = resolveSubtitleStyle(opts?.style);
+  const width = opts?.width ?? 720;
+  const height = opts?.height ?? 1280;
+  const scale = Math.min(width, height) / 720;
+  const fontSize = Math.round(({ small: 42, medium: 52, large: 64 } as const)[style.size] * scale);
+  const alignment = ({ top: 8, middle: 5, bottom: 2 } as const)[style.position];
+  const marginV = style.position === "middle" ? 0 : Math.round(90 * (height / 1280));
+  const angle = Number(style.rotation);
+  const effect = {
+    none: { borderStyle: 1, outline: 0, shadow: 0, back: "&H00000000" },
+    outline: { borderStyle: 1, outline: 3, shadow: 0, back: "&H64000000" },
+    shadow: { borderStyle: 1, outline: 1, shadow: 3, back: "&H78000000" },
+    background: { borderStyle: 3, outline: 7, shadow: 0, back: "&H70000000" }
+  }[style.effect];
   const header = `[Script Info]
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
-PlayResX: 720
-PlayResY: 1280
+PlayResX: ${width}
+PlayResY: ${height}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Karaoke,${font},52,&H00FFFFFF,&H00E07020,&H80000000,&H64000000,-1,0,0,0,100,100,0,0,1,3,0,2,40,40,90,1
+Style: Karaoke,${font},${fontSize},&H00FFFFFF,&H00E07020,&H80000000,${effect.back},-1,0,0,0,100,100,0,${angle},${effect.borderStyle},${effect.outline},${effect.shadow},${alignment},40,40,${marginV},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -131,22 +155,32 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const RLE = "\u202B";
   const PDF = "\u202C";
+  const RTL_SPACE = "\u200F ";
 
   const events = lines
     .map((line) => {
-      // Keep speaking order for {\k}; RLE places the first spoken word on the right for he/ar.
+      // Keep speaking order for {\k}; RLE places the first spoken word on the right.
       const kText = line.words
         .map((w) => {
           const durCs = Math.max(1, Math.round((w.endSecond - w.startSecond) * 100));
-          return `{\\k${durCs}}${escapeAss(w.text)}`;
+          const text = escapeAss(w.text);
+          return `{\\k${durCs}}${rtl ? isolateLtrRuns(text) : text}`;
         })
-        .join(rtl ? "" : " ");
+        .join(rtl ? RTL_SPACE : " ");
       const body = rtl ? `${RLE}${kText}${PDF}` : kText;
       return `Dialogue: 0,${assTime(line.startSecond)},${assTime(line.endSecond)},Karaoke,,0,0,0,,${body}`;
     })
     .join("\n");
 
   return `${header}${events}\n`;
+}
+
+const LRI = "\u2066";
+const PDI = "\u2069";
+
+/** Keep phone numbers, prices and Latin product names readable inside RTL captions. */
+export function isolateLtrRuns(text: string): string {
+  return text.replace(/[A-Za-z0-9][A-Za-z0-9.,:%+/#@_-]*/g, (run) => `${LRI}${run}${PDI}`);
 }
 
 /** Simple centered title card ASS (avoids fragile drawtext -vf chains). */

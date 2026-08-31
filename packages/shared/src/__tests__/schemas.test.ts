@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { BriefInputSchema, BriefOutputSchema, ScriptOutputSchema, SceneSpecSchema } from "../index.js";
+import {
+  BriefInputSchema,
+  BriefOutputSchema,
+  ScriptOutputSchema,
+  SceneSpecSchema,
+  SubtitleStyleSchema,
+  resolveSubtitleStyle
+} from "../index.js";
 
 describe("Brief schemas", () => {
   it("applies defaults", () => {
@@ -35,6 +42,21 @@ describe("Brief schemas", () => {
   it("brief output requires required fields", () => {
     expect(() => BriefOutputSchema.parse({})).toThrow();
   });
+  it("preserves bounded subtitle controls in the brief", () => {
+    const parsed = BriefInputSchema.parse({
+      title: "Styled captions",
+      sourceText: "Use readable captions",
+      creative: {
+        subtitlePosition: "top",
+        subtitleSize: "large",
+        subtitleFont: "noto_serif",
+        subtitleRotation: "-8",
+        subtitleEffect: "background"
+      }
+    });
+    expect(parsed.creative?.subtitlePosition).toBe("top");
+    expect(parsed.creative?.subtitleEffect).toBe("background");
+  });
   it("keeps structured reference-video analysis in brief output", () => {
     const parsed = BriefOutputSchema.parse({
       title: "Original explainer",
@@ -62,6 +84,23 @@ describe("Brief schemas", () => {
       }
     });
     expect(parsed.referenceVideoAnalysis?.shotRhythm).toBe("Five-second beats");
+  });
+});
+
+describe("Subtitle style schema", () => {
+  it("resolves defaults for old runs", () => {
+    expect(resolveSubtitleStyle(undefined)).toEqual({
+      position: "bottom",
+      size: "medium",
+      font: "dejavu_sans",
+      rotation: "0",
+      effect: "outline"
+    });
+  });
+
+  it("rejects arbitrary renderer/filter values", () => {
+    expect(() => SubtitleStyleSchema.parse({ position: "x=0:y=0", rotation: "360" })).toThrow();
+    expect(() => SubtitleStyleSchema.parse({ font: "../../evil.ttf" })).toThrow();
   });
 });
 

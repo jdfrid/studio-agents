@@ -4,6 +4,7 @@ import {
   buildKaraokeCues,
   buildRenderProfileSnapshot,
   creativeFlagOn,
+  resolveSubtitleStyle,
   resolveRenderProfile,
   type Agent,
   type AssetOutput,
@@ -32,6 +33,13 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
     const voiceBySceneId = new Map(audio.perScene.map((s) => [s.sceneId, s] as const));
     const assetBySceneId = new Map(asset.perScene.map((s) => [s.sceneId, s] as const));
     const karaokeOn = creativeFlagOn(brief.creative, "karaokeCaptions", true);
+    const subtitleStyle = resolveSubtitleStyle({
+      ...(brief.creative?.subtitlePosition ? { position: brief.creative.subtitlePosition } : {}),
+      ...(brief.creative?.subtitleSize ? { size: brief.creative.subtitleSize } : {}),
+      ...(brief.creative?.subtitleFont ? { font: brief.creative.subtitleFont } : {}),
+      ...(brief.creative?.subtitleRotation ? { rotation: brief.creative.subtitleRotation } : {}),
+      ...(brief.creative?.subtitleEffect ? { effect: brief.creative.subtitleEffect } : {})
+    });
 
     let cursor = 0;
     const timeline: SceneTimelineEntry[] = [];
@@ -131,6 +139,7 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
       aspectRatio: brief.aspectRatio,
       durationSeconds: script.totalDurationSeconds,
       language: brief.language,
+      subtitleStyle,
       musicPrompt: audio.music.prompt,
       backgroundVisualPrompt: script.backgroundVisualPrompt,
       generatedAt: new Date().toISOString(),

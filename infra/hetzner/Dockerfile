@@ -26,6 +26,7 @@ RUN apt-get update \
     ca-certificates \
     ffmpeg \
     fonts-dejavu-core \
+    fonts-noto-core \
   && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { SceneTimelineEntrySchema } from "./package.js";
 import { RenderProfileIdSchema } from "../renderProfiles.js";
 import { BriefBrandingOutputSchema } from "./brief.js";
+import { SubtitleStyleSchema } from "./subtitleStyle.js";
 
 export const VideoInsertSchema = z.object({
   name: z.string(),
@@ -33,6 +34,8 @@ export const RenderInputSchema = z.object({
   language: z.string().optional(),
   /** Burn karaoke captions onto the assembled film. */
   karaokeCaptions: z.boolean().default(false),
+  /** Bounded customer-facing subtitle appearance settings. Missing means legacy defaults. */
+  subtitleStyle: SubtitleStyleSchema.optional(),
   /** Burn a vertical side watermark. */
   sideWatermark: z.boolean().default(false),
   /** Burn per-scene lower-third titles. */
