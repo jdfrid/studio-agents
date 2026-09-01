@@ -75,13 +75,17 @@ export function gcsClient(): GcsClient {
   };
 }
 
-export async function checkGcsBucket(): Promise<{ exists: boolean; location?: string; storageClass?: string }> {
-  const [exists] = await client().bucket(bucketName()).exists();
-  if (!exists) return { exists: false };
-  const [metadata] = await client().bucket(bucketName()).getMetadata();
+export async function checkGcsBucket(): Promise<{
+  uploadAllowed: boolean;
+  checkedPermission: string;
+}> {
+  // Checking bucket metadata requires storage.buckets.get, which the application
+  // does not need in order to upload objects. Ask IAM only for the workload's
+  // required permission, without writing a probe object.
+  const permission = "storage.objects.create";
+  const [permissions] = await client().bucket(bucketName()).iam.testPermissions(permission);
   return {
-    exists: true,
-    location: metadata.location,
-    storageClass: metadata.storageClass
+    uploadAllowed: permissions[permission] === true,
+    checkedPermission: permission
   };
 }

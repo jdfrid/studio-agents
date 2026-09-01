@@ -663,7 +663,7 @@ export async function registerRoutes(app: FastifyInstance) {
         prisma.providerAlert.count({ where }),
         prisma.providerAlert.findMany({
           where,
-          include: { monitor: { select: { provider: true, displayName: true } } },
+          include: { monitor: { select: { provider: true, displayName: true, lastErrorCode: true } } },
           orderBy: { lastSeenAt: "desc" },
           skip: (query.page - 1) * query.pageSize,
           take: query.pageSize

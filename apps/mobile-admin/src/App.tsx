@@ -2,6 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Browser } from "@capacitor/browser";
 import { api, type AdminUser, type Dashboard, type OperationalMetrics, type ProviderAlert, type ProviderMonitor } from "./api";
 import { beginLogin, listenForLogin, logout, restoreSession } from "./auth";
+import {
+  formatCurrency,
+  formatFreshness,
+  localizedAlert,
+  monitorRisk,
+  providerLabel,
+  statusLabel
+} from "./monitoringUi";
 import { registerPushNotifications } from "./push";
 
 type Screen = "overview" | "users" | "activity" | "providers" | "alerts" | "settings";
@@ -15,7 +23,7 @@ const tabs: Array<{ id: Screen; label: string }> = [
 ];
 
 function money(value: number) {
-  return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 1 }).format(value);
+  return formatCurrency(value, "ILS");
 }
 
 function Login({ error }: { error: string }) {
@@ -109,6 +117,13 @@ export default function App() {
   }, [authenticated, loadOverview]);
 
   const critical = useMemo(() => alerts.filter((item) => item.status === "OPEN" && item.severity === "CRITICAL").length, [alerts]);
+  const sortedProviders = useMemo(
+    () =>
+      [...providers].sort(
+        (a, b) => monitorRisk(a).rank - monitorRisk(b).rank || providerLabel(a.provider).localeCompare(providerLabel(b.provider), "he")
+      ),
+    [providers]
+  );
   if (authenticated === null) return <main className="login">טוען…</main>;
   if (!authenticated) return <Login error={error} />;
 
@@ -185,7 +200,7 @@ export default function App() {
         {screen === "providers" && (
           <>
             <button className="primary compact" onClick={() => void refreshProviders()}>בדיקה מחדש</button>
-            <section className="list">{providers.map((provider) => <ProviderCard key={provider.id} provider={provider} onBilling={openBilling} />)}</section>
+            <section className="list">{sortedProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} onBilling={openBilling} />)}</section>
           </>
         )}
         {screen === "alerts" && <section className="list">{alerts.length ? alerts.map((alert) => <AlertCard key={alert.id} alert={alert} onAck={acknowledge} />) : <p className="empty">אין התראות</p>}</section>}
@@ -198,16 +213,58 @@ export default function App() {
 }
 
 function AlertCard({ alert, onAck }: { alert: ProviderAlert; onAck: (id: string) => Promise<void> }) {
-  return <article className={`card alert ${alert.severity.toLowerCase()}`}><div className="row"><strong>{alert.title}</strong><span>{new Date(alert.lastSeenAt).toLocaleString("he-IL")}</span></div><p>{alert.message}</p>{alert.recommendedAction && <small>{alert.recommendedAction}</small>}{alert.status === "OPEN" && <button onClick={() => void onAck(alert.id)}>סימון כטופל</button>}</article>;
+  const text = localizedAlert(alert);
+  const technicalMessage = alert.metadata?.technicalMessage ?? alert.message;
+  return <article className={`card alert ${alert.severity.toLowerCase()}`}>
+    <div className="row"><strong>{text.title}</strong><span>{statusLabel(alert.status)} · {formatFreshness(alert.lastSeenAt)}</span></div>
+    <p>{text.message}</p>
+    <small>{text.action}</small>
+    {technicalMessage && <details><summary>פרטים טכניים</summary><pre dir="ltr">{technicalMessage}</pre></details>}
+    {alert.status === "OPEN" && alert.severity !== "RECOVERY" && <button onClick={() => void onAck(alert.id)}>סימון כטופל</button>}
+  </article>;
 }
 
 function ProviderCard({ provider, onBilling }: { provider: ProviderMonitor; onBilling: (provider: string) => Promise<void> }) {
-  const value = provider.lastValue === null ? "לא זמין" : `${provider.lastValue.toLocaleString()} ${provider.unit ?? ""}`;
-  return <article className={`card provider ${provider.lastErrorMessage ? "down" : ""}`}><div className="row"><strong>{provider.displayName}</strong><span>{provider.sourceRealtime ? "זמן אמת" : "אומדן"}</span></div><b>{value}</b>{provider.estimatedRunwayHours !== null && <span>Runway: {provider.estimatedRunwayHours.toFixed(1)} שעות</span>}<small>{provider.lastErrorMessage ?? `מקור: ${provider.source}`}</small>{provider.billingUrl && <button onClick={() => void onBilling(provider.provider)}>טעינת יתרה באתר הרשמי</button>}</article>;
+  const snapshot = provider.snapshots[0];
+  const details = snapshot?.details ?? {};
+  const risk = monitorRisk(provider);
+  const monetary = provider.metricType === "BALANCE" && provider.lastValue !== null;
+  const currency = provider.unit?.toUpperCase() === "USD" ? "USD" : "ILS";
+  const value = monetary
+    ? formatCurrency(provider.lastValue!, currency)
+    : provider.metricType === "QUOTA" && provider.lastValue !== null
+      ? provider.unit === "USD spending capacity"
+        ? `${formatCurrency(provider.lastValue, "USD")} עד תקרת ההוצאה`
+        : `${provider.lastValue.toLocaleString("he-IL")} ${provider.unit === "characters" ? "תווים" : provider.unit?.toLowerCase() === "credits" ? "קרדיטים" : "יחידות"}`
+      : risk.className === "disabled"
+        ? "לא מוגדר — אופציונלי"
+        : snapshot?.healthy === false
+          ? "הבדיקה נכשלה"
+          : "השירות זמין";
+  const estimatedSpend = typeof details.estimatedCostNis24h === "number" ? details.estimatedCostNis24h : null;
+  const unavailableReason =
+    typeof details.balanceUnavailableReason === "string"
+      ? details.balanceUnavailableReason
+      : provider.metricType === "SERVICE_HEALTH"
+        ? "זהו שירות תשתית ללא יתרת ארנק שניתנת לקריאה; המדד הזמין הוא תקינות השירות."
+        : "ה‑API הרשמי אינו מספק יתרה כספית עבור סוג החשבון הזה.";
+  const technicalDetails =
+    typeof details.failureReason === "string" ? details.failureReason : provider.lastErrorMessage;
+  return <article className={`card provider ${risk.className}`}>
+    <div className="row"><strong>{providerLabel(provider.provider, provider.displayName)}</strong><span className={`risk ${risk.className}`}>{risk.label}</span></div>
+    <small>{monetary ? "יתרה כספית רשמית" : provider.metricType === "QUOTA" ? "מכסה שנותרה" : "מצב השירות"}</small>
+    <b>{value}</b>
+    {provider.estimatedRunwayHours !== null && <span>זמן משוער עד גמר: {provider.estimatedRunwayHours.toFixed(1)} שעות</span>}
+    {!monetary && unavailableReason && <span>יתרה כספית: לא זמינה — {unavailableReason}</span>}
+    {estimatedSpend !== null && <span>עלות פנימית משוערת ב־24 שעות: {formatCurrency(estimatedSpend, "ILS")}</span>}
+    <small>עודכן {formatFreshness(provider.lastCheckedAt)} · {provider.sourceRealtime ? "נתון ישיר" : "אומדן"}</small>
+    {technicalDetails && <details><summary>פרטים טכניים</summary><pre dir="ltr">{technicalDetails}</pre></details>}
+    {provider.billingUrl && <button onClick={() => void onBilling(provider.provider)}>פתיחת חשבון וחיוב באתר הרשמי</button>}
+  </article>;
 }
 
 function ThresholdCard({ provider, onSave }: { provider: ProviderMonitor; onSave: (provider: ProviderMonitor, warning: string, critical: string) => Promise<void> }) {
   const [warning, setWarning] = useState(provider.warningThreshold?.toString() ?? "");
   const [criticalValue, setCritical] = useState(provider.criticalThreshold?.toString() ?? "");
-  return <article className="card"><strong>{provider.displayName}</strong><div className="thresholds"><label>אזהרה<input type="number" min="0" value={warning} onChange={(e) => setWarning(e.target.value)} /></label><label>קריטי<input type="number" min="0" value={criticalValue} onChange={(e) => setCritical(e.target.value)} /></label></div><button onClick={() => void onSave(provider, warning, criticalValue)}>שמירת ספים</button></article>;
+  return <article className="card"><strong>{providerLabel(provider.provider, provider.displayName)}</strong><small>ספים עבור {provider.metricType === "QUOTA" ? "מכסה שנותרה" : provider.metricType === "BALANCE" ? "יתרה כספית" : "מדד השירות"}</small><div className="thresholds"><label>אזהרה<input type="number" min="0" value={warning} onChange={(e) => setWarning(e.target.value)} /></label><label>קריטי<input type="number" min="0" value={criticalValue} onChange={(e) => setCritical(e.target.value)} /></label></div><button onClick={() => void onSave(provider, warning, criticalValue)}>שמירת ספים</button></article>;
 }

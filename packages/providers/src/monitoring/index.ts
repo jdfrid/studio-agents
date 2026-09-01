@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { Prisma, prisma, type ProviderAlertSeverity, type ProviderMetricType } from "@studio/infra-prisma";
+import {
+  Prisma,
+  prisma,
+  type CostActivityType,
+  type ProviderAlertSeverity,
+  type ProviderMetricType
+} from "@studio/infra-prisma";
 import { checkGcsBucket } from "../gcs.js";
 
 export interface ProviderReading {
@@ -16,6 +22,7 @@ export interface ProviderReading {
   errorMessage?: string;
   billingUrl?: string;
   sourceEvent?: string;
+  operationalStatus?: "HEALTHY" | "DEGRADED" | "NOT_CONFIGURED" | "DISABLED" | "PERMISSION_ERROR";
 }
 
 export interface ProviderMonitorAdapter {
@@ -48,9 +55,10 @@ export function calculateRunwayHours(remaining: number | null, consumed: number,
 }
 
 export function severityForReading(
-  reading: Pick<ProviderReading, "healthy" | "value">,
+  reading: Pick<ProviderReading, "healthy" | "value" | "operationalStatus">,
   thresholds: MonitorThresholds
 ): ProviderAlertSeverity | null {
+  if (reading.operationalStatus === "DISABLED") return null;
   if (!reading.healthy) return "CRITICAL";
   if (reading.value === null) return null;
   if (thresholds.critical !== null && reading.value <= thresholds.critical) return "CRITICAL";
@@ -70,10 +78,48 @@ function fingerprint(provider: string, code: string): string {
   return createHash("sha256").update(`${provider}:${code}`).digest("hex");
 }
 
-function recommendedAction(provider: string, severity: ProviderAlertSeverity): string {
-  if (severity === "RECOVERY") return "Verify queued work resumes normally.";
-  if (officialBillingUrl(provider)) return "Review the provider account and use its official billing page if funding is required.";
-  return "Review provider credentials, quota and service health.";
+const PROVIDER_NAMES_HE: Record<string, string> = {
+  gemini: "Google Gemini ו‑Veo",
+  gcs: "אחסון Google Cloud",
+  fal: "fal.ai",
+  heygen: "HeyGen",
+  elevenlabs: "ElevenLabs",
+  lemonsqueezy: "Lemon Squeezy",
+  postgresql: "מסד הנתונים PostgreSQL",
+  redis: "Redis",
+  api: "שרת ה‑API",
+  worker: "מעבד המשימות"
+};
+
+export function providerNameHe(provider: string): string {
+  return PROVIDER_NAMES_HE[provider.toLowerCase()] ?? provider;
+}
+
+function recommendedAction(provider: string, severity: ProviderAlertSeverity, code: string): string {
+  if (severity === "RECOVERY") return "לא נדרשת פעולה. האירוע נפתר ונשמר לצורכי מעקב.";
+  if (code === "not_configured") return "יש להגדיר פרטי גישה רק אם השירות אמור להיות פעיל.";
+  if (code === "upload_permission_denied")
+    return "יש להעניק לחשבון השירות הרשאת storage.objects.create בדלי שהוגדר.";
+  if (code.startsWith("http_401") || code.startsWith("http_403"))
+    return "יש לבדוק שמפתח ה‑API תקף ושיש לו הרשאות לקריאת נתוני המנוי.";
+  if (officialBillingUrl(provider))
+    return "יש לבדוק את החשבון באתר הרשמי; טעינת כסף נדרשת רק אם האתר מציג יתרה או מכסה נמוכה.";
+  return "יש לבדוק הרשאות, מכסה וזמינות של השירות.";
+}
+
+function alertTitle(provider: string, severity: ProviderAlertSeverity): string {
+  const level = severity === "CRITICAL" ? "תקלה קריטית" : severity === "WARNING" ? "אזהרה" : "התקלה נפתרה";
+  return `${providerNameHe(provider)} — ${level}`;
+}
+
+function alertMessage(provider: string, severity: ProviderAlertSeverity, code: string): string {
+  if (severity === "RECOVERY") return `${providerNameHe(provider)} חזר לפעילות תקינה.`;
+  if (code === "upload_permission_denied") return "אין הרשאה להעלות קבצים לדלי האחסון שהוגדר.";
+  if (code === "not_configured") return "השירות לא הוגדר.";
+  if (code.startsWith("http_401")) return "פרטי הגישה נדחו על ידי השירות.";
+  if (code.startsWith("http_403")) return "פרטי הגישה תקפים, אך חסרה הרשאה לביצוע הבדיקה.";
+  if (code.startsWith("threshold_")) return `היתרה או המכסה של ${providerNameHe(provider)} ירדה מתחת לסף שהוגדר.`;
+  return `בדיקת הזמינות של ${providerNameHe(provider)} נכשלה.`;
 }
 
 async function sendPushForAlert(alertId: string): Promise<void> {
@@ -150,21 +196,26 @@ async function upsertAlert(input: {
     create: {
       monitorId: input.monitorId,
       severity: input.severity,
+      status: input.severity === "RECOVERY" ? "RESOLVED" : "OPEN",
       fingerprint: key,
-      title: `${input.provider}: ${input.severity.toLowerCase()}`,
-      message: redact(input.message) ?? "Provider requires attention.",
-      recommendedAction: recommendedAction(input.provider, input.severity),
-      sourceEvent: input.sourceEvent
+      title: alertTitle(input.provider, input.severity),
+      message: alertMessage(input.provider, input.severity, input.code),
+      recommendedAction: recommendedAction(input.provider, input.severity, input.code),
+      sourceEvent: input.sourceEvent,
+      metadata: { technicalMessage: redact(input.message), errorCode: input.code }
     },
     update: {
       severity: input.severity,
-      status: "OPEN",
+      status: input.severity === "RECOVERY" ? "RESOLVED" : "OPEN",
       lastSeenAt: now,
-      resolvedAt: null,
+      resolvedAt: input.severity === "RECOVERY" ? now : null,
       acknowledgedAt: null,
       acknowledgedById: null,
       occurrenceCount: { increment: 1 },
-      message: redact(input.message),
+      title: alertTitle(input.provider, input.severity),
+      message: alertMessage(input.provider, input.severity, input.code),
+      recommendedAction: recommendedAction(input.provider, input.severity, input.code),
+      metadata: { technicalMessage: redact(input.message), errorCode: input.code },
       sourceEvent: input.sourceEvent,
       ...(shouldPush ? { pushSentAt: null } : {})
     }
@@ -224,6 +275,10 @@ export async function persistProviderReading(reading: ProviderReading) {
       ? calculateRunwayHours(reading.value, consumed, elapsed)
       : null;
   const errorMessage = redact(reading.errorMessage);
+  const details = {
+    ...(reading.details ?? {}),
+    operationalStatus: reading.operationalStatus ?? (reading.healthy ? "HEALTHY" : "DEGRADED")
+  };
   await prisma.$transaction([
     prisma.providerSnapshot.create({
       data: {
@@ -233,7 +288,7 @@ export async function persistProviderReading(reading: ProviderReading) {
         source: reading.source,
         sourceRealtime: reading.sourceRealtime,
         estimatedRunwayHours: runway,
-        details: (reading.details ?? {}) as Prisma.InputJsonValue,
+        details: details as Prisma.InputJsonValue,
         errorCode: reading.errorCode,
         errorMessage
       }
@@ -301,6 +356,20 @@ async function jsonRequest(url: string, headers: Record<string, string>): Promis
   }
 }
 
+function apiFailureReason(body: any): string | undefined {
+  const candidate = body?.detail?.message ?? body?.detail ?? body?.message ?? body?.error?.message ?? body?.error;
+  return typeof candidate === "string" ? redact(candidate) : undefined;
+}
+
+async function estimatedInternalSpendNis24h(types: CostActivityType[]): Promise<number | null> {
+  if (!types.length) return null;
+  const result = await prisma.costEvent.aggregate({
+    where: { activityType: { in: types }, startedAt: { gte: new Date(Date.now() - 24 * 3_600_000) } },
+    _sum: { costNis: true }
+  });
+  return result._sum.costNis ?? 0;
+}
+
 function envHealthAdapter(config: {
   provider: string;
   displayName: string;
@@ -308,43 +377,146 @@ function envHealthAdapter(config: {
   url?: string;
   headers?: () => Record<string, string>;
   parseValue?: (body: any) => number | null;
+  parseMetricType?: (body: any) => ProviderMetricType;
+  parseUnit?: (body: any) => string | undefined;
   metricType?: ProviderMetricType;
   unit?: string;
   source?: string;
+  optional?: boolean;
+  balanceUnavailableReason?: string;
+  parseDetails?: (body: any) => Record<string, unknown>;
+  internalCostTypes?: CostActivityType[];
 }): ProviderMonitorAdapter {
   return {
     provider: config.provider,
     async read() {
       const configured = Boolean(process.env[config.envKey]?.trim());
-      if (!configured || !config.url) {
+      if (!configured) {
+        const optional = config.optional === true;
         return {
           provider: config.provider,
           displayName: config.displayName,
           metricType: config.metricType ?? "SERVICE_HEALTH",
           value: null,
           unit: config.unit,
-          healthy: configured,
-          source: configured ? "configuration_check" : "not_configured",
+          healthy: optional,
+          source: optional ? "optional_not_configured" : "not_configured",
           sourceRealtime: true,
-          errorCode: configured ? undefined : "not_configured",
-          errorMessage: configured ? undefined : `${config.envKey} is not configured`
+          operationalStatus: optional ? "DISABLED" : "NOT_CONFIGURED",
+          details: {
+            configured: false,
+            optional,
+            balanceUnavailableReason: config.balanceUnavailableReason
+          },
+          errorCode: optional ? undefined : "not_configured",
+          errorMessage: optional ? undefined : `${config.envKey} is not configured`
+        };
+      }
+      if (!config.url) {
+        return {
+          provider: config.provider,
+          displayName: config.displayName,
+          metricType: config.metricType ?? "SERVICE_HEALTH",
+          value: null,
+          unit: config.unit,
+          healthy: true,
+          source: "configuration_check",
+          sourceRealtime: true,
+          operationalStatus: "HEALTHY",
+          details: {
+            configured: true,
+            balanceUnavailableReason: config.balanceUnavailableReason,
+            estimatedCostNis24h: await estimatedInternalSpendNis24h(config.internalCostTypes ?? [])
+          }
         };
       }
       const result = await jsonRequest(config.url, config.headers?.() ?? {});
+      const reason = apiFailureReason(result.body);
       return {
         provider: config.provider,
         displayName: config.displayName,
-        metricType: config.metricType ?? "SERVICE_HEALTH",
+        metricType: config.parseMetricType?.(result.body) ?? config.metricType ?? "SERVICE_HEALTH",
         value: config.parseValue?.(result.body) ?? null,
-        unit: config.unit,
+        unit: config.parseUnit?.(result.body) ?? config.unit,
         healthy: result.ok,
         source: config.source ?? "official_api",
         sourceRealtime: true,
-        details: { httpStatus: result.status },
+        operationalStatus: result.ok ? "HEALTHY" : "DEGRADED",
+        details: {
+          configured: true,
+          httpStatus: result.status,
+          balanceUnavailableReason: config.balanceUnavailableReason,
+          ...(config.parseDetails?.(result.body) ?? {}),
+          estimatedCostNis24h: await estimatedInternalSpendNis24h(config.internalCostTypes ?? []),
+          ...(reason ? { failureReason: reason } : {})
+        },
         errorCode: result.ok ? undefined : `http_${result.status}`,
-        errorMessage: result.ok ? undefined : `${config.displayName} health request failed`
+        errorMessage: result.ok
+          ? undefined
+          : `${config.displayName} request failed (HTTP ${result.status})${reason ? `: ${reason}` : ""}`
       };
     }
+  };
+}
+
+export function parseHeygenBilling(body: any): {
+  metricType: ProviderMetricType;
+  value: number | null;
+  unit?: string;
+  details: Record<string, unknown>;
+} {
+  const data = body?.data ?? {};
+  if (data.billing_type === "wallet" && typeof data.wallet?.remaining_balance === "number") {
+    const currency = String(data.wallet.currency ?? "credits").toUpperCase();
+    return {
+      metricType: currency === "USD" ? "BALANCE" : "QUOTA",
+      value: data.wallet.remaining_balance,
+      unit: currency,
+      details: {
+        billingType: "wallet",
+        autoReloadEnabled: data.wallet.auto_reload?.enabled === true,
+        ...(currency === "USD" ? {} : { balanceUnavailableReason: "ארנק HeyGen נקוב בקרדיטים, לא בכסף." })
+      }
+    };
+  }
+  if (data.billing_type === "subscription") {
+    const premium = data.subscription?.credits?.premium_credits?.remaining;
+    const addOn = data.subscription?.credits?.add_on_credits?.remaining;
+    const values = [premium, addOn].filter((value): value is number => typeof value === "number");
+    return {
+      metricType: "QUOTA",
+      value: values.length ? values.reduce((sum, value) => sum + value, 0) : null,
+      unit: "credits",
+      details: {
+        billingType: "subscription",
+        plan: data.subscription?.plan ?? null,
+        premiumCreditsRemaining: typeof premium === "number" ? premium : null,
+        addOnCreditsRemaining: typeof addOn === "number" ? addOn : null,
+        balanceUnavailableReason: "חשבון המנוי של HeyGen מספק קרדיטים שנותרו, לא יתרה כספית."
+      }
+    };
+  }
+  if (data.billing_type === "usage_based") {
+    const current = data.usage_based?.spending_current_usd;
+    const cap = data.usage_based?.spending_cap_usd;
+    return {
+      metricType: "QUOTA",
+      value: typeof current === "number" && typeof cap === "number" ? Math.max(0, cap - current) : null,
+      unit: "USD spending capacity",
+      details: {
+        billingType: "usage_based",
+        spendingCurrentUsd: typeof current === "number" ? current : null,
+        spendingCapUsd: typeof cap === "number" ? cap : null,
+        remainingCredits:
+          typeof data.usage_based?.remaining_credits === "number" ? data.usage_based.remaining_credits : null,
+        balanceUnavailableReason: "זהו מרווח עד תקרת הוצאה, לא כסף ששולם מראש."
+      }
+    };
+  }
+  return {
+    metricType: "BILLING_HEALTH",
+    value: null,
+    details: { billingType: data.billing_type ?? null, balanceUnavailableReason: "סוג החיוב אינו מספק יתרה כספית." }
   };
 }
 
@@ -359,57 +531,79 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
       provider: "gemini",
       displayName: "Gemini / Omni / Veo",
       envKey: process.env.GEMINI_API_KEY ? "GEMINI_API_KEY" : process.env.GOOGLE_AI_API_KEY ? "GOOGLE_AI_API_KEY" : "GOOGLE_API_KEY",
-      url: geminiKey() ? `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(geminiKey())}` : undefined
+      url: geminiKey() ? `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(geminiKey())}` : undefined,
+      balanceUnavailableReason: "Google AI אינה מספקת יתרה כספית בחשבון דרך ה‑API הזה.",
+      internalCostTypes: ["veo_video", "gemini_tts", "gemini_image", "gemini_text", "gemini_music"]
     }),
     {
       provider: "gcs",
       async read() {
         try {
           const bucket = await checkGcsBucket();
-          const spend = await prisma.costEvent.aggregate({
-            where: {
-              activityType: { in: ["gcs_upload", "gcs_storage"] },
-              startedAt: { gte: new Date(Date.now() - 24 * 3_600_000) }
-            },
-            _sum: { costNis: true }
-          });
+          const spend = await estimatedInternalSpendNis24h(["gcs_upload", "gcs_storage"]);
           return {
             provider: "gcs",
             displayName: "Google Cloud Storage",
             metricType: "SERVICE_HEALTH",
             value: null,
-            healthy: bucket.exists,
-            source: "gcs_bucket_api",
+            healthy: bucket.uploadAllowed,
+            source: "gcs_iam_permission_test",
             sourceRealtime: true,
-            details: { ...bucket, estimatedCostNis24h: spend._sum.costNis ?? 0 },
-            errorCode: bucket.exists ? undefined : "bucket_not_found",
-            errorMessage: bucket.exists ? undefined : "Configured GCS bucket was not found"
+            operationalStatus: bucket.uploadAllowed ? "HEALTHY" : "PERMISSION_ERROR",
+            details: {
+              ...bucket,
+              configured: true,
+              estimatedCostNis24h: spend,
+              balanceUnavailableReason: "Google Cloud מחייב לפי שימוש ואינו מספק יתרת ארנק לדלי דרך Storage API."
+            },
+            errorCode: bucket.uploadAllowed ? undefined : "upload_permission_denied",
+            errorMessage: bucket.uploadAllowed
+              ? undefined
+              : `Service account lacks ${bucket.checkedPermission} on the configured bucket`
           };
         } catch (error) {
+          const message = error instanceof Error ? error.message : "GCS check failed";
+          const bucketGetOnly = /storage\.buckets\.get/i.test(message);
           return {
             provider: "gcs",
             displayName: "Google Cloud Storage",
             metricType: "SERVICE_HEALTH",
             value: null,
-            healthy: false,
-            source: "gcs_bucket_api",
+            healthy: bucketGetOnly,
+            source: "gcs_iam_permission_test",
             sourceRealtime: true,
-            errorCode: "gcs_unavailable",
-            errorMessage: error instanceof Error ? error.message : "GCS check failed"
+            operationalStatus: bucketGetOnly ? "DEGRADED" : "PERMISSION_ERROR",
+            details: {
+              configured: true,
+              metadataPermissionMissing: bucketGetOnly,
+              failureReason: message,
+              balanceUnavailableReason: "Google Cloud מחייב לפי שימוש ואינו מספק יתרת ארנק לדלי דרך Storage API."
+            },
+            errorCode: bucketGetOnly ? undefined : "gcs_permission_check_failed",
+            errorMessage: bucketGetOnly ? undefined : message
           };
         }
       }
     },
-    envHealthAdapter({ provider: "fal", displayName: "fal.ai", envKey: "FAL_API_KEY" }),
+    envHealthAdapter({
+      provider: "fal",
+      displayName: "fal.ai",
+      envKey: "FAL_API_KEY",
+      optional: true,
+      balanceUnavailableReason: "לא הוגדר API רשמי ומהימן לקריאת יתרה; יש לבדוק את החיוב באתר הרשמי."
+    }),
     envHealthAdapter({
       provider: "heygen",
       displayName: "HeyGen",
       envKey: "HEYGEN_API_KEY",
-      url: process.env.HEYGEN_API_KEY ? "https://api.heygen.com/v2/user/remaining_quota" : undefined,
+      url: process.env.HEYGEN_API_KEY ? "https://api.heygen.com/v3/users/me" : undefined,
       headers: () => ({ "X-Api-Key": process.env.HEYGEN_API_KEY ?? "" }),
-      parseValue: (body) => (typeof body?.data?.remaining_quota === "number" ? body.data.remaining_quota : null),
-      metricType: "QUOTA",
-      unit: "credits"
+      parseValue: (body) => parseHeygenBilling(body).value,
+      parseMetricType: (body) => parseHeygenBilling(body).metricType,
+      parseUnit: (body) => parseHeygenBilling(body).unit,
+      parseDetails: (body) => parseHeygenBilling(body).details,
+      optional: true,
+      balanceUnavailableReason: "סוג החיוב בחשבון קובע אם HeyGen מספק כסף, קרדיטים או תקרת הוצאה."
     }),
     envHealthAdapter({
       provider: "elevenlabs",
@@ -422,7 +616,16 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
           ? body.character_limit - body.character_count
           : null,
       metricType: "QUOTA",
-      unit: "characters"
+      unit: "characters",
+      optional: true,
+      parseDetails: (body) => ({
+        characterLimit: typeof body?.character_limit === "number" ? body.character_limit : null,
+        characterCount: typeof body?.character_count === "number" ? body.character_count : null,
+        nextResetUnix: typeof body?.next_character_count_reset_unix === "number" ? body.next_character_count_reset_unix : null,
+        subscriptionStatus: typeof body?.status === "string" ? body.status : null,
+        tier: typeof body?.tier === "string" ? body.tier : null
+      }),
+      balanceUnavailableReason: "ElevenLabs API מספק שימוש ומכסת תווים, אך לא יתרה כספית."
     }),
     envHealthAdapter({
       provider: "lemonsqueezy",
@@ -432,7 +635,9 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
       headers: () => ({
         Authorization: `Bearer ${process.env.LEMONSQUEEZY_API_KEY ?? ""}`,
         Accept: "application/vnd.api+json"
-      })
+      }),
+      optional: true,
+      balanceUnavailableReason: "Lemon Squeezy הוא שירות גבייה; נקודת הקצה הזו מאמתת גישה ואינה מחזירה יתרה זמינה."
     }),
     {
       provider: "postgresql",

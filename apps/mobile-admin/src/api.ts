@@ -36,7 +36,16 @@ export interface ProviderMonitor {
   source: string;
   sourceRealtime: boolean;
   lastErrorMessage: string | null;
+  lastErrorCode: string | null;
   billingUrl: string | null;
+  enabled: boolean;
+  snapshots: Array<{
+    healthy: boolean;
+    checkedAt: string;
+    details: Record<string, unknown>;
+    errorCode: string | null;
+    errorMessage: string | null;
+  }>;
 }
 
 export interface ProviderAlert {
@@ -48,7 +57,8 @@ export interface ProviderAlert {
   recommendedAction: string | null;
   lastSeenAt: string;
   occurrenceCount: number;
-  monitor: { provider: string; displayName: string };
+  metadata: { technicalMessage?: string; errorCode?: string } | null;
+  monitor: { provider: string; displayName: string; lastErrorCode?: string | null };
 }
 
 export interface OperationalMetrics {
