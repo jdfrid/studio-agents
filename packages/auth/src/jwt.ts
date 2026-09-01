@@ -5,6 +5,7 @@ export interface SessionPayload {
   sub: string;
   email: string;
   role: UserRole;
+  tokenUse?: "session" | "mobile_access";
 }
 
 const COOKIE_NAME = "studio_session";
@@ -38,11 +39,21 @@ export function sessionCookieName(): string {
 }
 
 export async function signSession(payload: SessionPayload): Promise<string> {
-  return new SignJWT({ email: payload.email, role: payload.role })
+  return new SignJWT({ email: payload.email, role: payload.role, tokenUse: "session" })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE_SEC}s`)
+    .sign(secretKey());
+}
+
+export async function signMobileAccess(payload: SessionPayload): Promise<string> {
+  return new SignJWT({ email: payload.email, role: payload.role, tokenUse: "mobile_access" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(payload.sub)
+    .setAudience("studio-mobile-admin")
+    .setIssuedAt()
+    .setExpirationTime("15m")
     .sign(secretKey());
 }
 
@@ -53,7 +64,9 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
     const email = payload.email;
     const role = payload.role;
     if (typeof sub !== "string" || typeof email !== "string" || typeof role !== "string") return null;
-    return { sub, email, role: role as UserRole };
+    const tokenUse = payload.tokenUse;
+    if (tokenUse !== undefined && tokenUse !== "session" && tokenUse !== "mobile_access") return null;
+    return { sub, email, role: role as UserRole, tokenUse };
   } catch {
     return null;
   }

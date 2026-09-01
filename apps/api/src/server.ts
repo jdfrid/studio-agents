@@ -39,7 +39,10 @@ app.setErrorHandler((error, request, reply) => {
     return;
   }
   app.log.error(error);
-  reply.code(500).send({ error: "internal_error", message: error instanceof Error ? error.message : String(error) });
+  reply.code(500).send({
+    error: "internal_error",
+    message: process.env.NODE_ENV === "development" ? "Internal server error; see server logs" : "Internal server error"
+  });
 });
 
 await registerRoutes(app);

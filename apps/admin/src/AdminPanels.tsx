@@ -283,7 +283,8 @@ export function AdminUsersPanel() {
   const [message, setMessage] = useState("");
 
   async function reloadUsers() {
-    setUsers(await apiGet<AdminUser[]>("/admin/users"));
+    const response = await apiGet<{ items: AdminUser[] }>("/admin/users?pageSize=100");
+    setUsers(response.items);
   }
 
   useEffect(() => {

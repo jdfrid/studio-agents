@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   StageNameSchema,
@@ -66,6 +66,7 @@ import {
   verifyWebhookSignature,
   getAdminDashboard,
   getAdminUsers,
+  getAdminOperationalMetrics,
   getAdminUserPnl,
   adminAdjustCredits,
   updateAdminUser,
@@ -74,6 +75,28 @@ import {
   updatePlatformSettings
 } from "@studio/billing";
 import { PlatformSettingsPatchSchema, AdminUserUpdateSchema } from "@studio/shared";
+import { officialBillingUrl, pollProviderMonitors } from "@studio/providers";
+
+const mobileRateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function mobileAdminRateLimit() {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.url.startsWith("/auth/mobile") && !request.url.startsWith("/admin")) return;
+    const now = Date.now();
+    const key = `${request.ip}:${request.url.startsWith("/auth/mobile") ? "auth" : "admin"}`;
+    const limit = request.url.startsWith("/auth/mobile") ? 12 : 120;
+    const current = mobileRateBuckets.get(key);
+    if (!current || current.resetAt <= now) {
+      mobileRateBuckets.set(key, { count: 1, resetAt: now + 60_000 });
+      return;
+    }
+    current.count += 1;
+    if (current.count > limit) {
+      reply.header("retry-after", Math.ceil((current.resetAt - now) / 1000));
+      return reply.code(429).send({ error: "rate_limited" });
+    }
+  };
+}
 
 async function assertRunOwner(runId: string, userId: string, role?: "USER" | "ADMIN") {
   const run = await prisma.projectRun.findUnique({ where: { id: runId } });
@@ -83,8 +106,29 @@ async function assertRunOwner(runId: string, userId: string, role?: "USER" | "AD
   return run;
 }
 
+async function auditAdmin(
+  userId: string,
+  action: string,
+  entity: string,
+  entityId?: string,
+  metadata: Record<string, unknown> = {}
+) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { tenantId: true } });
+  if (!user) return;
+  await prisma.auditLog.create({
+    data: {
+      tenantId: user.tenantId,
+      action,
+      entity,
+      entityId,
+      metadata: { actorUserId: userId, ...metadata }
+    }
+  });
+}
+
 export async function registerRoutes(app: FastifyInstance) {
   await authPlugin(app);
+  app.addHook("onRequest", mobileAdminRateLimit());
   await registerAuthRoutes(app);
 
   app.get("/health", async () => ({ ok: true }));
@@ -519,10 +563,188 @@ export async function registerRoutes(app: FastifyInstance) {
       }));
     });
 
-    adminRoutes.get("/dashboard", async () => getAdminDashboard());
-    adminRoutes.get("/users", async () => getAdminUsers());
+    adminRoutes.get("/dashboard", async (request) => {
+      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "dashboard");
+      return getAdminDashboard();
+    });
+    adminRoutes.get("/users", async (request) => {
+      const query = z
+        .object({
+          page: z.coerce.number().int().positive().default(1),
+          pageSize: z.coerce.number().int().min(1).max(100).default(25),
+          search: z.string().trim().max(200).optional(),
+          from: z.coerce.date().optional(),
+          to: z.coerce.date().optional()
+        })
+        .parse(request.query);
+      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "users", undefined, {
+        page: query.page,
+        hasSearch: Boolean(query.search)
+      });
+      return getAdminUsers(query);
+    });
+    adminRoutes.get("/metrics", async (request) => {
+      const now = new Date();
+      const query = z
+        .object({
+          from: z.coerce.date().default(new Date(now.getTime() - 30 * 86_400_000)),
+          to: z.coerce.date().default(now),
+          bucket: z.enum(["day", "week"]).default("day")
+        })
+        .refine((value) => value.from <= value.to, "from must be before to")
+        .refine((value) => value.to.getTime() - value.from.getTime() <= 366 * 86_400_000, "date range is too large")
+        .parse(request.query);
+      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "metrics", undefined, {
+        from: query.from.toISOString(),
+        to: query.to.toISOString()
+      });
+      return getAdminOperationalMetrics(query.from, query.to, query.bucket);
+    });
+
+    adminRoutes.get("/providers", async (request) => {
+      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "provider_monitor");
+      return prisma.providerMonitor.findMany({
+        orderBy: [{ enabled: "desc" }, { displayName: "asc" }],
+        include: { snapshots: { orderBy: { checkedAt: "desc" }, take: 1 } }
+      });
+    });
+
+    adminRoutes.post("/providers/refresh", async (request) => {
+      await auditAdmin(request.user!.sub, "PROVIDER_MONITOR_REFRESH", "provider_monitor");
+      await pollProviderMonitors();
+      return { ok: true };
+    });
+
+    adminRoutes.patch("/providers/:id/thresholds", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const body = z
+        .object({
+          warningThreshold: z.number().nonnegative().nullable(),
+          criticalThreshold: z.number().nonnegative().nullable(),
+          enabled: z.boolean().optional()
+        })
+        .refine(
+          (value) =>
+            value.warningThreshold === null ||
+            value.criticalThreshold === null ||
+            value.criticalThreshold <= value.warningThreshold,
+          "critical threshold must not exceed warning threshold"
+        )
+        .parse(request.body);
+      const updated = await prisma.providerMonitor
+        .update({ where: { id }, data: body })
+        .catch(() => null);
+      if (!updated) return reply.code(404).send({ error: "not_found" });
+      await auditAdmin(request.user!.sub, "PROVIDER_THRESHOLD_UPDATE", "provider_monitor", id, body);
+      return updated;
+    });
+
+    adminRoutes.get("/alerts", async (request) => {
+      const query = z
+        .object({
+          page: z.coerce.number().int().positive().default(1),
+          pageSize: z.coerce.number().int().min(1).max(100).default(25),
+          status: z.enum(["OPEN", "ACKNOWLEDGED", "RESOLVED"]).optional(),
+          search: z.string().trim().max(200).optional()
+        })
+        .parse(request.query);
+      const where = {
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.search
+          ? {
+              OR: [
+                { title: { contains: query.search, mode: "insensitive" as const } },
+                { message: { contains: query.search, mode: "insensitive" as const } }
+              ]
+            }
+          : {})
+      };
+      const [total, items] = await Promise.all([
+        prisma.providerAlert.count({ where }),
+        prisma.providerAlert.findMany({
+          where,
+          include: { monitor: { select: { provider: true, displayName: true } } },
+          orderBy: { lastSeenAt: "desc" },
+          skip: (query.page - 1) * query.pageSize,
+          take: query.pageSize
+        })
+      ]);
+      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "provider_alert");
+      return { items, total, page: query.page, pageSize: query.pageSize };
+    });
+
+    adminRoutes.post("/alerts/:id/acknowledge", async (request, reply) => {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const updated = await prisma.providerAlert
+        .update({
+          where: { id },
+          data: {
+            status: "ACKNOWLEDGED",
+            acknowledgedAt: new Date(),
+            acknowledgedById: request.user!.sub
+          }
+        })
+        .catch(() => null);
+      if (!updated) return reply.code(404).send({ error: "not_found" });
+      await auditAdmin(request.user!.sub, "PROVIDER_ALERT_ACKNOWLEDGE", "provider_alert", id);
+      return updated;
+    });
+
+    adminRoutes.put("/devices/:deviceId/push-token", async (request) => {
+      const { deviceId } = z.object({ deviceId: z.string().min(8).max(200) }).parse(request.params);
+      const { token } = z.object({ token: z.string().min(20).max(4096) }).parse(request.body);
+      await prisma.adminDevice.upsert({
+        where: { userId_deviceId: { userId: request.user!.sub, deviceId } },
+        create: { userId: request.user!.sub, deviceId, fcmToken: token },
+        update: { fcmToken: token, revokedAt: null, lastSeenAt: new Date() }
+      });
+      return { ok: true };
+    });
+
+    adminRoutes.get("/devices", async (request) => {
+      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "admin_device");
+      return prisma.adminDevice.findMany({
+        where: { user: { role: "ADMIN" } },
+        select: {
+          id: true,
+          userId: true,
+          deviceId: true,
+          platform: true,
+          lastSeenAt: true,
+          revokedAt: true,
+          user: { select: { email: true } }
+        },
+        orderBy: { lastSeenAt: "desc" }
+      });
+    });
+
+    adminRoutes.delete("/devices/:deviceId", async (request) => {
+      const { deviceId } = z.object({ deviceId: z.string().min(8).max(200) }).parse(request.params);
+      const now = new Date();
+      await prisma.$transaction([
+        prisma.adminDevice.updateMany({
+          where: { deviceId },
+          data: { revokedAt: now, fcmToken: null }
+        }),
+        prisma.mobileRefreshToken.updateMany({
+          where: { deviceId, revokedAt: null },
+          data: { revokedAt: now }
+        })
+      ]);
+      await auditAdmin(request.user!.sub, "ADMIN_DEVICE_REVOKE", "admin_device", deviceId);
+      return { ok: true };
+    });
+
+    adminRoutes.post("/providers/:provider/billing-link", async (request, reply) => {
+      const { provider } = z.object({ provider: z.string().regex(/^[a-z0-9-]+$/) }).parse(request.params);
+      const url = officialBillingUrl(provider);
+      if (!url) return reply.code(404).send({ error: "billing_link_unavailable" });
+      await auditAdmin(request.user!.sub, "PROVIDER_BILLING_OPEN", "provider_monitor", provider);
+      return { url };
+    });
     adminRoutes.get("/users/:id/pnl", async (request, reply) => {
       const { id } = z.object({ id: z.string() }).parse(request.params);
+      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "user_pnl", id);
       const pnl = await getAdminUserPnl(id);
       if (!pnl) {
         reply.code(404);
@@ -535,6 +757,10 @@ export async function registerRoutes(app: FastifyInstance) {
       const { id } = z.object({ id: z.string() }).parse(request.params);
       const body = z.object({ delta: z.number(), note: z.string().default("") }).parse(request.body);
       const balance = await adminAdjustCredits(id, body.delta, body.note);
+      await auditAdmin(request.user!.sub, "ADMIN_CREDIT_ADJUST", "user", id, {
+        delta: body.delta,
+        note: body.note.slice(0, 200)
+      });
       return { balance };
     });
 
@@ -542,18 +768,29 @@ export async function registerRoutes(app: FastifyInstance) {
       const { id } = z.object({ id: z.string() }).parse(request.params);
       const body = AdminUserUpdateSchema.parse(request.body);
       try {
-        return await updateAdminUser(id, body);
+        const updated = await updateAdminUser(id, body);
+        await auditAdmin(request.user!.sub, "ADMIN_USER_UPDATE", "user", id, {
+          fields: Object.keys(body)
+        });
+        return updated;
       } catch {
         reply.code(404);
         return { error: "not_found" };
       }
     });
 
-    adminRoutes.get("/settings", async () => getPlatformSettings());
+    adminRoutes.get("/settings", async (request) => {
+      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "platform_settings");
+      return getPlatformSettings();
+    });
 
     adminRoutes.patch("/settings", async (request) => {
       const body = PlatformSettingsPatchSchema.parse(request.body);
-      return updatePlatformSettings(body);
+      const updated = await updatePlatformSettings(body);
+      await auditAdmin(request.user!.sub, "ADMIN_SETTINGS_UPDATE", "platform_settings", "platform", {
+        fields: Object.keys(body)
+      });
+      return updated;
     });
 
     adminRoutes.get("/creative-catalog", async () => getAdminCreativeCatalog());

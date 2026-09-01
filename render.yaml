@@ -43,6 +43,19 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: MOBILE_ADMIN_REDIRECT_URI
+        value: studioadmin://oauth/callback
+      - key: API_HEALTH_URL
+        fromService:
+          type: web
+          name: studio-agents-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
 
   - type: worker
     name: studio-agents-worker
@@ -74,6 +87,21 @@ services:
       - key: GCS_CREDENTIALS_JSON
         sync: false
       - key: GEMINI_API_KEY
+        sync: false
+      - key: API_HEALTH_URL
+        fromService:
+          type: web
+          name: studio-agents-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: PROVIDER_MONITOR_INTERVAL_MS
+        value: 300000
+      - key: PROVIDER_ALERT_COOLDOWN_MS
+        value: 900000
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
         sync: false
 
   - type: web

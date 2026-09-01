@@ -21,6 +21,7 @@
     "@studio/billing": "workspace:*",
     "@studio/infra-prisma": "workspace:*",
     "@studio/orchestrator": "workspace:*",
+    "@studio/providers": "workspace:^",
     "@studio/shared": "workspace:*",
     "bullmq": "^5.7.5",
     "ioredis": "^5.4.1"

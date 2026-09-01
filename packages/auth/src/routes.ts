@@ -9,6 +9,13 @@ import type { UserView } from "@studio/shared";
 import { getUserViewWithCredits, findOrCreateUser } from "./users.js";
 import { recordUserLogin } from "./loginAudit.js";
 import { isAuthDisabled, sessionCookieName, sessionCookieOptions, sessionCookieClearOptions, signSession, verifySession, type SessionPayload } from "./jwt.js";
+import {
+  createMobileAuthCode,
+  exchangeMobileAuthCode,
+  mobileRedirectUri,
+  revokeMobileDevice,
+  rotateMobileRefreshToken
+} from "./mobileAuth.js";
 
 async function devUserView(): Promise<UserView> {
   const profile = {
@@ -50,6 +57,18 @@ function requestWantsAdminUi(request: FastifyRequest): boolean {
 }
 
 export async function registerAuthRoutes(app: FastifyInstance) {
+  app.get("/auth/mobile/google", async (request, reply) => {
+    const { deviceId } = request.query as { deviceId?: string };
+    if (!deviceId || deviceId.length > 200) {
+      return reply.code(400).send({ error: "invalid_device_id" });
+    }
+    const state = randomBytes(16).toString("hex");
+    const cookieOpts = { ...sessionCookieOptions(isSecure()), maxAge: 600, httpOnly: true };
+    reply.setCookie("mobile_oauth_state", state, cookieOpts);
+    reply.setCookie("mobile_oauth_device", deviceId, cookieOpts);
+    reply.redirect(googleAuthUrl(state));
+  });
+
   app.get("/auth/google", async (request, reply) => {
     const state = randomBytes(16).toString("hex");
     const cookieOpts = { ...sessionCookieOptions(isSecure()), maxAge: 600, httpOnly: true };
@@ -64,7 +83,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
   app.get("/auth/google/callback", async (request, reply) => {
     const { code, state } = request.query as { code?: string; state?: string };
     const savedState = request.cookies?.oauth_state;
-    if (!code || !state || state !== savedState) {
+    const mobileState = request.cookies?.mobile_oauth_state;
+    const isMobile = Boolean(state && mobileState && state === mobileState);
+    if (!code || !state || (!isMobile && state !== savedState)) {
       reply.code(400).send({ error: "invalid_oauth_state" });
       return;
     }
@@ -74,6 +95,18 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     const profile = await exchangeGoogleCode(code);
     const user = await findOrCreateUser(profile);
     await recordUserLogin(user.id, request);
+    if (isMobile) {
+      const deviceId = request.cookies?.mobile_oauth_device;
+      reply.clearCookie("mobile_oauth_state", sessionCookieClearOptions());
+      reply.clearCookie("mobile_oauth_device", sessionCookieClearOptions());
+      if (!deviceId || user.role !== "ADMIN") {
+        return reply.code(403).send({ error: "admin_required" });
+      }
+      const mobileCode = await createMobileAuthCode(user.id, deviceId);
+      const redirect = new URL(mobileRedirectUri());
+      redirect.searchParams.set("code", mobileCode);
+      return reply.redirect(redirect.toString());
+    }
     const token = await signSession({ sub: user.id, email: user.email, role: user.role });
     reply.setCookie(sessionCookieName(), token, sessionCookieOptions(isSecure()));
     const admin = adminUrl();
@@ -107,6 +140,37 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
   app.post("/auth/logout", async (_request, reply) => {
     reply.clearCookie(sessionCookieName(), sessionCookieClearOptions());
+    return { ok: true };
+  });
+
+  app.post("/auth/mobile/exchange", async (request, reply) => {
+    const body = request.body as { code?: string; deviceId?: string };
+    if (!body?.code || !body.deviceId || body.deviceId.length > 200) {
+      return reply.code(400).send({ error: "invalid_request" });
+    }
+    try {
+      return await exchangeMobileAuthCode(body.code, body.deviceId);
+    } catch {
+      return reply.code(401).send({ error: "invalid_mobile_auth_code" });
+    }
+  });
+
+  app.post("/auth/mobile/refresh", async (request, reply) => {
+    const body = request.body as { refreshToken?: string; deviceId?: string };
+    if (!body?.refreshToken || !body.deviceId) {
+      return reply.code(400).send({ error: "invalid_request" });
+    }
+    try {
+      return await rotateMobileRefreshToken(body.refreshToken, body.deviceId);
+    } catch {
+      return reply.code(401).send({ error: "invalid_refresh_token" });
+    }
+  });
+
+  app.post("/auth/mobile/logout", { preHandler: requireAdmin() }, async (request, reply) => {
+    const body = request.body as { deviceId?: string };
+    if (!body?.deviceId) return reply.code(400).send({ error: "invalid_request" });
+    await revokeMobileDevice(request.user!.sub, body.deviceId);
     return { ok: true };
   });
 }

@@ -83,6 +83,9 @@ model User {
   payments      Payment[]
   runs          ProjectRun[]
   loginEvents   UserLoginEvent[]
+  mobileAuthCodes MobileAuthCode[]
+  mobileRefreshTokens MobileRefreshToken[]
+  adminDevices  AdminDevice[]
 
   @@index([email])
 }
@@ -234,6 +237,26 @@ enum CostBilledUnit {
   bytes
 }
 
+enum ProviderMetricType {
+  BALANCE
+  QUOTA
+  BILLING_HEALTH
+  ESTIMATED_SPEND
+  SERVICE_HEALTH
+}
+
+enum ProviderAlertSeverity {
+  WARNING
+  CRITICAL
+  RECOVERY
+}
+
+enum ProviderAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
 model CostEvent {
   id               String            @id @default(cuid())
   tenantId         String
@@ -354,6 +377,126 @@ model AuditLog {
 
   @@index([tenantId, entity, entityId])
   @@index([tenantId, createdAt])
+}
+
+model MobileAuthCode {
+  id         String    @id @default(cuid())
+  userId     String
+  codeHash   String    @unique
+  deviceId   String?
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+model MobileRefreshToken {
+  id         String    @id @default(cuid())
+  userId     String
+  familyId   String
+  tokenHash  String    @unique
+  deviceId   String
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, deviceId])
+  @@index([familyId])
+  @@index([expiresAt])
+}
+
+model AdminDevice {
+  id          String    @id @default(cuid())
+  userId      String
+  deviceId    String
+  platform    String    @default("android")
+  fcmToken    String?
+  lastSeenAt  DateTime  @default(now())
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@index([fcmToken])
+}
+
+model ProviderMonitor {
+  id                  String             @id @default(cuid())
+  provider            String             @unique
+  displayName         String
+  metricType          ProviderMetricType
+  unit                String?
+  warningThreshold    Float?
+  criticalThreshold   Float?
+  lastValue           Float?
+  lastCheckedAt       DateTime?
+  lastHealthyAt       DateTime?
+  source              String
+  sourceRealtime      Boolean            @default(false)
+  billingUrl          String?
+  lastErrorCode       String?
+  lastErrorMessage    String?
+  estimatedRunwayHours Float?
+  enabled             Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  snapshots ProviderSnapshot[]
+  alerts    ProviderAlert[]
+
+  @@index([enabled, lastCheckedAt])
+}
+
+model ProviderSnapshot {
+  id                  String   @id @default(cuid())
+  monitorId           String
+  value               Float?
+  healthy             Boolean
+  source              String
+  sourceRealtime      Boolean  @default(false)
+  estimatedRunwayHours Float?
+  details             Json     @default("{}")
+  errorCode           String?
+  errorMessage        String?
+  checkedAt           DateTime @default(now())
+
+  monitor ProviderMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId, checkedAt])
+}
+
+model ProviderAlert {
+  id                String                @id @default(cuid())
+  monitorId         String
+  severity          ProviderAlertSeverity
+  status            ProviderAlertStatus   @default(OPEN)
+  fingerprint       String
+  title             String
+  message           String
+  recommendedAction String?
+  sourceEvent       String
+  firstSeenAt       DateTime              @default(now())
+  lastSeenAt        DateTime              @default(now())
+  acknowledgedAt    DateTime?
+  acknowledgedById String?
+  resolvedAt        DateTime?
+  pushSentAt        DateTime?
+  occurrenceCount   Int                   @default(1)
+  metadata          Json                  @default("{}")
+
+  monitor ProviderMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@unique([fingerprint])
+  @@index([status, severity, lastSeenAt])
+  @@index([monitorId, lastSeenAt])
 }
 
 model Series {

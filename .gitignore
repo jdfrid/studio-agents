@@ -12,6 +12,9 @@ coverage
 .vitest-cache
 .pnpm-store
 *.tsbuildinfo
+apps/mobile-admin/android/app/google-services.json
+apps/mobile-admin/android/*.jks
+apps/mobile-admin/android/*.keystore
 .DS_Store
 renders/
 tmp/

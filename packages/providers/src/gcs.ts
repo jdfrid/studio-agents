@@ -74,3 +74,14 @@ export function gcsClient(): GcsClient {
     }
   };
 }
+
+export async function checkGcsBucket(): Promise<{ exists: boolean; location?: string; storageClass?: string }> {
+  const [exists] = await client().bucket(bucketName()).exists();
+  if (!exists) return { exists: false };
+  const [metadata] = await client().bucket(bucketName()).getMetadata();
+  return {
+    exists: true,
+    location: metadata.location,
+    storageClass: metadata.storageClass
+  };
+}

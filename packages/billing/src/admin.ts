@@ -40,9 +40,37 @@ export async function getAdminDashboard() {
   };
 }
 
-export async function getAdminUsers(limit = 100) {
+export interface AdminListQuery {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  from?: Date;
+  to?: Date;
+}
+
+function dateRange(from?: Date, to?: Date) {
+  return from || to ? { gte: from, lte: to } : undefined;
+}
+
+export async function getAdminUsers(query: AdminListQuery = {}) {
+  const page = Math.max(1, query.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 25));
+  const where = {
+    ...(query.search
+      ? {
+          OR: [
+            { email: { contains: query.search, mode: "insensitive" as const } },
+            { name: { contains: query.search, mode: "insensitive" as const } }
+          ]
+        }
+      : {}),
+    ...(dateRange(query.from, query.to) ? { createdAt: dateRange(query.from, query.to) } : {})
+  };
+  const total = await prisma.user.count({ where });
   const users = await prisma.user.findMany({
-    take: limit,
+    where,
+    skip: (page - 1) * pageSize,
+    take: pageSize,
     orderBy: { createdAt: "desc" },
     include: { subscription: true }
   });
@@ -84,7 +112,76 @@ export async function getAdminUsers(limit = 100) {
       createdAt: u.createdAt.toISOString()
     });
   }
-  return results;
+  return {
+    items: results,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize))
+  };
+}
+
+export async function getAdminOperationalMetrics(from: Date, to: Date, bucket: "day" | "week" = "day") {
+  const [costs, payments, runs, services] = await Promise.all([
+    prisma.costEvent.findMany({
+      where: { startedAt: { gte: from, lte: to } },
+      select: { startedAt: true, costNis: true, costUsd: true, activityType: true, billedUnits: true }
+    }),
+    prisma.payment.findMany({
+      where: { createdAt: { gte: from, lte: to }, status: "paid" },
+      select: { createdAt: true, amountNis: true }
+    }),
+    prisma.projectRun.findMany({
+      where: { createdAt: { gte: from, lte: to } },
+      select: { createdAt: true, status: true }
+    }),
+    prisma.costEvent.groupBy({
+      by: ["activityType"],
+      where: { startedAt: { gte: from, lte: to } },
+      _sum: { costNis: true, costUsd: true, billedUnits: true },
+      _count: true
+    })
+  ]);
+  const points = new Map<string, { costNis: number; revenueNis: number; completed: number; failed: number }>();
+  const keyFor = (date: Date) => {
+    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    if (bucket === "week") d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString();
+  };
+  const point = (date: Date) => {
+    const key = keyFor(date);
+    const current = points.get(key) ?? { costNis: 0, revenueNis: 0, completed: 0, failed: 0 };
+    points.set(key, current);
+    return current;
+  };
+  for (const cost of costs) point(cost.startedAt).costNis += cost.costNis;
+  for (const payment of payments) point(payment.createdAt).revenueNis += payment.amountNis;
+  for (const run of runs) {
+    if (run.status === "COMPLETED") point(run.createdAt).completed += 1;
+    if (run.status === "FAILED") point(run.createdAt).failed += 1;
+  }
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+    bucket,
+    totals: {
+      costNis: costs.reduce((sum, row) => sum + row.costNis, 0),
+      costUsd: costs.reduce((sum, row) => sum + row.costUsd, 0),
+      revenueNis: payments.reduce((sum, row) => sum + row.amountNis, 0),
+      completed: runs.filter((row) => row.status === "COMPLETED").length,
+      failed: runs.filter((row) => row.status === "FAILED").length
+    },
+    services: services.map((row) => ({
+      service: row.activityType,
+      events: row._count,
+      billedUnits: row._sum.billedUnits ?? 0,
+      costNis: row._sum.costNis ?? 0,
+      costUsd: row._sum.costUsd ?? 0
+    })),
+    trend: [...points.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([at, values]) => ({ at, ...values, marginNis: values.revenueNis - values.costNis }))
+  };
 }
 
 export async function getAdminUserPnl(userId: string) {

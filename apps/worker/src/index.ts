@@ -9,6 +9,7 @@ import { assetAgent } from "@studio/agent-asset";
 import { packageAgent } from "@studio/agent-package";
 import { renderAgent } from "@studio/agent-render";
 import { seriesAgent } from "@studio/agent-series";
+import { pollProviderMonitors, recordProviderFailure } from "@studio/providers";
 
 registerAgent(briefAgent);
 registerAgent(scriptAgent);
@@ -29,9 +30,36 @@ const stageTimeouts: Record<StageName, number> = {
 };
 
 const workers: Worker[] = [];
+let monitorTimer: NodeJS.Timeout | undefined;
+
+function classifyProviderFailure(error: Error): { provider: string; code: string } {
+  const message = error.message.toLowerCase();
+  const provider =
+    message.includes("eleven") ? "elevenlabs" :
+    message.includes("heygen") ? "heygen" :
+    message.includes("fal") ? "fal" :
+    message.includes("redis") ? "redis" :
+    message.includes("gcs") || message.includes("storage") ? "gcs" :
+    "gemini";
+  const code =
+    /billing|payment/.test(message) ? "billing_failure" :
+    /quota|limit|resource_exhausted|429/.test(message) ? "billing_quota" :
+    /unauthori|forbidden|credential|401|403/.test(message) ? "authorization_failure" :
+    "provider_failure";
+  return { provider, code };
+}
 
 async function main() {
   await refreshPlatformSettingsCache();
+  await pollProviderMonitors();
+  const intervalMs = Math.max(60_000, Number(process.env.PROVIDER_MONITOR_INTERVAL_MS ?? 300_000));
+  monitorTimer = setInterval(() => {
+    void pollProviderMonitors().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error("Provider monitor poll failed:", error);
+    });
+  }, intervalMs);
+  monitorTimer.unref();
   for (const stage of STAGE_ORDER) {
     const w = new Worker(
       queueName(stage),
@@ -57,6 +85,12 @@ async function main() {
     w.on("failed", (job, err) => {
       // eslint-disable-next-line no-console
       console.error(`[worker:${stage}] job ${job?.id ?? "?"} failed:`, err);
+      const classified = classifyProviderFailure(err);
+      void recordProviderFailure({
+        ...classified,
+        message: err.message,
+        sourceEvent: `worker:${stage}`
+      }).catch(() => undefined);
     });
     w.on("error", (err) => {
       // eslint-disable-next-line no-console
@@ -74,6 +108,7 @@ void main().catch((err) => {
 async function shutdown() {
   // eslint-disable-next-line no-console
   console.log("Shutting down workers...");
+  if (monitorTimer) clearInterval(monitorTimer);
   await Promise.all(workers.map((w) => w.close()));
   process.exit(0);
 }
