@@ -1,17 +1,25 @@
 import type { ProviderAlert, ProviderMonitor } from "./api";
 
 const PROVIDERS: Record<string, string> = {
-  gemini: "Google Gemini ו‑Veo",
-  gcs: "אחסון Google Cloud",
-  fal: "fal.ai",
-  heygen: "HeyGen",
-  elevenlabs: "ElevenLabs",
-  lemonsqueezy: "Lemon Squeezy",
-  postgresql: "מסד הנתונים",
-  redis: "Redis",
-  api: "שרת ה‑API",
-  worker: "מעבד המשימות"
+  gemini: "Google AI — Gemini, Omni ו‑Veo",
+  gcs: "Google Cloud Storage — אחסון",
+  fal: "fal.ai — מודלי רינדור",
+  heygen: "HeyGen — וידאו וסנכרון שפתיים",
+  elevenlabs: "ElevenLabs — קול וקריינות",
+  lemonsqueezy: "Lemon Squeezy — חיוב לקוחות",
+  openai: "OpenAI — טקסט וקול",
+  anthropic: "Anthropic Claude — טקסט",
+  xai: "xAI Grok — טקסט ווידאו",
+  shotstack: "Shotstack — רינדור וידאו",
+  pexels: "Pexels — מדיה",
+  freesound: "Freesound — אפקטים קוליים",
+  postgresql: "תשתית המערכת — PostgreSQL",
+  redis: "תשתית המערכת — Redis",
+  api: "תשתית Prompt2Spot — שרת API",
+  worker: "תשתית Prompt2Spot — מעבד משימות"
 };
+
+const INFRASTRUCTURE = new Set(["api", "worker", "postgresql", "redis"]);
 
 export function providerLabel(provider: string, fallback?: string): string {
   return PROVIDERS[provider.toLowerCase()] ?? fallback ?? provider;
@@ -27,6 +35,7 @@ export function statusLabel(status: ProviderAlert["status"]): string {
 
 export function localizedAlert(alert: ProviderAlert): { title: string; message: string; action: string } {
   const provider = providerLabel(alert.monitor.provider, alert.monitor.displayName);
+  const infrastructure = INFRASTRUCTURE.has(alert.monitor.provider.toLowerCase());
   const code = alert.metadata?.errorCode ?? alert.monitor.lastErrorCode ?? "";
   const title = `${provider} — ${severityLabel(alert.severity)}`;
   if (alert.severity === "RECOVERY" || alert.status === "RESOLVED") {
@@ -47,7 +56,11 @@ export function localizedAlert(alert: ProviderAlert): { title: string; message: 
     };
   }
   if (code === "not_configured") {
-    return { title, message: "השירות לא הוגדר.", action: "יש להגדירו רק אם הוא אמור להיות פעיל." };
+    return {
+      title,
+      message: "נמצא שימוש אחרון בשירות, אך לא נמצא חיבור פעיל.",
+      action: "יש להחזיר את פרטי הגישה או להפסיק לבחור בשירות זה."
+    };
   }
   if (/^http_401/.test(code)) {
     return { title, message: "מפתח הגישה נדחה.", action: "יש לבדוק שהמפתח תקף." };
@@ -57,18 +70,30 @@ export function localizedAlert(alert: ProviderAlert): { title: string; message: 
   }
   return {
     title,
-    message: alert.severity === "WARNING" ? "היתרה או המכסה נמוכה." : "בדיקת השירות נכשלה.",
-    action: "יש לפתוח את הפרטים הטכניים ולבדוק הרשאות, מכסה וזמינות."
+    message: infrastructure
+      ? "בדיקת תשתית פנימית נכשלה. זו אינה בעיית יתרה אצל ספק חיצוני."
+      : alert.severity === "WARNING"
+        ? "היתרה או המכסה נמוכה."
+        : "בדיקת השירות החיצוני נכשלה.",
+    action: infrastructure
+      ? "יש לבדוק את תצורת הרשת ואת התהליך הפנימי המתאים."
+      : "יש לפתוח את הפרטים הטכניים ולבדוק הרשאות, מכסה וזמינות."
   };
 }
 
 export function monitorRisk(provider: ProviderMonitor): { rank: number; label: string; className: string } {
   const details = provider.snapshots[0]?.details ?? {};
   const status = String(details.operationalStatus ?? "");
-  if (!provider.enabled || status === "DISABLED" || status === "NOT_CONFIGURED") {
+  const staleWorker =
+    provider.provider === "worker" &&
+    (!provider.lastCheckedAt || Date.now() - new Date(provider.lastCheckedAt).getTime() > 10 * 60_000);
+  if (!provider.enabled || status === "DISABLED") {
     return { rank: 3, label: "לא פעיל", className: "disabled" };
   }
-  if (provider.lastErrorCode || provider.snapshots[0]?.healthy === false) {
+  if (!provider.configured && provider.expectedFromRecentUsage) {
+    return { rank: 0, label: "חסר חיבור", className: "critical" };
+  }
+  if (staleWorker || provider.lastErrorCode || provider.snapshots[0]?.healthy === false) {
     return { rank: 0, label: "דורש טיפול", className: "critical" };
   }
   if (status === "DEGRADED") {
@@ -91,5 +116,7 @@ export function formatFreshness(value: string | null, now = Date.now()): string 
 }
 
 export function formatCurrency(value: number, currency: "ILS" | "USD"): string {
-  return new Intl.NumberFormat("he-IL", { style: "currency", currency, maximumFractionDigits: 2 }).format(value);
+  return new Intl.NumberFormat("he-IL", { style: "currency", currency, maximumFractionDigits: 2 }).format(
+    value
+  );
 }

@@ -41,14 +41,24 @@ const OFFICIAL_BILLING_URLS: Record<string, string> = {
   fal: "https://fal.ai/dashboard/billing",
   heygen: "https://app.heygen.com/settings/billing",
   elevenlabs: "https://elevenlabs.io/app/subscription",
-  lemonsqueezy: "https://app.lemonsqueezy.com/settings/stores"
+  lemonsqueezy: "https://app.lemonsqueezy.com/settings/stores",
+  openai: "https://platform.openai.com/settings/organization/billing/overview",
+  anthropic: "https://console.anthropic.com/settings/billing",
+  xai: "https://console.x.ai/team/default/billing",
+  shotstack: "https://dashboard.shotstack.io/billing",
+  pexels: "https://www.pexels.com/api/",
+  freesound: "https://freesound.org/home/apply/"
 };
 
 export function officialBillingUrl(provider: string): string | null {
   return OFFICIAL_BILLING_URLS[provider.toLowerCase()] ?? null;
 }
 
-export function calculateRunwayHours(remaining: number | null, consumed: number, elapsedHours: number): number | null {
+export function calculateRunwayHours(
+  remaining: number | null,
+  consumed: number,
+  elapsedHours: number
+): number | null {
   if (remaining === null || remaining < 0 || consumed <= 0 || elapsedHours <= 0) return null;
   const hourlyRate = consumed / elapsedHours;
   return hourlyRate > 0 ? remaining / hourlyRate : null;
@@ -79,17 +89,161 @@ function fingerprint(provider: string, code: string): string {
 }
 
 const PROVIDER_NAMES_HE: Record<string, string> = {
-  gemini: "Google Gemini ו‑Veo",
-  gcs: "אחסון Google Cloud",
-  fal: "fal.ai",
-  heygen: "HeyGen",
-  elevenlabs: "ElevenLabs",
-  lemonsqueezy: "Lemon Squeezy",
+  gemini: "Google AI — Gemini, Omni ו‑Veo",
+  gcs: "Google Cloud Storage",
+  fal: "fal.ai — מודלי רינדור",
+  heygen: "HeyGen — וידאו וסנכרון שפתיים",
+  elevenlabs: "ElevenLabs — קול וקריינות",
+  lemonsqueezy: "Lemon Squeezy — חיוב לקוחות",
+  openai: "OpenAI — טקסט וקול",
+  anthropic: "Anthropic Claude — טקסט",
+  xai: "xAI Grok — טקסט ווידאו",
+  shotstack: "Shotstack — רינדור וידאו",
+  pexels: "Pexels — מדיה",
+  freesound: "Freesound — אפקטים קוליים",
   postgresql: "מסד הנתונים PostgreSQL",
   redis: "Redis",
-  api: "שרת ה‑API",
+  api: "תשתית Prompt2Spot — שרת API",
   worker: "מעבד המשימות"
 };
+
+export type ProviderCategory = "PAID_PROVIDER" | "SYSTEM_INFRASTRUCTURE";
+
+export interface ProviderInventoryEntry {
+  provider: string;
+  displayName: string;
+  company: string;
+  capability: string;
+  category: ProviderCategory;
+  configured: boolean;
+  expectedFromRecentUsage: boolean;
+}
+
+const PAID_PROVIDER_DEFINITIONS = [
+  {
+    provider: "gemini",
+    company: "Google AI",
+    capability: "יצירת טקסט, תמונות, מוזיקה, קריינות ווידאו באמצעות Gemini, Omni ו‑Veo",
+    envKeys: ["GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "GOOGLE_API_KEY"],
+    credentialPattern: /gemini|google/i
+  },
+  {
+    provider: "gcs",
+    company: "Google Cloud",
+    capability: "אחסון קבצי מקור ותוצרי וידאו ב‑Google Cloud Storage",
+    envKeys: ["GCS_BUCKET"],
+    credentialPattern: /gcs|google.*storage|cloud.*storage/i
+  },
+  {
+    provider: "fal",
+    company: "fal.ai",
+    capability: "רינדור וידאו במודלי Kling, Wan, Hailuo, Seedance ו‑Luma",
+    envKeys: ["FAL_API_KEY"],
+    credentialPattern: /fal|kling|wan|hailuo|seedance|luma/i
+  },
+  {
+    provider: "heygen",
+    company: "HeyGen",
+    capability: "יצירת וידאו וסנכרון שפתיים",
+    envKeys: ["HEYGEN_API_KEY"],
+    credentialPattern: /heygen/i
+  },
+  {
+    provider: "elevenlabs",
+    company: "ElevenLabs",
+    capability: "שכפול קול וקריינות",
+    envKeys: ["ELEVENLABS_API_KEY"],
+    credentialPattern: /eleven/i
+  },
+  {
+    provider: "lemonsqueezy",
+    company: "Lemon Squeezy",
+    capability: "גבייה, מנויים ותשלומי לקוחות",
+    envKeys: ["LEMONSQUEEZY_API_KEY"],
+    credentialPattern: /lemon/i
+  },
+  {
+    provider: "openai",
+    company: "OpenAI",
+    capability: "יצירת טקסט וקריינות",
+    envKeys: ["OPENAI_API_KEY"],
+    credentialPattern: /openai|gpt/i
+  },
+  {
+    provider: "anthropic",
+    company: "Anthropic",
+    capability: "יצירת טקסט באמצעות Claude",
+    envKeys: ["ANTHROPIC_API_KEY"],
+    credentialPattern: /anthropic|claude/i
+  },
+  {
+    provider: "xai",
+    company: "xAI",
+    capability: "יצירת טקסט ווידאו באמצעות Grok",
+    envKeys: ["XAI_API_KEY"],
+    credentialPattern: /(^|[^a-z])xai|grok/i
+  },
+  {
+    provider: "shotstack",
+    company: "Shotstack",
+    capability: "עריכה ורינדור וידאו",
+    envKeys: ["SHOTSTACK_API_KEY"],
+    credentialPattern: /shotstack/i
+  },
+  {
+    provider: "pexels",
+    company: "Pexels",
+    capability: "חיפוש תמונות וסרטוני מלאי",
+    envKeys: ["PEXELS_API_KEY"],
+    credentialPattern: /pexels/i
+  },
+  {
+    provider: "freesound",
+    company: "Freesound",
+    capability: "חיפוש אפקטים וקובצי קול",
+    envKeys: ["FREESOUND_API_KEY", "FREESOUND_CLIENT_SECRET"],
+    credentialPattern: /freesound/i
+  }
+] as const;
+
+const SYSTEM_INVENTORY: ProviderInventoryEntry[] = [
+  {
+    provider: "api",
+    displayName: providerNameHe("api"),
+    company: "Prompt2Spot",
+    capability: "API פנימי לאפליקציות ולניהול",
+    category: "SYSTEM_INFRASTRUCTURE",
+    configured: true,
+    expectedFromRecentUsage: false
+  },
+  {
+    provider: "worker",
+    displayName: providerNameHe("worker"),
+    company: "Prompt2Spot",
+    capability: "עיבוד משימות היצירה ברקע",
+    category: "SYSTEM_INFRASTRUCTURE",
+    configured: true,
+    expectedFromRecentUsage: false
+  },
+  {
+    provider: "postgresql",
+    displayName: providerNameHe("postgresql"),
+    company: "PostgreSQL",
+    capability: "מסד הנתונים של המערכת",
+    category: "SYSTEM_INFRASTRUCTURE",
+    configured: true,
+    expectedFromRecentUsage: false
+  },
+  {
+    provider: "redis",
+    displayName: providerNameHe("redis"),
+    company: "Redis",
+    capability: "תורים ומצב זמני של משימות",
+    category: "SYSTEM_INFRASTRUCTURE",
+    configured: true,
+    expectedFromRecentUsage: false
+  }
+];
 
 export function providerNameHe(provider: string): string {
   return PROVIDER_NAMES_HE[provider.toLowerCase()] ?? provider;
@@ -118,7 +272,8 @@ function alertMessage(provider: string, severity: ProviderAlertSeverity, code: s
   if (code === "not_configured") return "השירות לא הוגדר.";
   if (code.startsWith("http_401")) return "פרטי הגישה נדחו על ידי השירות.";
   if (code.startsWith("http_403")) return "פרטי הגישה תקפים, אך חסרה הרשאה לביצוע הבדיקה.";
-  if (code.startsWith("threshold_")) return `היתרה או המכסה של ${providerNameHe(provider)} ירדה מתחת לסף שהוגדר.`;
+  if (code.startsWith("threshold_"))
+    return `היתרה או המכסה של ${providerNameHe(provider)} ירדה מתחת לסף שהוגדר.`;
   return `בדיקת הזמינות של ${providerNameHe(provider)} נכשלה.`;
 }
 
@@ -159,9 +314,10 @@ async function sendPushForAlert(alertId: string): Promise<void> {
   });
   const invalid = result.responses.flatMap((item, index) => {
     const token = tokens[index];
-    return token && !item.success &&
-    (item.error?.code === "messaging/registration-token-not-registered" ||
-      item.error?.code === "messaging/invalid-registration-token")
+    return token &&
+      !item.success &&
+      (item.error?.code === "messaging/registration-token-not-registered" ||
+        item.error?.code === "messaging/invalid-registration-token")
       ? [token]
       : [];
   });
@@ -265,10 +421,15 @@ export async function persistProviderReading(reading: ProviderReading) {
     }
   });
   const recent = await prisma.providerSnapshot.findFirst({
-    where: { monitorId: monitor.id, value: { not: null }, checkedAt: { gte: new Date(Date.now() - 24 * 3_600_000) } },
+    where: {
+      monitorId: monitor.id,
+      value: { not: null },
+      checkedAt: { gte: new Date(Date.now() - 24 * 3_600_000) }
+    },
     orderBy: { checkedAt: "asc" }
   });
-  const consumed = recent?.value !== null && reading.value !== null ? Math.max(0, (recent?.value ?? 0) - reading.value) : 0;
+  const consumed =
+    recent?.value !== null && reading.value !== null ? Math.max(0, (recent?.value ?? 0) - reading.value) : 0;
   const elapsed = recent ? Math.max(1 / 60, (Date.now() - recent.checkedAt.getTime()) / 3_600_000) : 0;
   const runway =
     reading.metricType === "BALANCE" || reading.metricType === "QUOTA"
@@ -298,8 +459,12 @@ export async function persistProviderReading(reading: ProviderReading) {
       data: {
         lastValue: reading.value,
         lastCheckedAt: new Date(),
-        ...(reading.healthy ? { lastHealthyAt: new Date(), lastErrorCode: null, lastErrorMessage: null } : {}),
-        ...(!reading.healthy ? { lastErrorCode: reading.errorCode ?? "provider_error", lastErrorMessage: errorMessage } : {}),
+        ...(reading.healthy
+          ? { lastHealthyAt: new Date(), lastErrorCode: null, lastErrorMessage: null }
+          : {}),
+        ...(!reading.healthy
+          ? { lastErrorCode: reading.errorCode ?? "provider_error", lastErrorMessage: errorMessage }
+          : {}),
         estimatedRunwayHours: runway
       }
     })
@@ -344,7 +509,10 @@ export async function recordProviderFailure(input: {
   await persistProviderReading(reading);
 }
 
-async function jsonRequest(url: string, headers: Record<string, string>): Promise<{ ok: boolean; status: number; body: any }> {
+async function jsonRequest(
+  url: string,
+  headers: Record<string, string>
+): Promise<{ ok: boolean; status: number; body: any }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -357,7 +525,8 @@ async function jsonRequest(url: string, headers: Record<string, string>): Promis
 }
 
 function apiFailureReason(body: any): string | undefined {
-  const candidate = body?.detail?.message ?? body?.detail ?? body?.message ?? body?.error?.message ?? body?.error;
+  const candidate =
+    body?.detail?.message ?? body?.detail ?? body?.message ?? body?.error?.message ?? body?.error;
   return typeof candidate === "string" ? redact(candidate) : undefined;
 }
 
@@ -368,6 +537,91 @@ async function estimatedInternalSpendNis24h(types: CostActivityType[]): Promise<
     _sum: { costNis: true }
   });
   return result._sum.costNis ?? 0;
+}
+
+async function estimatedProviderSpendNis24h(provider: string, types: CostActivityType[]): Promise<number> {
+  if (types.length) return (await estimatedInternalSpendNis24h(types)) ?? 0;
+  const definition = PAID_PROVIDER_DEFINITIONS.find((candidate) => candidate.provider === provider);
+  if (!definition) return 0;
+  const events = await prisma.costEvent.findMany({
+    where: { startedAt: { gte: new Date(Date.now() - 24 * 3_600_000) } },
+    select: { model: true, metadata: true, costNis: true }
+  });
+  return events.reduce((sum, event) => {
+    const text = `${event.model ?? ""} ${JSON.stringify(event.metadata ?? {})}`;
+    return definition.credentialPattern.test(text) ? sum + event.costNis : sum;
+  }, 0);
+}
+
+type InventoryCredential = {
+  provider: string;
+  displayName: string;
+  enabled: boolean;
+  encryptedKey: string | null;
+};
+type InventoryUsage = { activityType: CostActivityType; model: string | null; metadata: Prisma.JsonValue };
+
+function usageText(usage: InventoryUsage): string {
+  return `${usage.activityType} ${usage.model ?? ""} ${JSON.stringify(usage.metadata ?? {})}`.toLowerCase();
+}
+
+export function buildProviderInventory(
+  credentials: InventoryCredential[],
+  usage: InventoryUsage[],
+  env: NodeJS.ProcessEnv = process.env
+): ProviderInventoryEntry[] {
+  return PAID_PROVIDER_DEFINITIONS.flatMap((definition) => {
+    const configuredInEnv = definition.envKeys.some((key) => Boolean(env[key]?.trim()));
+    const configuredInDb = credentials.some(
+      (credential) =>
+        credential.enabled &&
+        Boolean(credential.encryptedKey) &&
+        definition.credentialPattern.test(`${credential.provider} ${credential.displayName}`)
+    );
+    const expectedFromRecentUsage = usage.some((event) => {
+      const text = usageText(event);
+      if (definition.provider === "gemini") {
+        const attributedElsewhere = PAID_PROVIDER_DEFINITIONS.some(
+          (candidate) =>
+            !["gemini", "gcs"].includes(candidate.provider) && candidate.credentialPattern.test(text)
+        );
+        return (
+          (/^gemini_/.test(event.activityType) || /^veo_/.test(event.activityType)) && !attributedElsewhere
+        );
+      }
+      if (definition.provider === "gcs") return /^gcs_/.test(event.activityType);
+      return definition.credentialPattern.test(text);
+    });
+    const configured = configuredInEnv || configuredInDb;
+    if (!configured && !expectedFromRecentUsage) return [];
+    return [
+      {
+        provider: definition.provider,
+        displayName: providerNameHe(definition.provider),
+        company: definition.company,
+        capability: definition.capability,
+        category: "PAID_PROVIDER" as const,
+        configured,
+        expectedFromRecentUsage
+      }
+    ];
+  });
+}
+
+export async function getProviderInventory(): Promise<ProviderInventoryEntry[]> {
+  const since = new Date(Date.now() - 30 * 86_400_000);
+  const [credentials, usage] = await Promise.all([
+    prisma.providerCredential.findMany({
+      where: { enabled: true },
+      select: { provider: true, displayName: true, enabled: true, encryptedKey: true }
+    }),
+    prisma.costEvent.findMany({
+      where: { startedAt: { gte: since } },
+      select: { activityType: true, model: true, metadata: true },
+      distinct: ["activityType", "model"]
+    })
+  ]);
+  return [...buildProviderInventory(credentials, usage), ...SYSTEM_INVENTORY];
 }
 
 function envHealthAdapter(config: {
@@ -386,13 +640,15 @@ function envHealthAdapter(config: {
   balanceUnavailableReason?: string;
   parseDetails?: (body: any) => Record<string, unknown>;
   internalCostTypes?: CostActivityType[];
+  configured?: boolean;
+  expectedFromRecentUsage?: boolean;
 }): ProviderMonitorAdapter {
   return {
     provider: config.provider,
     async read() {
-      const configured = Boolean(process.env[config.envKey]?.trim());
+      const configured = config.configured ?? Boolean(process.env[config.envKey]?.trim());
       if (!configured) {
-        const optional = config.optional === true;
+        const optional = config.optional === true && !config.expectedFromRecentUsage;
         return {
           provider: config.provider,
           displayName: config.displayName,
@@ -426,7 +682,10 @@ function envHealthAdapter(config: {
           details: {
             configured: true,
             balanceUnavailableReason: config.balanceUnavailableReason,
-            estimatedCostNis24h: await estimatedInternalSpendNis24h(config.internalCostTypes ?? [])
+            estimatedCostNis24h: await estimatedProviderSpendNis24h(
+              config.provider,
+              config.internalCostTypes ?? []
+            )
           }
         };
       }
@@ -447,7 +706,10 @@ function envHealthAdapter(config: {
           httpStatus: result.status,
           balanceUnavailableReason: config.balanceUnavailableReason,
           ...(config.parseDetails?.(result.body) ?? {}),
-          estimatedCostNis24h: await estimatedInternalSpendNis24h(config.internalCostTypes ?? []),
+          estimatedCostNis24h: await estimatedProviderSpendNis24h(
+            config.provider,
+            config.internalCostTypes ?? []
+          ),
           ...(reason ? { failureReason: reason } : {})
         },
         errorCode: result.ok ? undefined : `http_${result.status}`,
@@ -516,22 +778,40 @@ export function parseHeygenBilling(body: any): {
   return {
     metricType: "BILLING_HEALTH",
     value: null,
-    details: { billingType: data.billing_type ?? null, balanceUnavailableReason: "סוג החיוב אינו מספק יתרה כספית." }
+    details: {
+      billingType: data.billing_type ?? null,
+      balanceUnavailableReason: "סוג החיוב אינו מספק יתרה כספית."
+    }
   };
 }
 
-export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
+export async function createDefaultMonitorAdapters(
+  runtime: "api" | "worker" = "worker"
+): Promise<ProviderMonitorAdapter[]> {
+  const inventory = await getProviderInventory();
+  const inventoryByProvider = new Map(inventory.map((entry) => [entry.provider, entry]));
   const geminiKey = () =>
     process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
-  const apiHealthUrl = process.env.API_HEALTH_URL
-    ? new URL("/health", process.env.API_HEALTH_URL).toString()
-    : undefined;
-  return [
-    envHealthAdapter({
+  const paidAdapter = (config: Parameters<typeof envHealthAdapter>[0]) => {
+    const entry = inventoryByProvider.get(config.provider);
+    return envHealthAdapter({
+      ...config,
+      configured: entry?.configured ?? false,
+      expectedFromRecentUsage: entry?.expectedFromRecentUsage ?? false
+    });
+  };
+  const adapters: ProviderMonitorAdapter[] = [
+    paidAdapter({
       provider: "gemini",
       displayName: "Gemini / Omni / Veo",
-      envKey: process.env.GEMINI_API_KEY ? "GEMINI_API_KEY" : process.env.GOOGLE_AI_API_KEY ? "GOOGLE_AI_API_KEY" : "GOOGLE_API_KEY",
-      url: geminiKey() ? `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(geminiKey())}` : undefined,
+      envKey: process.env.GEMINI_API_KEY
+        ? "GEMINI_API_KEY"
+        : process.env.GOOGLE_AI_API_KEY
+          ? "GOOGLE_AI_API_KEY"
+          : "GOOGLE_API_KEY",
+      url: geminiKey()
+        ? `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(geminiKey())}`
+        : undefined,
       balanceUnavailableReason: "Google AI אינה מספקת יתרה כספית בחשבון דרך ה‑API הזה.",
       internalCostTypes: ["veo_video", "gemini_tts", "gemini_image", "gemini_text", "gemini_music"]
     }),
@@ -554,7 +834,8 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
               ...bucket,
               configured: true,
               estimatedCostNis24h: spend,
-              balanceUnavailableReason: "Google Cloud מחייב לפי שימוש ואינו מספק יתרת ארנק לדלי דרך Storage API."
+              balanceUnavailableReason:
+                "Google Cloud מחייב לפי שימוש ואינו מספק יתרת ארנק לדלי דרך Storage API."
             },
             errorCode: bucket.uploadAllowed ? undefined : "upload_permission_denied",
             errorMessage: bucket.uploadAllowed
@@ -577,7 +858,8 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
               configured: true,
               metadataPermissionMissing: bucketGetOnly,
               failureReason: message,
-              balanceUnavailableReason: "Google Cloud מחייב לפי שימוש ואינו מספק יתרת ארנק לדלי דרך Storage API."
+              balanceUnavailableReason:
+                "Google Cloud מחייב לפי שימוש ואינו מספק יתרת ארנק לדלי דרך Storage API."
             },
             errorCode: bucketGetOnly ? undefined : "gcs_permission_check_failed",
             errorMessage: bucketGetOnly ? undefined : message
@@ -585,14 +867,14 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
         }
       }
     },
-    envHealthAdapter({
+    paidAdapter({
       provider: "fal",
       displayName: "fal.ai",
       envKey: "FAL_API_KEY",
       optional: true,
       balanceUnavailableReason: "לא הוגדר API רשמי ומהימן לקריאת יתרה; יש לבדוק את החיוב באתר הרשמי."
     }),
-    envHealthAdapter({
+    paidAdapter({
       provider: "heygen",
       displayName: "HeyGen",
       envKey: "HEYGEN_API_KEY",
@@ -605,7 +887,7 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
       optional: true,
       balanceUnavailableReason: "סוג החיוב בחשבון קובע אם HeyGen מספק כסף, קרדיטים או תקרת הוצאה."
     }),
-    envHealthAdapter({
+    paidAdapter({
       provider: "elevenlabs",
       displayName: "ElevenLabs",
       envKey: "ELEVENLABS_API_KEY",
@@ -621,13 +903,16 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
       parseDetails: (body) => ({
         characterLimit: typeof body?.character_limit === "number" ? body.character_limit : null,
         characterCount: typeof body?.character_count === "number" ? body.character_count : null,
-        nextResetUnix: typeof body?.next_character_count_reset_unix === "number" ? body.next_character_count_reset_unix : null,
+        nextResetUnix:
+          typeof body?.next_character_count_reset_unix === "number"
+            ? body.next_character_count_reset_unix
+            : null,
         subscriptionStatus: typeof body?.status === "string" ? body.status : null,
         tier: typeof body?.tier === "string" ? body.tier : null
       }),
       balanceUnavailableReason: "ElevenLabs API מספק שימוש ומכסת תווים, אך לא יתרה כספית."
     }),
-    envHealthAdapter({
+    paidAdapter({
       provider: "lemonsqueezy",
       displayName: "Lemon Squeezy",
       envKey: "LEMONSQUEEZY_API_KEY",
@@ -637,7 +922,8 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
         Accept: "application/vnd.api+json"
       }),
       optional: true,
-      balanceUnavailableReason: "Lemon Squeezy הוא שירות גבייה; נקודת הקצה הזו מאמתת גישה ואינה מחזירה יתרה זמינה."
+      balanceUnavailableReason:
+        "Lemon Squeezy הוא שירות גבייה; נקודת הקצה הזו מאמתת גישה ואינה מחזירה יתרה זמינה."
     }),
     {
       provider: "postgresql",
@@ -684,12 +970,21 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
         }
       }
     },
-    envHealthAdapter({
+    {
       provider: "api",
-      displayName: "API",
-      envKey: "API_HEALTH_URL",
-      url: apiHealthUrl
-    }),
+      async read() {
+        return {
+          provider: "api",
+          displayName: providerNameHe("api"),
+          metricType: "SERVICE_HEALTH",
+          value: null,
+          healthy: true,
+          source: runtime === "api" ? "api_request_self_check" : "worker_monitor_active",
+          sourceRealtime: true,
+          details: { runtime }
+        };
+      }
+    },
     {
       provider: "worker",
       async read() {
@@ -703,13 +998,74 @@ export function createDefaultMonitorAdapters(): ProviderMonitorAdapter[] {
           sourceRealtime: true
         };
       }
-    }
+    },
+    paidAdapter({
+      provider: "openai",
+      displayName: "OpenAI",
+      envKey: "OPENAI_API_KEY",
+      url: process.env.OPENAI_API_KEY ? "https://api.openai.com/v1/models" : undefined,
+      headers: () => ({ Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}` }),
+      optional: true,
+      balanceUnavailableReason: "OpenAI אינה מספקת יתרת חיוב בנקודת בדיקת המודלים."
+    }),
+    paidAdapter({
+      provider: "anthropic",
+      displayName: "Anthropic Claude",
+      envKey: "ANTHROPIC_API_KEY",
+      optional: true,
+      balanceUnavailableReason: "Anthropic אינה מספקת יתרה דרך API ציבורי לקריאה בלבד."
+    }),
+    paidAdapter({
+      provider: "xai",
+      displayName: "xAI Grok",
+      envKey: "XAI_API_KEY",
+      url: process.env.XAI_API_KEY ? "https://api.x.ai/v1/models" : undefined,
+      headers: () => ({ Authorization: `Bearer ${process.env.XAI_API_KEY ?? ""}` }),
+      optional: true,
+      balanceUnavailableReason: "xAI אינה מספקת יתרת חיוב בנקודת בדיקת המודלים."
+    }),
+    paidAdapter({
+      provider: "shotstack",
+      displayName: "Shotstack",
+      envKey: "SHOTSTACK_API_KEY",
+      optional: true,
+      balanceUnavailableReason: "לא קיימת בדיקת יתרה יציבה ללא יצירת עבודת רינדור."
+    }),
+    paidAdapter({
+      provider: "pexels",
+      displayName: "Pexels",
+      envKey: "PEXELS_API_KEY",
+      url: process.env.PEXELS_API_KEY ? "https://api.pexels.com/v1/curated?per_page=1" : undefined,
+      headers: () => ({ Authorization: process.env.PEXELS_API_KEY ?? "" }),
+      optional: true,
+      balanceUnavailableReason: "Pexels מספקת מכסת API, אך לא יתרת ארנק בנקודת הבדיקה."
+    }),
+    paidAdapter({
+      provider: "freesound",
+      displayName: "Freesound",
+      envKey: process.env.FREESOUND_API_KEY ? "FREESOUND_API_KEY" : "FREESOUND_CLIENT_SECRET",
+      optional: true,
+      balanceUnavailableReason: "Freesound אינו מספק יתרת חיוב דרך API הניטור."
+    })
   ];
+  return adapters.filter((adapter) => {
+    const entry = inventoryByProvider.get(adapter.provider);
+    return (
+      entry?.category === "PAID_PROVIDER" ||
+      (entry?.category === "SYSTEM_INFRASTRUCTURE" &&
+        !(runtime === "worker" && adapter.provider === "api") &&
+        !(runtime === "api" && adapter.provider === "worker"))
+    );
+  });
 }
 
-export async function pollProviderMonitors(adapters = createDefaultMonitorAdapters()) {
+export async function pollProviderMonitors(
+  adapters?: ProviderMonitorAdapter[],
+  runtime: "api" | "worker" = "worker"
+) {
+  const selectedAdapters = adapters ?? (await createDefaultMonitorAdapters(runtime));
   return Promise.all(
-    adapters.map(async (adapter) => {
+    selectedAdapters.map(async (adapter) => {
       try {
         return await persistProviderReading(await adapter.read());
       } catch (error) {

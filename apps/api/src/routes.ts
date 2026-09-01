@@ -50,12 +50,7 @@ import {
   profileToProductionCostConfig,
   resolveRenderProfile
 } from "@studio/shared";
-import {
-  registerAuthRoutes,
-  requireAuth,
-  requireAdmin,
-  authPlugin
-} from "@studio/auth";
+import { registerAuthRoutes, requireAuth, requireAdmin, authPlugin } from "@studio/auth";
 import {
   assertCanStartRun,
   creditCostForNewRun,
@@ -75,7 +70,7 @@ import {
   updatePlatformSettings
 } from "@studio/billing";
 import { PlatformSettingsPatchSchema, AdminUserUpdateSchema } from "@studio/shared";
-import { officialBillingUrl, pollProviderMonitors } from "@studio/providers";
+import { getProviderInventory, officialBillingUrl, pollProviderMonitors } from "@studio/providers";
 
 const mobileRateBuckets = new Map<string, { count: number; resetAt: number }>();
 
@@ -459,392 +454,456 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.register(
     async (adminRoutes) => {
-    adminRoutes.addHook("preHandler", requireAdmin());
+      adminRoutes.addHook("preHandler", requireAdmin());
 
-    adminRoutes.get("/health/queues", async () => {
-      const queues = await getQueueStats();
-      return { ok: true, queues };
-    });
-
-    adminRoutes.get("/gemini/capabilities", async () => {
-      const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
-      const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
-      return checkGeminiCapabilities(provider);
-    });
-
-    adminRoutes.get("/config/render-profiles", async () => {
-      const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
-      const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
-      const videoModel = geminiModels(provider).video;
-      const baseConfig = buildProductionCostConfig(videoModel);
-      const defaultProfile = resolveRenderProfile();
-      return {
-        defaultProfileId: defaultProfile.id,
-        profiles: listRenderProfiles().map((profile) => ({
-          id: profile.id,
-          label: profile.label,
-          provider: profile.provider,
-          strategy: profile.strategy,
-          capabilities: profile.capabilities,
-          estimate30sBudget: estimateRunCost(
-            { budgetMode: true, durationSeconds: 30 },
-            profileToProductionCostConfig(profile, baseConfig)
-          )
-        }))
-      };
-    });
-
-    adminRoutes.get("/config/cost", async () => {
-      const tenant = await prisma.tenant.findFirst({ where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" } });
-      const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
-      const videoModel = geminiModels(provider).video;
-      const config = buildProductionCostConfig(videoModel);
-      return {
-        config,
-        examples: {
-          budget30s: estimateRunCost({ budgetMode: true, durationSeconds: 30 }, config),
-          normal30s: estimateRunCost({ budgetMode: false, durationSeconds: 30 }, config)
-        }
-      };
-    });
-
-    adminRoutes.get("/runs/log-matrix", async () => getRunsLogMatrix(100));
-
-    adminRoutes.get("/runs", async () => {
-      const rows = await prisma.projectRun.findMany({
-        include: { stages: true, user: true },
-        orderBy: { updatedAt: "desc" },
-        take: 100
+      adminRoutes.get("/health/queues", async () => {
+        const queues = await getQueueStats();
+        return { ok: true, queues };
       });
-      return rows.map((r) => ({
-        id: r.id,
-        status: r.status,
-        currentStage: r.currentStage,
-        title: (r.brief as { title?: string })?.title ?? "(untitled)",
-        renderProfile: (r.brief as { renderProfile?: string })?.renderProfile ?? null,
-        userEmail: r.user?.email ?? null,
-        updatedAt: r.updatedAt.toISOString()
-      }));
-    });
 
-    adminRoutes.get("/runs/:id", async (request, reply) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      const view = await getRun(id);
-      if (!view) {
-        reply.code(404);
-        return { error: "not_found" };
-      }
-      const ledger = await getRunCostLedger(id);
-      return { ...view, actualTotalNis: ledger.summary.totalNis };
-    });
-
-    adminRoutes.get("/runs/:id/cost-events", async (request, reply) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      const run = await prisma.projectRun.findUnique({ where: { id } });
-      if (!run) {
-        reply.code(404);
-        return { error: "not_found" };
-      }
-      return getRunCostLedger(id);
-    });
-
-    adminRoutes.get("/runs/:id/gemini-operations", async (request) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      const rows = await prisma.artifact.findMany({
-        where: { runId: id, kind: "gemini_operation" },
-        orderBy: { createdAt: "asc" }
+      adminRoutes.get("/gemini/capabilities", async () => {
+        const tenant = await prisma.tenant.findFirst({
+          where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" }
+        });
+        const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
+        return checkGeminiCapabilities(provider);
       });
-      return rows.map((row) => ({
-        id: row.id,
-        stage: row.stage,
-        gcsPath: row.gcsPath,
-        metadata: row.metadata,
-        createdAt: row.createdAt.toISOString()
-      }));
-    });
 
-    adminRoutes.get("/dashboard", async (request) => {
-      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "dashboard");
-      return getAdminDashboard();
-    });
-    adminRoutes.get("/users", async (request) => {
-      const query = z
-        .object({
-          page: z.coerce.number().int().positive().default(1),
-          pageSize: z.coerce.number().int().min(1).max(100).default(25),
-          search: z.string().trim().max(200).optional(),
-          from: z.coerce.date().optional(),
-          to: z.coerce.date().optional()
-        })
-        .parse(request.query);
-      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "users", undefined, {
-        page: query.page,
-        hasSearch: Boolean(query.search)
+      adminRoutes.get("/config/render-profiles", async () => {
+        const tenant = await prisma.tenant.findFirst({
+          where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" }
+        });
+        const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
+        const videoModel = geminiModels(provider).video;
+        const baseConfig = buildProductionCostConfig(videoModel);
+        const defaultProfile = resolveRenderProfile();
+        return {
+          defaultProfileId: defaultProfile.id,
+          profiles: listRenderProfiles().map((profile) => ({
+            id: profile.id,
+            label: profile.label,
+            provider: profile.provider,
+            strategy: profile.strategy,
+            capabilities: profile.capabilities,
+            estimate30sBudget: estimateRunCost(
+              { budgetMode: true, durationSeconds: 30 },
+              profileToProductionCostConfig(profile, baseConfig)
+            )
+          }))
+        };
       });
-      return getAdminUsers(query);
-    });
-    adminRoutes.get("/metrics", async (request) => {
-      const now = new Date();
-      const query = z
-        .object({
-          from: z.coerce.date().default(new Date(now.getTime() - 30 * 86_400_000)),
-          to: z.coerce.date().default(now),
-          bucket: z.enum(["day", "week"]).default("day")
-        })
-        .refine((value) => value.from <= value.to, "from must be before to")
-        .refine((value) => value.to.getTime() - value.from.getTime() <= 366 * 86_400_000, "date range is too large")
-        .parse(request.query);
-      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "metrics", undefined, {
-        from: query.from.toISOString(),
-        to: query.to.toISOString()
-      });
-      return getAdminOperationalMetrics(query.from, query.to, query.bucket);
-    });
 
-    adminRoutes.get("/providers", async (request) => {
-      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "provider_monitor");
-      return prisma.providerMonitor.findMany({
-        orderBy: [{ enabled: "desc" }, { displayName: "asc" }],
-        include: { snapshots: { orderBy: { checkedAt: "desc" }, take: 1 } }
-      });
-    });
-
-    adminRoutes.post("/providers/refresh", async (request) => {
-      await auditAdmin(request.user!.sub, "PROVIDER_MONITOR_REFRESH", "provider_monitor");
-      await pollProviderMonitors();
-      return { ok: true };
-    });
-
-    adminRoutes.patch("/providers/:id/thresholds", async (request, reply) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      const body = z
-        .object({
-          warningThreshold: z.number().nonnegative().nullable(),
-          criticalThreshold: z.number().nonnegative().nullable(),
-          enabled: z.boolean().optional()
-        })
-        .refine(
-          (value) =>
-            value.warningThreshold === null ||
-            value.criticalThreshold === null ||
-            value.criticalThreshold <= value.warningThreshold,
-          "critical threshold must not exceed warning threshold"
-        )
-        .parse(request.body);
-      const updated = await prisma.providerMonitor
-        .update({ where: { id }, data: body })
-        .catch(() => null);
-      if (!updated) return reply.code(404).send({ error: "not_found" });
-      await auditAdmin(request.user!.sub, "PROVIDER_THRESHOLD_UPDATE", "provider_monitor", id, body);
-      return updated;
-    });
-
-    adminRoutes.get("/alerts", async (request) => {
-      const query = z
-        .object({
-          page: z.coerce.number().int().positive().default(1),
-          pageSize: z.coerce.number().int().min(1).max(100).default(25),
-          status: z.enum(["OPEN", "ACKNOWLEDGED", "RESOLVED"]).optional(),
-          search: z.string().trim().max(200).optional()
-        })
-        .parse(request.query);
-      const where = {
-        ...(query.status ? { status: query.status } : {}),
-        ...(query.search
-          ? {
-              OR: [
-                { title: { contains: query.search, mode: "insensitive" as const } },
-                { message: { contains: query.search, mode: "insensitive" as const } }
-              ]
-            }
-          : {})
-      };
-      const [total, items] = await Promise.all([
-        prisma.providerAlert.count({ where }),
-        prisma.providerAlert.findMany({
-          where,
-          include: { monitor: { select: { provider: true, displayName: true, lastErrorCode: true } } },
-          orderBy: { lastSeenAt: "desc" },
-          skip: (query.page - 1) * query.pageSize,
-          take: query.pageSize
-        })
-      ]);
-      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "provider_alert");
-      return { items, total, page: query.page, pageSize: query.pageSize };
-    });
-
-    adminRoutes.post("/alerts/:id/acknowledge", async (request, reply) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      const updated = await prisma.providerAlert
-        .update({
-          where: { id },
-          data: {
-            status: "ACKNOWLEDGED",
-            acknowledgedAt: new Date(),
-            acknowledgedById: request.user!.sub
+      adminRoutes.get("/config/cost", async () => {
+        const tenant = await prisma.tenant.findFirst({
+          where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "demo" }
+        });
+        const provider = tenant ? await createProvidersRepo(tenant.id).primary("GEMINI") : null;
+        const videoModel = geminiModels(provider).video;
+        const config = buildProductionCostConfig(videoModel);
+        return {
+          config,
+          examples: {
+            budget30s: estimateRunCost({ budgetMode: true, durationSeconds: 30 }, config),
+            normal30s: estimateRunCost({ budgetMode: false, durationSeconds: 30 }, config)
           }
-        })
-        .catch(() => null);
-      if (!updated) return reply.code(404).send({ error: "not_found" });
-      await auditAdmin(request.user!.sub, "PROVIDER_ALERT_ACKNOWLEDGE", "provider_alert", id);
-      return updated;
-    });
-
-    adminRoutes.put("/devices/:deviceId/push-token", async (request) => {
-      const { deviceId } = z.object({ deviceId: z.string().min(8).max(200) }).parse(request.params);
-      const { token } = z.object({ token: z.string().min(20).max(4096) }).parse(request.body);
-      await prisma.adminDevice.upsert({
-        where: { userId_deviceId: { userId: request.user!.sub, deviceId } },
-        create: { userId: request.user!.sub, deviceId, fcmToken: token },
-        update: { fcmToken: token, revokedAt: null, lastSeenAt: new Date() }
+        };
       });
-      return { ok: true };
-    });
 
-    adminRoutes.get("/devices", async (request) => {
-      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "admin_device");
-      return prisma.adminDevice.findMany({
-        where: { user: { role: "ADMIN" } },
-        select: {
-          id: true,
-          userId: true,
-          deviceId: true,
-          platform: true,
-          lastSeenAt: true,
-          revokedAt: true,
-          user: { select: { email: true } }
-        },
-        orderBy: { lastSeenAt: "desc" }
+      adminRoutes.get("/runs/log-matrix", async () => getRunsLogMatrix(100));
+
+      adminRoutes.get("/runs", async () => {
+        const rows = await prisma.projectRun.findMany({
+          include: { stages: true, user: true },
+          orderBy: { updatedAt: "desc" },
+          take: 100
+        });
+        return rows.map((r) => ({
+          id: r.id,
+          status: r.status,
+          currentStage: r.currentStage,
+          title: (r.brief as { title?: string })?.title ?? "(untitled)",
+          renderProfile: (r.brief as { renderProfile?: string })?.renderProfile ?? null,
+          userEmail: r.user?.email ?? null,
+          updatedAt: r.updatedAt.toISOString()
+        }));
       });
-    });
 
-    adminRoutes.delete("/devices/:deviceId", async (request) => {
-      const { deviceId } = z.object({ deviceId: z.string().min(8).max(200) }).parse(request.params);
-      const now = new Date();
-      await prisma.$transaction([
-        prisma.adminDevice.updateMany({
-          where: { deviceId },
-          data: { revokedAt: now, fcmToken: null }
-        }),
-        prisma.mobileRefreshToken.updateMany({
-          where: { deviceId, revokedAt: null },
-          data: { revokedAt: now }
-        })
-      ]);
-      await auditAdmin(request.user!.sub, "ADMIN_DEVICE_REVOKE", "admin_device", deviceId);
-      return { ok: true };
-    });
-
-    adminRoutes.post("/providers/:provider/billing-link", async (request, reply) => {
-      const { provider } = z.object({ provider: z.string().regex(/^[a-z0-9-]+$/) }).parse(request.params);
-      const url = officialBillingUrl(provider);
-      if (!url) return reply.code(404).send({ error: "billing_link_unavailable" });
-      await auditAdmin(request.user!.sub, "PROVIDER_BILLING_OPEN", "provider_monitor", provider);
-      return { url };
-    });
-    adminRoutes.get("/users/:id/pnl", async (request, reply) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "user_pnl", id);
-      const pnl = await getAdminUserPnl(id);
-      if (!pnl) {
-        reply.code(404);
-        return { error: "not_found" };
-      }
-      return pnl;
-    });
-
-    adminRoutes.post("/users/:id/credits", async (request) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      const body = z.object({ delta: z.number(), note: z.string().default("") }).parse(request.body);
-      const balance = await adminAdjustCredits(id, body.delta, body.note);
-      await auditAdmin(request.user!.sub, "ADMIN_CREDIT_ADJUST", "user", id, {
-        delta: body.delta,
-        note: body.note.slice(0, 200)
+      adminRoutes.get("/runs/:id", async (request, reply) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        const view = await getRun(id);
+        if (!view) {
+          reply.code(404);
+          return { error: "not_found" };
+        }
+        const ledger = await getRunCostLedger(id);
+        return { ...view, actualTotalNis: ledger.summary.totalNis };
       });
-      return { balance };
-    });
 
-    adminRoutes.patch("/users/:id", async (request, reply) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      const body = AdminUserUpdateSchema.parse(request.body);
-      try {
-        const updated = await updateAdminUser(id, body);
-        await auditAdmin(request.user!.sub, "ADMIN_USER_UPDATE", "user", id, {
+      adminRoutes.get("/runs/:id/cost-events", async (request, reply) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        const run = await prisma.projectRun.findUnique({ where: { id } });
+        if (!run) {
+          reply.code(404);
+          return { error: "not_found" };
+        }
+        return getRunCostLedger(id);
+      });
+
+      adminRoutes.get("/runs/:id/gemini-operations", async (request) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        const rows = await prisma.artifact.findMany({
+          where: { runId: id, kind: "gemini_operation" },
+          orderBy: { createdAt: "asc" }
+        });
+        return rows.map((row) => ({
+          id: row.id,
+          stage: row.stage,
+          gcsPath: row.gcsPath,
+          metadata: row.metadata,
+          createdAt: row.createdAt.toISOString()
+        }));
+      });
+
+      adminRoutes.get("/dashboard", async (request) => {
+        await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "dashboard");
+        return getAdminDashboard();
+      });
+      adminRoutes.get("/users", async (request) => {
+        const query = z
+          .object({
+            page: z.coerce.number().int().positive().default(1),
+            pageSize: z.coerce.number().int().min(1).max(100).default(25),
+            search: z.string().trim().max(200).optional(),
+            from: z.coerce.date().optional(),
+            to: z.coerce.date().optional()
+          })
+          .parse(request.query);
+        await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "users", undefined, {
+          page: query.page,
+          hasSearch: Boolean(query.search)
+        });
+        return getAdminUsers(query);
+      });
+      adminRoutes.get("/metrics", async (request) => {
+        const now = new Date();
+        const query = z
+          .object({
+            from: z.coerce.date().default(new Date(now.getTime() - 30 * 86_400_000)),
+            to: z.coerce.date().default(now),
+            bucket: z.enum(["day", "week"]).default("day")
+          })
+          .refine((value) => value.from <= value.to, "from must be before to")
+          .refine(
+            (value) => value.to.getTime() - value.from.getTime() <= 366 * 86_400_000,
+            "date range is too large"
+          )
+          .parse(request.query);
+        await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "metrics", undefined, {
+          from: query.from.toISOString(),
+          to: query.to.toISOString()
+        });
+        return getAdminOperationalMetrics(query.from, query.to, query.bucket);
+      });
+
+      adminRoutes.get("/providers", async (request) => {
+        await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "provider_monitor");
+        const inventory = await getProviderInventory();
+        const rows = await prisma.providerMonitor.findMany({
+          where: { provider: { in: inventory.map((entry) => entry.provider) } },
+          include: { snapshots: { orderBy: { checkedAt: "desc" }, take: 1 } }
+        });
+        const byProvider = new Map(rows.map((row) => [row.provider, row]));
+        return inventory.map((entry) => {
+          const row = byProvider.get(entry.provider);
+          const apiSelfCheck = entry.provider === "api";
+          const now = new Date();
+          return {
+            id: row?.id ?? `inventory-${entry.provider}`,
+            provider: entry.provider,
+            displayName: entry.displayName,
+            category: entry.category,
+            company: entry.company,
+            capability: entry.capability,
+            configured: entry.configured,
+            expectedFromRecentUsage: entry.expectedFromRecentUsage,
+            metricType: row?.metricType ?? "SERVICE_HEALTH",
+            unit: row?.unit ?? null,
+            lastValue: row?.lastValue ?? null,
+            lastCheckedAt: apiSelfCheck ? now : (row?.lastCheckedAt ?? null),
+            warningThreshold: row?.warningThreshold ?? null,
+            criticalThreshold: row?.criticalThreshold ?? null,
+            estimatedRunwayHours: row?.estimatedRunwayHours ?? null,
+            source: apiSelfCheck ? "api_request_self_check" : (row?.source ?? "inventory"),
+            sourceRealtime: apiSelfCheck || (row?.sourceRealtime ?? false),
+            lastErrorMessage: apiSelfCheck
+              ? null
+              : (row?.lastErrorMessage ??
+                (!entry.configured && entry.expectedFromRecentUsage
+                  ? "Recent usage exists but no active credential was found."
+                  : null)),
+            lastErrorCode: apiSelfCheck
+              ? null
+              : (row?.lastErrorCode ??
+                (!entry.configured && entry.expectedFromRecentUsage ? "not_configured" : null)),
+            billingUrl: row?.billingUrl ?? officialBillingUrl(entry.provider),
+            enabled: row?.enabled ?? true,
+            snapshots: apiSelfCheck
+              ? [
+                  {
+                    healthy: true,
+                    checkedAt: now,
+                    details: { operationalStatus: "HEALTHY", runtime: "api" },
+                    errorCode: null,
+                    errorMessage: null
+                  }
+                ]
+              : (row?.snapshots ?? [])
+          };
+        });
+      });
+
+      adminRoutes.post("/providers/refresh", async (request) => {
+        await auditAdmin(request.user!.sub, "PROVIDER_MONITOR_REFRESH", "provider_monitor");
+        await pollProviderMonitors(undefined, "api");
+        return { ok: true };
+      });
+
+      adminRoutes.patch("/providers/:id/thresholds", async (request, reply) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        const body = z
+          .object({
+            warningThreshold: z.number().nonnegative().nullable(),
+            criticalThreshold: z.number().nonnegative().nullable(),
+            enabled: z.boolean().optional()
+          })
+          .refine(
+            (value) =>
+              value.warningThreshold === null ||
+              value.criticalThreshold === null ||
+              value.criticalThreshold <= value.warningThreshold,
+            "critical threshold must not exceed warning threshold"
+          )
+          .parse(request.body);
+        const updated = await prisma.providerMonitor.update({ where: { id }, data: body }).catch(() => null);
+        if (!updated) return reply.code(404).send({ error: "not_found" });
+        await auditAdmin(request.user!.sub, "PROVIDER_THRESHOLD_UPDATE", "provider_monitor", id, body);
+        return updated;
+      });
+
+      adminRoutes.get("/alerts", async (request) => {
+        const inventory = await getProviderInventory();
+        const query = z
+          .object({
+            page: z.coerce.number().int().positive().default(1),
+            pageSize: z.coerce.number().int().min(1).max(100).default(25),
+            status: z.enum(["OPEN", "ACKNOWLEDGED", "RESOLVED"]).optional(),
+            search: z.string().trim().max(200).optional()
+          })
+          .parse(request.query);
+        const where = {
+          // A successful authenticated request to this route is the authoritative API
+          // self-check. Legacy worker-to-localhost API alerts are therefore excluded.
+          monitor: {
+            provider: {
+              in: inventory.map((entry) => entry.provider).filter((provider) => provider !== "api")
+            }
+          },
+          ...(query.status ? { status: query.status } : {}),
+          ...(query.search
+            ? {
+                OR: [
+                  { title: { contains: query.search, mode: "insensitive" as const } },
+                  { message: { contains: query.search, mode: "insensitive" as const } }
+                ]
+              }
+            : {})
+        };
+        const [total, items] = await Promise.all([
+          prisma.providerAlert.count({ where }),
+          prisma.providerAlert.findMany({
+            where,
+            include: { monitor: { select: { provider: true, displayName: true, lastErrorCode: true } } },
+            orderBy: { lastSeenAt: "desc" },
+            skip: (query.page - 1) * query.pageSize,
+            take: query.pageSize
+          })
+        ]);
+        await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "provider_alert");
+        return { items, total, page: query.page, pageSize: query.pageSize };
+      });
+
+      adminRoutes.post("/alerts/:id/acknowledge", async (request, reply) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        const updated = await prisma.providerAlert
+          .update({
+            where: { id },
+            data: {
+              status: "ACKNOWLEDGED",
+              acknowledgedAt: new Date(),
+              acknowledgedById: request.user!.sub
+            }
+          })
+          .catch(() => null);
+        if (!updated) return reply.code(404).send({ error: "not_found" });
+        await auditAdmin(request.user!.sub, "PROVIDER_ALERT_ACKNOWLEDGE", "provider_alert", id);
+        return updated;
+      });
+
+      adminRoutes.put("/devices/:deviceId/push-token", async (request) => {
+        const { deviceId } = z.object({ deviceId: z.string().min(8).max(200) }).parse(request.params);
+        const { token } = z.object({ token: z.string().min(20).max(4096) }).parse(request.body);
+        await prisma.adminDevice.upsert({
+          where: { userId_deviceId: { userId: request.user!.sub, deviceId } },
+          create: { userId: request.user!.sub, deviceId, fcmToken: token },
+          update: { fcmToken: token, revokedAt: null, lastSeenAt: new Date() }
+        });
+        return { ok: true };
+      });
+
+      adminRoutes.get("/devices", async (request) => {
+        await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "admin_device");
+        return prisma.adminDevice.findMany({
+          where: { user: { role: "ADMIN" } },
+          select: {
+            id: true,
+            userId: true,
+            deviceId: true,
+            platform: true,
+            lastSeenAt: true,
+            revokedAt: true,
+            user: { select: { email: true } }
+          },
+          orderBy: { lastSeenAt: "desc" }
+        });
+      });
+
+      adminRoutes.delete("/devices/:deviceId", async (request) => {
+        const { deviceId } = z.object({ deviceId: z.string().min(8).max(200) }).parse(request.params);
+        const now = new Date();
+        await prisma.$transaction([
+          prisma.adminDevice.updateMany({
+            where: { deviceId },
+            data: { revokedAt: now, fcmToken: null }
+          }),
+          prisma.mobileRefreshToken.updateMany({
+            where: { deviceId, revokedAt: null },
+            data: { revokedAt: now }
+          })
+        ]);
+        await auditAdmin(request.user!.sub, "ADMIN_DEVICE_REVOKE", "admin_device", deviceId);
+        return { ok: true };
+      });
+
+      adminRoutes.post("/providers/:provider/billing-link", async (request, reply) => {
+        const { provider } = z.object({ provider: z.string().regex(/^[a-z0-9-]+$/) }).parse(request.params);
+        const url = officialBillingUrl(provider);
+        if (!url) return reply.code(404).send({ error: "billing_link_unavailable" });
+        await auditAdmin(request.user!.sub, "PROVIDER_BILLING_OPEN", "provider_monitor", provider);
+        return { url };
+      });
+      adminRoutes.get("/users/:id/pnl", async (request, reply) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "user_pnl", id);
+        const pnl = await getAdminUserPnl(id);
+        if (!pnl) {
+          reply.code(404);
+          return { error: "not_found" };
+        }
+        return pnl;
+      });
+
+      adminRoutes.post("/users/:id/credits", async (request) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        const body = z.object({ delta: z.number(), note: z.string().default("") }).parse(request.body);
+        const balance = await adminAdjustCredits(id, body.delta, body.note);
+        await auditAdmin(request.user!.sub, "ADMIN_CREDIT_ADJUST", "user", id, {
+          delta: body.delta,
+          note: body.note.slice(0, 200)
+        });
+        return { balance };
+      });
+
+      adminRoutes.patch("/users/:id", async (request, reply) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        const body = AdminUserUpdateSchema.parse(request.body);
+        try {
+          const updated = await updateAdminUser(id, body);
+          await auditAdmin(request.user!.sub, "ADMIN_USER_UPDATE", "user", id, {
+            fields: Object.keys(body)
+          });
+          return updated;
+        } catch {
+          reply.code(404);
+          return { error: "not_found" };
+        }
+      });
+
+      adminRoutes.get("/settings", async (request) => {
+        await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "platform_settings");
+        return getPlatformSettings();
+      });
+
+      adminRoutes.patch("/settings", async (request) => {
+        const body = PlatformSettingsPatchSchema.parse(request.body);
+        const updated = await updatePlatformSettings(body);
+        await auditAdmin(request.user!.sub, "ADMIN_SETTINGS_UPDATE", "platform_settings", "platform", {
           fields: Object.keys(body)
         });
         return updated;
-      } catch {
-        reply.code(404);
-        return { error: "not_found" };
-      }
-    });
-
-    adminRoutes.get("/settings", async (request) => {
-      await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "platform_settings");
-      return getPlatformSettings();
-    });
-
-    adminRoutes.patch("/settings", async (request) => {
-      const body = PlatformSettingsPatchSchema.parse(request.body);
-      const updated = await updatePlatformSettings(body);
-      await auditAdmin(request.user!.sub, "ADMIN_SETTINGS_UPDATE", "platform_settings", "platform", {
-        fields: Object.keys(body)
       });
-      return updated;
-    });
 
-    adminRoutes.get("/creative-catalog", async () => getAdminCreativeCatalog());
-    adminRoutes.post("/creative-catalog/fields", async (request) => {
-      await createCreativeField(CreativeFieldCreateSchema.parse(request.body));
-      return getAdminCreativeCatalog();
-    });
-    adminRoutes.patch("/creative-catalog/fields/:id", async (request) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      await updateCreativeField(id, CreativeFieldUpdateSchema.parse(request.body));
-      return getAdminCreativeCatalog();
-    });
-    adminRoutes.patch("/creative-catalog/fields/:id/active", async (request) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      const { active } = CreativeActivePatchSchema.parse(request.body);
-      await setCreativeFieldActive(id, active);
-      return getAdminCreativeCatalog();
-    });
-    adminRoutes.delete("/creative-catalog/fields/:id", async (request) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      await deleteCreativeField(id);
-      return getAdminCreativeCatalog();
-    });
-    adminRoutes.post("/creative-catalog/fields/reorder", async (request) => {
-      await reorderCreativeFields(CreativeReorderSchema.parse(request.body).ids);
-      return getAdminCreativeCatalog();
-    });
-    adminRoutes.post("/creative-catalog/fields/:fieldId/options", async (request) => {
-      const { fieldId } = z.object({ fieldId: z.string() }).parse(request.params);
-      await createCreativeOption(fieldId, CreativeOptionCreateSchema.parse(request.body));
-      return getAdminCreativeCatalog();
-    });
-    adminRoutes.patch("/creative-catalog/options/:id", async (request) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      await updateCreativeOption(id, CreativeOptionUpdateSchema.parse(request.body));
-      return getAdminCreativeCatalog();
-    });
-    adminRoutes.patch("/creative-catalog/options/:id/active", async (request) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      const { active } = CreativeActivePatchSchema.parse(request.body);
-      await setCreativeOptionActive(id, active);
-      return getAdminCreativeCatalog();
-    });
-    adminRoutes.delete("/creative-catalog/options/:id", async (request) => {
-      const { id } = z.object({ id: z.string() }).parse(request.params);
-      await deleteCreativeOption(id);
-      return getAdminCreativeCatalog();
-    });
-    adminRoutes.post("/creative-catalog/fields/:fieldId/options/reorder", async (request) => {
-      const { fieldId } = z.object({ fieldId: z.string() }).parse(request.params);
-      await reorderCreativeOptions(fieldId, CreativeReorderSchema.parse(request.body).ids);
-      return getAdminCreativeCatalog();
-    });
-  },
+      adminRoutes.get("/creative-catalog", async () => getAdminCreativeCatalog());
+      adminRoutes.post("/creative-catalog/fields", async (request) => {
+        await createCreativeField(CreativeFieldCreateSchema.parse(request.body));
+        return getAdminCreativeCatalog();
+      });
+      adminRoutes.patch("/creative-catalog/fields/:id", async (request) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        await updateCreativeField(id, CreativeFieldUpdateSchema.parse(request.body));
+        return getAdminCreativeCatalog();
+      });
+      adminRoutes.patch("/creative-catalog/fields/:id/active", async (request) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        const { active } = CreativeActivePatchSchema.parse(request.body);
+        await setCreativeFieldActive(id, active);
+        return getAdminCreativeCatalog();
+      });
+      adminRoutes.delete("/creative-catalog/fields/:id", async (request) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        await deleteCreativeField(id);
+        return getAdminCreativeCatalog();
+      });
+      adminRoutes.post("/creative-catalog/fields/reorder", async (request) => {
+        await reorderCreativeFields(CreativeReorderSchema.parse(request.body).ids);
+        return getAdminCreativeCatalog();
+      });
+      adminRoutes.post("/creative-catalog/fields/:fieldId/options", async (request) => {
+        const { fieldId } = z.object({ fieldId: z.string() }).parse(request.params);
+        await createCreativeOption(fieldId, CreativeOptionCreateSchema.parse(request.body));
+        return getAdminCreativeCatalog();
+      });
+      adminRoutes.patch("/creative-catalog/options/:id", async (request) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        await updateCreativeOption(id, CreativeOptionUpdateSchema.parse(request.body));
+        return getAdminCreativeCatalog();
+      });
+      adminRoutes.patch("/creative-catalog/options/:id/active", async (request) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        const { active } = CreativeActivePatchSchema.parse(request.body);
+        await setCreativeOptionActive(id, active);
+        return getAdminCreativeCatalog();
+      });
+      adminRoutes.delete("/creative-catalog/options/:id", async (request) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        await deleteCreativeOption(id);
+        return getAdminCreativeCatalog();
+      });
+      adminRoutes.post("/creative-catalog/fields/:fieldId/options/reorder", async (request) => {
+        const { fieldId } = z.object({ fieldId: z.string() }).parse(request.params);
+        await reorderCreativeOptions(fieldId, CreativeReorderSchema.parse(request.body).ids);
+        return getAdminCreativeCatalog();
+      });
+    },
     { prefix: "/admin" }
   );
 }

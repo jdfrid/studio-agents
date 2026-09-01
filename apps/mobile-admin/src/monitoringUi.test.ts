@@ -7,6 +7,11 @@ function monitor(overrides: Partial<ProviderMonitor> = {}): ProviderMonitor {
     id: "monitor-1",
     provider: "elevenlabs",
     displayName: "ElevenLabs",
+    category: "PAID_PROVIDER",
+    company: "ElevenLabs",
+    capability: "קריינות",
+    configured: true,
+    expectedFromRecentUsage: false,
     metricType: "QUOTA",
     unit: "characters",
     lastValue: null,
@@ -20,7 +25,9 @@ function monitor(overrides: Partial<ProviderMonitor> = {}): ProviderMonitor {
     lastErrorCode: null,
     billingUrl: null,
     enabled: true,
-    snapshots: [{ healthy: true, checkedAt: "2026-09-01T12:00:00Z", details: {}, errorCode: null, errorMessage: null }],
+    snapshots: [
+      { healthy: true, checkedAt: "2026-09-01T12:00:00Z", details: {}, errorCode: null, errorMessage: null }
+    ],
     ...overrides
   };
 }
@@ -34,7 +41,17 @@ describe("mobile monitoring UI", () => {
   it("treats an optional unconfigured provider as inactive", () => {
     expect(
       monitorRisk(
-        monitor({ snapshots: [{ healthy: true, checkedAt: "", details: { operationalStatus: "DISABLED" }, errorCode: null, errorMessage: null }] })
+        monitor({
+          snapshots: [
+            {
+              healthy: true,
+              checkedAt: "",
+              details: { operationalStatus: "DISABLED" },
+              errorCode: null,
+              errorMessage: null
+            }
+          ]
+        })
       ).label
     ).toBe("לא פעיל");
   });
@@ -53,6 +70,23 @@ describe("mobile monitoring UI", () => {
       monitor: { provider: "gcs", displayName: "Google Cloud Storage" }
     } satisfies ProviderAlert;
     expect(localizedAlert(alert).message).toContain("להעלות קבצים");
-    expect(providerLabel("gcs")).toBe("אחסון Google Cloud");
+    expect(providerLabel("gcs")).toContain("Google Cloud Storage");
+  });
+
+  it("never describes an internal API failure as a balance problem", () => {
+    const alert = {
+      id: "alert-api",
+      severity: "CRITICAL",
+      status: "OPEN",
+      title: "api failed",
+      message: "fetch failed",
+      recommendedAction: null,
+      lastSeenAt: "2026-09-01T12:00:00Z",
+      occurrenceCount: 1,
+      metadata: { technicalMessage: "fetch failed", errorCode: "monitor_failed" },
+      monitor: { provider: "api", displayName: "API" }
+    } satisfies ProviderAlert;
+    expect(localizedAlert(alert).title).toContain("תשתית Prompt2Spot");
+    expect(localizedAlert(alert).message).toContain("אינה בעיית יתרה");
   });
 });

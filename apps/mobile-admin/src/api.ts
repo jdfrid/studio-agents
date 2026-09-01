@@ -26,6 +26,11 @@ export interface ProviderMonitor {
   id: string;
   provider: string;
   displayName: string;
+  category: "PAID_PROVIDER" | "SYSTEM_INFRASTRUCTURE";
+  company: string;
+  capability: string;
+  configured: boolean;
+  expectedFromRecentUsage: boolean;
   metricType: string;
   unit: string | null;
   lastValue: number | null;

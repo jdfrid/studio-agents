@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildProviderInventory,
   calculateRunwayHours,
   officialBillingUrl,
   parseHeygenBilling,
@@ -15,7 +16,9 @@ describe("provider monitoring", () => {
   });
 
   it("prioritizes provider failures and critical thresholds", () => {
-    expect(severityForReading({ healthy: false, value: null }, { warning: 20, critical: 10 })).toBe("CRITICAL");
+    expect(severityForReading({ healthy: false, value: null }, { warning: 20, critical: 10 })).toBe(
+      "CRITICAL"
+    );
     expect(severityForReading({ healthy: true, value: 8 }, { warning: 20, critical: 10 })).toBe("CRITICAL");
     expect(severityForReading({ healthy: true, value: 15 }, { warning: 20, critical: 10 })).toBe("WARNING");
     expect(severityForReading({ healthy: true, value: 30 }, { warning: 20, critical: 10 })).toBeNull();
@@ -39,8 +42,8 @@ describe("provider monitoring", () => {
   });
 
   it("uses clear Hebrew provider names", () => {
-    expect(providerNameHe("gcs")).toBe("אחסון Google Cloud");
-    expect(providerNameHe("api")).toBe("שרת ה‑API");
+    expect(providerNameHe("gcs")).toBe("Google Cloud Storage");
+    expect(providerNameHe("api")).toContain("תשתית Prompt2Spot");
   });
 
   it("distinguishes HeyGen wallet money from subscription credits", () => {
@@ -57,5 +60,22 @@ describe("provider monitoring", () => {
         }
       })
     ).toMatchObject({ metricType: "QUOTA", value: 12, unit: "credits" });
+  });
+
+  it("builds a deterministic inventory from env, DB credentials and recent usage", () => {
+    const inventory = buildProviderInventory(
+      [{ provider: "Anthropic", displayName: "Claude", enabled: true, encryptedKey: "encrypted" }],
+      [
+        { activityType: "veo_video", model: "fal-ai/kling-video", metadata: {} },
+        { activityType: "gemini_text", model: "gemini-2.5-pro", metadata: {} }
+      ],
+      { ELEVENLABS_API_KEY: "configured" }
+    );
+    expect(inventory.map((entry) => entry.provider)).toEqual(["gemini", "fal", "elevenlabs", "anthropic"]);
+    expect(inventory.find((entry) => entry.provider === "fal")).toMatchObject({
+      configured: false,
+      expectedFromRecentUsage: true
+    });
+    expect(inventory.some((entry) => entry.provider === "lemonsqueezy")).toBe(false);
   });
 });
