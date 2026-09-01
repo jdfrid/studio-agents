@@ -183,19 +183,89 @@ export function isolateLtrRuns(text: string): string {
   return text.replace(/[A-Za-z0-9][A-Za-z0-9.,:%+/#@_-]*/g, (run) => `${LRI}${run}${PDI}`);
 }
 
+const RLE = "\u202B";
+const PDF = "\u202C";
+const RTL_SCRIPT = /[\u0590-\u08FF]/;
+
+export function isRtlRenderedText(text: string, language?: string | null): boolean {
+  return isRtlContentLanguage(language) || RTL_SCRIPT.test(text);
+}
+
+/** Preserve logical input order and let libass/FriBidi perform visual RTL layout. */
+export function assBidiText(text: string, language?: string | null, rtl?: boolean): string {
+  const useRtl = rtl ?? isRtlRenderedText(text, language);
+  const escaped = escapeAss(text.trim() || " ");
+  return useRtl ? `${RLE}${isolateLtrRuns(escaped)}${PDF}` : escaped;
+}
+
+export type RenderedTextLayer = {
+  text: string;
+  startSecond?: number;
+  endSecond: number;
+  fontSize: number;
+  fontName?: string;
+  color?: string;
+  bold?: boolean;
+  alignment: number;
+  marginL?: number;
+  marginR?: number;
+  marginV?: number;
+  x?: number;
+  y?: number;
+  angle?: number;
+};
+
+/** ASS document for generated titles, lower thirds, watermarks and end-card copy. */
+export function buildRenderedTextAss(
+  input: {
+    width: number;
+    height: number;
+    layers: RenderedTextLayer[];
+    language?: string | null;
+  },
+  opts?: { fontName?: string; rtl?: boolean }
+): string {
+  const defaultFont = opts?.fontName ?? "Arial";
+  const styles = input.layers
+    .map((layer, index) => {
+      const font = layer.fontName ?? defaultFont;
+      return `Style: Text${index},${font},${layer.fontSize},${layer.color ?? "&H00FFFFFF"},&H00FFFFFF,&H80000000,&H64000000,${layer.bold === false ? 0 : -1},0,0,0,100,100,0,${layer.angle ?? 0},1,2,0,${layer.alignment},${layer.marginL ?? 0},${layer.marginR ?? 0},${layer.marginV ?? 0},1`;
+    })
+    .join("\n");
+  const events = input.layers
+    .map((layer, index) => {
+      const position =
+        Number.isFinite(layer.x) && Number.isFinite(layer.y) ? `{\\pos(${layer.x},${layer.y})}` : "";
+      const text = assBidiText(layer.text, input.language, opts?.rtl);
+      return `Dialogue: 0,${assTime(layer.startSecond ?? 0)},${assTime(layer.endSecond)},Text${index},,0,0,0,,${position}${text}`;
+    })
+    .join("\n");
+  return `[Script Info]
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+PlayResX: ${input.width}
+PlayResY: ${input.height}
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+${styles}
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+${events}
+`;
+}
+
 /** Simple centered title card ASS (avoids fragile drawtext -vf chains). */
 export function buildTitleCardAss(
   input: { headline: string; subtitle?: string; durationSeconds: number; width: number; height: number },
-  opts?: { fontName?: string; rtl?: boolean }
+  opts?: { fontName?: string; rtl?: boolean; language?: string | null }
 ): string {
   const font = opts?.fontName ?? "Arial";
   const dur = Math.max(1, input.durationSeconds);
-  const rtl = Boolean(opts?.rtl);
-  const RLE = "\u202B";
-  const PDF = "\u202C";
-  const wrap = (t: string) => (rtl ? `${RLE}${t}${PDF}` : t);
-  const headline = wrap(escapeAss(input.headline.trim() || " "));
-  const subtitle = input.subtitle?.trim() ? wrap(escapeAss(input.subtitle.trim())) : "";
+  const headline = assBidiText(input.headline, opts?.language, opts?.rtl);
+  const subtitle = input.subtitle?.trim() ? assBidiText(input.subtitle, opts?.language, opts?.rtl) : "";
   const titleSize = Math.max(36, Math.round(Math.min(input.width, input.height) * 0.07));
   const subSize = Math.max(22, Math.round(Math.min(input.width, input.height) * 0.038));
   return `[Script Info]

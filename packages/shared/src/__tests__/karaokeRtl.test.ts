@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildKaraokeAss,
   buildKaraokeCues,
+  buildRenderedTextAss,
+  buildTitleCardAss,
   isRtlContentLanguage,
+  isRtlRenderedText,
   isolateLtrRuns,
   stripNiqqud
 } from "../karaokeCaptions.js";
@@ -44,6 +47,56 @@ describe("RTL karaoke", () => {
     const cues = buildKaraokeCues("Hello world", 0, 2);
     const ass = buildKaraokeAss(cues, { language: "en" });
     expect(ass).not.toContain("\u202B");
+  });
+});
+
+describe("RTL generated text layers", () => {
+  it("keeps Hebrew title-card headline and subtitle logical and bidi-correct", () => {
+    const ass = buildTitleCardAss(
+      {
+        headline: "כותרת מבצע 25%",
+        subtitle: "חדש ב-iPhone-15",
+        durationSeconds: 4,
+        width: 1080,
+        height: 1920
+      },
+      { language: "he" }
+    );
+    expect(ass).toContain("\u202Bכותרת מבצע \u206625%\u2069\u202C");
+    expect(ass).toContain("\u202Bחדש ב-\u2066iPhone-15\u2069\u202C");
+  });
+
+  it("right-aligns Hebrew lower-third title and brand", () => {
+    expect(isRtlRenderedText("הכותרת", undefined)).toBe(true);
+    expect(isRtlRenderedText("Brand", "en")).toBe(false);
+    const ass = buildRenderedTextAss({
+      width: 1080,
+      height: 1920,
+      language: "he",
+      layers: [
+        { text: "הכותרת", endSecond: 2.8, fontSize: 44, alignment: 9, x: 1026, y: 1700 },
+        { text: "מותג 360", endSecond: 2.8, fontSize: 30, alignment: 9, x: 1026, y: 1760 }
+      ]
+    });
+    expect(ass).toContain(",9,0,0,0,1");
+    expect(ass).toContain("{\\pos(1026,1700)}\u202Bהכותרת\u202C");
+    expect(ass).toContain("\u202Bמותג \u2066360\u2069\u202C");
+  });
+
+  it("keeps English generated titles LTR", () => {
+    const ass = buildTitleCardAss(
+      {
+        headline: "Summer Sale 25%",
+        subtitle: "Made for iPhone-15",
+        durationSeconds: 4,
+        width: 1920,
+        height: 1080
+      },
+      { language: "en" }
+    );
+    expect(ass).not.toContain("\u202B");
+    expect(ass).not.toContain("\u2066");
+    expect(ass).toContain("Summer Sale 25%");
   });
 });
 

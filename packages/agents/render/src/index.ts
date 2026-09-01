@@ -11,8 +11,10 @@ import {
   RenderInputSchema,
   RenderOutputSchema,
   buildKaraokeAss,
+  buildRenderedTextAss,
   buildTitleCardAss,
   getRenderProfile,
+  isRtlRenderedText,
   resolveSubtitleStyle,
   sanitizeVeoPromptForExternalAudio,
   usesFalVideoProvider,
@@ -113,7 +115,9 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       const renderMulticlipScene = async (scene: SceneTimelineEntry): Promise<MulticlipSceneOut> => {
         const isTitleCard = scene.sceneKind === "title_card";
         const promptHash = stablePromptHash(
-          isTitleCard ? `title_card:${scene.title}:${scene.visualPrompt}` : scene.veoPrompt
+          isTitleCard
+            ? `title_card:${input.language ?? ""}:${scene.title}:${scene.visualPrompt}`
+            : scene.veoPrompt
         );
         await ctx.log.log("render_scene_start", "Rendering scene", {
           sceneId: scene.sceneId,
@@ -152,7 +156,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         }
 
         if (isTitleCard) {
-          const titlePath = await createTitleCardClip(dir, dimensions, scene);
+          const titlePath = await createTitleCardClip(dir, dimensions, scene, input.language);
           const finalizedTitle = await finalizeSceneClip(titlePath, dir, scene.sceneId, dimensions);
           const scenePath = finalizedTitle.path;
           const clipArtifact = await ctx.artifacts.save({
@@ -358,7 +362,8 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         dimensions,
         input.branding ?? null,
         ctx.storage,
-        input.brandEndVoice ?? null
+        input.brandEndVoice ?? null,
+        input.language
       );
 
       const outputScale = Number(process.env.RENDER_OUTPUT_SCALE ?? 0);
@@ -596,7 +601,8 @@ async function renderExtendChain(
     dimensions,
     input.branding ?? null,
     ctx.storage,
-    input.brandEndVoice ?? null
+    input.brandEndVoice ?? null,
+    input.language
   );
 
   const outputScale = Number(process.env.RENDER_OUTPUT_SCALE ?? 0);
@@ -1292,7 +1298,8 @@ async function createBusinessEndCardClip(
   dimensions: VideoDimensions,
   branding: BriefBrandingOutput,
   storage: GcsClient,
-  brandVoice?: { gcsPath: string; durationSeconds?: number | null } | null
+  brandVoice?: { gcsPath: string; durationSeconds?: number | null } | null,
+  language?: string | null
 ): Promise<string> {
   const endClip = path.join(dir, `biz-end-${nanoid(4)}.mp4`);
   const { width, height } = dimensions;
@@ -1300,7 +1307,6 @@ async function createBusinessEndCardClip(
   const slogan = branding.slogan?.trim() || "";
   const website = (branding.websiteUrl?.trim() || "").replace(/^https?:\/\//i, "");
   const font = resolveDrawtextFont();
-  const fontOpt = font ? `:fontfile='${font.replace(/\\/g, "/").replace(/:/g, "\\:")}'` : "";
   const nameSize = Math.max(28, Math.round(Math.min(width, height) * 0.06));
   const sloganSize = Math.max(18, Math.round(Math.min(width, height) * 0.035));
   const urlSize = Math.max(16, Math.round(Math.min(width, height) * 0.032));
@@ -1331,35 +1337,69 @@ async function createBusinessEndCardClip(
     await downloadMediaToFile(storage, brandVoice.gcsPath, voiceLocal);
   }
 
-  const drawParts: string[] = [];
+  const layers: Parameters<typeof buildRenderedTextAss>[0]["layers"] = [];
   if (name) {
-    const y = hasLogo ? `(h/2)+${Math.round(logoMax * 0.55)}` : `(h-text_h)/2-${Math.round(nameSize * 0.4)}`;
-    drawParts.push(
-      `drawtext=text='${escapeDrawtext(name)}'${fontOpt}:fontsize=${nameSize}:fontcolor=white:x=(w-text_w)/2:y=${y}`
-    );
+    const y = hasLogo
+      ? Math.round(height / 2 + logoMax * 0.55)
+      : Math.round(height / 2 - nameSize * 0.4);
+    layers.push({ text: name, endSecond: cardSeconds, fontSize: nameSize, alignment: 8, x: width / 2, y });
   }
   if (slogan) {
     const y = hasLogo
-      ? `(h/2)+${Math.round(logoMax * 0.55 + nameSize * 1.35)}`
+      ? Math.round(height / 2 + logoMax * 0.55 + nameSize * 1.35)
       : name
-        ? `(h-text_h)/2+${Math.round(nameSize * 0.9)}`
-        : `(h-text_h)/2`;
-    drawParts.push(
-      `drawtext=text='${escapeDrawtext(slogan)}'${fontOpt}:fontsize=${sloganSize}:fontcolor=white@0.88:x=(w-text_w)/2:y=${y}`
-    );
+        ? Math.round(height / 2 + nameSize * 0.9)
+        : Math.round(height / 2);
+    layers.push({
+      text: slogan,
+      endSecond: cardSeconds,
+      fontSize: sloganSize,
+      color: "&H1FFFFFFF",
+      bold: false,
+      alignment: 8,
+      x: width / 2,
+      y
+    });
   }
   if (website) {
     const yBase = hasLogo
       ? Math.round(logoMax * 0.55 + nameSize * 1.35 + (slogan ? sloganSize * 1.4 : 0))
       : Math.round(nameSize * (slogan ? 2.2 : 0.9));
-    const y = hasLogo ? `(h/2)+${yBase}` : name || slogan ? `(h-text_h)/2+${yBase}` : `(h-text_h)/2`;
-    drawParts.push(
-      `drawtext=text='${escapeDrawtext(website)}'${fontOpt}:fontsize=${urlSize}:fontcolor=0x7ab5ff:x=(w-text_w)/2:y=${y}`
-    );
+    const y = hasLogo
+      ? Math.round(height / 2 + yBase)
+      : name || slogan
+        ? Math.round(height / 2 + yBase)
+        : Math.round(height / 2);
+    layers.push({
+      text: website,
+      endSecond: cardSeconds,
+      fontSize: urlSize,
+      color: "&H00FFB57A",
+      bold: false,
+      alignment: 8,
+      x: width / 2,
+      y
+    });
   }
-  drawParts.push(
-    `drawtext=text='${escapeDrawtext(BRANDING_END_TEXT)}'${fontOpt}:fontsize=${creditSize}:fontcolor=white@0.55:x=(w-text_w)/2:y=h-th-${Math.round(height * 0.06)}`
+  layers.push({
+    text: BRANDING_END_TEXT,
+    endSecond: cardSeconds,
+    fontSize: creditSize,
+    color: "&H73FFFFFF",
+    bold: false,
+    alignment: 2,
+    marginV: Math.round(height * 0.06)
+  });
+  const ass = buildRenderedTextAss(
+    { width, height, layers, language },
+    { fontName: assFontNameFromPath(font) }
   );
+  const assPath = path.join(dir, `biz-end-${nanoid(4)}.ass`);
+  await writeFile(assPath, ass, "utf8");
+  const fontsDir = font ? path.dirname(font) : null;
+  const assEsc = escapeFfmpegPath(assPath);
+  const fontsEsc = fontsDir ? escapeFfmpegPath(fontsDir) : null;
+  const assFilter = fontsEsc ? `ass='${assEsc}':fontsdir='${fontsEsc}'` : `ass='${assEsc}'`;
 
   const audioArgs = voiceLocal
     ? ["-i", voiceLocal]
@@ -1370,7 +1410,7 @@ async function createBusinessEndCardClip(
       `[0:v]scale=${width}:${height},format=yuv420p[bg]`,
       `[1:v]scale=w='min(iw\\,${logoMax})':h='min(ih\\,${logoMax})':force_original_aspect_ratio=decrease[logo]`,
       `[bg][logo]overlay=(W-w)/2:(H-h)/2-${Math.round(logoMax * 0.35)},fade=t=in:st=0:d=0.35[base]`,
-      `[base]${drawParts.join(",")}[vout]`
+      `[base]${assFilter}[vout]`
     ].join(";");
     await runFfmpeg([
       "-f",
@@ -1407,7 +1447,7 @@ async function createBusinessEndCardClip(
     return endClip;
   }
 
-  const vf = [`scale=${width}:${height}`, "format=yuv420p", "fade=t=in:st=0:d=0.35", ...drawParts].join(",");
+  const vf = [`scale=${width}:${height}`, "format=yuv420p", "fade=t=in:st=0:d=0.35", assFilter].join(",");
   await runFfmpeg([
     "-f",
     "lavfi",
@@ -1504,7 +1544,8 @@ function assFontNameFromPath(fontPath: string | null): string {
 async function createTitleCardClip(
   dir: string,
   dimensions: VideoDimensions,
-  scene: SceneTimelineEntry
+  scene: SceneTimelineEntry,
+  language?: string | null
 ): Promise<string> {
   const out = path.join(dir, `title-${scene.order}-${nanoid(4)}.mp4`);
   const { width, height } = dimensions;
@@ -1546,7 +1587,7 @@ async function createTitleCardClip(
     const font = resolveDrawtextFont();
     const ass = buildTitleCardAss(
       { headline, subtitle: sub || undefined, durationSeconds: duration, width, height },
-      { fontName: assFontNameFromPath(font) }
+      { fontName: assFontNameFromPath(font), language }
     );
     const assPath = path.join(dir, `title-card-${nanoid(4)}.ass`);
     await writeFile(assPath, ass, "utf8");
@@ -1608,20 +1649,26 @@ async function burnKaraokeAndWatermark(
       }
     }
 
+    const generatedLayers: Parameters<typeof buildRenderedTextAss>[0]["layers"] = [];
+    const defaultFont = resolveDrawtextFont();
     if (wantMark) {
       const mark =
         input.branding?.businessName?.trim() || input.branding?.slogan?.trim() || "prompt2spot.com";
-      const font = resolveDrawtextFont();
-      const fontOpt = font ? `:fontfile='${escapeFfmpegPath(font)}'` : "";
       const size = Math.max(18, Math.round(Math.min(dimensions.width, dimensions.height) * 0.028));
-      filters.push(
-        `drawtext=text='${escapeDrawtext(mark)}'${fontOpt}:fontsize=${size}:fontcolor=white@0.38:x=${Math.round(dimensions.width * 0.035)}:y=(h+text_w)/2:angle=-PI/2`
-      );
+      generatedLayers.push({
+        text: mark,
+        endSecond: 86400,
+        fontSize: size,
+        color: "&H9EFFFFFF",
+        bold: false,
+        alignment: 5,
+        x: Math.round(dimensions.width * 0.035),
+        y: Math.round(dimensions.height / 2),
+        angle: -90
+      });
     }
 
     if (wantLower) {
-      const font = resolveDrawtextFont();
-      const fontOpt = font ? `:fontfile='${escapeFfmpegPath(font)}'` : "";
       const titleSize = Math.max(22, Math.round(Math.min(dimensions.width, dimensions.height) * 0.042));
       const subSize = Math.max(16, Math.round(titleSize * 0.72));
       const brand = input.branding?.businessName?.trim() || "";
@@ -1639,15 +1686,53 @@ async function burnKaraokeAndWatermark(
         if (end <= start + 0.2) continue;
         const enable = `enable='between(t\\,${start.toFixed(2)}\\,${end.toFixed(2)})'`;
         filters.push(`drawbox=x=0:y=h-${barH}:w=w:h=${barH}:color=black@0.55:t=fill:${enable}`);
-        filters.push(
-          `drawtext=text='${escapeDrawtext(title)}'${fontOpt}:fontsize=${titleSize}:fontcolor=white:x=${Math.round(dimensions.width * 0.05)}:y=${yTitle}:${enable}`
-        );
+        const titleRtl = isRtlRenderedText(title, input.language);
+        generatedLayers.push({
+          text: title,
+          startSecond: start,
+          endSecond: end,
+          fontSize: titleSize,
+          alignment: titleRtl ? 9 : 7,
+          x: titleRtl
+            ? Math.round(dimensions.width * 0.95)
+            : Math.round(dimensions.width * 0.05),
+          y: yTitle
+        });
         if (brand) {
-          filters.push(
-            `drawtext=text='${escapeDrawtext(brand)}'${fontOpt}:fontsize=${subSize}:fontcolor=white@0.85:x=${Math.round(dimensions.width * 0.05)}:y=${ySub}:${enable}`
-          );
+          const brandRtl = isRtlRenderedText(brand, input.language);
+          generatedLayers.push({
+            text: brand,
+            startSecond: start,
+            endSecond: end,
+            fontSize: subSize,
+            color: "&H26FFFFFF",
+            bold: false,
+            alignment: brandRtl ? 9 : 7,
+            x: brandRtl
+              ? Math.round(dimensions.width * 0.95)
+              : Math.round(dimensions.width * 0.05),
+            y: ySub
+          });
         }
       }
+    }
+
+    if (generatedLayers.length) {
+      const ass = buildRenderedTextAss(
+        {
+          width: dimensions.width,
+          height: dimensions.height,
+          layers: generatedLayers,
+          language: input.language
+        },
+        { fontName: assFontNameFromPath(defaultFont) }
+      );
+      const generatedAssPath = path.join(dir, `generated-text-${nanoid(4)}.ass`);
+      await writeFile(generatedAssPath, ass, "utf8");
+      const assEsc = escapeFfmpegPath(generatedAssPath);
+      const fontsDir = defaultFont ? path.dirname(defaultFont) : null;
+      const fontsEsc = fontsDir ? escapeFfmpegPath(fontsDir) : null;
+      filters.push(fontsEsc ? `ass='${assEsc}':fontsdir='${fontsEsc}'` : `ass='${assEsc}'`);
     }
 
     if (!filters.length) return videoPath;
@@ -1695,13 +1780,14 @@ async function appendBrandingEndCard(
   dimensions: VideoDimensions,
   branding: BriefBrandingOutput | null | undefined,
   storage: GcsClient,
-  brandVoice?: { gcsPath: string; durationSeconds?: number | null } | null
+  brandVoice?: { gcsPath: string; durationSeconds?: number | null } | null,
+  language?: string | null
 ): Promise<string> {
   try {
     const lastFrame = path.join(dir, `end-last-${nanoid(4)}.png`);
     await runFfmpeg(["-sseof", "-0.08", "-i", videoPath, "-frames:v", "1", "-y", lastFrame]);
     const endClip = shouldUseBusinessEndCard(branding)
-      ? await createBusinessEndCardClip(dir, dimensions, branding!, storage, brandVoice)
+      ? await createBusinessEndCardClip(dir, dimensions, branding!, storage, brandVoice, language)
       : await createEndCardClip(dir, dimensions, lastFrame);
 
     const out = path.join(dir, `with-end-${nanoid(4)}.mp4`);
