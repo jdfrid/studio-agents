@@ -2273,3 +2273,19 @@ a { color: inherit; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+.distribution-page { display: grid; gap: 24px; }
+.distribution-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 12px; }
+.distribution-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+.distribution-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #232733);
+  border-radius: 10px;
+  background: #11151e;
+}
+.distribution-page .new-run-form label { display: grid; gap: 6px; font-size: 0.85rem; color: var(--muted, #8b94a6); }

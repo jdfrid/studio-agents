@@ -5,11 +5,12 @@ import { LandingPage } from "./LandingPage.js";
 import { Dashboard } from "./Dashboard.js";
 import { CreateVideoForm } from "./CreateVideoForm.js";
 import { RunView } from "./RunView.js";
+import { DistributionPage } from "./DistributionPage.js";
 import type { ProjectRunView } from "./types.js";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher.js";
 import "./styles.css";
 
-type View = "landing" | "dashboard" | "create" | "run";
+type View = "landing" | "dashboard" | "create" | "run" | "distribution";
 
 type AppLocation = {
   view: View;
@@ -23,12 +24,14 @@ function parseLocation(): AppLocation {
     if (id) return { view: "run", runId: id };
   }
   if (path === "/create") return { view: "create", runId: null };
+  if (path.startsWith("/distribution")) return { view: "distribution", runId: null };
   return { view: "dashboard", runId: null };
 }
 
 function pathFor(loc: AppLocation): string {
   if (loc.view === "run" && loc.runId) return `/runs/${loc.runId}`;
   if (loc.view === "create") return "/create";
+  if (loc.view === "distribution") return "/distribution";
   return "/";
 }
 
@@ -110,6 +113,14 @@ function AppShell() {
             <span aria-hidden>＋</span>
             {t("shell.newCreation")}
           </button>
+          <button
+            type="button"
+            className={view === "distribution" ? "nav-active" : ""}
+            onClick={() => navigate({ view: "distribution", runId: null })}
+          >
+            <span aria-hidden>↗</span>
+            {t("shell.distribute")}
+          </button>
         </nav>
         <div className="header-user">
           <LanguageSwitcher compact />
@@ -147,6 +158,7 @@ function AppShell() {
             onBack={() => navigate({ view: "dashboard", runId: null })}
           />
         ) : null}
+        {view === "distribution" ? <DistributionPage /> : null}
       </main>
     </div>
   );

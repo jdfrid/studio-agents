@@ -1,7 +1,7 @@
 import { Worker, type Job, type WorkerOptions } from "bullmq";
 import { STAGE_ORDER, type StageName } from "@studio/shared";
 import { refreshPlatformSettingsCache } from "@studio/billing";
-import { redisConnection, registerAgent, runStage, queueName } from "@studio/orchestrator";
+import { redisConnection, registerAgent, runStage, queueName, DISTRIBUTION_QUEUE_NAME, runDistributionJob } from "@studio/orchestrator";
 import { briefAgent } from "@studio/agent-brief";
 import { scriptAgent } from "@studio/agent-script";
 import { audioAgent } from "@studio/agent-audio";
@@ -99,6 +99,27 @@ async function main() {
     // eslint-disable-next-line no-console
     console.log(`Worker started for queue: ${queueName(stage)}`);
   }
+
+  const distributionWorker = new Worker(
+    DISTRIBUTION_QUEUE_NAME,
+    async (job: Job<{ publishJobId: string; poll?: boolean }>) => {
+      await runDistributionJob(job.data.publishJobId, Boolean(job.data.poll));
+    },
+    {
+      connection: redisConnection() as WorkerOptions["connection"],
+      concurrency: 2,
+      lockDuration: 15 * 60_000,
+      stalledInterval: 60_000,
+      maxStalledCount: 2
+    }
+  );
+  workers.push(distributionWorker);
+  distributionWorker.on("failed", (job, err) => {
+    // eslint-disable-next-line no-console
+    console.error(`[worker:distribution] job ${job?.id ?? "?"} failed:`, err);
+  });
+  // eslint-disable-next-line no-console
+  console.log(`Worker started for queue: ${DISTRIBUTION_QUEUE_NAME}`);
 }
 
 void main().catch((err) => {

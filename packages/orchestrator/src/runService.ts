@@ -587,6 +587,8 @@ export async function setRunStatus(
   if (status === "COMPLETED") {
     const { commitCredits } = await import("@studio/billing");
     await commitCredits(runId).catch(() => undefined);
+    const { maybeAutoDistribute } = await import("./distribution/auto.js");
+    await maybeAutoDistribute(runId).catch(() => undefined);
   }
   if (status === "FAILED" || status === "CANCELLED") {
     const { releaseCredits } = await import("@studio/billing");

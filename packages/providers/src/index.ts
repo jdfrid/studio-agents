@@ -9,3 +9,4 @@ export * from "./gemini/index.js";
 export * from "./video/index.js";
 export * from "./http.js";
 export * from "./monitoring/index.js";
+export * from "./social/index.js";

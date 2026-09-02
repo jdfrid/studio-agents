@@ -71,6 +71,7 @@ import {
 } from "@studio/billing";
 import { PlatformSettingsPatchSchema, AdminUserUpdateSchema } from "@studio/shared";
 import { getProviderInventory, officialBillingUrl, pollProviderMonitors } from "@studio/providers";
+import { registerDistributionRoutes } from "./distributionRoutes.js";
 
 const mobileRateBuckets = new Map<string, { count: number; resetAt: number }>();
 
@@ -125,6 +126,7 @@ export async function registerRoutes(app: FastifyInstance) {
   await authPlugin(app);
   app.addHook("onRequest", mobileAdminRateLimit());
   await registerAuthRoutes(app);
+  await registerDistributionRoutes(app);
 
   app.get("/health", async () => ({ ok: true }));
   app.get("/config/creative-catalog", async (request) => {

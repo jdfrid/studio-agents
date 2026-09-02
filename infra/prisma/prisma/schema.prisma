@@ -60,6 +60,11 @@ model Tenant {
   providers ProviderCredential[]
   audits    AuditLog[]
   series    Series[]
+  socialConnections  SocialConnection[]
+  socialDestinations SocialDestination[]
+  contentPackages    ContentPackage[]
+  publishJobs        PublishJob[]
+  distributeRules    DistributeRule[]
 }
 
 model User {
@@ -86,6 +91,8 @@ model User {
   mobileAuthCodes MobileAuthCode[]
   mobileRefreshTokens MobileRefreshToken[]
   adminDevices  AdminDevice[]
+  socialConnections SocialConnection[]
+  contentPackages   ContentPackage[]
 
   @@index([email])
 }
@@ -304,6 +311,7 @@ model ProjectRun {
   artifacts    Artifact[]
   costEvents   CostEvent[]
   creditEntries CreditLedger[]
+  contentPackages ContentPackage[]
 
   @@index([tenantId, status])
   @@index([userId, status])
@@ -591,5 +599,183 @@ model CreativeOptionTranslation {
 
   @@id([optionId, locale])
   @@index([locale])
+}
+
+enum SocialNetwork {
+  TELEGRAM
+  YOUTUBE
+  FACEBOOK
+  INSTAGRAM
+  X
+  TIKTOK
+}
+
+enum SocialAuthKind {
+  oauth2
+  bot_token
+  app_user
+}
+
+enum SocialConnectionStatus {
+  active
+  expired
+  revoked
+  needs_reauth
+}
+
+enum SocialDestinationKind {
+  channel
+  page
+  profile
+  group
+  bot_chat
+  playlist
+}
+
+enum SocialDestinationStatus {
+  active
+  paused
+  archived
+}
+
+enum ContentPackageSource {
+  run
+  api
+  manual
+}
+
+enum PublishMode {
+  now
+  schedule
+  draft
+}
+
+enum PublishJobStatus {
+  queued
+  transforming
+  uploading
+  processing
+  published
+  failed
+  cancelled
+  needs_review
+}
+
+model SocialConnection {
+  id                String                 @id @default(cuid())
+  tenantId          String
+  network           SocialNetwork
+  authKind          SocialAuthKind
+  encryptedTokens   String?
+  externalUserId    String
+  displayName       String
+  handle            String?
+  avatarUrl         String?
+  scopes            String[]               @default([])
+  status            SocialConnectionStatus @default(active)
+  connectedByUserId String?
+  lastSyncedAt      DateTime?
+  config            Json                   @default("{}")
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connectedBy User?               @relation(fields: [connectedByUserId], references: [id], onDelete: SetNull)
+  destinations SocialDestination[]
+
+  @@unique([tenantId, network, externalUserId])
+  @@index([tenantId, network, status])
+}
+
+model SocialDestination {
+  id           String                   @id @default(cuid())
+  tenantId     String
+  connectionId String
+  kind         SocialDestinationKind
+  externalId   String
+  name         String
+  handle       String?
+  url          String?
+  capabilities Json                     @default("{}")
+  config       Json                     @default("{}")
+  isDefault    Boolean                  @default(false)
+  status       SocialDestinationStatus  @default(active)
+  lastSyncedAt DateTime?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection SocialConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  jobs       PublishJob[]
+
+  @@unique([connectionId, kind, externalId])
+  @@index([tenantId, status])
+}
+
+model ContentPackage {
+  id              String               @id @default(cuid())
+  tenantId        String
+  source          ContentPackageSource
+  runId           String?
+  artifactId      String?
+  media           Json                 @default("[]")
+  copy            Json                 @default("{}")
+  coverGcsPath    String?
+  scheduleAt      DateTime?
+  mode            PublishMode          @default(now)
+  overrides       Json                 @default("{}")
+  createdByUserId String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run    ProjectRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  user   User?       @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  jobs   PublishJob[]
+
+  @@index([tenantId, createdAt])
+  @@index([runId])
+}
+
+model PublishJob {
+  id             String           @id @default(cuid())
+  tenantId       String
+  packageId      String
+  destinationId  String
+  status         PublishJobStatus @default(queued)
+  nativePayload  Json             @default("{}")
+  remotePostId   String?
+  remoteUrl      String?
+  attempts       Int              @default(0)
+  lastError      String?
+  errorCode      String?
+  adapterVersion String?
+  publishHandle  Json             @default("{}")
+  scheduledFor   DateTime?
+  publishedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  package     ContentPackage    @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  destination SocialDestination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, createdAt])
+  @@index([packageId])
+  @@index([destinationId])
+}
+
+model DistributeRule {
+  id              String   @id @default(cuid())
+  tenantId        String
+  enabled         Boolean  @default(false)
+  destinationIds  String[] @default([])
+  requireApproval Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId])
 }
 

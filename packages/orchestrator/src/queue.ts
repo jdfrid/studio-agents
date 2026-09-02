@@ -111,6 +111,8 @@ export async function getQueueStats(): Promise<
       delayed: counts.delayed ?? 0
     });
   }
+  const { getDistributionQueueStats } = await import("./distribution/queue.js");
+  stats.push(await getDistributionQueueStats());
   return stats;
 }
 
@@ -119,6 +121,8 @@ export async function shutdownQueues(): Promise<void> {
     await q.close();
   }
   queues.clear();
+  const { closeDistributionQueue } = await import("./distribution/queue.js");
+  await closeDistributionQueue();
   if (connection) {
     connection.disconnect();
     connection = null;

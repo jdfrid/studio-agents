@@ -31,3 +31,4 @@ export * from "./visualCorrections.js";
 export * from "./hebrewUi.js";
 export * from "./karaokeCaptions.js";
 export * from "./veoPrompt.js";
+export * from "./social/index.js";
