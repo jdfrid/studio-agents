@@ -300,9 +300,15 @@ export function DistributionPage() {
                   </button>
                   {network.configured && network.oauthCallbackUrl ? (
                     <p className="muted" style={{ marginTop: 8, wordBreak: "break-all" }}>
-                      {t("distribution.oauthCallbackHint")}
-                      <br />
-                      <code>{network.oauthCallbackUrl}</code>
+                      {network.oauthCallbackUrl.includes("/auth/google/callback")
+                        ? t("distribution.oauthUsesGoogleLogin")
+                        : t("distribution.oauthCallbackHint")}
+                      {network.oauthCallbackUrl.includes("/auth/google/callback") ? null : (
+                        <>
+                          <br />
+                          <code>{network.oauthCallbackUrl}</code>
+                        </>
+                      )}
                     </p>
                   ) : null}
                 </>

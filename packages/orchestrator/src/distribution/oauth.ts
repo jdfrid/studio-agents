@@ -65,12 +65,21 @@ export function newOAuthNonce(): string {
   return randomBytes(12).toString("hex");
 }
 
+function youtubeUsesSiteLoginRedirect(): boolean {
+  const youtubeId = process.env.YOUTUBE_CLIENT_ID?.trim();
+  const googleId = process.env.GOOGLE_CLIENT_ID?.trim();
+  return !youtubeId || !googleId || youtubeId === googleId;
+}
+
 export function oauthCallbackUrl(network: SocialNetwork): string {
   const explicit = process.env.DISTRIBUTION_OAUTH_CALLBACK_BASE?.replace(/\/$/, "");
   if (explicit) return `${explicit}/distribution/oauth/${network}/callback`;
+  const app = (process.env.APP_URL ?? "http://localhost:5173").replace(/\/$/, "");
+  if (network === "youtube" && youtubeUsesSiteLoginRedirect()) {
+    return `${app}/auth/google/callback`;
+  }
   const api = process.env.API_PUBLIC_URL?.replace(/\/$/, "");
   if (api) return `${api}/distribution/oauth/${network}/callback`;
-  const app = (process.env.APP_URL ?? "http://localhost:5173").replace(/\/$/, "");
   return `${app}/api/distribution/oauth/${network}/callback`;
 }
 

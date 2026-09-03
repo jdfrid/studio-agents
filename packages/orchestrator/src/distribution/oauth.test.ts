@@ -26,18 +26,23 @@ describe("distribution oauth state", () => {
 });
 
 describe("oauthCallbackUrl", () => {
-  it("uses APP_URL /api path when no API public origin is set", () => {
+  it("reuses the Google login callback for YouTube when sharing site credentials", () => {
     const prev = {
       API_PUBLIC_URL: process.env.API_PUBLIC_URL,
       DISTRIBUTION_OAUTH_CALLBACK_BASE: process.env.DISTRIBUTION_OAUTH_CALLBACK_BASE,
-      APP_URL: process.env.APP_URL
+      APP_URL: process.env.APP_URL,
+      YOUTUBE_CLIENT_ID: process.env.YOUTUBE_CLIENT_ID,
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID
     };
     delete process.env.API_PUBLIC_URL;
     delete process.env.DISTRIBUTION_OAUTH_CALLBACK_BASE;
+    delete process.env.YOUTUBE_CLIENT_ID;
     process.env.APP_URL = "https://prompt2spot.com";
+    process.env.GOOGLE_CLIENT_ID = "site-google-client";
     try {
-      expect(oauthCallbackUrl("youtube")).toBe(
-        "https://prompt2spot.com/api/distribution/oauth/youtube/callback"
+      expect(oauthCallbackUrl("youtube")).toBe("https://prompt2spot.com/auth/google/callback");
+      expect(oauthCallbackUrl("facebook")).toBe(
+        "https://prompt2spot.com/api/distribution/oauth/facebook/callback"
       );
     } finally {
       for (const [key, value] of Object.entries(prev)) {

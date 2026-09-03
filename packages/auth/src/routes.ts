@@ -5,7 +5,7 @@ import {
   googleAuthUrl,
   appUrl
 } from "./google.js";
-import type { UserView } from "@studio/shared";
+import { SocialNetworkSchema, type UserView } from "@studio/shared";
 import { getUserViewWithCredits, findOrCreateUser } from "./users.js";
 import { recordUserLogin } from "./loginAudit.js";
 import { isAuthDisabled, sessionCookieName, sessionCookieOptions, sessionCookieClearOptions, signSession, verifySession, type SessionPayload } from "./jwt.js";
@@ -30,6 +30,18 @@ async function devUserView(): Promise<UserView> {
 declare module "fastify" {
   interface FastifyRequest {
     user?: SessionPayload;
+  }
+}
+
+function peekDistributionOAuthNetwork(state: string): string | null {
+  const encoded = state.split(".")[0];
+  if (!encoded || encoded === state) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as { network?: unknown };
+    const network = SocialNetworkSchema.safeParse(parsed.network);
+    return network.success ? network.data : null;
+  } catch {
+    return null;
   }
 }
 
@@ -81,7 +93,22 @@ export async function registerAuthRoutes(app: FastifyInstance) {
   });
 
   app.get("/auth/google/callback", async (request, reply) => {
-    const { code, state } = request.query as { code?: string; state?: string };
+    const query = request.query as {
+      code?: string;
+      state?: string;
+      error?: string;
+      error_description?: string;
+    };
+    const distributionNetwork = query.state ? peekDistributionOAuthNetwork(query.state) : null;
+    if (distributionNetwork) {
+      const dest = new URL(`${appUrl()}/api/distribution/oauth/${distributionNetwork}/callback`);
+      for (const key of ["code", "state", "error", "error_description"] as const) {
+        const value = query[key];
+        if (value) dest.searchParams.set(key, value);
+      }
+      return reply.redirect(dest.toString());
+    }
+    const { code, state } = query;
     const savedState = request.cookies?.oauth_state;
     const mobileState = request.cookies?.mobile_oauth_state;
     const isMobile = Boolean(state && mobileState && state === mobileState);
