@@ -24,6 +24,7 @@ import {
   listPackages,
   listPublishJobs,
   oauthReturnUrl,
+  parseOAuthCallbackQuery,
   patchDestination,
   previewPackageForUser,
   resolveTelegramDestination,
@@ -39,7 +40,7 @@ function errorStatus(message: string): number {
   if (/not_found|artifact_not_found|destination_not_found|connection_not_found|chat_not_found|user_not_found/i.test(message)) {
     return 404;
   }
-  if (/unauthorized|oauth_state|oauth_network/i.test(message)) return 401;
+  if (/unauthorized|oauth_state|oauth_network|oauth_user/i.test(message)) return 401;
   if (/not_configured|oauth_not_supported/i.test(message)) return 501;
   return 400;
 }
@@ -47,21 +48,28 @@ function errorStatus(message: string): number {
 export async function registerDistributionRoutes(app: FastifyInstance) {
   app.get("/distribution/oauth/:network/callback", async (request, reply) => {
     const { network } = z.object({ network: SocialNetworkSchema }).parse(request.params);
-    const query = z
-      .object({
-        code: z.string().optional(),
-        state: z.string().optional(),
-        error: z.string().optional(),
-        error_description: z.string().optional()
-      })
-      .parse(request.query);
-    if (query.error || !query.code || !query.state) {
+    const query = parseOAuthCallbackQuery({ query: request.query, url: request.url });
+    request.log.info(
+      {
+        network,
+        hasCode: Boolean(query.code),
+        hasState: Boolean(query.state),
+        oauthError: query.error ?? null,
+        queryKeys: Object.keys((request.query as object) ?? {})
+      },
+      "distribution oauth callback"
+    );
+    if (query.error) {
       return reply.redirect(
         oauthReturnUrl({
           connected: network,
-          error: query.error_description || query.error || "missing_code"
+          error: (query.error_description || query.error).slice(0, 180)
         })
       );
+    }
+    if (!query.code || !query.state) {
+      // Opening the redirect URI by hand (or a stripped query) is not a Google denial.
+      return reply.redirect(oauthReturnUrl({ connected: network, error: "oauth_retry" }));
     }
     try {
       verifyOAuthState(query.state);
@@ -86,6 +94,18 @@ export async function registerDistributionRoutes(app: FastifyInstance) {
         return await startSocialOAuth(request.user!.sub, network);
       } catch (error) {
         const message = error instanceof Error ? error.message : "start_failed";
+        reply.code(errorStatus(message));
+        return { error: message };
+      }
+    });
+
+    scoped.post("/distribution/oauth/:network/complete", async (request, reply) => {
+      const { network } = z.object({ network: SocialNetworkSchema }).parse(request.params);
+      const body = z.object({ code: z.string().min(1), state: z.string().min(1) }).parse(request.body);
+      try {
+        return await completeSocialOAuth(network, body.code, body.state, request.user!.sub);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "oauth_failed";
         reply.code(errorStatus(message));
         return { error: message };
       }

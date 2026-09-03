@@ -162,7 +162,10 @@ async function upsertConnection(input: {
 }
 
 export async function listDistributionNetworks() {
-  return listNetworkPublicViews();
+  return listNetworkPublicViews().map((view) => ({
+    ...view,
+    oauthCallbackUrl: view.authKind === "oauth2" ? oauthCallbackUrl(view.network) : null
+  }));
 }
 
 export async function startSocialOAuth(userId: string, network: SocialNetwork) {
@@ -170,28 +173,36 @@ export async function startSocialOAuth(userId: string, network: SocialNetwork) {
   if (!adapter.startOAuth) throw new Error("oauth_not_supported");
   const tenantId = await tenantIdForUser(userId);
   const pkce = adapter.pkce ? randomPkce() : undefined;
+  const redirectUri = oauthCallbackUrl(network);
   const state = signOAuthState({
     tenantId,
     userId,
     network,
-    codeVerifier: pkce?.verifier
+    codeVerifier: pkce?.verifier,
+    redirectUri
   });
   const started = await adapter.startOAuth({
-    redirectUri: oauthCallbackUrl(network),
+    redirectUri,
     state,
     codeChallenge: pkce?.challenge
   });
   return { authorizeUrl: started.authorizeUrl };
 }
 
-export async function completeSocialOAuth(network: SocialNetwork, code: string, stateToken: string) {
+export async function completeSocialOAuth(
+  network: SocialNetwork,
+  code: string,
+  stateToken: string,
+  expectedUserId?: string
+) {
   const state = (await import("./oauth.js")).verifyOAuthState(stateToken);
   if (state.network !== network) throw new Error("oauth_network_mismatch");
+  if (expectedUserId && state.userId !== expectedUserId) throw new Error("oauth_user_mismatch");
   const adapter = getNetworkAdapter(network);
   if (!adapter.exchangeOAuth) throw new Error("oauth_not_supported");
   const exchanged = await adapter.exchangeOAuth({
     code,
-    redirectUri: oauthCallbackUrl(network),
+    redirectUri: state.redirectUri || oauthCallbackUrl(network),
     codeVerifier: state.codeVerifier
   });
   const connection = await upsertConnection({

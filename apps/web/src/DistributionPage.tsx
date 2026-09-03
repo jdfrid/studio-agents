@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./api.js";
 
@@ -7,6 +7,7 @@ type NetworkView = {
   authKind: string;
   configured: boolean;
   missingEnv: string[];
+  oauthCallbackUrl?: string | null;
 };
 
 type ConnectionView = {
@@ -46,6 +47,29 @@ type RuleView = {
 
 type RunSummary = { id: string; title: string; status: string };
 
+function oauthPathNetwork(): string | null {
+  const path = window.location.pathname.replace(/\/+$/, "");
+  const match = path.match(/^\/distribution\/oauth\/([^/]+)\/callback$/);
+  return match?.[1] ?? null;
+}
+
+function clearDistributionQuery(): void {
+  window.history.replaceState({}, "", "/distribution");
+}
+
+function oauthResultMessage(
+  t: (key: string, options?: { error?: string; network?: string }) => string,
+  error: string | null,
+  connected: string | null
+): string {
+  if (error === "oauth_retry" || error === "missing_code") return t("distribution.oauthRetry");
+  if (error === "access_denied") return t("distribution.oauthDenied");
+  if (error && /redirect_uri/i.test(error)) return t("distribution.oauthRedirectMismatch");
+  if (error) return t("distribution.oauthError", { error });
+  if (connected) return t("distribution.oauthOk", { network: connected });
+  return "";
+}
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -82,8 +106,7 @@ export function DistributionPage() {
   const [previews, setPreviews] = useState<Array<{ destination: DestinationView; preview: { accepted: boolean; lossy: boolean; warnings: string[]; errors: string[]; nativeCopy: { caption?: string; title?: string } } }>>([]);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
-
-  const params = useMemo(() => new URLSearchParams(window.location.search), []);
+  const oauthHandled = useRef(false);
 
   const refresh = useCallback(async () => {
     const [n, c, d, j, r, ruleRow] = await Promise.all([
@@ -106,11 +129,28 @@ export function DistributionPage() {
 
   useEffect(() => {
     void refresh().catch((err) => setMessage((err as Error).message));
-    const connected = params.get("connected");
-    const error = params.get("error");
-    if (error) setMessage(t("distribution.oauthError", { error }));
-    else if (connected) setMessage(t("distribution.oauthOk", { network: connected }));
-  }, [params, refresh, t]);
+    if (oauthHandled.current) return;
+    oauthHandled.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const state = params.get("state");
+    const pathNetwork = oauthPathNetwork();
+    if (pathNetwork && code && state) {
+      void apiPost(`/distribution/oauth/${pathNetwork}/complete`, { code, state })
+        .then(async () => {
+          clearDistributionQuery();
+          setMessage(t("distribution.oauthOk", { network: pathNetwork }));
+          await refresh();
+        })
+        .catch((err) => setMessage((err as Error).message));
+      return;
+    }
+    const next = oauthResultMessage(t, params.get("error"), params.get("connected"));
+    if (next) {
+      setMessage(next);
+      clearDistributionQuery();
+    }
+  }, [refresh, t]);
 
   async function connectOAuth(network: string) {
     setBusy(network);
@@ -249,14 +289,23 @@ export function DistributionPage() {
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  className="primary"
-                  disabled={!network.configured || Boolean(busy)}
-                  onClick={() => void connectOAuth(network.network)}
-                >
-                  {network.configured ? t("distribution.connect") : t("distribution.notConfigured")}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={!network.configured || Boolean(busy)}
+                    onClick={() => void connectOAuth(network.network)}
+                  >
+                    {network.configured ? t("distribution.connect") : t("distribution.notConfigured")}
+                  </button>
+                  {network.configured && network.oauthCallbackUrl ? (
+                    <p className="muted" style={{ marginTop: 8, wordBreak: "break-all" }}>
+                      {t("distribution.oauthCallbackHint")}
+                      <br />
+                      <code>{network.oauthCallbackUrl}</code>
+                    </p>
+                  ) : null}
+                </>
               )}
             </article>
           ))}

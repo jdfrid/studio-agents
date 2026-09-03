@@ -6,7 +6,34 @@ export interface DistributionOAuthState {
   userId: string;
   network: SocialNetwork;
   codeVerifier?: string;
+  redirectUri?: string;
   exp: number;
+}
+
+export type OAuthCallbackQuery = {
+  code?: string;
+  state?: string;
+  error?: string;
+  error_description?: string;
+};
+
+function firstString(value: unknown): string | undefined {
+  if (typeof value === "string" && value.length > 0) return value;
+  if (Array.isArray(value) && typeof value[0] === "string" && value[0].length > 0) return value[0];
+  return undefined;
+}
+
+/** Reads Google OAuth params from Fastify query, falling back to the raw URL. */
+export function parseOAuthCallbackQuery(input: { query: unknown; url?: string }): OAuthCallbackQuery {
+  const query = input.query && typeof input.query === "object" ? (input.query as Record<string, unknown>) : {};
+  const fromUrl = input.url?.includes("?") ? new URLSearchParams(input.url.slice(input.url.indexOf("?") + 1)) : null;
+  const pick = (key: string) => firstString(query[key]) || fromUrl?.get(key) || undefined;
+  return {
+    code: pick("code"),
+    state: pick("state"),
+    error: pick("error"),
+    error_description: pick("error_description")
+  };
 }
 
 function secret(): Buffer {

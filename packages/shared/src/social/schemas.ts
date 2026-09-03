@@ -188,7 +188,8 @@ export const NetworkPublicViewSchema = z.object({
   authKind: SocialAuthKindSchema,
   configured: z.boolean(),
   missingEnv: z.array(z.string()),
-  capabilities: CapabilityManifestSchema
+  capabilities: CapabilityManifestSchema,
+  oauthCallbackUrl: z.string().nullable().optional()
 });
 export type NetworkPublicView = z.infer<typeof NetworkPublicViewSchema>;
 
