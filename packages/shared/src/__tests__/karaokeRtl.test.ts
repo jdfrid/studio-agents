@@ -17,19 +17,25 @@ describe("stripNiqqud", () => {
 });
 
 describe("RTL karaoke", () => {
-  it("detects he/ar as RTL", () => {
+  it("detects he/ar as RTL including Hebrew labels", () => {
     expect(isRtlContentLanguage("he")).toBe(true);
+    expect(isRtlContentLanguage("he-IL")).toBe(true);
+    expect(isRtlContentLanguage("עברית")).toBe(true);
+    expect(isRtlContentLanguage("hebrew")).toBe(true);
     expect(isRtlContentLanguage("ar")).toBe(true);
     expect(isRtlContentLanguage("en")).toBe(false);
+    expect(isRtlContentLanguage(undefined)).toBe(false);
   });
 
-  it("wraps RTL dialogue with RLE marks", () => {
+  it("wraps RTL dialogue with RLE and keeps logical word order without per-word karaoke", () => {
     const cues = buildKaraokeCues("שלום עולם", 0, 2);
     const ass = buildKaraokeAss(cues, { language: "he" });
+    expect(ass).toContain("Language: he");
     expect(ass).toContain("\u202B");
     expect(ass).toContain("\u202C");
-    expect(ass).toContain("{\\k");
-    expect(ass).toContain("שלום\u200F ");
+    expect(ass).toContain("שלום עולם");
+    expect(ass.indexOf("שלום")).toBeLessThan(ass.indexOf("עולם"));
+    expect(ass).not.toContain("{\\k");
   });
 
   it("isolates numbers and Latin names inside Hebrew logical-order text", () => {
@@ -41,6 +47,7 @@ describe("RTL karaoke", () => {
     });
     expect(ass).toContain("\u206625%\u2069");
     expect(ass).toContain("\u2066iPhone-15\u2069");
+    expect(ass).not.toContain("{\\k");
   });
 
   it("does not wrap English with RLE", () => {

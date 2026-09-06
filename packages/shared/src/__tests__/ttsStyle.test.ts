@@ -3,7 +3,10 @@ import {
   buildTtsDeliveryStyle,
   geminiDialogueVoicePair,
   geminiTtsStyleFromCreative,
-  inferCastSexesFromBible
+  inferCastSexesFromBible,
+  inferSexFromUserCopy,
+  resolvePresenterSex,
+  voiceSexFromCreative
 } from "../creativeOptions.js";
 
 describe("geminiTtsStyleFromCreative", () => {
@@ -46,10 +49,11 @@ describe("buildTtsDeliveryStyle", () => {
 });
 
 describe("geminiDialogueVoicePair", () => {
-  it("uses two male voices when characterBible has two men", () => {
+  it("uses two male voices when characterBible has two men even without a voiceGender pick", () => {
     const pair = geminiDialogueVoicePair(
-      { voiceGender: "male" },
-      "Character A: male, 40, short hair. Character B: male, 35, beard."
+      {},
+      "Character A: male, 40, short hair. Character B: male, 35, beard.",
+      "he"
     );
     expect(["Charon", "Puck", "Fenrir", "Orus"]).toContain(pair.primary);
     expect(["Charon", "Puck", "Fenrir", "Orus"]).toContain(pair.secondary);
@@ -71,5 +75,21 @@ describe("geminiDialogueVoicePair", () => {
 describe("inferCastSexesFromBible", () => {
   it("detects two Hebrew men", () => {
     expect(inferCastSexesFromBible("דמות א: גבר מבוגר. דמות ב: גבר צעיר.")).toEqual(["male", "male"]);
+  });
+});
+
+describe("presenter sex lock", () => {
+  it("treats unset Hebrew voice as female until the cast is known", () => {
+    expect(voiceSexFromCreative({})).toBeUndefined();
+    expect(resolvePresenterSex({ language: "he" })).toBe("female");
+  });
+
+  it("follows an on-screen male cast when the user did not pick a voice", () => {
+    expect(resolvePresenterSex({ language: "he", characterBible: "גבר בן 40 בחליפה כהה" })).toBe("male");
+  });
+
+  it("reads an explicit woman from the user brief", () => {
+    expect(inferSexFromUserCopy("סרטון עם מגישה באולפן")).toBe("female");
+    expect(resolvePresenterSex({ language: "he", userText: "מגישה באולפן" })).toBe("female");
   });
 });

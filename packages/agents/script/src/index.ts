@@ -15,10 +15,13 @@ import {
   narrationCharLimitForBucket,
   normalizeContentLanguage,
   planSceneLayout,
+  presenterCastInstruction,
   profileToProductionCostConfig,
+  resolvePresenterSex,
   resolveRenderProfile,
   sanitizeVeoPromptForExternalAudio,
   userFacingLanguageInstruction,
+  voiceSexFromCreative,
   type Agent,
   type AgentContext,
   type ScriptInput,
@@ -58,6 +61,15 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const contentLang = normalizeContentLanguage(brief.language);
     const langEn = contentLanguageEnglishName(contentLang);
     const langNative = contentLanguageNativeName(contentLang);
+    const userText = [brief.title, brief.summary, brief.visualDirection, brief.instructions, brief.toneOfVoice]
+      .filter(Boolean)
+      .join("\n");
+    const presenterSex = resolvePresenterSex({
+      creative: brief.creative,
+      language: contentLang,
+      userText
+    });
+    const hasPhotos = Boolean(brief.visualAnchors?.length);
 
     const systemParts = [
       "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline.",
@@ -72,6 +84,11 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "Keep visualPrompt and veoPrompt under 200 characters each.",
       "CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette.",
       `Output characterBible in ${langEn}: a fixed description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes. Explicitly state each character's gender (male/female or זכר/נקבה).`,
+      presenterCastInstruction({
+        sex: presenterSex,
+        userLocked: Boolean(voiceSexFromCreative(brief.creative)),
+        hasPhotos
+      }),
       "Each veoPrompt must explicitly continue from the previous scene without changing setting or cast.",
       brief.visualAnchors?.length
         ? "Uploaded photos define the cast identity — keep those faces. Still avoid naming real celebrities in text prompts."
@@ -374,7 +391,17 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         geminiModel: provider.type === "GEMINI" ? model : undefined
       },
       parsed.characterBible,
-      { hasUserCharacterPhotos: Boolean(brief.visualAnchors?.length) }
+      {
+        hasUserCharacterPhotos: hasPhotos,
+        presenterSex: hasPhotos
+          ? undefined
+          : resolvePresenterSex({
+              creative: brief.creative,
+              characterBible: parsed.characterBible,
+              language: contentLang,
+              userText
+            })
+      }
     );
 
     await ctx.artifacts.save({

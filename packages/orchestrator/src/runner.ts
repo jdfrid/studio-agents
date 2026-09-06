@@ -7,6 +7,7 @@ import {
   geminiVoiceNameFromCreative,
   buildTtsDeliveryStyle,
   geminiDialogueVoicePair,
+  voiceSexFromCreative,
   nextStage,
   resolveRenderProfile,
   resolveSubtitleStyle,
@@ -159,8 +160,10 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       };
       const briefInput = brief as { creative?: Parameters<typeof geminiVoiceNameFromCreative>[0] };
       const creative = briefData.creative ?? briefInput.creative;
-      const pair = geminiDialogueVoicePair(creative, script?.characterBible);
-      const voiceName = briefData.ttsVoiceName ?? pair.primary;
+      const pair = geminiDialogueVoicePair(creative, script?.characterBible, briefData.language);
+      const voiceName = voiceSexFromCreative(creative)
+        ? (briefData.ttsVoiceName ?? pair.primary)
+        : pair.primary;
       const voiceNameB = pair.secondary;
       const voiceStyle = buildTtsDeliveryStyle({
         creative,

@@ -192,6 +192,8 @@ export const resources = {
         oauthRedirectMismatch: "כתובת ה-redirect ב-Google Cloud לא תואמת. הוסיפו בדיוק את הכתובת שמופיעה מתחת לכפתור החיבור, שמרו, ואז לחצו שוב על «חיבור».",
         oauthCallbackHint: "Authorized redirect URI ב-Google Cloud:",
         oauthUsesGoogleLogin: "YouTube משתמש באותה כתובת התחברות שכבר מאושרת ב-Google. אין צורך ב-URI נוסף — לחצו «חיבור».",
+        oauthYoutubeBrandHint:
+          "ערוץ נוסף שמנהלים מאותו Google: לחצו «חיבור» שוב, ובחלון Google בחרו את שם הערוץ (חשבון מותג) — לא את כתובת הג׳ימייל.",
         oauthOk: "החשבון ב־{{network}} חובר.",
         published: "פורסם",
         needsReview: "ממתין לאישור",
@@ -392,6 +394,8 @@ export const resources = {
         oauthRedirectMismatch: "The Google Cloud redirect URI does not match. Add the exact URI shown under Connect, save, then click Connect again.",
         oauthCallbackHint: "Google Cloud authorized redirect URI:",
         oauthUsesGoogleLogin: "YouTube reuses the site Google login redirect URI. No extra URI is required — click Connect.",
+        oauthYoutubeBrandHint:
+          "Another channel you manage with this Google account: click Connect again, then pick the channel name (Brand Account) in the Google window — not the Gmail address.",
         oauthOk: "{{network}} is connected.",
         published: "Published",
         needsReview: "Needs review",

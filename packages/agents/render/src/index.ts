@@ -1399,7 +1399,7 @@ async function createBusinessEndCardClip(
   const fontsDir = font ? path.dirname(font) : null;
   const assEsc = escapeFfmpegPath(assPath);
   const fontsEsc = fontsDir ? escapeFfmpegPath(fontsDir) : null;
-  const assFilter = fontsEsc ? `ass='${assEsc}':fontsdir='${fontsEsc}'` : `ass='${assEsc}'`;
+  const assFilter = assFilterExpr(assEsc, fontsEsc);
 
   const audioArgs = voiceLocal
     ? ["-i", voiceLocal]
@@ -1526,6 +1526,13 @@ function escapeFfmpegPath(filePath: string): string {
   return filePath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
 }
 
+function assFilterExpr(assEsc: string, fontsEsc: string | null): string {
+  const parts = [`ass='${assEsc}'`];
+  if (fontsEsc) parts.push(`fontsdir='${fontsEsc}'`);
+  parts.push("shaping=complex");
+  return parts.join(":");
+}
+
 function assFontNameFromPath(fontPath: string | null): string {
   if (!fontPath) return "Arial";
   const base = path.basename(fontPath).toLowerCase();
@@ -1594,9 +1601,7 @@ async function createTitleCardClip(
     const assEsc = escapeFfmpegPath(assPath);
     const fontsDir = font ? path.dirname(font) : null;
     const fontsEsc = fontsDir ? escapeFfmpegPath(fontsDir) : null;
-    const vf = fontsEsc
-      ? `format=yuv420p,fade=t=in:st=0:d=0.35,ass='${assEsc}':fontsdir='${fontsEsc}'`
-      : `format=yuv420p,fade=t=in:st=0:d=0.35,ass='${assEsc}'`;
+    const vf = `format=yuv420p,fade=t=in:st=0:d=0.35,${assFilterExpr(assEsc, fontsEsc)}`;
     await runFfmpeg(baseArgs(vf));
     return out;
   } catch {
@@ -1635,7 +1640,6 @@ async function burnKaraokeAndWatermark(
         const ass = buildKaraokeAss(cues, {
           fontName: assFontNameFromPath(font),
           language: input.language,
-          rtl: undefined,
           style: input.subtitleStyle,
           width: dimensions.width,
           height: dimensions.height
@@ -1645,7 +1649,7 @@ async function burnKaraokeAndWatermark(
         const fontsDir = font ? path.dirname(font) : null;
         const assEsc = escapeFfmpegPath(assPath);
         const fontsEsc = fontsDir ? escapeFfmpegPath(fontsDir) : null;
-        filters.push(fontsEsc ? `ass='${assEsc}':fontsdir='${fontsEsc}'` : `ass='${assEsc}'`);
+        filters.push(assFilterExpr(assEsc, fontsEsc));
       }
     }
 
@@ -1732,7 +1736,7 @@ async function burnKaraokeAndWatermark(
       const assEsc = escapeFfmpegPath(generatedAssPath);
       const fontsDir = defaultFont ? path.dirname(defaultFont) : null;
       const fontsEsc = fontsDir ? escapeFfmpegPath(fontsDir) : null;
-      filters.push(fontsEsc ? `ass='${assEsc}':fontsdir='${fontsEsc}'` : `ass='${assEsc}'`);
+      filters.push(assFilterExpr(assEsc, fontsEsc));
     }
 
     if (!filters.length) return videoPath;

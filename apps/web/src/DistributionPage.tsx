@@ -311,6 +311,11 @@ export function DistributionPage() {
                       )}
                     </p>
                   ) : null}
+                  {network.network === "youtube" && network.configured ? (
+                    <p className="muted" style={{ marginTop: 8 }}>
+                      {t("distribution.oauthYoutubeBrandHint")}
+                    </p>
+                  ) : null}
                 </>
               )}
             </article>

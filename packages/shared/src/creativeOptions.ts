@@ -1338,28 +1338,74 @@ export function formatCreativeConstraints(
 
 /** Gemini prebuilt TTS voice from creative gender / style / accent. */
 export function geminiVoiceNameFromCreative(creative?: CreativeOptions | null): string | undefined {
+  const sex = voiceSexFromCreative(creative);
+  if (!sex) return undefined;
+  const blob = `${creative?.voiceType ?? ""} ${creative?.speechStyle ?? ""} ${creative?.accent ?? ""}`.toLowerCase();
+  return pickGeminiVoiceForSex(sex, blob);
+}
+
+/** User- or style-locked narration sex. Undefined means the pipeline should match the on-screen cast. */
+export function voiceSexFromCreative(creative?: CreativeOptions | null): "male" | "female" | undefined {
   if (!creative) return undefined;
   const gender = creative.voiceGender;
+  if (gender === "male" || gender === "female") return gender;
   const type = String(creative.voiceType ?? "");
   const style = String(creative.speechStyle ?? "");
   const accent = String(creative.accent ?? "");
-  const hasVoiceHint = Boolean(gender || type || style || accent);
-  if (!hasVoiceHint) return undefined;
-
+  if (!type && !style && !accent) return undefined;
+  if (/זכר|גברי|male/i.test(type)) return "male";
+  if (/נקבה|נשי|female/i.test(type)) return "female";
   const blob = `${type} ${style} ${accent}`.toLowerCase();
-  const legacyMale = /זכר|גברי|male/i.test(type);
-  const legacyFemale = /נקבה|נשי|female/i.test(type);
+  if (/עמוק|סמכותי|מבוגר|חדשותי/.test(blob)) return "male";
+  return "female";
+}
 
-  const sex: "male" | "female" =
-    gender === "male" || legacyMale
-      ? "male"
-      : gender === "female" || legacyFemale
-        ? "female"
-        : /עמוק|סמכותי|מבוגר|חדשותי/.test(blob)
-          ? "male"
-          : "female";
+export function defaultVoiceSexForLanguage(language?: string | null): "male" | "female" {
+  return isMaleGeminiVoice(defaultGeminiVoiceForLanguage(language)) ? "male" : "female";
+}
 
-  return pickGeminiVoiceForSex(sex, blob);
+/** Infer a presenter sex from the user's own copy (not from model-invented cast). */
+export function inferSexFromUserCopy(text?: string | null): "male" | "female" | undefined {
+  const t = String(text ?? "");
+  if (!t.trim()) return undefined;
+  const female = /מגישה|קריינית|דוברת|אישה|אשה|בחורה|\bfemale\b|\bwoman\b|\bwomen\b|\blady\b/i.test(t);
+  const male = /מגיש(?!ה)|קריין(?!ית)|דובר(?!ת)|\bגבר\b|\bזכר\b|\bmale\b|\bman\b|\bmen\b|\bguy\b/i.test(t);
+  if (female && !male) return "female";
+  if (male && !female) return "male";
+  return undefined;
+}
+
+export function resolvePresenterSex(input: {
+  creative?: CreativeOptions | null;
+  characterBible?: string | null;
+  language?: string | null;
+  userText?: string | null;
+}): "male" | "female" {
+  const fromCreative = voiceSexFromCreative(input.creative);
+  if (fromCreative) return fromCreative;
+  const fromCopy = inferSexFromUserCopy(input.userText);
+  if (fromCopy) return fromCopy;
+  const cast = inferCastSexesFromBible(input.characterBible);
+  if (cast.length && cast.every((sex) => sex === cast[0])) return cast[0]!;
+  if (cast[0]) return cast[0]!;
+  return defaultVoiceSexForLanguage(input.language);
+}
+
+export function presenterCastInstruction(opts: {
+  sex: "male" | "female";
+  userLocked: boolean;
+  hasPhotos?: boolean;
+}): string {
+  if (opts.hasPhotos) {
+    return "CAST PHOTOS define identity: keep the uploaded people. Do not invent a different gender. Narration voice will match those people.";
+  }
+  const person = opts.sex === "female" ? "a woman (female adult)" : "a man (male adult)";
+  const opposite = opts.sex === "female" ? "a man or male host" : "a woman or female host";
+  const voice = opts.sex;
+  if (opts.userLocked) {
+    return `CAST–VOICE MATCH (mandatory): narration voice is ${voice}. Every on-screen speaker must be ${person}. Do not show ${opposite}. characterBible, visualPrompt, veoPrompt, and visualDirection must match that sex.`;
+  }
+  return `CAST–VOICE MATCH (mandatory): unless the user clearly specified otherwise, the on-screen speaker must be ${person} so it matches the ${voice} narration voice. Never show ${opposite} while the voice is ${voice}.`;
 }
 
 function pickGeminiVoiceForSex(sex: "male" | "female", blob: string): string {
@@ -1419,25 +1465,28 @@ function pickDifferentGeminiVoice(sex: "male" | "female", exclude: string): stri
  */
 export function geminiDialogueVoicePair(
   creative?: CreativeOptions | null,
-  characterBible?: string | null
+  characterBible?: string | null,
+  language?: string | null
 ): {
   primary: string;
   secondary: string;
 } {
-  const primary =
-    geminiVoiceNameFromCreative(creative) ?? defaultGeminiVoiceForLanguage(creative?.language ?? null);
-  const primarySex: "male" | "female" = isMaleGeminiVoice(primary) ? "male" : "female";
+  const lang = language ?? creative?.language ?? null;
+  const locked = voiceSexFromCreative(creative);
   const cast = inferCastSexesFromBible(characterBible);
+  const blob = `${creative?.voiceType ?? ""} ${creative?.speechStyle ?? ""} ${creative?.accent ?? ""}`.toLowerCase();
+
+  const primarySex: "male" | "female" =
+    locked ?? (cast[0] ? cast[0] : defaultVoiceSexForLanguage(lang));
+  const primary =
+    (locked ? geminiVoiceNameFromCreative(creative) : undefined) ?? pickGeminiVoiceForSex(primarySex, blob);
 
   let secondarySex: "male" | "female";
   if (cast.length >= 2) {
     secondarySex = cast[1]!;
   } else if (cast.length === 1) {
     secondarySex = cast[0]!;
-  } else if (creative?.voiceGender === "male" || creative?.voiceGender === "female") {
-    secondarySex = creative.voiceGender;
   } else {
-    // Same sex as primary — opposite-gender pairing was surprising for same-sex casts.
     secondarySex = primarySex;
   }
 

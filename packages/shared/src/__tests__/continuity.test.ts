@@ -55,12 +55,14 @@ describe("continuity", () => {
       backgroundVisualPrompt: "Forest trail",
       sceneAction: "He adjusts backpack",
       order: 1,
-      total: 3
+      total: 3,
+      presenterSex: "male"
     });
     expect(prompt).toContain("Man, 40s, navy jacket");
     expect(prompt).toContain("Forest trail");
     expect(prompt).toContain("Scene 2 of 3");
     expect(prompt).toContain("EXACT same characters");
+    expect(prompt).toContain("On-screen speaker is a man (male), not a woman.");
   });
 
   it("applyContinuityToScript rewrites all scene prompts", () => {

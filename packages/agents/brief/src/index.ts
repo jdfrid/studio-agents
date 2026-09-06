@@ -9,13 +9,15 @@ import {
   creativeFlagOn,
   formatCreativeConstraints,
   geminiVoiceNameFromCreative,
-  defaultGeminiVoiceForLanguage,
   languageCodeFromCreative,
   normalizeCreativeOptions,
   normalizeContentLanguage,
+  presenterCastInstruction,
   resolveContentLanguage,
+  resolvePresenterSex,
   resolveRenderProfile,
   userFacingLanguageInstruction,
+  voiceSexFromCreative,
   type Agent,
   type BriefInput,
   type BriefOutput
@@ -52,10 +54,23 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     });
     const langEn = contentLanguageEnglishName(contentLang);
     const langNative = contentLanguageNativeName(contentLang);
+    const hasPhotos = Boolean(
+      input.attachments.some((a) => a.role === "anchor" || a.role === "scene")
+    );
+    const presenterSex = resolvePresenterSex({
+      creative,
+      language: contentLang,
+      userText: [input.title, input.sourceText, input.instructions].filter(Boolean).join("\n")
+    });
 
     const system = [
       "You are a senior creative producer. Convert free-form briefs into a single strict JSON object describing the production requirements for a short promotional video.",
       "visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots.",
+      presenterCastInstruction({
+        sex: presenterSex,
+        userLocked: Boolean(voiceSexFromCreative(creative)),
+        hasPhotos
+      }),
       "If the user provided instructions (do/don't constraints), honor them strictly in visualDirection and brandConstraints.",
       "If branding.businessName is set, keep the business name consistent in summary, callToAction, and tone — do not invent a competing brand.",
       "If attachments include role=anchor images, treat them as mandatory visual references for cast and/or setting/background — describe matching looks in visualDirection.",
@@ -497,8 +512,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       videoInsert,
       referenceVideoAnalysis,
       branding: brandingOut,
-      ttsVoiceName:
-        geminiVoiceNameFromCreative(creative) ?? defaultGeminiVoiceForLanguage(resolvedLanguage),
+      ttsVoiceName: geminiVoiceNameFromCreative(creative) ?? null,
       ...(creative ? { creative } : {})
     };
 

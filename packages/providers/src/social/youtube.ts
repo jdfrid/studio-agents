@@ -43,7 +43,7 @@ export function createYoutubeAdapter(): NetworkAdapter {
         redirect_uri: input.redirectUri,
         response_type: "code",
         access_type: "offline",
-        prompt: "consent",
+        prompt: "select_account consent",
         scope: YOUTUBE_SCOPES.join(" "),
         state: input.state,
         include_granted_scopes: "true"

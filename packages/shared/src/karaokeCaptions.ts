@@ -1,3 +1,4 @@
+import { normalizeContentLanguage } from "./contentLanguage.js";
 import { resolveSubtitleStyle, type SubtitleStyle } from "./schemas/subtitleStyle.js";
 
 /**
@@ -25,8 +26,10 @@ export function stripNiqqud(text: string): string {
 }
 
 export function isRtlContentLanguage(language?: string | null): boolean {
-  const lang = String(language ?? "").toLowerCase();
-  return lang.startsWith("he") || lang.startsWith("ar") || lang.startsWith("yi") || lang.startsWith("fa");
+  const raw = String(language ?? "").trim();
+  if (!raw) return false;
+  const lang = normalizeContentLanguage(raw);
+  return lang === "he" || lang === "ar" || lang === "yi" || lang === "fa";
 }
 
 export function splitNarrationWords(narration: string): string[] {
@@ -107,9 +110,9 @@ function assTime(seconds: number): string {
 }
 
 /**
- * Build ASS with karaoke {\k} tags.
- * RTL text stays in logical/speaking order. libass/FriBidi lays it out from the
- * right edge; directional isolates protect embedded Latin text and numbers.
+ * Build ASS captions.
+ * LTR uses per-word karaoke {\k} tags. RTL uses a whole line with RLE so libass
+ * does not force left-to-right word order. Embedded Latin/numbers stay isolated.
  */
 export function buildKaraokeAss(
   lines: KaraokeLineCue[],
@@ -123,7 +126,8 @@ export function buildKaraokeAss(
   }
 ): string {
   const font = opts?.fontName ?? "Arial";
-  const rtl = opts?.rtl ?? isRtlContentLanguage(opts?.language);
+  const sample = lines.map((line) => line.text).join(" ");
+  const rtl = opts?.rtl ?? isRtlRenderedText(sample, opts?.language);
   const style = resolveSubtitleStyle(opts?.style);
   const width = opts?.width ?? 720;
   const height = opts?.height ?? 1280;
@@ -138,11 +142,12 @@ export function buildKaraokeAss(
     shadow: { borderStyle: 1, outline: 1, shadow: 3, back: "&H78000000" },
     background: { borderStyle: 3, outline: 7, shadow: 0, back: "&H70000000" }
   }[style.effect];
+  const langLine = rtl ? `Language: ${assLanguageTag(opts?.language)}\n` : "";
   const header = `[Script Info]
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
-PlayResX: ${width}
+${langLine}PlayResX: ${width}
 PlayResY: ${height}
 
 [V4+ Styles]
@@ -153,26 +158,31 @@ Style: Karaoke,${font},${fontSize},&H00FFFFFF,&H00E07020,&H80000000,${effect.bac
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
-  const RLE = "\u202B";
-  const PDF = "\u202C";
-  const RTL_SPACE = "\u200F ";
-
   const events = lines
     .map((line) => {
-      // Keep speaking order for {\k}; RLE places the first spoken word on the right.
+      if (rtl) {
+        // Per-word {\k} tags force LTR layout in libass. Whole-line + RLE keeps Hebrew RTL.
+        const body = assBidiText(line.text, opts?.language, true);
+        return `Dialogue: 0,${assTime(line.startSecond)},${assTime(line.endSecond)},Karaoke,,0,0,0,,${body}`;
+      }
       const kText = line.words
         .map((w) => {
           const durCs = Math.max(1, Math.round((w.endSecond - w.startSecond) * 100));
-          const text = escapeAss(w.text);
-          return `{\\k${durCs}}${rtl ? isolateLtrRuns(text) : text}`;
+          return `{\\k${durCs}}${escapeAss(w.text)}`;
         })
-        .join(rtl ? RTL_SPACE : " ");
-      const body = rtl ? `${RLE}${kText}${PDF}` : kText;
-      return `Dialogue: 0,${assTime(line.startSecond)},${assTime(line.endSecond)},Karaoke,,0,0,0,,${body}`;
+        .join(" ");
+      return `Dialogue: 0,${assTime(line.startSecond)},${assTime(line.endSecond)},Karaoke,,0,0,0,,${kText}`;
     })
     .join("\n");
 
   return `${header}${events}\n`;
+}
+
+function assLanguageTag(language?: string | null): string {
+  const lang = normalizeContentLanguage(language || "he");
+  if (lang === "ar") return "ar";
+  if (lang === "fa") return "fa";
+  return "he";
 }
 
 const LRI = "\u2066";
