@@ -1043,8 +1043,8 @@ a { color: inherit; }
 .product-showcase {
   position: relative;
   min-width: 0;
-  padding: 20px 10px 28px 28px;
-  direction: rtl;
+  padding-block: 20px 28px;
+  padding-inline: 10px 28px;
 }
 .showcase-glow {
   position: absolute;

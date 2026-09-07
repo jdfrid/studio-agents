@@ -13,7 +13,7 @@ describe("Brief schemas", () => {
     const parsed = BriefInputSchema.parse({ title: "Test", sourceText: "Make a video" });
     expect(parsed.aspectRatio).toBe("9:16");
     expect(parsed.durationSeconds).toBe(30);
-    expect(parsed.language).toBe("he");
+    expect(parsed.language).toBe("en");
   });
   it("rejects too short title", () => {
     expect(() => BriefInputSchema.parse({ title: "", sourceText: "x" })).toThrow();

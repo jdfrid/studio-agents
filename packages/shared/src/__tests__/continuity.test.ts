@@ -65,6 +65,19 @@ describe("continuity", () => {
     expect(prompt).toContain("On-screen speaker is a man (male), not a woman.");
   });
 
+  it("locks child age when a child voice is selected", () => {
+    const prompt = buildReferenceImagePrompt({
+      characterBible: "Boy, 8, brown hair, blue hoodie",
+      backgroundVisualPrompt: "Schoolyard",
+      sceneAction: "He waves",
+      order: 0,
+      total: 2,
+      presenterSex: "male",
+      presenterAge: "child"
+    });
+    expect(prompt).toContain("On-screen speaker is a child (about 6–10 years old), not an adult.");
+  });
+
   it("applyContinuityToScript rewrites all scene prompts", () => {
     const out = applyContinuityToScript({
       ...baseScript(),

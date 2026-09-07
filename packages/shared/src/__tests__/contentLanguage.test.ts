@@ -20,6 +20,7 @@ describe("contentLanguage", () => {
   });
 
   it("normalizes codes", () => {
+    expect(normalizeContentLanguage("")).toBe("en");
     expect(normalizeContentLanguage("he-IL")).toBe("he");
     expect(normalizeContentLanguage("אידיש")).toBe("yi");
     expect(normalizeContentLanguage("יידיש")).toBe("yi");

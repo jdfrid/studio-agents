@@ -62,7 +62,7 @@ export async function alignDubbingToVisual(runId: string): Promise<ProjectRunVie
 
   const user = JSON.stringify(
     {
-      language: brief.language ?? "he",
+      language: brief.language ?? "en",
       title: brief.title,
       summary: brief.summary,
       toneOfVoice: brief.toneOfVoice,

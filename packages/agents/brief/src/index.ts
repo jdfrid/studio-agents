@@ -17,6 +17,7 @@ import {
   resolvePresenterSex,
   resolveRenderProfile,
   userFacingLanguageInstruction,
+  voiceAgeFromCreative,
   voiceSexFromCreative,
   type Agent,
   type BriefInput,
@@ -68,8 +69,9 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       "visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots.",
       presenterCastInstruction({
         sex: presenterSex,
-        userLocked: Boolean(voiceSexFromCreative(creative)),
-        hasPhotos
+        userLocked: Boolean(voiceSexFromCreative(creative) || voiceAgeFromCreative(creative)),
+        hasPhotos,
+        age: voiceAgeFromCreative(creative)
       }),
       "If the user provided instructions (do/don't constraints), honor them strictly in visualDirection and brandConstraints.",
       "If branding.businessName is set, keep the business name consistent in summary, callToAction, and tone — do not invent a competing brand.",

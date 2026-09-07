@@ -11,11 +11,15 @@ import type {
 import { baseAdapter } from "./base.js";
 import { SocialApiError, socialFormJson, socialJson, socialRequest } from "./http.js";
 
-const TIKTOK_SCOPES = ["user.info.basic", "video.upload", "video.publish"];
+function tiktokScopes(): string[] {
+  const scopes = ["user.info.basic", "video.upload"];
+  if (directPostEnabled()) scopes.push("video.publish");
+  return scopes;
+}
 
 function tiktokApp(): { key: string; secret: string } {
-  const key = process.env.TIKTOK_CLIENT_KEY;
-  const secret = process.env.TIKTOK_CLIENT_SECRET;
+  const key = process.env.TIKTOK_CLIENT_KEY?.trim();
+  const secret = process.env.TIKTOK_CLIENT_SECRET?.trim();
   if (!key || !secret) throw new SocialApiError("tiktok", "TikTok OAuth is not configured", 501, "not_configured");
   return { key, secret };
 }
@@ -36,7 +40,7 @@ export function createTiktokAdapter(): NetworkAdapter {
         client_key: key,
         redirect_uri: input.redirectUri,
         response_type: "code",
-        scope: TIKTOK_SCOPES.join(","),
+        scope: tiktokScopes().join(","),
         state: input.state
       });
       if (input.codeChallenge) {
@@ -74,7 +78,7 @@ export function createTiktokAdapter(): NetworkAdapter {
       };
       const identity = await this.identify!(tokens);
       identity.externalUserId = raw.open_id || identity.externalUserId;
-      identity.scopes = raw.scope?.split(",") ?? TIKTOK_SCOPES;
+      identity.scopes = raw.scope?.split(",") ?? tiktokScopes();
       return { tokens, identity };
     },
     async refreshAuth(tokens) {

@@ -8,6 +8,7 @@ import {
   resolvePresenterSex,
   voiceSexFromCreative
 } from "../creativeOptions.js";
+import { isMaleGeminiVoice } from "../voiceCatalog.js";
 
 describe("geminiTtsStyleFromCreative", () => {
   it("includes designStyle and event context when set", () => {
@@ -55,8 +56,8 @@ describe("geminiDialogueVoicePair", () => {
       "Character A: male, 40, short hair. Character B: male, 35, beard.",
       "he"
     );
-    expect(["Charon", "Puck", "Fenrir", "Orus"]).toContain(pair.primary);
-    expect(["Charon", "Puck", "Fenrir", "Orus"]).toContain(pair.secondary);
+    expect(isMaleGeminiVoice(pair.primary)).toBe(true);
+    expect(isMaleGeminiVoice(pair.secondary)).toBe(true);
     expect(pair.primary).not.toBe(pair.secondary);
   });
 
@@ -65,10 +66,8 @@ describe("geminiDialogueVoicePair", () => {
       { voiceGender: "male" },
       "Host: male news anchor. Guest: female reporter."
     );
-    const male = /^(Charon|Puck|Fenrir|Orus)$/i.test(pair.primary);
-    const secondaryMale = /^(Charon|Puck|Fenrir|Orus)$/i.test(pair.secondary);
-    expect(male).toBe(true);
-    expect(secondaryMale).toBe(false);
+    expect(isMaleGeminiVoice(pair.primary)).toBe(true);
+    expect(isMaleGeminiVoice(pair.secondary)).toBe(false);
   });
 });
 

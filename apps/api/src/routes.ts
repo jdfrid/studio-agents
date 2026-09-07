@@ -130,7 +130,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.get("/health", async () => ({ ok: true }));
   app.get("/config/creative-catalog", async (request) => {
-    const { locale } = z.object({ locale: z.enum(["he", "en"]).default("he") }).parse(request.query);
+    const { locale } = z.object({ locale: z.enum(["he", "en"]).default("en") }).parse(request.query);
     return { locale, fields: await getCreativeCatalog(locale) };
   });
 

@@ -21,6 +21,7 @@ import {
   resolveRenderProfile,
   sanitizeVeoPromptForExternalAudio,
   userFacingLanguageInstruction,
+  voiceAgeFromCreative,
   voiceSexFromCreative,
   type Agent,
   type AgentContext,
@@ -69,6 +70,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       language: contentLang,
       userText
     });
+    const presenterAge = voiceAgeFromCreative(brief.creative);
     const hasPhotos = Boolean(brief.visualAnchors?.length);
 
     const systemParts = [
@@ -86,8 +88,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       `Output characterBible in ${langEn}: a fixed description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes. Explicitly state each character's gender (male/female or זכר/נקבה).`,
       presenterCastInstruction({
         sex: presenterSex,
-        userLocked: Boolean(voiceSexFromCreative(brief.creative)),
-        hasPhotos
+        userLocked: Boolean(voiceSexFromCreative(brief.creative) || presenterAge),
+        hasPhotos,
+        age: presenterAge
       }),
       "Each veoPrompt must explicitly continue from the previous scene without changing setting or cast.",
       brief.visualAnchors?.length
@@ -400,7 +403,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
               characterBible: parsed.characterBible,
               language: contentLang,
               userText
-            })
+            }),
+        presenterAge: hasPhotos ? undefined : presenterAge
       }
     );
 

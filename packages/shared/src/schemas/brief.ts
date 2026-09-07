@@ -42,7 +42,7 @@ export const BriefInputSchema = z.object({
   style: z.string().max(500).optional(),
   durationSeconds: z.number().int().min(5).max(180).default(30),
   aspectRatio: AspectRatioSchema.default("9:16"),
-  language: z.string().min(2).max(10).default("he"),
+  language: z.string().min(2).max(10).default("en"),
   referenceLinks: z.array(z.string().url()).max(20).default([]),
   attachments: z
     .array(

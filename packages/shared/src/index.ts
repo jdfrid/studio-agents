@@ -21,6 +21,7 @@ export * from "./budget.js";
 export * from "./localization.js";
 export * from "./renderProfiles.js";
 export * from "./creativeOptions.js";
+export * from "./voiceCatalog.js";
 export * from "./contentLanguage.js";
 export * from "./costLedger.js";
 export * from "./runsLog.js";

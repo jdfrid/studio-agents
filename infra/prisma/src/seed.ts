@@ -78,6 +78,11 @@ async function main() {
       }
     }
   }
+  // Replaced by voiceCharacter (Gemini timbre catalog). Hide the old «voice style» field.
+  await prisma.creativeField.updateMany({
+    where: { key: "voiceType" },
+    data: { active: false }
+  });
   // eslint-disable-next-line no-console
   console.log("Seeded creative field catalog");
 }

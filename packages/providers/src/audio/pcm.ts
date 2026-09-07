@@ -117,3 +117,47 @@ function extractWavPcm(wav: Buffer): { pcm: Buffer; format: PcmFormat } {
     format: { sampleRate, bitsPerSample, channels }
   };
 }
+
+/**
+ * Resample PCM so playback at the original rate sounds higher or lower (chipmunk / robot).
+ * Duration shortens when pitch goes up. No-ops for non-16-bit WAV.
+ */
+export function shiftWavPitch(wav: Buffer, semitones: number): Buffer {
+  if (!Number.isFinite(semitones) || semitones === 0) return wav;
+  const { pcm, format } = extractWavPcm(wav);
+  if (format.bitsPerSample !== 16 || format.channels < 1) return wav;
+  const ratio = 2 ** (semitones / 12);
+  if (!Number.isFinite(ratio) || ratio <= 0) return wav;
+  const bytesPerFrame = 2 * format.channels;
+  const inFrames = Math.floor(pcm.length / bytesPerFrame);
+  if (inFrames < 2) return wav;
+  const outFrames = Math.max(1, Math.round(inFrames / ratio));
+  const out = Buffer.alloc(outFrames * bytesPerFrame);
+  for (let i = 0; i < outFrames; i++) {
+    const src = i * ratio;
+    const i0 = Math.min(inFrames - 1, Math.floor(src));
+    const i1 = Math.min(inFrames - 1, i0 + 1);
+    const frac = src - i0;
+    for (let ch = 0; ch < format.channels; ch++) {
+      const s0 = pcm.readInt16LE((i0 * format.channels + ch) * 2);
+      const s1 = pcm.readInt16LE((i1 * format.channels + ch) * 2);
+      const sample = Math.round(s0 + (s1 - s0) * frac);
+      out.writeInt16LE(Math.max(-32768, Math.min(32767, sample)), (i * format.channels + ch) * 2);
+    }
+  }
+  return pcmToWav(out, format);
+}
+
+export function applyVoicePitchShift<T extends { body: Buffer; mimeType: string; durationSeconds: number | null }>(
+  audio: T,
+  semitones?: number
+): T {
+  if (!semitones || !Number.isFinite(semitones) || semitones === 0) return audio;
+  if (!audio.mimeType.toLowerCase().includes("wav")) return audio;
+  try {
+    const body = shiftWavPitch(audio.body, semitones);
+    return { ...audio, body, durationSeconds: wavDurationSeconds(body) };
+  } catch {
+    return audio;
+  }
+}

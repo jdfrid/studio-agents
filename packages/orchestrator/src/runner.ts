@@ -7,6 +7,7 @@ import {
   geminiVoiceNameFromCreative,
   buildTtsDeliveryStyle,
   geminiDialogueVoicePair,
+  voicePitchSemitonesFromCreative,
   voiceSexFromCreative,
   nextStage,
   resolveRenderProfile,
@@ -172,8 +173,9 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         toneOfVoice: briefData.toneOfVoice,
         style: briefData.style
       });
+      const voicePitchSemitones = voicePitchSemitonesFromCreative(creative);
       const brand = briefData.branding;
-      const lang = (briefData.language ?? "he").toLowerCase();
+      const lang = (briefData.language ?? "en").toLowerCase();
       const visitPrefix = lang.startsWith("en") ? "Visit" : "בקרו ב־";
       const brandParts = [
         brand?.businessName?.trim(),
@@ -184,7 +186,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       ].filter(Boolean);
       const brandEndNarration = brandParts.length ? brandParts.join(". ") : undefined;
       return {
-        language: briefData.language ?? "he",
+        language: briefData.language ?? "en",
         scenes: (script?.scenes ?? []).map((scene) => {
           const speaker = scene.speaker ?? "narrator";
           const sceneVoice =
@@ -204,6 +206,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         ...(voiceName ? { voiceName } : {}),
         ...(voiceNameB ? { voiceNameB } : {}),
         ...(voiceStyle ? { voiceStyle } : {}),
+        ...(voicePitchSemitones ? { voicePitchSemitones } : {}),
         ...(brandEndNarration ? { brandEndNarration } : {})
       };
     }
@@ -341,7 +344,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
                 narration: brandEnd.narration
               }
             : null,
-        language: briefData.language ?? briefInput.language ?? "he",
+        language: briefData.language ?? briefInput.language ?? "en",
         karaokeCaptions,
         subtitleStyle: resolveSubtitleStyle({
           ...(creative?.subtitlePosition ? { position: creative.subtitlePosition } : {}),

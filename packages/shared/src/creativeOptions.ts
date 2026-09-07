@@ -1,5 +1,11 @@
 import { z } from "zod";
 import type { Locale } from "./localization.js";
+import {
+  geminiVoicesForSex,
+  isMaleGeminiVoice,
+  resolveVoiceCharacterPreset,
+  voiceCharacterFieldOptions
+} from "./voiceCatalog.js";
 
 const SubtitleRotationSchema = z.preprocess(
   (value) =>
@@ -42,6 +48,8 @@ export const CreativeOptionsSchema = z
     accent: z.string().max(80).optional(),
     /** Narration gender for Gemini TTS (male/female). */
     voiceGender: z.enum(["male", "female"]).optional(),
+    /** Gemini voice-character preset id (timbre). Legacy drafts may still use voiceType. */
+    voiceCharacter: z.string().max(80).optional(),
     voiceType: z.string().max(80).optional(),
     speechStyle: z.string().max(80).optional(),
     speechSpeed: z.string().max(40).optional(),
@@ -465,6 +473,12 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
         ]
       },
       {
+        key: "voiceCharacter",
+        labelHe: "סוג קול",
+        kind: "select",
+        options: voiceCharacterFieldOptions()
+      },
+      {
         key: "accent",
         labelHe: "שפה ומבטא",
         kind: "select",
@@ -475,27 +489,6 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "צרפתית", labelHe: "צרפתית" },
           { value: "יידיש", labelHe: "יידיש" },
           { value: "אידיש", labelHe: "אידיש" }
-        ]
-      },
-      {
-        key: "voiceType",
-        labelHe: "סגנון קול",
-        kind: "select",
-        options: [
-          { value: "עמוק", labelHe: "עמוק" },
-          { value: "סמכותי", labelHe: "סמכותי" },
-          { value: "ידידותי", labelHe: "ידידותי" },
-          { value: "צעיר", labelHe: "צעיר" },
-          { value: "מבוגר", labelHe: "מבוגר" },
-          { value: "חם", labelHe: "חם ונעים" },
-          { value: "רך", labelHe: "רך ומרגיע" },
-          { value: "אנרגטי", labelHe: "אנרגטי" },
-          { value: "טבעי", labelHe: "טבעי ולא פרסומי" },
-          { value: "מספר סיפורים", labelHe: "מספר סיפורים" },
-          { value: "רשמי", labelHe: "רשמי / ממלכתי" },
-          { value: "רדיופוני", labelHe: "רדיופוני" },
-          { value: "קרוב ואישי", labelHe: "קרוב ואישי" },
-          { value: "טכנולוגי", labelHe: "טכנולוגי" }
         ]
       },
       {
@@ -815,6 +808,7 @@ const FIELD_LABEL_EN: Record<keyof CreativeOptions, string> = {
   effects: "Effects",
   accent: "Language and accent",
   voiceGender: "Narration voice",
+  voiceCharacter: "Voice character",
   voiceType: "Voice style",
   speechStyle: "Speaking style",
   speechSpeed: "Speaking speed",
@@ -1138,6 +1132,7 @@ for (const section of CREATIVE_FIELD_SECTIONS) {
       option.labelEn =
         OPTION_LABEL_EN_BY_HE[option.labelHe] ??
         OPTION_LABEL_EN_BY_HE[option.value] ??
+        option.labelEn ??
         (/^[\x20-\x7E]+$/.test(option.labelHe) ? option.labelHe : option.value);
       option.code = stableOptionCode(field.key, option.value, option.labelEn);
     }
@@ -1336,17 +1331,27 @@ export function formatCreativeConstraints(
   return lines;
 }
 
-/** Gemini prebuilt TTS voice from creative gender / style / accent. */
+/** Gemini prebuilt TTS voice from creative gender / character / style / accent. */
 export function geminiVoiceNameFromCreative(creative?: CreativeOptions | null): string | undefined {
+  const preset = resolveVoiceCharacterPreset(creative);
+  if (preset) return preset.geminiVoice;
   const sex = voiceSexFromCreative(creative);
   if (!sex) return undefined;
-  const blob = `${creative?.voiceType ?? ""} ${creative?.speechStyle ?? ""} ${creative?.accent ?? ""}`.toLowerCase();
+  const blob = `${creative?.voiceCharacter ?? ""} ${creative?.voiceType ?? ""} ${creative?.speechStyle ?? ""} ${creative?.accent ?? ""}`.toLowerCase();
   return pickGeminiVoiceForSex(sex, blob);
+}
+
+/** Optional pitch shift in semitones for baby / robotic character presets. */
+export function voicePitchSemitonesFromCreative(creative?: CreativeOptions | null): number | undefined {
+  const pitch = resolveVoiceCharacterPreset(creative)?.pitchSemitones;
+  return pitch && Number.isFinite(pitch) ? pitch : undefined;
 }
 
 /** User- or style-locked narration sex. Undefined means the pipeline should match the on-screen cast. */
 export function voiceSexFromCreative(creative?: CreativeOptions | null): "male" | "female" | undefined {
   if (!creative) return undefined;
+  const fromCharacter = resolveVoiceCharacterPreset(creative)?.sex;
+  if (fromCharacter) return fromCharacter;
   const gender = creative.voiceGender;
   if (gender === "male" || gender === "female") return gender;
   const type = String(creative.voiceType ?? "");
@@ -1358,6 +1363,14 @@ export function voiceSexFromCreative(creative?: CreativeOptions | null): "male" 
   const blob = `${type} ${style} ${accent}`.toLowerCase();
   if (/עמוק|סמכותי|מבוגר|חדשותי/.test(blob)) return "male";
   return "female";
+}
+
+/** Child/baby voice locks on-screen age. Adult presets do not override ageGroup. */
+export function voiceAgeFromCreative(
+  creative?: CreativeOptions | null
+): "child" | "baby" | undefined {
+  const age = resolveVoiceCharacterPreset(creative)?.age;
+  return age === "child" || age === "baby" ? age : undefined;
 }
 
 export function defaultVoiceSexForLanguage(language?: string | null): "male" | "female" {
@@ -1395,17 +1408,41 @@ export function presenterCastInstruction(opts: {
   sex: "male" | "female";
   userLocked: boolean;
   hasPhotos?: boolean;
+  age?: "child" | "baby";
 }): string {
   if (opts.hasPhotos) {
     return "CAST PHOTOS define identity: keep the uploaded people. Do not invent a different gender. Narration voice will match those people.";
   }
-  const person = opts.sex === "female" ? "a woman (female adult)" : "a man (male adult)";
-  const opposite = opts.sex === "female" ? "a man or male host" : "a woman or female host";
+  const person = presenterPersonPhrase(opts.sex, opts.age);
+  const opposite = presenterOppositePhrase(opts.sex, opts.age);
   const voice = opts.sex;
+  const ageLock =
+    opts.age === "child"
+      ? " Age lock: the speaker is a child (about 6–10 years old), never an adult."
+      : opts.age === "baby"
+        ? " Age lock: the speaker is a toddler (about 1–3 years old), never an older child or adult."
+        : "";
   if (opts.userLocked) {
-    return `CAST–VOICE MATCH (mandatory): narration voice is ${voice}. Every on-screen speaker must be ${person}. Do not show ${opposite}. characterBible, visualPrompt, veoPrompt, and visualDirection must match that sex.`;
+    return `CAST–VOICE MATCH (mandatory): narration voice is ${voice}. Every on-screen speaker must be ${person}. Do not show ${opposite}.${ageLock} characterBible, visualPrompt, veoPrompt, and visualDirection must match that sex and age.`;
   }
-  return `CAST–VOICE MATCH (mandatory): unless the user clearly specified otherwise, the on-screen speaker must be ${person} so it matches the ${voice} narration voice. Never show ${opposite} while the voice is ${voice}.`;
+  return `CAST–VOICE MATCH (mandatory): unless the user clearly specified otherwise, the on-screen speaker must be ${person} so it matches the ${voice} narration voice. Never show ${opposite} while the voice is ${voice}.${ageLock}`;
+}
+
+function presenterPersonPhrase(sex: "male" | "female", age?: "child" | "baby"): string {
+  if (age === "baby") return sex === "female" ? "a baby/toddler girl" : "a baby/toddler boy";
+  if (age === "child") {
+    return sex === "female"
+      ? "a girl (female child, about 6–10 years old)"
+      : "a boy (male child, about 6–10 years old)";
+  }
+  return sex === "female" ? "a woman (female adult)" : "a man (male adult)";
+}
+
+function presenterOppositePhrase(sex: "male" | "female", age?: "child" | "baby"): string {
+  if (age === "baby" || age === "child") {
+    return sex === "female" ? "an adult woman or male host" : "an adult man or female host";
+  }
+  return sex === "female" ? "a man or male host" : "a woman or female host";
 }
 
 function pickGeminiVoiceForSex(sex: "male" | "female", blob: string): string {
@@ -1419,13 +1456,6 @@ function pickGeminiVoiceForSex(sex: "male" | "female", blob: string): string {
   if (/מרגש|דרמטי|zephyr/i.test(blob)) return "Zephyr";
   if (/רגוע|leda/i.test(blob)) return "Leda";
   return "Kore";
-}
-
-const MALE_GEMINI_VOICES = ["Charon", "Puck", "Fenrir", "Orus"] as const;
-const FEMALE_GEMINI_VOICES = ["Kore", "Aoede", "Zephyr", "Leda"] as const;
-
-function isMaleGeminiVoice(name: string): boolean {
-  return /^(Charon|Puck|Fenrir|Orus)$/i.test(name);
 }
 
 /** Infer character sexes from locked cast text (Hebrew/English cues). */
@@ -1454,7 +1484,7 @@ export function inferCastSexesFromBible(characterBible?: string | null): Array<"
 }
 
 function pickDifferentGeminiVoice(sex: "male" | "female", exclude: string): string {
-  const pool = sex === "male" ? MALE_GEMINI_VOICES : FEMALE_GEMINI_VOICES;
+  const pool = geminiVoicesForSex(sex);
   const alt = pool.find((v) => v.toLowerCase() !== exclude.toLowerCase());
   return alt ?? pickGeminiVoiceForSex(sex, "");
 }
@@ -1474,7 +1504,7 @@ export function geminiDialogueVoicePair(
   const lang = language ?? creative?.language ?? null;
   const locked = voiceSexFromCreative(creative);
   const cast = inferCastSexesFromBible(characterBible);
-  const blob = `${creative?.voiceType ?? ""} ${creative?.speechStyle ?? ""} ${creative?.accent ?? ""}`.toLowerCase();
+  const blob = `${creative?.voiceCharacter ?? ""} ${creative?.voiceType ?? ""} ${creative?.speechStyle ?? ""} ${creative?.accent ?? ""}`.toLowerCase();
 
   const primarySex: "male" | "female" =
     locked ?? (cast[0] ? cast[0] : defaultVoiceSexForLanguage(lang));
@@ -1498,8 +1528,10 @@ export function geminiDialogueVoicePair(
 export function geminiTtsStyleFromCreative(creative?: CreativeOptions | null): string | undefined {
   if (!creative) return undefined;
   const parts: string[] = [];
+  const preset = resolveVoiceCharacterPreset(creative);
+  if (preset) parts.push(preset.timbrePrompt);
   if (creative.speechStyle) parts.push(String(creative.speechStyle));
-  if (creative.voiceType) parts.push(String(creative.voiceType));
+  if (!preset && creative.voiceType) parts.push(String(creative.voiceType));
   if (creative.speechSpeed) parts.push(`מהירות: ${creative.speechSpeed}`);
   if (creative.accent) parts.push(`מבטא: ${creative.accent}`);
   if (creative.communicationStyle) parts.push(`טון תקשורת: ${creative.communicationStyle}`);

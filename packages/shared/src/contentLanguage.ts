@@ -32,7 +32,7 @@ export function normalizeContentLanguage(code?: string | null): string {
 
   const raw = String(code ?? "").trim();
 
-  if (!raw) return "he";
+  if (!raw) return "en";
 
   const lower = raw.toLowerCase();
 
@@ -52,7 +52,7 @@ export function normalizeContentLanguage(code?: string | null): string {
 
   if (lower.startsWith("es") || raw.includes("ספרד")) return "es";
 
-  return lower.slice(0, 8) || "he";
+  return lower.slice(0, 8) || "en";
 
 }
 
@@ -94,7 +94,7 @@ export function contentLanguageEnglishName(code?: string | null): string {
 
     default:
 
-      return "Hebrew";
+      return "English";
 
   }
 
@@ -138,7 +138,7 @@ export function contentLanguageNativeName(code?: string | null): string {
 
     default:
 
-      return "עברית";
+      return "English";
 
   }
 
@@ -207,7 +207,7 @@ export function resolveContentLanguage(input: {
 
   if (letters.length >= 12 && !looksLikeHebrew(letters) && /[a-zA-Z]{8,}/.test(letters)) return "en";
 
-  return "he";
+  return "en";
 
 }
 

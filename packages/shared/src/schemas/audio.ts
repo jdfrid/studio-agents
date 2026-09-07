@@ -30,6 +30,8 @@ export const AudioInputSchema = z.object({
   voiceNameB: z.string().max(40).optional(),
   /** Delivery style hint prepended to TTS text (speechStyle / accent / event tone). */
   voiceStyle: z.string().max(500).optional(),
+  /** Cheap local pitch shift in semitones (baby / robotic Gemini presets). */
+  voicePitchSemitones: z.number().min(-12).max(12).optional(),
   /** Optional brand end-card spoken line (business name / slogan / site). */
   brandEndNarration: z.string().max(400).optional()
 });

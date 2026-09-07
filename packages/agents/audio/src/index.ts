@@ -4,7 +4,8 @@ import {
   fetchMusic,
   geminiGenerateMusic,
   geminiSynthesizeSpeech,
-  synthesizeSpeech
+  synthesizeSpeech,
+  applyVoicePitchShift
 } from "@studio/providers";
 import {
   AudioInputSchema,
@@ -112,6 +113,9 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
                   await ctx.cost.record({ ...event, sceneId: scene.sceneId });
                 }
               );
+              if (scene.speaker !== "b") {
+                audio = applyVoicePitchShift(audio, input.voicePitchSemitones);
+              }
             } catch (primaryError) {
               if (!ttsProvider || ttsProvider.id === primaryTts.id) throw primaryError;
               await ctx.log.log("audio_tts_fallback", "Gemini TTS failed; trying fallback TTS provider", {
@@ -276,17 +280,20 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
       const brandLine = input.brandEndNarration?.trim();
       if (brandLine && !useClonedVoice && defaultTts?.type === "GEMINI") {
         try {
-          const audio = await geminiSynthesizeSpeech(
-            defaultTts,
-            {
-              text: brandLine,
-              language: input.language,
-              ...(input.voiceName ? { voiceName: input.voiceName } : {}),
-              ...(input.voiceStyle ? { style: input.voiceStyle } : {})
-            },
-            async (event) => {
-              await ctx.cost.record({ ...event, sceneId: "brand_end" });
-            }
+          const audio = applyVoicePitchShift(
+            await geminiSynthesizeSpeech(
+              defaultTts,
+              {
+                text: brandLine,
+                language: input.language,
+                ...(input.voiceName ? { voiceName: input.voiceName } : {}),
+                ...(input.voiceStyle ? { style: input.voiceStyle } : {})
+              },
+              async (event) => {
+                await ctx.cost.record({ ...event, sceneId: "brand_end" });
+              }
+            ),
+            input.voicePitchSemitones
           );
           const voiceExt = audio.mimeType.includes("wav")
             ? "wav"

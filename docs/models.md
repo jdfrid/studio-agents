@@ -16,7 +16,8 @@ flowchart TD
   heygenForced --> resolve
   env[RENDER_PROFILE env / platform default] --> resolve
   resolve --> gen[getVideoBeatGenerator]
-  gen --> veo[Veo Gemini]
+  gen --> omni[Gemini Omni Interactions API]
+  gen --> veo[Veo Gemini legacy / fallback]
   gen --> fal[fal: Kling Wan Hailuo Seedance Luma]
   gen --> hg[HeyGen]
 ```
@@ -25,7 +26,7 @@ flowchart TD
 
 1. `preferHeygenDub=on` ב־creative → כופה `heygen-i2v` (בשלב brief).
 2. אחרת `brief.renderProfile` אם תקין.
-3. אחרת ברירת מחדל: הגדרת פלטפורם באדמין → `RENDER_PROFILE` ב־env → `GEMINI_VEO_MODE=extend` → **`veo-multiclip`**.
+3. אחרת ברירת מחדל: הגדרת פלטפורם באדמין → `RENDER_PROFILE` ב־env → `GEMINI_VEO_MODE=extend` → **`omni-multiclip`**.
 
 **הערת טופס:** יצירת סרטון מה־UI שולחת כרגע `budgetMode: true` תמיד (פחות סצנות / מצב חסכון ל־asset).
 
@@ -33,105 +34,107 @@ flowchart TD
 
 ## 2. פרופילי רינדור (וידאו)
 
-| id | תווית | ספק | strategy | beat | max clip | תמונת עוגן | אודיו מהספק | מפתח / תנאי | מגבלות עיקריות |
-|----|--------|-----|----------|------|----------|------------|-------------|-------------|----------------|
-| `veo-multiclip` | Veo Fast — זול (ברירת מחדל) | Gemini Veo | multiclip | 4s (budget) / buckets 4–8 | 8s | לא חובה | לא (TTS בנפרד) | `GEMINI_API_KEY` | אין lip-sync אמיתי; מדיניות תוכן/סלבס; מכסות RPM/יתרה Google |
-| `veo-extend` | Veo Fast — שרשרת | Gemini Veo | extend | 10s | 8s ל־API call | לא חובה | לא | `GEMINI_API_KEY` | יקר יותר; כשל באמצע השרשרת שובר את הריצה |
-| `kling-i2v` | Kling 2.1 | fal | multiclip | 10s | 10s | **חובה** | לא | `FAL_API_KEY` | prompt תנועה ≤~2400 תווים; עלות לפי שנייה (~$0.09/s) |
-| `wan-i2v` | Wan 2.7 | fal | multiclip | 5s | 5s | **חובה** | לא | `FAL_API_KEY` | I2V בלבד; זול יחסית |
-| `hailuo-i2v` | Hailuo MiniMax | fal | multiclip | 6s | 6s | **חובה** | לא | `FAL_API_KEY` | I2V בלבד |
-| `seedance-mini-i2v` | Seedance 2 Mini | fal | multiclip | 5s | 15s | **חובה** | לא | `FAL_API_KEY` | חסימות copyright; יקר יותר מ־Wan |
-| `seedance-fast-i2v` | Seedance 2 Fast | fal | multiclip | 5s | 15s | **חובה** | לא | `FAL_API_KEY` | כמו למעלה, מהיר יותר / יקר יותר |
-| `seedance-i2v` | Seedance 2 מלא | fal | multiclip | 5s | 15s | **חובה** | לא | `FAL_API_KEY` | איכות מלאה; יקר |
-| `luma-ray-i2v` | Luma Ray 3.2 | fal | multiclip | 5s | 5s | **חובה** | לא | `FAL_API_KEY` | מקס 5s לקליפ בודד |
-| `heygen-i2v` | HeyGen lip-sync | HeyGen | multiclip | 8s | 30s | **חובה** | כן (משאיר אודיו ספק) | `HEYGEN_API_KEY` (+ TTS לקלט) | קרדיטים **נפרדים** מ־Google; דורש אודיו TTS לסצנה |
+| id                  | תווית                                       | ספק                     | strategy  | beat                      | max clip      | תמונת עוגן | אודיו מהספק          | מפתח / תנאי                   | מגבלות עיקריות                                                             |
+| ------------------- | ------------------------------------------- | ----------------------- | --------- | ------------------------- | ------------- | ---------- | -------------------- | ----------------------------- | -------------------------------------------------------------------------- |
+| `omni-multiclip`    | Gemini Omni 1.1 Flash (Preview, ברירת מחדל) | Gemini Interactions API | multiclip | 4–8s                      | 10s           | נתמך       | לא נשמר (TTS בנפרד)  | `GEMINI_API_KEY`              | אין extend/last-frame; Preview וזמינות אזורית; fallback אוטומטי ל־Veo Fast |
+| `veo-multiclip`     | Veo Fast — היסטורי                          | Gemini Veo              | multiclip | 4s (budget) / buckets 4–8 | 8s            | לא חובה    | לא (TTS בנפרד)       | `GEMINI_API_KEY`              | אין lip-sync אמיתי; מדיניות תוכן/סלבס; מכסות RPM/יתרה Google               |
+| `veo-extend`        | Veo Fast — שרשרת                            | Gemini Veo              | extend    | 10s                       | 8s ל־API call | לא חובה    | לא                   | `GEMINI_API_KEY`              | יקר יותר; כשל באמצע השרשרת שובר את הריצה                                   |
+| `kling-i2v`         | Kling 2.1                                   | fal                     | multiclip | 10s                       | 10s           | **חובה**   | לא                   | `FAL_API_KEY`                 | prompt תנועה ≤~2400 תווים; עלות לפי שנייה (~$0.09/s)                       |
+| `wan-i2v`           | Wan 2.7                                     | fal                     | multiclip | 5s                        | 5s            | **חובה**   | לא                   | `FAL_API_KEY`                 | I2V בלבד; זול יחסית                                                        |
+| `hailuo-i2v`        | Hailuo MiniMax                              | fal                     | multiclip | 6s                        | 6s            | **חובה**   | לא                   | `FAL_API_KEY`                 | I2V בלבד                                                                   |
+| `seedance-mini-i2v` | Seedance 2 Mini                             | fal                     | multiclip | 5s                        | 15s           | **חובה**   | לא                   | `FAL_API_KEY`                 | חסימות copyright; יקר יותר מ־Wan                                           |
+| `seedance-fast-i2v` | Seedance 2 Fast                             | fal                     | multiclip | 5s                        | 15s           | **חובה**   | לא                   | `FAL_API_KEY`                 | כמו למעלה, מהיר יותר / יקר יותר                                            |
+| `seedance-i2v`      | Seedance 2 מלא                              | fal                     | multiclip | 5s                        | 15s           | **חובה**   | לא                   | `FAL_API_KEY`                 | איכות מלאה; יקר                                                            |
+| `luma-ray-i2v`      | Luma Ray 3.2                                | fal                     | multiclip | 5s                        | 5s            | **חובה**   | לא                   | `FAL_API_KEY`                 | מקס 5s לקליפ בודד                                                          |
+| `heygen-i2v`        | HeyGen lip-sync                             | HeyGen                  | multiclip | 8s                        | 30s           | **חובה**   | כן (משאיר אודיו ספק) | `HEYGEN_API_KEY` (+ TTS לקלט) | קרדיטים **נפרדים** מ־Google; דורש אודיו TTS לסצנה                          |
 
 **נתיבי fal (model id)**
 
-| id | falModel |
-|----|----------|
-| kling-i2v | `fal-ai/kling-video/v2.1/standard/image-to-video` |
-| wan-i2v | `fal-ai/wan/v2.7/image-to-video` |
-| hailuo-i2v | `fal-ai/minimax/hailuo-02/standard/image-to-video` |
-| seedance-mini-i2v | `bytedance/seedance-2.0/mini/image-to-video` |
-| seedance-fast-i2v | `bytedance/seedance-2.0/fast/image-to-video` |
-| seedance-i2v | `bytedance/seedance-2.0/image-to-video` |
-| luma-ray-i2v | `luma/agent/ray/v3.2/image-to-video` |
-| heygen-i2v | `heygen/v3/videos/image` (API ישיר, לא fal) |
+| id                | falModel                                           |
+| ----------------- | -------------------------------------------------- |
+| kling-i2v         | `fal-ai/kling-video/v2.1/standard/image-to-video`  |
+| wan-i2v           | `fal-ai/wan/v2.7/image-to-video`                   |
+| hailuo-i2v        | `fal-ai/minimax/hailuo-02/standard/image-to-video` |
+| seedance-mini-i2v | `bytedance/seedance-2.0/mini/image-to-video`       |
+| seedance-fast-i2v | `bytedance/seedance-2.0/fast/image-to-video`       |
+| seedance-i2v      | `bytedance/seedance-2.0/image-to-video`            |
+| luma-ray-i2v      | `luma/agent/ray/v3.2/image-to-video`               |
+| heygen-i2v        | `heygen/v3/videos/image` (API ישיר, לא fal)        |
 
-**Veo — מודל Gemini בפועל**
+**Gemini video — מודל בפועל**
 
-נקבע מ־`GEMINI_VIDEO_MODEL` (ברירת מחדל `veo-3.1-fast-generate-preview`). אפשרויות נוספות ב־env.example: lite (לא מומלץ ל־I2V), standard (יקר).
+נקבע מ־`GEMINI_VIDEO_MODEL` (ברירת מחדל `gemini-omni-1.1-flash-preview`). Omni משתמש ב־`POST /v1beta/interactions`, נשאר Preview ומתומחר בקירוב ב־$0.10 לשניית 720p. אם המודל לא זמין או לא נתמך, ה־adapter עובר בבטחה ל־`veo-3.1-fast-generate-preview`; מודל השימוש שנרשם הוא המודל שביצע בפועל. פרופילי Veo המפורשים נשארים זמינים ומשתמשים ב־`predictLongRunning`.
 
 ---
 
 ## 3. מודלים שאינם וידאו (לפי שלב)
 
-| שלב | תפקיד | מודל / ספק | env / בחירה | תנאי הפעלה | מגבלות |
-|-----|--------|------------|-------------|------------|--------|
-| brief | תכנון JSON | Gemini text | `GEMINI_TEXT_MODEL` ≈ `gemini-3.5-flash` | `GEMINI_API_KEY` | תלוי בשפה/creative; מצורפים בלי base64 |
-| script | תסריט + veoPrompt | אותו text | כמו למעלה | אחרי brief | JSON עלול להיחתך בהרבה סצנות |
-| audio | דיבוב | Gemini TTS | `GEMINI_TTS_MODEL` ≈ `gemini-2.5-flash-preview-tts` | narration לא ריק; לא muted | יידיש best-effort; `finishReason=OTHER`; ברירת קול Aoede/לפי creative |
-| audio | שיבוט קול | ElevenLabs | `ELEVENLABS_API_KEY` + דגימה | העלאת `voice_clone` | בלי מפתח — שגיאה אם ביקשו שיבוט |
-| audio | מוזיקה | Lyria / Gemini music | `GEMINI_MUSIC_MODEL`, `GEMINI_LYRIA_ENABLED` | budget יכול לדלג | כישלון מוזיקה לא תמיד מפיל את כל השלב |
-| asset | תמונות עוגן לסצנה | Gemini image | `GEMINI_IMAGE_MODEL` ≈ `gemini-3.1-flash-image` | `GEMINI_API_KEY` | `blockReason=OTHER` / IMAGE_OTHER; עד ~2–4 refs inline; budget=`reference_only` |
-| package | timeline + karaoke cues | לוגיקה מקומית | — | תמיד | אומדן זמני מילים (לא Whisper) |
-| render | וידאו לפי פרופיל | ראה §2 | לפי פרופיל | credential מתאים | concat/ffmpeg; reuse קליפים |
-| render | title_card / כתוביות / watermark / end card | FFmpeg | גופן מערכת | flags creative | לא API; באגי פילטרים אפשריים |
+| שלב     | תפקיד                                       | מודל / ספק           | env / בחירה                                         | תנאי הפעלה                 | מגבלות                                                                          |
+| ------- | ------------------------------------------- | -------------------- | --------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------- |
+| brief   | תכנון JSON                                  | Gemini text          | `GEMINI_TEXT_MODEL` ≈ `gemini-3.5-flash`            | `GEMINI_API_KEY`           | תלוי בשפה/creative; מצורפים בלי base64                                          |
+| script  | תסריט + veoPrompt                           | אותו text            | כמו למעלה                                           | אחרי brief                 | JSON עלול להיחתך בהרבה סצנות                                                    |
+| audio   | דיבוב                                       | Gemini TTS           | `GEMINI_TTS_MODEL` ≈ `gemini-2.5-flash-preview-tts` | narration לא ריק; לא muted | קטלוג `voiceCharacter` (~30 קולות Gemini + טימבר); תינוק/רובוט = קירוב + pitch מקומי; יידיש best-effort |
+| audio   | שיבוט קול                                   | ElevenLabs           | `ELEVENLABS_API_KEY` + דגימה                        | העלאת `voice_clone`        | בלי מפתח — שגיאה אם ביקשו שיבוט                                                 |
+| audio   | מוזיקה                                      | Lyria / Gemini music | `GEMINI_MUSIC_MODEL`, `GEMINI_LYRIA_ENABLED`        | budget יכול לדלג           | כישלון מוזיקה לא תמיד מפיל את כל השלב                                           |
+| asset   | תמונות עוגן לסצנה                           | Gemini image         | `GEMINI_IMAGE_MODEL` ≈ `gemini-3.1-flash-image`     | `GEMINI_API_KEY`           | `blockReason=OTHER` / IMAGE_OTHER; עד ~2–4 refs inline; budget=`reference_only` |
+| package | timeline + karaoke cues                     | לוגיקה מקומית        | —                                                   | תמיד                       | אומדן זמני מילים (לא Whisper)                                                   |
+| render  | וידאו לפי פרופיל                            | ראה §2               | לפי פרופיל                                          | credential מתאים           | concat/ffmpeg; reuse קליפים                                                     |
+| render  | title_card / כתוביות / watermark / end card | FFmpeg               | גופן מערכת                                          | flags creative             | לא API; באגי פילטרים אפשריים                                                    |
 
 ---
 
 ## 4. מפתחות env קריטיים
 
-| משתנה | למה |
-|--------|-----|
-| `GEMINI_API_KEY` | brief, script, TTS, image, Veo, music |
-| `RENDER_PROFILE` | ברירת מחדל גלובלית לפרופיל וידאו |
-| `FAL_API_KEY` | כל פרופילי Kling / Wan / Hailuo / Seedance / Luma |
-| `HEYGEN_API_KEY` | `heygen-i2v` |
-| `HEYGEN_API_BASE` | ברירת מחדל `https://api.heygen.com` (ריק שובר upload) |
-| `ELEVENLABS_API_KEY` | שיבוט קול בלבד |
-| `GEMINI_VEO_AUDIO` | ברירת מחדל `0` — דיבוב מ־TTS + FFmpeg |
-| `GEMINI_VEO_SCENE_GAP_MS` | מרווח בין סצנות Veo (ברירת מחדל 20000) — מפחית 429 |
-| `GEMINI_VEO_MAX_INFLIGHT` | מקסימום יצירות Veo במקביל בכל ה־workers (ברירת מחדל 1) |
-| `GEMINI_VEO_429_MAX_ATTEMPTS` | כמה ניסיונות אוטומטיים על 429 (ברירת מחדל 8) |
-| `GCS_*` | ארטיפקטים / חתימות URL |
+| משתנה                         | למה                                                    |
+| ----------------------------- | ------------------------------------------------------ |
+| `GEMINI_API_KEY`              | brief, script, TTS, image, Gemini Omni/Veo, music      |
+| `RENDER_PROFILE`              | ברירת מחדל גלובלית לפרופיל וידאו                       |
+| `FAL_API_KEY`                 | כל פרופילי Kling / Wan / Hailuo / Seedance / Luma      |
+| `HEYGEN_API_KEY`              | `heygen-i2v`                                           |
+| `HEYGEN_API_BASE`             | ברירת מחדל `https://api.heygen.com` (ריק שובר upload)  |
+| `ELEVENLABS_API_KEY`          | שיבוט קול בלבד                                         |
+| `GEMINI_VEO_AUDIO`            | ברירת מחדל `0` — דיבוב מ־TTS + FFmpeg                  |
+| `GEMINI_VEO_SCENE_GAP_MS`     | מרווח בין סצנות Veo (ברירת מחדל 20000) — מפחית 429     |
+| `GEMINI_VEO_MAX_INFLIGHT`     | מקסימום יצירות Veo במקביל בכל ה־workers (ברירת מחדל 1) |
+| `GEMINI_VEO_429_MAX_ATTEMPTS` | כמה ניסיונות אוטומטיים על 429 (ברירת מחדל 8)           |
+| `GCS_*`                       | ארטיפקטים / חתימות URL                                 |
 
 ---
 
 ## 5. מה כל פרופיל “מצפה” מהפייפליין
 
-| פרופיל | תסריט | אודיו | ויזואל | רינדור |
-|---------|--------|--------|---------|---------|
-| Veo multiclip/extend | משפטים קצרים לפי bucket | TTS לכל beat | תמונות אופציונליות | קליפים נפרדים או שרשרת extend |
-| fal / Kling | motion prompt באנגלית | TTS (מעורבב ב־FFmpeg) | **reference frame חובה** | I2V לכל סצנה + concat |
-| HeyGen | דיבוב מדובר קצר | **TTS חובה** (מניע שפתיים) | **תמונת דמות חובה** | lip-sync; משאיר אודיו ספק |
+| פרופיל               | תסריט                   | אודיו                      | ויזואל                     | רינדור                                         |
+| -------------------- | ----------------------- | -------------------------- | -------------------------- | ---------------------------------------------- |
+| Omni multiclip       | משפטים קצרים לפי bucket | TTS לכל beat               | תמונת reference אופציונלית | Interactions API + concat; fallback ל־Veo Fast |
+| Veo multiclip/extend | משפטים קצרים לפי bucket | TTS לכל beat               | תמונות אופציונליות         | קליפים נפרדים או שרשרת extend                  |
+| fal / Kling          | motion prompt באנגלית   | TTS (מעורבב ב־FFmpeg)      | **reference frame חובה**   | I2V לכל סצנה + concat                          |
+| HeyGen               | דיבוב מדובר קצר         | **TTS חובה** (מניע שפתיים) | **תמונת דמות חובה**        | lip-sync; משאיר אודיו ספק                      |
 
 ---
 
 ## 6. נספח — כשלים שחזרו בפרודקשן
 
-| תסמין | ספק אמיתי | מה לעשות |
-|--------|-----------|----------|
-| הודעת Google Prepay + JSON `insufficient_credit` | **HeyGen** | לרכוש קרדיטים ב־HeyGen, לא ב־Google AI Studio |
-| `TTS … finishReason=OTHER` | Gemini TTS | לקצר דיבוב; יידיש ללא קוד שפה `yi-*`; ניסיונות חוזרים בקוד |
-| `Failed to parse URL from /v3/assets` | HeyGen base ריק | `HEYGEN_API_BASE=https://api.heygen.com` |
-| `No such filter: 'drawte'` | FFmpeg title_card | פסיקים ב־`alpha=if(...)` חתכו את `drawtext` — תוקן (alpha פשוט / בלי ביטויי פסיק ב־`-vf`) |
-| Kling `string_too_long` | fal Kling | קיצור veoPrompt ב־package (~2400) |
-| IMAGE_OTHER / blockReason OTHER | Gemini image | retries + פרומפט רך + פחות refs |
-| `429 RESOURCE_EXHAUSTED` / quota | Gemini Veo | retry+backoff אוטומטי; מרווח בין סצנות; Rerun משתמש ב־clip cache |
+| תסמין                                            | ספק אמיתי         | מה לעשות                                                                                  |
+| ------------------------------------------------ | ----------------- | ----------------------------------------------------------------------------------------- |
+| הודעת Google Prepay + JSON `insufficient_credit` | **HeyGen**        | לרכוש קרדיטים ב־HeyGen, לא ב־Google AI Studio                                             |
+| `TTS … finishReason=OTHER`                       | Gemini TTS        | לקצר דיבוב; יידיש ללא קוד שפה `yi-*`; ניסיונות חוזרים בקוד                                |
+| `Failed to parse URL from /v3/assets`            | HeyGen base ריק   | `HEYGEN_API_BASE=https://api.heygen.com`                                                  |
+| `No such filter: 'drawte'`                       | FFmpeg title_card | פסיקים ב־`alpha=if(...)` חתכו את `drawtext` — תוקן (alpha פשוט / בלי ביטויי פסיק ב־`-vf`) |
+| Kling `string_too_long`                          | fal Kling         | קיצור veoPrompt ב־package (~2400)                                                         |
+| IMAGE_OTHER / blockReason OTHER                  | Gemini image      | retries + פרומפט רך + פחות refs                                                           |
+| `429 RESOURCE_EXHAUSTED` / quota                 | Gemini Veo        | retry+backoff אוטומטי; מרווח בין סצנות; Rerun משתמש ב־clip cache                          |
 
 ---
 
 ## 7. המלצות בחירה מהירה
 
-- **זול / ברירת מחדל בלי תמונה:** `veo-multiclip`
+- **ברירת מחדל רגילה (טקסט או תמונה):** `omni-multiclip`
 - **דיבוב עם סנכרון שפתיים:** `heygen-i2v` + תמונת דמות + יתרת HeyGen
 - **תנועה מתמונה זולה:** `wan-i2v` / `hailuo-i2v` / `luma-ray-i2v`
 - **איכות I2V גבוהה יותר:** `kling-i2v` או Seedance (יקר)
 - **רצף ויזואלי אחד ארוך:** `veo-extend` (זהירות עלות/כשל)
 
-**לייצור לקוחות:** חשבון Gemini API ב־Paid עם מכסת Veo מספקת לדקה/ליום. המערכת מרככת 429 (retry, מרווח בין סצנות, מנעול גלובלי) אבל **לא מחליפה** מכסה יומית ריקה.
+**לייצור לקוחות:** חשבון Gemini API ב־Paid עם גישה ל־Omni Preview ומכסת וידאו מספקת. יש להשאיר את `veo-3.1-fast-generate-preview` זמין כ־fallback. המערכת מרככת 429 (retry, מרווח בין סצנות, מנעול גלובלי) אבל **לא מחליפה** מכסה יומית ריקה.
 
 ---
 

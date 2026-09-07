@@ -14,6 +14,12 @@ function presenterSexLock(sex?: "male" | "female"): string {
   return "";
 }
 
+function presenterAgeLock(age?: "child" | "baby"): string {
+  if (age === "child") return "On-screen speaker is a child (about 6–10 years old), not an adult.";
+  if (age === "baby") return "On-screen speaker is a toddler (about 1–3 years old), not an older child or adult.";
+  return "";
+}
+
 export type ContinuityContext = {
   characterBible: string;
   backgroundVisualPrompt: string;
@@ -23,6 +29,8 @@ export type ContinuityContext = {
   hasUserCharacterPhotos?: boolean;
   /** Locked on-screen speaker sex so visuals match narration. */
   presenterSex?: "male" | "female";
+  /** Locked on-screen speaker age when the chosen voice is a child or baby. */
+  presenterAge?: "child" | "baby";
 };
 
 export function deriveCharacterBible(backgroundVisualPrompt: string, explicit?: string | null): string {
@@ -49,11 +57,12 @@ export function buildReferenceImagePrompt(
   const action = stripContinuityPrefix(ctx.sceneAction).trim();
   const lock = ctx.hasUserCharacterPhotos ? CONTINUITY_LOCK_USER_PHOTOS : CONTINUITY_LOCK;
   const sexLock = ctx.hasUserCharacterPhotos ? "" : presenterSexLock(ctx.presenterSex);
+  const ageLock = ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
   const sameLine = ctx.hasUserCharacterPhotos
     ? "Composite the uploaded people into the event setting with identical wardrobe/coat colors; prefer speaker close-up or OTS (listener closed mouth)."
     : "Same people, same clothes, same place — only pose and micro-action change.";
   // Reserve room for lock + action; trim bible/location so Zod max(1600) never fails.
-  const fixed = [lock, sexLock, `Scene ${ctx.order + 1} of ${ctx.total}.`, sameLine].filter(Boolean).join(" ");
+  const fixed = [lock, sexLock, ageLock, `Scene ${ctx.order + 1} of ${ctx.total}.`, sameLine].filter(Boolean).join(" ");
   const budget = PROMPT_MAX - fixed.length - 48;
   const half = Math.max(80, Math.floor(budget / 3));
   const characters = ctx.characterBible.trim().slice(0, half);
@@ -64,6 +73,7 @@ export function buildReferenceImagePrompt(
     [
       lock,
       sexLock,
+      ageLock,
       `Scene ${ctx.order + 1} of ${ctx.total}.`,
       `Characters (locked): ${characters}.`,
       `Location (locked): ${location}.`,
@@ -76,9 +86,11 @@ export function buildReferenceImagePrompt(
 export function buildVeoContinuityPrefix(ctx: ContinuityContext): string {
   const lock = ctx.hasUserCharacterPhotos ? CONTINUITY_LOCK_USER_PHOTOS : CONTINUITY_LOCK;
   const sexLock = ctx.hasUserCharacterPhotos ? "" : presenterSexLock(ctx.presenterSex);
+  const ageLock = ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
   return [
     lock,
     sexLock,
+    ageLock,
     `Scene ${ctx.order + 1} of ${ctx.total}.`,
     `Character lock: ${ctx.characterBible.trim()}.`,
     `Location lock: ${ctx.backgroundVisualPrompt.trim()}.`
@@ -95,7 +107,9 @@ function stripContinuityPrefix(text: string): string {
 function prefixScenePrompt(existing: string, ctx: ContinuityContext): string {
   const core = stripContinuityPrefix(existing).trim();
   const sexLock = ctx.hasUserCharacterPhotos ? "" : presenterSexLock(ctx.presenterSex);
-  const prefix = `Same cast & location. ${ctx.characterBible.trim()}. ${sexLock ? `${sexLock} ` : ""}`;
+  const ageLock = ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
+  const extra = [sexLock, ageLock].filter(Boolean).join(" ");
+  const prefix = `Same cast & location. ${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`;
   const combined = `${prefix}${core}`;
   return combined.length <= 1200 ? combined : combined.slice(0, 1200);
 }
@@ -104,12 +118,13 @@ function prefixScenePrompt(existing: string, ctx: ContinuityContext): string {
 export function applyContinuityToScript(
   output: ScriptOutput,
   explicitCharacterBible?: string | null,
-  opts?: { hasUserCharacterPhotos?: boolean; presenterSex?: "male" | "female" }
+  opts?: { hasUserCharacterPhotos?: boolean; presenterSex?: "male" | "female"; presenterAge?: "child" | "baby" }
 ): ScriptOutput {
   const characterBible = deriveCharacterBible(output.backgroundVisualPrompt, explicitCharacterBible ?? output.characterBible);
   const total = output.scenes.length;
   const hasUserCharacterPhotos = opts?.hasUserCharacterPhotos === true;
   const presenterSex = hasUserCharacterPhotos ? undefined : opts?.presenterSex;
+  const presenterAge = hasUserCharacterPhotos ? undefined : opts?.presenterAge;
 
   const scenes: SceneSpec[] = output.scenes.map((scene, index) => {
     const ctx: ContinuityContext = {
@@ -118,7 +133,8 @@ export function applyContinuityToScript(
       order: index,
       total,
       hasUserCharacterPhotos,
-      presenterSex
+      presenterSex,
+      presenterAge
     };
     const actionSource = scene.referenceImagePrompt ?? scene.visualPrompt ?? scene.veoPrompt;
     return {

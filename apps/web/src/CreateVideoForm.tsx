@@ -4,6 +4,7 @@ import { apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 import { useCreativeCatalog } from "./creativeCatalog.js";
 import { creativePayloadForRequest } from "./creativePayload.js";
+import { localeFor } from "./i18n/index.js";
 import type { ProjectRunView } from "./types.js";
 import {
   CREATIVE_FIELD_SECTIONS,
@@ -35,8 +36,8 @@ const LEGACY_MOODS: Record<string, (typeof MOOD_OPTIONS)[number]> = {
   "נקי ומודרני": "modern", "דרמטי": "dramatic", "רגוע": "calm", "אחר": "other"
 };
 const CONTENT_LANGUAGES = [
-  ["he", "Hebrew"],
   ["en", "English"],
+  ["he", "Hebrew"],
   ["ar", "Arabic"],
   ["ru", "Russian"],
   ["fr", "French"],
@@ -46,7 +47,7 @@ const CONTENT_LANGUAGES = [
 
 export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: ProjectRunView) => void; onCancel: () => void }) {
   const { t, i18n } = useTranslation("createVideo");
-  const uiLocale: Locale = i18n.resolvedLanguage?.startsWith("en") ? "en" : "he";
+  const uiLocale: Locale = localeFor(i18n.resolvedLanguage);
   const catalog = useCreativeCatalog(uiLocale);
   const { user } = useAuth();
   const canCreate = user?.canCreateVideo ?? false;
@@ -81,7 +82,8 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [creative, setCreative] = useState<CreativeOptions>({
     karaokeCaptions: "on",
-    preferHeygenDub: "off"
+    preferHeygenDub: "off",
+    language: "en"
   });
   const [catalogSelections, setCatalogSelections] = useState<Record<string, string | number>>({});
   const [busy, setBusy] = useState(false);
@@ -534,7 +536,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
               }
             : {}),
           ...(targetAudience.trim() ? { targetAudience: targetAudience.trim() } : {}),
-          language: languageCodeFromCreative(creativeWithBasics) ?? "he",
+          language: languageCodeFromCreative(creativeWithBasics) ?? "en",
           durationSeconds,
           aspectRatio: aspectRatioFromCreative(creativeWithBasics) ?? "9:16",
           budgetMode: true,
@@ -559,12 +561,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     }
   }
 
-  const builtInKeys = new Set(
-    CREATIVE_FIELD_SECTIONS.flatMap((section) => section.fields.map((field) => String(field.key)))
-  );
+  const builtInKeys = new Set([
+    ...CREATIVE_FIELD_SECTIONS.flatMap((section) => section.fields.map((field) => String(field.key))),
+    "voiceType"
+  ]);
   const fieldsFor = (sectionId: string) =>
     (CREATIVE_FIELD_SECTIONS.find((section) => section.id === sectionId)?.fields ?? []).map((field) => {
-      const managed = catalog.byKey.get(String(field.key));
+      const managed =
+        field.key === "voiceCharacter" ? undefined : catalog.byKey.get(String(field.key));
       if (!managed) {
         return {
           ...field,
@@ -1034,7 +1038,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           <label className="field-block">
             {t("basic.contentLanguage")}
             <select
-              value={String(creative.language ?? "he")}
+              value={String(creative.language ?? "en")}
               onChange={(e) => setCreativeField("language", e.target.value as never)}
             >
               {CONTENT_LANGUAGES.map(([value, labelKey]) => (

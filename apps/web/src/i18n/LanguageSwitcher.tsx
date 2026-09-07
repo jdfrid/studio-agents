@@ -13,19 +13,19 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
     <div className={`language-switcher${compact ? " language-switcher-compact" : ""}`} aria-label={t("common.language")}>
       <button
         type="button"
-        className={locale === "he" ? "is-active" : ""}
-        aria-pressed={locale === "he"}
-        onClick={() => void select("he")}
-      >
-        עברית
-      </button>
-      <button
-        type="button"
         className={locale === "en" ? "is-active" : ""}
         aria-pressed={locale === "en"}
         onClick={() => void select("en")}
       >
         English
+      </button>
+      <button
+        type="button"
+        className={locale === "he" ? "is-active" : ""}
+        aria-pressed={locale === "he"}
+        onClick={() => void select("he")}
+      >
+        עברית
       </button>
     </div>
   );

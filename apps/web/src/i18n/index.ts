@@ -4,7 +4,7 @@ import { resources } from "./resources.js";
 import { createVideoResources } from "./createVideoResources.js";
 import { runResources } from "./runResources.js";
 
-export const UI_LOCALE_STORAGE_KEY = "prompt2spot:ui-locale";
+export const UI_LOCALE_STORAGE_KEY = "prompt2spot:ui-locale-v2";
 export type UiLocale = "he" | "en";
 
 function isUiLocale(value: string | null): value is UiLocale {
@@ -14,14 +14,14 @@ function isUiLocale(value: string | null): value is UiLocale {
 function storedLocale(): UiLocale {
   try {
     const value = window.localStorage.getItem(UI_LOCALE_STORAGE_KEY);
-    return isUiLocale(value) ? value : "he";
+    return isUiLocale(value) ? value : "en";
   } catch {
-    return "he";
+    return "en";
   }
 }
 
 export function localeFor(language = i18n.resolvedLanguage): UiLocale {
-  return language?.startsWith("en") ? "en" : "he";
+  return language?.startsWith("he") ? "he" : "en";
 }
 
 function syncDocument(locale: UiLocale) {
@@ -43,7 +43,7 @@ void i18n.use(initReactI18next).init({
     }
   },
   lng: storedLocale(),
-  fallbackLng: "he",
+  fallbackLng: "en",
   supportedLngs: ["he", "en"],
   interpolation: { escapeValue: false },
   initAsync: false,
