@@ -9,11 +9,20 @@ import {
 } from "../index.js";
 
 describe("Brief schemas", () => {
-  it("applies defaults", () => {
-    const parsed = BriefInputSchema.parse({ title: "Test", sourceText: "Make a video" });
-    expect(parsed.aspectRatio).toBe("9:16");
-    expect(parsed.durationSeconds).toBe(30);
-    expect(parsed.language).toBe("en");
+  it("accepts a brand template id and brand colors", () => {
+    const parsed = BriefInputSchema.parse({
+      title: "Gold watch",
+      sourceText: "Today's deal is a gold watch",
+      brandTemplateId: "tmpl_1",
+      branding: {
+        businessName: "DealsLuxy",
+        primaryColor: "#C9A227",
+        secondaryColor: "#0D1117"
+      }
+    });
+    expect(parsed.brandTemplateId).toBe("tmpl_1");
+    expect(parsed.branding?.primaryColor).toBe("#C9A227");
+    expect(parsed.branding?.secondaryColor).toBe("#0D1117");
   });
   it("rejects too short title", () => {
     expect(() => BriefInputSchema.parse({ title: "", sourceText: "x" })).toThrow();

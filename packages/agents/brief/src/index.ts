@@ -396,7 +396,9 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         : `https://${websiteUrlRaw}`
       : "";
     const creativeLogoPlacement = creative?.logoPlacement;
-    const hasBusinessBrand = Boolean(businessName || slogan || logoAsset || websiteUrl);
+    const primaryColor = input.branding?.primaryColor;
+    const secondaryColor = input.branding?.secondaryColor;
+    const hasBusinessBrand = Boolean(businessName || slogan || logoAsset || websiteUrl || primaryColor);
     let logoPlacement: NonNullable<BriefOutput["branding"]>["logoPlacement"] | undefined;
     if (hasBusinessBrand) {
       if (creativeLogoPlacement === "none") logoPlacement = "none";
@@ -408,6 +410,8 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
           ...(businessName ? { businessName } : {}),
           ...(slogan ? { slogan } : {}),
           ...(websiteUrl ? { websiteUrl } : {}),
+          ...(primaryColor ? { primaryColor } : {}),
+          ...(secondaryColor ? { secondaryColor } : {}),
           logo: logoAsset,
           ...(logoPlacement ? { logoPlacement } : {})
         }
@@ -469,6 +473,20 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         ...(brandNameConstraint ? [brandNameConstraint] : []),
         ...(slogan
           ? [resolvedLanguage === "he" || resolvedLanguage === "yi" ? `סלוגן העסק: ${slogan}` : `Business slogan: ${slogan}`]
+          : []),
+        ...(websiteUrl
+          ? [
+              resolvedLanguage === "he" || resolvedLanguage === "yi"
+                ? `CTA לאתר העסק: ${websiteUrl.replace(/^https?:\/\//i, "")}`
+                : `Always point viewers to the business website: ${websiteUrl.replace(/^https?:\/\//i, "")}`
+            ]
+          : []),
+        ...(primaryColor
+          ? [
+              `Brand palette (mandatory in visuals and end card): primary ${primaryColor}${
+                secondaryColor ? `, secondary ${secondaryColor}` : ""
+              }`
+            ]
           : []),
         ...(anchorNote ? [anchorNote] : []),
         ...(referenceVideoAnalysis

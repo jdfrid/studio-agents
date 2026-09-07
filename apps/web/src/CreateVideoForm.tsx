@@ -6,16 +6,20 @@ import { useCreativeCatalog } from "./creativeCatalog.js";
 import { creativePayloadForRequest } from "./creativePayload.js";
 import { localeFor } from "./i18n/index.js";
 import type { ProjectRunView } from "./types.js";
+import { BrandTemplatePanel } from "./BrandTemplatePanel.js";
 import {
   CREATIVE_FIELD_SECTIONS,
   aspectRatioFromCreative,
+  contrastTextHex,
   estimateRunCost,
   formatCostNis,
   getRenderProfile,
   languageCodeFromCreative,
+  normalizeHexColor,
   predictRenderProfileId,
   profileToProductionCostConfig,
   type ApprovalMode,
+  type BrandTemplateView,
   type CreativeOptions,
   type Locale
 } from "@studio/shared";
@@ -76,7 +80,12 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   const [businessName, setBusinessName] = useState("");
   const [slogan, setSlogan] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
+  const [primaryColor, setPrimaryColor] = useState("");
+  const [secondaryColor, setSecondaryColor] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [brandTemplateId, setBrandTemplateId] = useState("");
+  const [templateLogoUrl, setTemplateLogoUrl] = useState<string | null>(null);
+  const [brandingOpen, setBrandingOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [showExclusions, setShowExclusions] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
@@ -161,6 +170,9 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         businessName?: string;
         slogan?: string;
         websiteUrl?: string;
+        primaryColor?: string;
+        secondaryColor?: string;
+        brandTemplateId?: string;
       };
       setTitle(draft.title ?? "");
       setPrompt(draft.prompt ?? "");
@@ -188,6 +200,10 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       setBusinessName(draft.businessName ?? "");
       setSlogan(draft.slogan ?? "");
       setWebsiteUrl(draft.websiteUrl ?? "");
+      setPrimaryColor(draft.primaryColor ?? "");
+      setSecondaryColor(draft.secondaryColor ?? "");
+      setBrandTemplateId(draft.brandTemplateId ?? "");
+      if (draft.businessName || draft.brandTemplateId) setBrandingOpen(true);
     } catch {
       // Ignore an invalid local draft and start clean.
     }
@@ -213,7 +229,10 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         catalogSelections,
         businessName,
         slogan,
-        websiteUrl
+        websiteUrl,
+        primaryColor,
+        secondaryColor,
+        brandTemplateId
       };
       window.localStorage.setItem("prompt2spot:create-draft", JSON.stringify(draft));
       setDraftSavedAt(new Date());
@@ -237,11 +256,36 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     catalogSelections,
     businessName,
     slogan,
-    websiteUrl
+    websiteUrl,
+    primaryColor,
+    secondaryColor,
+    brandTemplateId
   ]);
 
   const previewAspect = aspectRatioFromCreative(creative) ?? "9:16";
-  const showBrandingPreview = Boolean(businessName.trim() || slogan.trim() || websiteUrl.trim() || logoFile);
+  const previewLogoSrc = logoPreviewUrl || templateLogoUrl;
+  const previewBg = normalizeHexColor(secondaryColor) ?? "";
+  const previewFg = contrastTextHex(previewBg || "#0D1117");
+  const previewAccent = normalizeHexColor(primaryColor) ?? "#7ab5ff";
+  const showBrandingPreview = Boolean(
+    businessName.trim() || slogan.trim() || websiteUrl.trim() || previewLogoSrc || previewBg
+  );
+
+  function applyBrandTemplate(template: BrandTemplateView, varied: CreativeOptions) {
+    setBrandTemplateId(template.id || "");
+    if (template.businessName?.trim()) setBusinessName(template.businessName.trim());
+    if (template.slogan?.trim()) setSlogan(template.slogan.trim());
+    if (template.websiteUrl?.trim()) setWebsiteUrl(template.websiteUrl.trim());
+    if (template.primaryColor) setPrimaryColor(template.primaryColor);
+    if (template.secondaryColor) setSecondaryColor(template.secondaryColor);
+    if (template.durationSeconds) setDurationSeconds(template.durationSeconds);
+    if (template.platform) setPlatform(template.platform);
+    if (template.filmTemplate === "product_demo") setVideoGoal("product");
+    setTemplateLogoUrl(template.logoUrl ?? null);
+    if (template.logoUrl) setLogoFile(null);
+    setCreative((previous) => ({ ...previous, ...varied }));
+    setBrandingOpen(true);
+  }
 
   function addVisualFiles(incoming: FileList | File[]) {
     const next = [...visualFiles];
@@ -499,12 +543,16 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         })
       );
       const creativeCatalogSnapshot = [...catalogSnapshot, ...missingBuiltInSnapshot];
+      const primaryHex = normalizeHexColor(primaryColor);
+      const secondaryHex = normalizeHexColor(secondaryColor);
       const brandingPayload =
-        businessName.trim() || slogan.trim() || websiteUrl.trim()
+        businessName.trim() || slogan.trim() || websiteUrl.trim() || primaryHex || secondaryHex
           ? {
               ...(businessName.trim() ? { businessName: businessName.trim() } : {}),
               ...(slogan.trim() ? { slogan: slogan.trim() } : {}),
-              ...(websiteUrl.trim() ? { websiteUrl: websiteUrl.trim() } : {})
+              ...(websiteUrl.trim() ? { websiteUrl: websiteUrl.trim() } : {}),
+              ...(primaryHex ? { primaryColor: primaryHex } : {}),
+              ...(secondaryHex ? { secondaryColor: secondaryHex } : {})
             }
           : undefined;
       const run = await apiPost<ProjectRunView>("/runs", {
@@ -544,7 +592,8 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           attachments,
           ...(creativePayload ? { creative: creativePayload } : {}),
           ...(creativeCatalogSnapshot.length ? { creativeCatalogSnapshot } : {}),
-          ...(brandingPayload ? { branding: brandingPayload } : {})
+          ...(brandingPayload ? { branding: brandingPayload } : {}),
+          ...(brandTemplateId ? { brandTemplateId } : {})
         }
       });
       window.localStorage.removeItem("prompt2spot:create-draft");
@@ -711,6 +760,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           />
           {title.length > 170 ? <small className="field-counter">{title.length}/200</small> : null}
         </label>
+        {brandTemplateId ? <p className="brand-template-run-hint">{t("branding.templates.productHint")}</p> : null}
 
         <fieldset className="choice-fieldset">
           <legend>{t("details.goal")} <span className="required-mark">{t("common.required")}</span></legend>
@@ -1116,11 +1166,17 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       </fieldset>
       </section>
 
-      <details className="branding-section optional-disclosure">
+      <details
+        className="branding-section optional-disclosure"
+        open={brandingOpen}
+        onToggle={(event) => setBrandingOpen((event.currentTarget as HTMLDetailsElement).open)}
+      >
         <summary>
           <span className="form-section-icon" aria-hidden>✦</span>
           <span><strong>{t("branding.heading")}</strong><small>{t("branding.summaryHelp")}</small></span>
-          <span className="disclosure-status">{businessName || logoFile ? t("branding.configured") : t("branding.optional")}</span>
+          <span className="disclosure-status">
+            {businessName || logoFile || brandTemplateId || templateLogoUrl ? t("branding.configured") : t("branding.optional")}
+          </span>
         </summary>
         <div className="optional-disclosure-body">
         <div className="form-section-heading">
@@ -1130,6 +1186,23 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
             <p className="muted branding-hint">{t("branding.help")}</p>
           </div>
         </div>
+        <BrandTemplatePanel
+          locale={uiLocale}
+          selectedId={brandTemplateId || null}
+          branding={{ businessName, slogan, websiteUrl, primaryColor, secondaryColor }}
+          creative={creative}
+          durationSeconds={durationSeconds}
+          platform={platform}
+          logoFile={logoFile}
+          onApply={applyBrandTemplate}
+          onClear={() => {
+            setBrandTemplateId("");
+            setTemplateLogoUrl(null);
+          }}
+          onHydrateLogo={(template) => {
+            if (!logoFile) setTemplateLogoUrl(template.logoUrl ?? null);
+          }}
+        />
         <label>
           {t("branding.businessName")}
           <input
@@ -1159,31 +1232,76 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
             inputMode="url"
           />
         </label>
+        <div className="brand-template-colors">
+          <label>
+            {t("branding.primaryColor")}
+            <span className="brand-color-input">
+              <input
+                type="color"
+                value={normalizeHexColor(primaryColor) ?? "#C9A227"}
+                onChange={(e) => setPrimaryColor(e.target.value.toUpperCase())}
+              />
+              <input
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                placeholder="#C9A227"
+                maxLength={7}
+              />
+            </span>
+          </label>
+          <label>
+            {t("branding.secondaryColor")}
+            <span className="brand-color-input">
+              <input
+                type="color"
+                value={normalizeHexColor(secondaryColor) ?? "#0D1117"}
+                onChange={(e) => setSecondaryColor(e.target.value.toUpperCase())}
+              />
+              <input
+                value={secondaryColor}
+                onChange={(e) => setSecondaryColor(e.target.value)}
+                placeholder="#0D1117"
+                maxLength={7}
+              />
+            </span>
+          </label>
+        </div>
+        <small className="muted branding-colors-help">{t("branding.colorsHelp")}</small>
         <label className="file-row">
           {t("branding.logo")}
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
-            onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              setLogoFile(e.target.files?.[0] ?? null);
+              if (e.target.files?.[0]) setTemplateLogoUrl(null);
+            }}
           />
           <small className="muted">{t("branding.logoHelp")}</small>
         </label>
         {showBrandingPreview ? (
           <div
             className={`branding-preview branding-preview-${previewAspect === "16:9" ? "landscape" : "portrait"}`}
+            style={previewBg ? { background: previewBg } : undefined}
             aria-live="polite"
             aria-label={t("branding.previewAria")}
           >
             <div className="branding-preview-inner">
-              {logoPreviewUrl ? (
-                <img src={logoPreviewUrl} alt={t("branding.logoAlt", { name: businessName || t("branding.businessName") })} className="branding-preview-logo" />
+              {previewLogoSrc ? (
+                <img src={previewLogoSrc} alt={t("branding.logoAlt", { name: businessName || t("branding.businessName") })} className="branding-preview-logo" />
               ) : (
                 <div className="branding-preview-logo-placeholder" aria-hidden />
               )}
-              {businessName.trim() ? <p className="branding-preview-name">{businessName.trim()}</p> : null}
-              {slogan.trim() ? <p className="branding-preview-slogan">{slogan.trim()}</p> : null}
+              {businessName.trim() ? (
+                <p className="branding-preview-name" style={{ color: previewFg }}>{businessName.trim()}</p>
+              ) : null}
+              {slogan.trim() ? (
+                <p className="branding-preview-slogan" style={{ color: previewFg }}>{slogan.trim()}</p>
+              ) : null}
               {websiteUrl.trim() ? (
-                <p className="branding-preview-url">{websiteUrl.trim().replace(/^https?:\/\//i, "")}</p>
+                <p className="branding-preview-url" style={{ color: previewAccent }}>
+                  {websiteUrl.trim().replace(/^https?:\/\//i, "")}
+                </p>
               ) : null}
               <p className="branding-preview-credit">prompt2spot.com</p>
             </div>

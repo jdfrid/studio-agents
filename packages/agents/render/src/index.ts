@@ -10,9 +10,12 @@ import {
   NoProviderConfiguredError,
   RenderInputSchema,
   RenderOutputSchema,
-  buildKaraokeAss,
+  contrastTextHex,
+  hexToAssColor,
+  hexToFfmpegColor,
   buildRenderedTextAss,
   buildTitleCardAss,
+  buildKaraokeAss,
   getRenderProfile,
   isRtlRenderedText,
   resolveSubtitleStyle,
@@ -1306,6 +1309,9 @@ async function createBusinessEndCardClip(
   const name = branding.businessName?.trim() || "";
   const slogan = branding.slogan?.trim() || "";
   const website = (branding.websiteUrl?.trim() || "").replace(/^https?:\/\//i, "");
+  const bgColor = hexToFfmpegColor(branding.secondaryColor);
+  const titleAss = hexToAssColor(contrastTextHex(branding.secondaryColor));
+  const accentAss = hexToAssColor(branding.primaryColor, "&H00FFB57A");
   const font = resolveDrawtextFont();
   const nameSize = Math.max(28, Math.round(Math.min(width, height) * 0.06));
   const sloganSize = Math.max(18, Math.round(Math.min(width, height) * 0.035));
@@ -1342,7 +1348,7 @@ async function createBusinessEndCardClip(
     const y = hasLogo
       ? Math.round(height / 2 + logoMax * 0.55)
       : Math.round(height / 2 - nameSize * 0.4);
-    layers.push({ text: name, endSecond: cardSeconds, fontSize: nameSize, alignment: 8, x: width / 2, y });
+    layers.push({ text: name, endSecond: cardSeconds, fontSize: nameSize, alignment: 8, x: width / 2, y, color: titleAss });
   }
   if (slogan) {
     const y = hasLogo
@@ -1354,7 +1360,7 @@ async function createBusinessEndCardClip(
       text: slogan,
       endSecond: cardSeconds,
       fontSize: sloganSize,
-      color: "&H1FFFFFFF",
+      color: titleAss,
       bold: false,
       alignment: 8,
       x: width / 2,
@@ -1374,7 +1380,7 @@ async function createBusinessEndCardClip(
       text: website,
       endSecond: cardSeconds,
       fontSize: urlSize,
-      color: "&H00FFB57A",
+      color: accentAss,
       bold: false,
       alignment: 8,
       x: width / 2,
@@ -1416,7 +1422,7 @@ async function createBusinessEndCardClip(
       "-f",
       "lavfi",
       "-i",
-      `color=c=0x0d1117:s=${width}x${height}:d=${cardSeconds}`,
+      `color=c=${bgColor}:s=${width}x${height}:d=${cardSeconds}`,
       "-loop",
       "1",
       "-i",
@@ -1452,7 +1458,7 @@ async function createBusinessEndCardClip(
     "-f",
     "lavfi",
     "-i",
-    `color=c=0x0d1117:s=${width}x${height}:d=${cardSeconds}`,
+    `color=c=${bgColor}:s=${width}x${height}:d=${cardSeconds}`,
     ...audioArgs,
     "-t",
     String(cardSeconds),

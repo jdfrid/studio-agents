@@ -65,6 +65,35 @@ model Tenant {
   contentPackages    ContentPackage[]
   publishJobs        PublishJob[]
   distributeRules    DistributeRule[]
+  brandTemplates     BrandTemplate[]
+}
+
+model BrandTemplate {
+  id               String   @id @default(cuid())
+  tenantId         String
+  name             String
+  businessName     String?
+  slogan           String?
+  websiteUrl       String?
+  primaryColor     String?
+  secondaryColor   String?
+  messages         String[] @default([])
+  mustSay          String[] @default([])
+  mustAvoid        String[] @default([])
+  filmTemplate     String?
+  durationSeconds  Int?
+  platform         String?
+  variationPolicy  Json     @default("{}")
+  defaultCreative  Json     @default("{}")
+  logoGcsPath      String?
+  logoMimeType     String?
+  logoName         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, updatedAt])
 }
 
 model User {

@@ -8,7 +8,9 @@ export const BriefBrandingInputSchema = z
     businessName: z.string().trim().max(120).optional(),
     slogan: z.string().trim().max(200).optional(),
     /** Public website / CTA link shown on the end card. */
-    websiteUrl: z.string().trim().max(300).optional()
+    websiteUrl: z.string().trim().max(300).optional(),
+    primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional()
   })
   .strict();
 export type BriefBrandingInput = z.infer<typeof BriefBrandingInputSchema>;
@@ -18,6 +20,8 @@ export const BriefBrandingOutputSchema = z
     businessName: z.string().trim().max(120).optional(),
     slogan: z.string().trim().max(200).optional(),
     websiteUrl: z.string().trim().max(300).optional(),
+    primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
     logo: z
       .object({
         name: z.string(),
@@ -96,7 +100,9 @@ export const BriefInputSchema = z.object({
     .max(100)
     .optional(),
   /** Optional business branding (name + slogan; logo via attachments role=logo). */
-  branding: BriefBrandingInputSchema.optional()
+  branding: BriefBrandingInputSchema.optional(),
+  /** Saved tenant brand template used to hydrate branding and constraints. */
+  brandTemplateId: z.string().min(1).max(40).optional()
 });
 export type BriefInput = z.infer<typeof BriefInputSchema>;
 

@@ -1,5 +1,6 @@
 export * from "./enums.js";
 export * from "./schemas/brief.js";
+export * from "./schemas/brandTemplate.js";
 export * from "./schemas/script.js";
 export * from "./schemas/audio.js";
 export * from "./schemas/asset.js";

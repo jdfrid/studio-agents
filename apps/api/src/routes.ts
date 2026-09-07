@@ -9,7 +9,10 @@ import {
   CreativeFieldUpdateSchema,
   CreativeOptionCreateSchema,
   CreativeOptionUpdateSchema,
-  CreativeReorderSchema
+  CreativeReorderSchema,
+  BrandTemplateWriteSchema,
+  applyBrandTemplateToBrief,
+  type BriefInput
 } from "@studio/shared";
 import {
   approveStage,
@@ -28,21 +31,27 @@ import {
   uploadStageArtifact
 } from "@studio/orchestrator";
 import {
+  createBrandTemplateRow,
   createCreativeField,
   createCreativeOption,
+  deleteBrandTemplateRow,
   deleteCreativeField,
   deleteCreativeOption,
   getAdminCreativeCatalog,
+  getBrandTemplateRow,
   getCreativeCatalog,
+  listBrandTemplateRows,
   prisma,
   reorderCreativeFields,
   reorderCreativeOptions,
   setCreativeFieldActive,
   setCreativeOptionActive,
+  toBrandTemplateView,
+  updateBrandTemplateRow,
   updateCreativeField,
   updateCreativeOption
 } from "@studio/infra-prisma";
-import { checkGeminiCapabilities, geminiModels } from "@studio/providers";
+import { checkGeminiCapabilities, geminiModels, gcsClient } from "@studio/providers";
 import {
   buildProductionCostConfig,
   estimateRunCost,
@@ -100,6 +109,57 @@ async function assertRunOwner(runId: string, userId: string, role?: "USER" | "AD
   if (role === "ADMIN") return run;
   if (run.userId && run.userId !== userId) return null;
   return run;
+}
+
+async function tenantIdForUser(userId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { tenantId: true } });
+  return user?.tenantId ?? null;
+}
+
+function parseLogoDataUrl(dataUrl?: string | null): { body: Buffer; mimeType: string } | null {
+  const raw = dataUrl?.trim();
+  if (!raw?.startsWith("data:")) return null;
+  const match = raw.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  const mimeType = match[1] || "image/png";
+  const body = Buffer.from(match[2]!, "base64");
+  if (!body.length || body.length > 5 * 1024 * 1024) return null;
+  if (!mimeType.startsWith("image/")) return null;
+  return { body, mimeType };
+}
+
+async function uploadBrandLogo(tenantId: string, templateId: string, dataUrl: string, name?: string | null) {
+  const parsed = parseLogoDataUrl(dataUrl);
+  if (!parsed) return null;
+  const ext = parsed.mimeType.includes("jpeg") || parsed.mimeType.includes("jpg")
+    ? ".jpg"
+    : parsed.mimeType.includes("webp")
+      ? ".webp"
+      : parsed.mimeType.includes("svg")
+        ? ".svg"
+        : ".png";
+  const gcsPath = `tenants/${tenantId}/brand-templates/${templateId}/logo${ext}`;
+  await gcsClient().upload({ gcsPath, body: parsed.body, mimeType: parsed.mimeType });
+  return { gcsPath, mimeType: parsed.mimeType, name: name?.trim() || `logo${ext}` };
+}
+
+async function signedBrandLogoUrl(gcsPath?: string | null): Promise<string | null> {
+  if (!gcsPath) return null;
+  try {
+    return await gcsClient().signedUrl(gcsPath, 3600);
+  } catch {
+    return null;
+  }
+}
+
+async function hydrateBriefWithBrandTemplate(userId: string, brief: BriefInput): Promise<BriefInput> {
+  const templateId = brief.brandTemplateId?.trim();
+  if (!templateId) return brief;
+  const tenantId = await tenantIdForUser(userId);
+  if (!tenantId) return brief;
+  const row = await getBrandTemplateRow(tenantId, templateId);
+  if (!row) return brief;
+  return applyBrandTemplateToBrief(brief, toBrandTemplateView(row), { applyVariation: false });
 }
 
 async function auditAdmin(
@@ -188,6 +248,89 @@ export async function registerRoutes(app: FastifyInstance) {
       }
     });
 
+    userRoutes.get("/brand-templates", async (request, reply) => {
+      const tenantId = await tenantIdForUser(request.user!.sub);
+      if (!tenantId) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const rows = await listBrandTemplateRows(tenantId);
+      return {
+        templates: await Promise.all(
+          rows.map(async (row) => toBrandTemplateView(row, await signedBrandLogoUrl(row.logoGcsPath)))
+        )
+      };
+    });
+
+    userRoutes.post("/brand-templates", async (request, reply) => {
+      const tenantId = await tenantIdForUser(request.user!.sub);
+      if (!tenantId) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const body = BrandTemplateWriteSchema.parse(request.body);
+      const created = await createBrandTemplateRow(tenantId, body);
+      let logo = null;
+      if (body.logoDataUrl) {
+        try {
+          logo = await uploadBrandLogo(tenantId, created.id, body.logoDataUrl, body.logoName);
+        } catch (error) {
+          request.log.warn({ err: error }, "brand template logo upload failed");
+        }
+        if (logo) {
+          const updated = await updateBrandTemplateRow(tenantId, created.id, body, logo);
+          reply.code(201);
+          return {
+            template: toBrandTemplateView(updated ?? created, await signedBrandLogoUrl(logo.gcsPath))
+          };
+        }
+      }
+      reply.code(201);
+      return { template: toBrandTemplateView(created, null) };
+    });
+
+    userRoutes.put("/brand-templates/:id", async (request, reply) => {
+      const tenantId = await tenantIdForUser(request.user!.sub);
+      if (!tenantId) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+      const body = BrandTemplateWriteSchema.parse(request.body);
+      let logo: { gcsPath: string; mimeType: string; name: string } | null | "clear" = body.clearLogo
+        ? "clear"
+        : null;
+      if (body.logoDataUrl && logo !== "clear") {
+        try {
+          logo = await uploadBrandLogo(tenantId, id, body.logoDataUrl, body.logoName);
+        } catch (error) {
+          request.log.warn({ err: error }, "brand template logo upload failed");
+          logo = null;
+        }
+      }
+      const updated = await updateBrandTemplateRow(tenantId, id, body, logo);
+      if (!updated) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return { template: toBrandTemplateView(updated, await signedBrandLogoUrl(updated.logoGcsPath)) };
+    });
+
+    userRoutes.delete("/brand-templates/:id", async (request, reply) => {
+      const tenantId = await tenantIdForUser(request.user!.sub);
+      if (!tenantId) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+      const ok = await deleteBrandTemplateRow(tenantId, id);
+      if (!ok) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      return { ok: true };
+    });
+
     userRoutes.post("/runs", async (request, reply) => {
       const body = CreateRunRequestSchema.parse(request.body);
       const userId = request.user!.sub;
@@ -202,11 +345,11 @@ export async function registerRoutes(app: FastifyInstance) {
         throw err;
       }
       // Render profile is admin-controlled (platform default); ignore client override.
-      const brief = {
+      const brief = await hydrateBriefWithBrandTemplate(userId, {
         ...body.brief,
         budgetMode: true,
         renderProfile: resolveRenderProfile().id
-      };
+      });
       const view = await createRun({ brief, userId, creditCost: cost });
       reply.code(201);
       return view;
