@@ -2397,3 +2397,67 @@ a { color: inherit; }
   background: #11151e;
 }
 .distribution-page .new-run-form label { display: grid; gap: 6px; font-size: 0.85rem; color: var(--muted, #8b94a6); }
+
+.landing-header .brand-lockup,
+.landing-nav .nav-text,
+.footer-links .nav-text {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+.landing-nav .nav-text { color: var(--text-soft); font-size: 0.9rem; }
+.landing-nav .nav-text:hover,
+.footer-links .nav-text:hover { color: var(--text); }
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  justify-content: center;
+}
+.landing-footer {
+  flex-wrap: wrap;
+}
+.site-page {
+  width: min(820px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 48px 0 72px;
+}
+.site-page h1 { margin: 8px 0 16px; font-size: clamp(1.8rem, 3vw, 2.6rem); line-height: 1.15; }
+.site-lead { color: var(--text-soft); font-size: 1.05rem; line-height: 1.7; margin: 0 0 28px; }
+.site-prose { display: grid; gap: 22px; }
+.site-prose h2 { margin: 0; font-size: 1.15rem; }
+.site-prose p { margin: 8px 0 0; color: var(--muted); line-height: 1.75; }
+.site-success {
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(66, 212, 155, 0.35);
+  background: rgba(66, 212, 155, 0.08);
+  color: var(--success);
+}
+.contact-form { display: grid; gap: 14px; max-width: 560px; }
+.contact-form label { display: grid; gap: 6px; color: var(--text-soft); font-size: 0.88rem; }
+.contact-form input,
+.contact-form textarea {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+}
+.contact-honeypot {
+  position: absolute;
+  left: -9999px;
+  height: 0;
+  overflow: hidden;
+}
+.site-pricing-cards { margin: 8px 0 28px; }
+.site-cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 800px) {
+  .site-page { width: min(100% - 28px, 820px); padding-top: 28px; }
+  .footer-links { justify-content: flex-start; }
+}

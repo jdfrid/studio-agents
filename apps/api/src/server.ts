@@ -5,11 +5,12 @@ import { ZodError } from "zod";
 import { refreshPlatformSettingsCache } from "@studio/billing";
 import { registerRoutes } from "./routes.js";
 import { apiValidationError } from "./validationError.js";
+import { corsOrigins, registerSecurityHeaders } from "./securityHeaders.js";
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? "info" },
   bodyLimit: 32 * 1024 * 1024,
-  trustProxy: true
+  trustProxy: 1
 });
 
 app.addHook("preParsing", async (request, _reply, payload) => {
@@ -27,9 +28,10 @@ app.addHook("preParsing", async (request, _reply, payload) => {
   return payload;
 });
 
-const corsOrigin = process.env.CORS_ORIGINS?.split(",").map((s) => s.trim()) ?? true;
+const corsOrigin = corsOrigins();
 await app.register(cors, { origin: corsOrigin, credentials: true });
 await app.register(sensible);
+await registerSecurityHeaders(app);
 
 app.setErrorHandler((error, request, reply) => {
   if (error instanceof ZodError) {

@@ -12,6 +12,7 @@ export * from "./schemas/artifact.js";
 export * from "./schemas/run.js";
 export * from "./schemas/auth.js";
 export * from "./schemas/billing.js";
+export * from "./schemas/contact.js";
 export * from "./schemas/platform.js";
 export * from "./schemas/admin.js";
 export * from "./schemas/creativeCatalog.js";

@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /contact
+Allow: /pricing
+Allow: /terms
+Allow: /privacy
+Allow: /legal
+Disallow: /create
+Disallow: /runs
+Disallow: /distribution
+Disallow: /api/
+
+Sitemap: https://prompt2spot.com/sitemap.xml

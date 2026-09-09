@@ -416,6 +416,19 @@ model AuditLog {
   @@index([tenantId, createdAt])
 }
 
+model ContactInquiry {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  locale    String   @default("en")
+  ipHash    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model MobileAuthCode {
   id         String    @id @default(cuid())
   userId     String

@@ -32,10 +32,26 @@ export async function createCheckout(userId: string, email: string, plan: "payg"
           email,
           custom: { user_id: userId }
         },
+        checkout_options: {
+          embed: false,
+          media: false,
+          logo: true,
+          desc: true,
+          discount: false,
+          dark: true,
+          subscription_preview: true,
+          button_color: "#7559FF"
+        },
         product_options: {
-          redirect_url: `${appUrl}/dashboard?payment=success`,
-          receipt_button_text: "חזרה לאפליקציה",
-          receipt_link_url: `${appUrl}/dashboard`
+          name: plan === "payg" ? "Prompt2Spot — single video" : "Prompt2Spot — monthly plan",
+          description:
+            plan === "payg"
+              ? "One Prompt2Spot video credit for the full brief-to-render studio workflow."
+              : "30 Prompt2Spot video credits per month for the full studio workflow.",
+          redirect_url: `${appUrl}/?payment=success`,
+          receipt_button_text: "Back to Prompt2Spot",
+          receipt_thank_you_note: "Thank you. Your credits will appear in Prompt2Spot shortly.",
+          receipt_link_url: `${appUrl}/`
         }
       },
       relationships: {

@@ -4,9 +4,13 @@ import { createDistributionPackage } from "./service.js";
 export async function maybeAutoDistribute(runId: string): Promise<void> {
   const run = await prisma.projectRun.findUnique({
     where: { id: runId },
-    include: { artifacts: { where: { kind: { in: ["final_video", "series_final_video"] } }, orderBy: { createdAt: "desc" } } }
+    include: {
+      artifacts: { where: { kind: { in: ["final_video", "series_final_video"] } }, orderBy: { createdAt: "desc" } },
+      user: { select: { role: true } }
+    }
   });
   if (!run?.userId) return;
+  if (run.user?.role !== "ADMIN") return;
   const rule = await prisma.distributeRule.findUnique({ where: { tenantId: run.tenantId } });
   if (!rule?.enabled || !rule.destinationIds.length) return;
   const artifact = run.artifacts[0];

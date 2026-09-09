@@ -1,32 +1,12 @@
 import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext.js";
-import { LanguageSwitcher } from "./i18n/LanguageSwitcher.js";
+import { PublicChrome } from "./PublicChrome.js";
 
-export function LandingPage() {
+export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   const { t, i18n } = useTranslation();
   const { login } = useAuth();
   return (
-    <div className="landing">
-      <header className="landing-header">
-        <a className="brand-lockup" href="/" aria-label={t("landing.homeLabel")}>
-          <span className="brand-mark" aria-hidden>
-            P2
-          </span>
-          <span className="brand-copy">
-            <strong className="brand">Prompt2Spot</strong>
-            <small>{t("common.brandTagline")}</small>
-          </span>
-        </a>
-        <nav className="landing-nav" aria-label={t("landing.siteNav")}>
-          <a href="#how-it-works">{t("landing.howItWorks")}</a>
-          <a href="#pricing">{t("landing.pricing")}</a>
-        </nav>
-        <LanguageSwitcher compact />
-        <button type="button" className="button-secondary landing-login" onClick={login}>
-          {t("landing.login")}
-        </button>
-      </header>
-
+    <PublicChrome onNavigate={onNavigate}>
       <main className="landing-main">
         <section className="landing-hero">
           <div className="landing-hero-copy">
@@ -38,9 +18,7 @@ export function LandingPage() {
               {t("landing.heroTitle")}
               <span> {t("landing.heroTitleAccent")}</span>
             </h1>
-            <p className="landing-tagline">
-              {t("landing.tagline")}
-            </p>
+            <p className="landing-tagline">{t("landing.tagline")}</p>
             <div className="landing-hero-actions">
               <button type="button" className="primary landing-cta" onClick={login}>
                 {t("landing.firstVideo")}
@@ -51,9 +29,15 @@ export function LandingPage() {
               </a>
             </div>
             <ul className="landing-assurances" aria-label={t("landing.benefitsLabel")}>
-              <li><span aria-hidden>✓</span> {t("landing.guided")}</li>
-              <li><span aria-hidden>✓</span> {t("landing.productAndCharacters")}</li>
-              <li><span aria-hidden>✓</span> {t("landing.brandingAndCaptions")}</li>
+              <li>
+                <span aria-hidden>✓</span> {t("landing.guided")}
+              </li>
+              <li>
+                <span aria-hidden>✓</span> {t("landing.productAndCharacters")}
+              </li>
+              <li>
+                <span aria-hidden>✓</span> {t("landing.brandingAndCaptions")}
+              </li>
             </ul>
           </div>
 
@@ -61,7 +45,9 @@ export function LandingPage() {
             <div className="showcase-glow" />
             <div className="showcase-window">
               <div className="showcase-topbar">
-                <span className="showcase-brand"><i>P2</i> {t("landing.showcase.newProductVideo")}</span>
+                <span className="showcase-brand">
+                  <i>P2</i> {t("landing.showcase.newProductVideo")}
+                </span>
                 <span className="showcase-status">{t("landing.showcase.creating")}</span>
               </div>
               <div className="showcase-body">
@@ -76,16 +62,32 @@ export function LandingPage() {
                     <div className="showcase-video-art">
                       <span className="video-orbit orbit-one" />
                       <span className="video-orbit orbit-two" />
-                      <strong>{t("landing.showcase.yourIdea")}<br />{t("landing.showcase.yourVideo")}</strong>
-                      <span className="video-play" aria-hidden>▶</span>
+                      <strong>
+                        {t("landing.showcase.yourIdea")}
+                        <br />
+                        {t("landing.showcase.yourVideo")}
+                      </strong>
+                      <span className="video-play" aria-hidden>
+                        ▶
+                      </span>
                     </div>
-                    <div className="showcase-progress"><span /></div>
+                    <div className="showcase-progress">
+                      <span />
+                    </div>
                   </div>
                   <div className="showcase-steps">
-                    {[t("landing.showcase.brief"), t("landing.showcase.script"), t("landing.showcase.voice"), t("landing.showcase.visual")].map((step) => (
-                      <span key={step}><i>✓</i>{step}</span>
-                    ))}
-                    <span className="is-current"><i>5</i>{t("landing.showcase.render")}</span>
+                    {[t("landing.showcase.brief"), t("landing.showcase.script"), t("landing.showcase.voice"), t("landing.showcase.visual")].map(
+                      (step) => (
+                        <span key={step}>
+                          <i>✓</i>
+                          {step}
+                        </span>
+                      )
+                    )}
+                    <span className="is-current">
+                      <i>5</i>
+                      {t("landing.showcase.render")}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -95,24 +97,44 @@ export function LandingPage() {
               <strong>{t("landing.showcase.transparent")}</strong>
             </div>
             <div className="showcase-float-card float-ready">
-              <span className="ready-icon" aria-hidden>✓</span>
-              <span><strong>{t("landing.showcase.ready")}</strong><small>{t("landing.showcase.watchAndDownload")}</small></span>
+              <span className="ready-icon" aria-hidden>
+                ✓
+              </span>
+              <span>
+                <strong>{t("landing.showcase.ready")}</strong>
+                <small>{t("landing.showcase.watchAndDownload")}</small>
+              </span>
             </div>
           </div>
         </section>
 
         <section className="landing-value-grid" aria-label={t("landing.capabilitiesLabel")}>
           <article>
-            <span className="feature-icon" aria-hidden>✦</span>
-            <div><h2>{t("landing.features.oneFlowTitle")}</h2><p>{t("landing.features.oneFlowBody")}</p></div>
+            <span className="feature-icon" aria-hidden>
+              ✦
+            </span>
+            <div>
+              <h2>{t("landing.features.oneFlowTitle")}</h2>
+              <p>{t("landing.features.oneFlowBody")}</p>
+            </div>
           </article>
           <article>
-            <span className="feature-icon" aria-hidden>◫</span>
-            <div><h2>{t("landing.features.assetsTitle")}</h2><p>{t("landing.features.assetsBody")}</p></div>
+            <span className="feature-icon" aria-hidden>
+              ◫
+            </span>
+            <div>
+              <h2>{t("landing.features.assetsTitle")}</h2>
+              <p>{t("landing.features.assetsBody")}</p>
+            </div>
           </article>
           <article>
-            <span className="feature-icon" aria-hidden>◎</span>
-            <div><h2>{t("landing.features.controlTitle")}</h2><p>{t("landing.features.controlBody")}</p></div>
+            <span className="feature-icon" aria-hidden>
+              ◎
+            </span>
+            <div>
+              <h2>{t("landing.features.controlTitle")}</h2>
+              <p>{t("landing.features.controlBody")}</p>
+            </div>
           </article>
         </section>
 
@@ -122,10 +144,34 @@ export function LandingPage() {
             <h2>{t("landing.process.title")}</h2>
           </div>
           <ol>
-            <li><span>01</span><div><h3>{t("landing.process.defineTitle")}</h3><p>{t("landing.process.defineBody")}</p></div></li>
-            <li><span>02</span><div><h3>{t("landing.process.assetsTitle")}</h3><p>{t("landing.process.assetsBody")}</p></div></li>
-            <li><span>03</span><div><h3>{t("landing.process.approveTitle")}</h3><p>{t("landing.process.approveBody")}</p></div></li>
-            <li><span>04</span><div><h3>{t("landing.process.receiveTitle")}</h3><p>{t("landing.process.receiveBody")}</p></div></li>
+            <li>
+              <span>01</span>
+              <div>
+                <h3>{t("landing.process.defineTitle")}</h3>
+                <p>{t("landing.process.defineBody")}</p>
+              </div>
+            </li>
+            <li>
+              <span>02</span>
+              <div>
+                <h3>{t("landing.process.assetsTitle")}</h3>
+                <p>{t("landing.process.assetsBody")}</p>
+              </div>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <h3>{t("landing.process.approveTitle")}</h3>
+                <p>{t("landing.process.approveBody")}</p>
+              </div>
+            </li>
+            <li>
+              <span>04</span>
+              <div>
+                <h3>{t("landing.process.receiveTitle")}</h3>
+                <p>{t("landing.process.receiveBody")}</p>
+              </div>
+            </li>
           </ol>
         </section>
 
@@ -138,7 +184,10 @@ export function LandingPage() {
             <article className="price-card">
               <span className="price-kicker">{t("landing.plans.try")}</span>
               <h3>{t("landing.plans.single")}</h3>
-              <p className="price"><strong>₪30</strong><small>{t("landing.plans.perVideo")}</small></p>
+              <p className="price">
+                <strong>₪30</strong>
+                <small>{t("landing.plans.perVideo")}</small>
+              </p>
               <ul>
                 <li>{t("landing.plans.oneCredit")}</li>
                 <li>{t("landing.plans.fullAccess")}</li>
@@ -150,7 +199,10 @@ export function LandingPage() {
               <span className="popular-badge">{t("landing.plans.popular")}</span>
               <span className="price-kicker">{t("landing.plans.regular")}</span>
               <h3>{t("landing.plans.monthly")}</h3>
-              <p className="price"><strong>₪600</strong><small>{t("landing.plans.perMonth")}</small></p>
+              <p className="price">
+                <strong>₪600</strong>
+                <small>{t("landing.plans.perMonth")}</small>
+              </p>
               <ul>
                 <li>{t("landing.plans.videosPerMonth")}</li>
                 <li>{t("landing.plans.approxPerVideo")}</li>
@@ -161,14 +213,6 @@ export function LandingPage() {
           </div>
         </section>
       </main>
-
-      <footer className="landing-footer">
-        <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden>P2</span>
-          <strong>Prompt2Spot</strong>
-        </div>
-        <p>{t("landing.footer")}</p>
-      </footer>
-    </div>
+    </PublicChrome>
   );
 }

@@ -3,6 +3,7 @@ import { initReactI18next } from "react-i18next";
 import { resources } from "./resources.js";
 import { createVideoResources } from "./createVideoResources.js";
 import { runResources } from "./runResources.js";
+import { siteResources } from "./siteResources.js";
 
 export const UI_LOCALE_STORAGE_KEY = "prompt2spot:ui-locale-v2";
 export type UiLocale = "he" | "en";
@@ -34,12 +35,14 @@ void i18n.use(initReactI18next).init({
     he: {
       translation: resources.he.translation,
       createVideo: createVideoResources.he,
-      run: runResources.he
+      run: runResources.he,
+      site: siteResources.he
     },
     en: {
       translation: resources.en.translation,
       createVideo: createVideoResources.en,
-      run: runResources.en
+      run: runResources.en,
+      site: siteResources.en
     }
   },
   lng: storedLocale(),

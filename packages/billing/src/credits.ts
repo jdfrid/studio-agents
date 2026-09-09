@@ -10,6 +10,7 @@ import {
   CREDIT_NEW_VIDEO,
   correctionCreditCost
 } from "@studio/shared";
+import { isCheckoutEnabled } from "./payments.js";
 
 export class InsufficientCreditsError extends Error {
   readonly required: number;
@@ -60,15 +61,6 @@ export async function getFreeVideosAllowanceAsync(): Promise<number> {
   return getFreeVideosAllowance();
 }
 
-export function isBillingConfigured(): boolean {
-  return Boolean(
-    process.env.LEMONSQUEEZY_API_KEY &&
-      process.env.LEMONSQUEEZY_STORE_ID &&
-      process.env.LEMONSQUEEZY_VARIANT_PAYG &&
-      process.env.LEMONSQUEEZY_VARIANT_SUBSCRIPTION
-  );
-}
-
 export async function getFreeVideosRemaining(userId: string): Promise<number> {
   const allowance = await getFreeVideosAllowanceForUser(userId);
   if (allowance <= 0) return 0;
@@ -96,7 +88,7 @@ export async function getCreateVideoEligibility(userId: string): Promise<{
     credits,
     freeVideosRemaining,
     canCreateVideo,
-    billingConfigured: isBillingConfigured()
+    billingConfigured: isCheckoutEnabled()
   };
 }
 

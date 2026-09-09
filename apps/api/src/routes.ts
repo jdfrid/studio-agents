@@ -12,6 +12,7 @@ import {
   CreativeReorderSchema,
   BrandTemplateWriteSchema,
   applyBrandTemplateToBrief,
+  ContactRequestSchema,
   type BriefInput
 } from "@studio/shared";
 import {
@@ -65,7 +66,7 @@ import {
   creditCostForNewRun,
   createCheckout,
   getBillingStatus,
-  isBillingConfigured,
+  isCheckoutEnabled,
   handleLemonWebhook,
   verifyWebhookSignature,
   getAdminDashboard,
@@ -81,6 +82,8 @@ import {
 import { PlatformSettingsPatchSchema, AdminUserUpdateSchema } from "@studio/shared";
 import { getProviderInventory, officialBillingUrl, pollProviderMonitors } from "@studio/providers";
 import { registerDistributionRoutes } from "./distributionRoutes.js";
+import { consumeRateLimit } from "./rateLimit.js";
+import { createHash } from "node:crypto";
 
 const mobileRateBuckets = new Map<string, { count: number; resetAt: number }>();
 
@@ -213,6 +216,36 @@ export async function registerRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  app.post("/contact", async (request, reply) => {
+    const ip = request.ip || "unknown";
+    if (!consumeRateLimit(`contact:${ip}`, 5, 60 * 60 * 1000)) {
+      reply.code(429);
+      return { error: "rate_limited", message: "Too many messages. Try again later." };
+    }
+    const body = ContactRequestSchema.parse(request.body);
+    if (body.companyWebsite?.trim()) {
+      return { ok: true };
+    }
+    const emailKey = body.email.trim().toLowerCase();
+    if (!consumeRateLimit(`contact:email:${emailKey}`, 5, 60 * 60 * 1000)) {
+      reply.code(429);
+      return { error: "rate_limited", message: "Too many messages. Try again later." };
+    }
+    const ipHash = createHash("sha256").update(`${ip}:${process.env.JWT_SECRET ?? "local"}`).digest("hex").slice(0, 32);
+    await prisma.contactInquiry.create({
+      data: {
+        name: body.name,
+        email: body.email,
+        subject: body.subject,
+        message: body.message,
+        locale: body.locale ?? "en",
+        ipHash
+      }
+    });
+    request.log.info({ subject: body.subject, locale: body.locale ?? "en" }, "contact inquiry received");
+    return { ok: true };
+  });
+
   app.register(async (userRoutes) => {
     userRoutes.addHook("preHandler", requireAuth());
 
@@ -227,11 +260,11 @@ export async function registerRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
-      if (!isBillingConfigured()) {
+      if (!isCheckoutEnabled()) {
         reply.code(503);
         return {
-          error: "billing_not_configured",
-          message: "מערכת התשלומים עדיין לא מוגדרת. נסה שוב מאוחר יותר או פנה לתמיכה."
+          error: "payments_paused",
+          message: "Online payments are paused. Contact us to add credits."
         };
       }
       try {
@@ -240,10 +273,9 @@ export async function registerRoutes(app: FastifyInstance) {
       } catch (err) {
         request.log.error({ err, plan: body.plan, userId: user.id }, "checkout failed");
         reply.code(502);
-        const detail = err instanceof Error ? err.message : "checkout failed";
         return {
           error: "checkout_failed",
-          message: `לא ניתן לפתוח דף תשלום: ${detail}`
+          message: "Checkout could not be opened. Contact us to add credits."
         };
       }
     });

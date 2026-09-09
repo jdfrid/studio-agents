@@ -34,7 +34,7 @@ import {
   upsertDistributeRule,
   verifyOAuthState
 } from "@studio/orchestrator";
-import { requireAuth } from "@studio/auth";
+import { requireAdmin } from "@studio/auth";
 
 function errorStatus(message: string): number {
   if (/not_found|artifact_not_found|destination_not_found|connection_not_found|chat_not_found|user_not_found/i.test(message)) {
@@ -82,7 +82,7 @@ export async function registerDistributionRoutes(app: FastifyInstance) {
   });
 
   await app.register(async (scoped) => {
-    scoped.addHook("preHandler", requireAuth());
+    scoped.addHook("preHandler", requireAdmin());
 
     scoped.get("/distribution/networks", async () => listDistributionNetworks());
 
