@@ -34,6 +34,7 @@ export const runResources = {
     run: {
       deleteConfirm: "Delete “{{title}}”? Processing will stop and will not retry.",
       back: "Back to videos",
+      remix: "Change settings and make a new video",
       projectEyebrow: "Video project",
       deleting: "Deleting…",
       deleteProcess: "Delete process",
@@ -299,7 +300,7 @@ export const runResources = {
     stages: { brief: "בריף", script: "תסריט", audio: "אודיו", asset: "ויזואל", package: "אריזה", render: "רינדור", series: "סדרה" },
     statuses: { PENDING: "ממתין", QUEUED: "בתור", RUNNING: "רץ", COMPLETED: "הושלם", AWAITING_APPROVAL: "ממתין לאישור", FAILED: "נכשל", DRAFT: "טיוטה", CANCELLED: "בוטל" },
     run: {
-      deleteConfirm: "למחוק את «{{title}}»? התהליך ייעצר ולא ימשיך לנסות.", back: "חזרה לסרטונים", projectEyebrow: "פרויקט וידאו", deleting: "מוחק…", deleteProcess: "מחק תהליך", delete: "מחק", productionEyebrow: "תהליך ההפקה", progressTitle: "התקדמות הסרטון", noStageContent: "אין תוכן להצגה בשלב זה עדיין.", approveContinue: "אשר והמשך", rerunning: "מריץ…", rerunStage: "הפעל מחדש את השלב",
+      deleteConfirm: "למחוק את «{{title}}»? התהליך ייעצר ולא ימשיך לנסות.", back: "חזרה לסרטונים", remix: "שנו הגדרות וצרו סרטון חדש", projectEyebrow: "פרויקט וידאו", deleting: "מוחק…", deleteProcess: "מחק תהליך", delete: "מחק", productionEyebrow: "תהליך ההפקה", progressTitle: "התקדמות הסרטון", noStageContent: "אין תוכן להצגה בשלב זה עדיין.", approveContinue: "אשר והמשך", rerunning: "מריץ…", rerunStage: "הפעל מחדש את השלב",
       dubbing: { title: "התאמת דיבוב", description: "כתיבה מחדש של הקריינות לפי התיאור הוויזואלי של כל סצנה, ואז דיבוב TTS מחדש (בלי לייצר קליפים מחדש כשאין שינוי בפרומפט).", confirm: "לכתוב מחדש את הדיבוב לפי הסצנות הוויזואליות ולהריץ TTS מחדש? קליפי הווידאו יישמרו אם הפרומפטים לא השתנו.", busy: "מתאים…", action: "התאם דיבוב לוויזואל" },
       settings: { title: "סיכום ההגדרות", renderModel: "מודל רינדור", systemDefault: "ברירת מחדל של המערכת", started: "התחלה", ended: "סיום", stillRunning: "עדיין רץ…", requestedDuration: "משך מבוקש", aspectRatio: "יחס תמונה", landscape: "לרוחב (16:9)", square: "ריבוע", portrait: "לאורך (9:16)", creationMode: "מצב יצירה", approvalManual: "אישור בכל שלב", approvalBeforeRender: "עצירה לפני סרטון סופי", approvalAutomatic: "אוטומטי", ttsVoice: "קול TTS", description: "תיאור", instructions: "הוראות", branding: "מיתוג העסק", advanced: "מתקדם", attachments: "קבצים שצורפו", attachmentRoles: { voice_clone: "שיבוט קול", insert_clip: "שילוב סרטון{{time}}", reference_video: "סרטון השראה — לניתוח בלבד", product: "תמונת מוצר", logo: "לוגו", character: "תמונת דמות / השראה" }, insertedAt: " @{{seconds}}ש׳" }
     },

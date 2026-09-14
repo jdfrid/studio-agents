@@ -126,6 +126,7 @@ export const resources = {
         delete: "מחק",
         deleteConfirm: "למחוק את «{{title}}»? התהליך ייעצר ולא ימשיך לנסות שוב.",
         deleteFailed: "מחיקה נכשלה",
+        remix: "הפקה מחדש",
         refreshCredits: "רענון יתרת קרדיטים",
         statuses: {
           RUNNING: "בתהליך",
@@ -328,6 +329,7 @@ export const resources = {
         delete: "Delete",
         deleteConfirm: "Delete “{{title}}”? The workflow will stop and will not retry.",
         deleteFailed: "Delete failed",
+        remix: "Make another version",
         refreshCredits: "Refresh credit balance",
         statuses: {
           RUNNING: "In progress",

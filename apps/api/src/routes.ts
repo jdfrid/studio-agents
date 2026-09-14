@@ -27,6 +27,7 @@ import {
   getRun,
   getRunCostLedger,
   getRunsLogMatrix,
+  reusableGcsPathsForRun,
   rerunStage,
   updateStageOutput,
   uploadStageArtifact
@@ -376,13 +377,44 @@ export async function registerRoutes(app: FastifyInstance) {
         }
         throw err;
       }
+      let incomingBrief = body.brief;
+      if (body.parentRunId) {
+        const allowedPaths = await reusableGcsPathsForRun(body.parentRunId, userId);
+        if (!allowedPaths) {
+          reply.code(404);
+          return { error: "parent_run_not_found" };
+        }
+        const unknownAttachment = (incomingBrief.attachments ?? []).find(
+          (attachment) => attachment.gcsPath && !allowedPaths.has(attachment.gcsPath)
+        );
+        if (unknownAttachment) {
+          reply.code(400);
+          return { error: "attachment_not_reusable" };
+        }
+        incomingBrief = {
+          ...incomingBrief,
+          attachments: (incomingBrief.attachments ?? []).map((attachment) =>
+            attachment.gcsPath ? { ...attachment, dataUrl: undefined } : attachment
+          )
+        };
+      } else {
+        incomingBrief = {
+          ...incomingBrief,
+          attachments: (incomingBrief.attachments ?? []).map(({ gcsPath: _gcsPath, ...attachment }) => attachment)
+        };
+      }
       // Render profile is admin-controlled (platform default); ignore client override.
       const brief = await hydrateBriefWithBrandTemplate(userId, {
-        ...body.brief,
+        ...incomingBrief,
         budgetMode: true,
         renderProfile: resolveRenderProfile().id
       });
-      const view = await createRun({ brief, userId, creditCost: cost });
+      const view = await createRun({
+        brief,
+        userId,
+        creditCost: cost,
+        parentRunId: body.parentRunId
+      });
       reply.code(201);
       return view;
     });

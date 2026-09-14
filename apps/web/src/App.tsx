@@ -28,15 +28,17 @@ type AppView =
 type AppLocation = {
   view: AppView;
   runId: string | null;
+  fromRunId?: string | null;
 };
 
 function parseLocation(): AppLocation {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const fromRunId = new URLSearchParams(window.location.search).get("from");
   if (path.startsWith("/runs/")) {
     const id = path.slice("/runs/".length).split("/")[0] ?? "";
     if (id) return { view: "run", runId: id };
   }
-  if (path === "/create") return { view: "create", runId: null };
+  if (path === "/create") return { view: "create", runId: null, fromRunId };
   if (path.startsWith("/distribution")) return { view: "distribution", runId: null };
   if (path === "/about") return { view: "about", runId: null };
   if (path === "/contact") return { view: "contact", runId: null };
@@ -49,7 +51,7 @@ function parseLocation(): AppLocation {
 
 function pathFor(loc: AppLocation): string {
   if (loc.view === "run" && loc.runId) return `/runs/${loc.runId}`;
-  if (loc.view === "create") return "/create";
+  if (loc.view === "create") return loc.fromRunId ? `/create?from=${encodeURIComponent(loc.fromRunId)}` : "/create";
   if (loc.view === "distribution") return "/distribution";
   if (loc.view === "about") return "/about";
   if (loc.view === "contact") return "/contact";
@@ -67,12 +69,15 @@ function AppShell() {
   const initial = parseLocation();
   const [view, setView] = useState<AppView>(initial.view);
   const [runId, setRunId] = useState<string | null>(initial.runId);
+  const [fromRunId, setFromRunId] = useState<string | null>(initial.fromRunId ?? null);
 
   const navigate = useCallback((next: AppLocation, mode: "push" | "replace" = "push") => {
     setView(next.view);
     setRunId(next.runId);
-    const path = pathFor(next);
-    if (path !== window.location.pathname) {
+    setFromRunId(next.fromRunId ?? null);
+    const path = pathFor({ ...next, fromRunId: next.fromRunId ?? null });
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (path !== current) {
       if (mode === "replace") window.history.replaceState(next, "", path);
       else window.history.pushState(next, "", path);
     }
@@ -103,11 +108,13 @@ function AppShell() {
       if (state?.view) {
         setView(state.view);
         setRunId(state.runId);
+        setFromRunId(state.fromRunId ?? null);
         return;
       }
       const loc = parseLocation();
       setView(loc.view);
       setRunId(loc.runId);
+      setFromRunId(loc.fromRunId ?? null);
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -212,16 +219,28 @@ function AppShell() {
               if (user.canCreateVideo) navigate({ view: "create", runId: null });
             }}
             onOpenRun={(id) => navigate({ view: "run", runId: id })}
+            onRemixRun={(id) => {
+              if (user.canCreateVideo) navigate({ view: "create", runId: null, fromRunId: id });
+            }}
           />
         )}
         {appView === "create" && (
           <CreateVideoForm
+            key={fromRunId ?? "new"}
+            sourceRunId={fromRunId}
             onCreated={(run: ProjectRunView) => navigate({ view: "run", runId: run.id })}
             onCancel={() => navigate({ view: "dashboard", runId: null })}
           />
         )}
         {appView === "run" && runId ? (
-          <RunView runId={runId} onBack={() => navigate({ view: "dashboard", runId: null })} />
+          <RunView
+            runId={runId}
+            onBack={() => navigate({ view: "dashboard", runId: null })}
+            onRemix={() => {
+              if (user.canCreateVideo) navigate({ view: "create", runId: null, fromRunId: runId });
+            }}
+            canRemix={user.canCreateVideo}
+          />
         ) : null}
         {appView === "distribution" && user.role === "ADMIN" ? <DistributionPage /> : null}
       </main>

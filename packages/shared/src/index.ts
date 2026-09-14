@@ -10,6 +10,7 @@ export * from "./schemas/subtitleStyle.js";
 export * from "./schemas/series.js";
 export * from "./schemas/artifact.js";
 export * from "./schemas/run.js";
+export * from "./remixBrief.js";
 export * from "./schemas/auth.js";
 export * from "./schemas/billing.js";
 export * from "./schemas/contact.js";

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { apiPost } from "./api.js";
+import { apiGet, apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 import { useCreativeCatalog } from "./creativeCatalog.js";
 import { creativePayloadForRequest } from "./creativePayload.js";
@@ -18,10 +18,14 @@ import {
   normalizeHexColor,
   predictRenderProfileId,
   profileToProductionCostConfig,
+  remixFormFromBrief,
+  remixHasAdvancedCreative,
   type ApprovalMode,
   type BrandTemplateView,
+  type BriefOutput,
   type CreativeOptions,
-  type Locale
+  type Locale,
+  type RemixKeptAttachment
 } from "@studio/shared";
 
 const VIDEO_GOALS = ["product", "service", "brand", "social", "explainer", "event", "other"] as const;
@@ -49,7 +53,15 @@ const CONTENT_LANGUAGES = [
   ["yi", "Yiddish"]
 ] as const;
 
-export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: ProjectRunView) => void; onCancel: () => void }) {
+export function CreateVideoForm({
+  onCreated,
+  onCancel,
+  sourceRunId
+}: {
+  onCreated: (run: ProjectRunView) => void;
+  onCancel: () => void;
+  sourceRunId?: string | null;
+}) {
   const { t, i18n } = useTranslation("createVideo");
   const uiLocale: Locale = localeFor(i18n.resolvedLanguage);
   const catalog = useCreativeCatalog(uiLocale);
@@ -95,11 +107,14 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     language: "en"
   });
   const [catalogSelections, setCatalogSelections] = useState<Record<string, string | number>>({});
+  const [keptAttachments, setKeptAttachments] = useState<RemixKeptAttachment[]>([]);
+  const [remixSourceTitle, setRemixSourceTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const lipSyncRequested = narrationMode === "lip_sync" || creative.preferHeygenDub === "on";
-  const heygenNeedsAnchor = lipSyncRequested && visualFiles.length === 0;
+  const keptAnchorCount = keptAttachments.filter((item) => item.role === "anchor" || item.role === "scene").length;
+  const heygenNeedsAnchor = lipSyncRequested && visualFiles.length === 0 && keptAnchorCount === 0;
   const contentLocale = languageCodeFromCreative(creative) === "en" ? "en" : "he";
   const contentT = i18n.getFixedT(contentLocale, "createVideo");
   const costEstimate = useMemo(() => {
@@ -148,6 +163,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
   }, [productPreviewUrls]);
 
   useEffect(() => {
+    if (sourceRunId) return;
     try {
       const saved = window.localStorage.getItem("prompt2spot:create-draft");
       if (!saved) return;
@@ -207,9 +223,59 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     } catch {
       // Ignore an invalid local draft and start clean.
     }
-  }, []);
+  }, [sourceRunId]);
 
   useEffect(() => {
+    if (!sourceRunId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const run = await apiGet<ProjectRunView>(`/runs/${sourceRunId}`);
+        if (cancelled) return;
+        const briefOut = run.stages.find((stage) => stage.stage === "brief")?.output as
+          | Pick<BriefOutput, "visualAnchors" | "voiceCloneSample" | "videoInsert" | "branding">
+          | undefined;
+        const form = remixFormFromBrief(run.brief, briefOut);
+        setTitle(form.title);
+        setPrompt(form.prompt);
+        setInstructions(form.instructions);
+        setExclusions(form.exclusions);
+        setShowExclusions(Boolean(form.exclusions));
+        setVideoGoal(form.videoGoal);
+        setDesiredAction(form.desiredAction);
+        setTargetAudience(form.targetAudience);
+        setMoods(form.moods);
+        setPlatform(form.platform);
+        setNarrationMode(form.narrationMode);
+        setMusicMode(form.musicMode);
+        setDurationSeconds(form.durationSeconds);
+        setApprovalMode(form.approvalMode);
+        setCreative(form.creative);
+        setCatalogSelections(form.catalogSelections);
+        setBusinessName(form.businessName);
+        setSlogan(form.slogan);
+        setWebsiteUrl(form.websiteUrl);
+        setPrimaryColor(form.primaryColor);
+        setSecondaryColor(form.secondaryColor);
+        setBrandTemplateId(form.brandTemplateId);
+        setKeptAttachments(form.keptAttachments);
+        setRemixSourceTitle(run.brief.title);
+        if (form.businessName || form.brandTemplateId) setBrandingOpen(true);
+        if (remixHasAdvancedCreative(form.creative)) setAdvancedOpen(true);
+        const keptInsert = form.keptAttachments.find((item) => item.role === "insert_clip");
+        if (keptInsert?.insertAtSeconds != null) setInsertAtSeconds(keptInsert.insertAtSeconds);
+        if (keptInsert?.audioSource) setInsertAudioSource(keptInsert.audioSource);
+      } catch (err) {
+        if (!cancelled) setError((err as Error).message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sourceRunId]);
+
+  useEffect(() => {
+    if (sourceRunId) return;
     const timer = window.setTimeout(() => {
       const draft = {
         title,
@@ -239,6 +305,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     }, 700);
     return () => window.clearTimeout(timer);
   }, [
+    sourceRunId,
     title,
     prompt,
     instructions,
@@ -410,7 +477,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
       setError(t("validation.logoSize"));
       return;
     }
-    if (lipSyncRequested && visualFiles.length === 0) {
+    if (lipSyncRequested && visualFiles.length === 0 && keptAnchorCount === 0) {
       setError(t("validation.anchorRequired"));
       return;
     }
@@ -425,33 +492,54 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     setBusy(true);
     setError("");
     try {
+      const replacedRoles = new Set<RemixKeptAttachment["role"]>();
+      if (voiceFile) replacedRoles.add("voice_clone");
+      if (referenceVideoFile) replacedRoles.add("reference_video");
+      if (insertFile) replacedRoles.add("insert_clip");
+      if (logoFile) replacedRoles.add("logo");
       const attachments: Array<{
         name: string;
         mimeType: string;
-        kind: "image" | "video" | "audio";
-        role: "anchor" | "voice_clone" | "insert_clip" | "reference_video" | "logo" | "product";
-        dataUrl: string;
+        kind: "image" | "video" | "audio" | "text" | "other";
+        role: "anchor" | "scene" | "voice_clone" | "insert_clip" | "reference_video" | "logo" | "product";
+        dataUrl?: string;
+        gcsPath?: string;
         insertAtSeconds?: number;
         audioSource?: "clip" | "narration";
-      }> = await Promise.all(
-        visualFiles.map(async (file) => ({
-          name: file.name,
-          mimeType: file.type || "image/png",
-          kind: file.type.startsWith("video/") ? ("video" as const) : ("image" as const),
-          role: "anchor" as const,
-          dataUrl: await fileToDataUrl(file)
-        }))
+      }> = keptAttachments
+        .filter((item) => !replacedRoles.has(item.role))
+        .map((item) => ({
+          name: item.name,
+          mimeType: item.mimeType,
+          kind: item.kind,
+          role: item.role,
+          gcsPath: item.gcsPath,
+          ...(item.role === "insert_clip"
+            ? { insertAtSeconds: Math.max(0, insertAtSeconds), audioSource: insertAudioSource }
+            : {})
+        }));
+      attachments.push(
+        ...(await Promise.all(
+          visualFiles.map(async (file) => ({
+            name: file.name,
+            mimeType: file.type || "image/png",
+            kind: file.type.startsWith("video/") ? ("video" as const) : ("image" as const),
+            role: "anchor" as const,
+            dataUrl: await fileToDataUrl(file)
+          }))
+        ))
       );
-      const productAttachments = await Promise.all(
-        productFiles.map(async (file) => ({
-          name: file.name,
-          mimeType: file.type || "image/png",
-          kind: "image" as const,
-          role: "product" as const,
-          dataUrl: await fileToDataUrl(file)
-        }))
+      attachments.push(
+        ...(await Promise.all(
+          productFiles.map(async (file) => ({
+            name: file.name,
+            mimeType: file.type || "image/png",
+            kind: "image" as const,
+            role: "product" as const,
+            dataUrl: await fileToDataUrl(file)
+          }))
+        ))
       );
-      attachments.push(...productAttachments);
       if (voiceFile) {
         attachments.push({
           name: voiceFile.name,
@@ -556,6 +644,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
             }
           : undefined;
       const run = await apiPost<ProjectRunView>("/runs", {
+        ...(sourceRunId ? { parentRunId: sourceRunId } : {}),
         brief: {
           title,
           sourceText: [
@@ -712,7 +801,11 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
     Number(Boolean(voiceFile)) +
     Number(Boolean(referenceVideoFile)) +
     Number(Boolean(insertFile)) +
-    Number(Boolean(logoFile));
+    Number(Boolean(logoFile)) +
+    keptAttachments.length;
+  const keptInsert = keptAttachments.find((item) => item.role === "insert_clip");
+  const showInsertOptions = Boolean(insertFile || (!!keptInsert && !insertFile));
+  const isRemix = Boolean(sourceRunId);
 
   return (
     <div className="create-form" dir={i18n.dir()}>
@@ -722,10 +815,12 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           {t("create.back")}
         </button>
         <div className="page-heading">
-          <p className="eyebrow">{t("create.eyebrow")}</p>
-          <h1>{t("create.title")}</h1>
-          <p className="muted">{t("create.subtitle")}</p>
-          <small className="draft-status">{draftSavedAt ? t("create.draftSaved") : t("create.draftActive")}</small>
+          <p className="eyebrow">{isRemix ? t("create.remixEyebrow") : t("create.eyebrow")}</p>
+          <h1>{isRemix ? t("create.remixTitle") : t("create.title")}</h1>
+          <p className="muted">{isRemix ? t("create.remixSubtitle") : t("create.subtitle")}</p>
+          {isRemix ? null : (
+            <small className="draft-status">{draftSavedAt ? t("create.draftSaved") : t("create.draftActive")}</small>
+          )}
         </div>
       </header>
       <nav className="create-progress" aria-label={t("progress.aria")}>
@@ -734,6 +829,15 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         <span><i>3</i>{t("progress.audio")}</span>
         <span><i>4</i>{t("progress.review")}</span>
       </nav>
+      {isRemix ? (
+        <section className="billing-banner remix-banner">
+          <span className="banner-icon" aria-hidden>↻</span>
+          <div>
+            <p className="eyebrow">{t("create.remixFrom", { title: remixSourceTitle || title })}</p>
+            <p>{t("create.remixCredit")}</p>
+          </div>
+        </section>
+      ) : null}
       {freeLeft > 0 ? (
         <p className="credit-info-line">
           <span aria-hidden>✦</span>
@@ -881,6 +985,30 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         <p className="materials-classification-note">
           {t("materials.classification")}
         </p>
+        {keptAttachments.length ? (
+          <>
+            <p className="materials-classification-note">{t("materials.keptHelp")}</p>
+            <ul className="kept-files-list">
+            {keptAttachments.map((item, index) => (
+              <li key={`${item.role}-${item.gcsPath}-${index}`} className="visual-file-item">
+                <span className="kept-file-role">{t(`materials.keptRoles.${item.role}`)}</span>
+                <span className="visual-file-name" title={item.name}>
+                  {item.name}
+                </span>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() =>
+                    setKeptAttachments((current) => current.filter((_, currentIndex) => currentIndex !== index))
+                  }
+                >
+                  {t("common.remove")}
+                </button>
+              </li>
+            ))}
+          </ul>
+          </>
+        ) : null}
         <details className="material-role-details">
           <summary>
             <span>{t("materials.manage")}</span>
@@ -1004,7 +1132,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
         />
         <small className="muted">{t("materials.insertHelp")}</small>
       </label>
-      {insertFile ? (
+      {showInsertOptions ? (
         <div className="insert-clip-options">
           <label>
             {t("materials.insertAt")}
@@ -1535,7 +1663,7 @@ export function CreateVideoForm({ onCreated, onCancel }: { onCreated: (run: Proj
           }
           onClick={() => void submit()}
         >
-          {busy ? t("summary.creating") : t("summary.create")}
+          {busy ? (isRemix ? t("summary.creatingRemix") : t("summary.creating")) : isRemix ? t("summary.createRemix") : t("summary.create")}
           {!busy ? <span aria-hidden>{i18n.dir() === "rtl" ? "←" : "→"}</span> : null}
         </button>
         </div>

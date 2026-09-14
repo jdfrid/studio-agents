@@ -5,7 +5,12 @@ export const en = {
     title: "Let's build your next video",
     subtitle: "Describe the idea, choose a style, and upload materials. We'll prepare the remaining settings for you.",
     draftSaved: "Autosaved just now",
-    draftActive: "Autosave is on"
+    draftActive: "Autosave is on",
+    remixEyebrow: "New version",
+    remixTitle: "Change one setting and make a new video",
+    remixSubtitle: "Every setting from the previous video is here. Change only what you need — for example day to night. This is billed as a new video.",
+    remixFrom: "Based on “{{title}}”",
+    remixCredit: "A new version uses one credit, or a remaining free video."
   },
   progress: {
     aria: "Video setup steps",
@@ -109,7 +114,17 @@ export const en = {
     insertAt: "Insert position (seconds from video start)",
     insertAudio: "Inserted clip audio",
     originalAudio: "Use original clip audio",
-    narrationAudio: "Mute the original (keep our narration around it)"
+    narrationAudio: "Mute the original (keep our narration around it)",
+    keptHelp: "Files from the previous video are reused. Remove any you do not want, or upload replacements below.",
+    keptRoles: {
+      anchor: "Character / background",
+      scene: "Scene image",
+      product: "Product",
+      voice_clone: "Voice clone",
+      insert_clip: "Inserted clip",
+      reference_video: "Reference video",
+      logo: "Logo"
+    }
   },
   basic: {
     heading: "Basic settings",
@@ -415,7 +430,9 @@ export const en = {
     autoAudience: "Automatic target audience",
     autoMood: "Automatic mood",
     create: "Create script and draft",
-    creating: "Preparing script and draft…"
+    creating: "Preparing script and draft…",
+    createRemix: "Create new video",
+    creatingRemix: "Preparing the new video…"
   },
   validation: {
     noCredits: "You don't have enough credits to create a video. Buy credits or use the free video from the dashboard.",
@@ -449,7 +466,10 @@ export const he = {
   create: {
     back: "חזרה", eyebrow: "יצירה חדשה", title: "בואו נבנה את הסרטון הבא",
     subtitle: "תארו את הרעיון, בחרו סגנון והעלו חומרים. את שאר ההגדרות נכין עבורכם.",
-    draftSaved: "נשמר אוטומטית לפני רגע", draftActive: "שמירה אוטומטית פעילה"
+    draftSaved: "נשמר אוטומטית לפני רגע", draftActive: "שמירה אוטומטית פעילה",
+    remixEyebrow: "גרסה חדשה", remixTitle: "שנו פרמטר וצרו סרטון חדש",
+    remixSubtitle: "כל ההגדרות מהסרטון הקודם כאן. שנו רק מה שצריך — למשל יום ללילה. זו הפקה חדשה ותחויב כסרטון חדש.",
+    remixFrom: "על בסיס «{{title}}»", remixCredit: "גרסה חדשה משתמשת בקרדיט אחד, או בסרטון חינם אם נותר."
   },
   progress: { aria: "שלבי הגדרת הסרטון", idea: "רעיון וסגנון", script: "תסריט וסצנות", audio: "קול ומוזיקה", review: "סקירה ויצירה" },
   common: { required: "חובה", optional: "לא חובה", remove: "הסר", automatic: "אוטומטי — לפי הבריף והאווירה", secondsShort: "{{count}} שנ׳", recommended: "מומלץ", custom: "מותאם" },
@@ -484,7 +504,17 @@ export const he = {
     referenceHelp: "המערכת תנתח את הסגנון, הצבעוניות, קצב החיתוכים, המצלמה ומבנה הסיפור. הסרטון לא ישולב בתוצר ולא יועתק. עד 15MB.",
     referenceSelected: "סרטון לניתוח: {{name}}", insert: "שילוב סרטון קצר (אופציונלי)",
     insertHelp: "קטע של כמה שניות שיושתל בתוך הסרטון עם מעבר חלק.", insertAt: "מיקום פריצה (שניות מתחילת הסרטון)",
-    insertAudio: "קול בסרטון המשולב", originalAudio: "מהסרטון המקורי", narrationAudio: "בלי קול מהמקור (רק הקריינות שלנו סביב)"
+    insertAudio: "קול בסרטון המשולב", originalAudio: "מהסרטון המקורי", narrationAudio: "בלי קול מהמקור (רק הקריינות שלנו סביב)",
+    keptHelp: "הקבצים מהסרטון הקודם נשמרים. אפשר להסיר או להעלות תחליף למטה.",
+    keptRoles: {
+      anchor: "דמות / רקע",
+      scene: "תמונת סצנה",
+      product: "מוצר",
+      voice_clone: "שיבוט קול",
+      insert_clip: "סרטון משולב",
+      reference_video: "סרטון השראה",
+      logo: "לוגו"
+    }
   },
   basic: {
     heading: "הגדרות בסיסיות", help: "הבחירות הנפוצות שמשפיעות על אורך הסרטון, הפורמט והחוויה.",
@@ -591,7 +621,8 @@ export const he = {
     cost: "עלות", time: "זמן משוער", minutes: "{{min}}–{{max}} דקות", status: "סטטוס מילוי", ready: "מוכן ליצירת סקיצה",
     missing: "חסר: {{fields}}", titleField: "כותרת", goalField: "מטרה", descriptionField: "תיאור", saveDraft: "שמירת טיוטה",
     preview: "תצוגת סיכום", untitled: "ללא כותרת", noGoal: "לא נבחרה מטרה", autoAudience: "קהל יעד אוטומטי",
-    autoMood: "אווירה אוטומטית", create: "יצירת תסריט וסקיצה", creating: "מכין תסריט וסקיצה…"
+    autoMood: "אווירה אוטומטית", create: "יצירת תסריט וסקיצה", creating: "מכין תסריט וסקיצה…",
+    createRemix: "צרו סרטון חדש", creatingRemix: "מכין את הסרטון החדש…"
   },
   validation: {
     noCredits: "אין מספיק קרדיטים ליצירת סרטון. רכוש קרדיטים או השתמש בסרטון החינמי מהדשבורד.",

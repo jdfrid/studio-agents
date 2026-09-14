@@ -25,6 +25,7 @@ export async function createRun(input: {
   userId?: string;
   skipCreditCheck?: boolean;
   creditCost?: number;
+  parentRunId?: string;
 }): Promise<ProjectRunView> {
   let tenantId: string;
   if (input.userId) {
@@ -52,6 +53,7 @@ export async function createRun(input: {
       currentStage: "brief",
       brief: brief as object,
       approvalMode,
+      parentRunId: input.parentRunId ?? null,
       stages: {
         create: STAGE_ORDER.map((stage) => ({
           stage: toPrismaStage(stage),
@@ -89,6 +91,38 @@ export async function getRun(runId: string, userId?: string): Promise<ProjectRun
   if (!run) return null;
   if (userId && run.userId && run.userId !== userId) return null;
   return toView(run);
+}
+
+export async function reusableGcsPathsForRun(runId: string, userId: string): Promise<Set<string> | null> {
+  const run = await prisma.projectRun.findFirst({
+    where: { id: runId, userId },
+    include: {
+      artifacts: { select: { gcsPath: true } },
+      stages: { where: { stage: "brief" }, take: 1 }
+    }
+  });
+  if (!run) return null;
+  const paths = new Set<string>();
+  for (const artifact of run.artifacts) {
+    if (artifact.gcsPath) paths.add(artifact.gcsPath);
+  }
+  const brief = run.brief as { attachments?: Array<{ gcsPath?: string }> };
+  for (const attachment of brief.attachments ?? []) {
+    if (attachment.gcsPath) paths.add(attachment.gcsPath);
+  }
+  const output = run.stages[0]?.output as {
+    visualAnchors?: Array<{ gcsPath?: string }>;
+    voiceCloneSample?: { gcsPath?: string } | null;
+    videoInsert?: { gcsPath?: string } | null;
+    branding?: { logo?: { gcsPath?: string } | null } | null;
+  } | null;
+  for (const anchor of output?.visualAnchors ?? []) {
+    if (anchor.gcsPath) paths.add(anchor.gcsPath);
+  }
+  if (output?.voiceCloneSample?.gcsPath) paths.add(output.voiceCloneSample.gcsPath);
+  if (output?.videoInsert?.gcsPath) paths.add(output.videoInsert.gcsPath);
+  if (output?.branding?.logo?.gcsPath) paths.add(output.branding.logo.gcsPath);
+  return paths;
 }
 
 export async function approveStage(runId: string, stage: StageName): Promise<ProjectRunView | null> {

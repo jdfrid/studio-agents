@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BriefInputSchema,
   BriefOutputSchema,
+  CreateRunRequestSchema,
   ScriptOutputSchema,
   SceneSpecSchema,
   SubtitleStyleSchema,
@@ -175,5 +176,15 @@ describe("Script schemas", () => {
         backgroundVisualPrompt: "b"
       })
     ).toThrow();
+  });
+});
+
+describe("CreateRunRequestSchema", () => {
+  it("accepts a parent run id for a remixed video", () => {
+    const parsed = CreateRunRequestSchema.parse({
+      parentRunId: "clxyzparent00000000000001",
+      brief: { title: "Night version", sourceText: "Same story at night" }
+    });
+    expect(parsed.parentRunId).toBe("clxyzparent00000000000001");
   });
 });

@@ -15,7 +15,17 @@ import {
 import type { ArtifactRow, ProjectRunView, StageName } from "./types.js";
 import { formatDateTime } from "./i18n/format.js";
 
-export function RunView({ runId, onBack }: { runId: string; onBack: () => void }) {
+export function RunView({
+  runId,
+  onBack,
+  onRemix,
+  canRemix
+}: {
+  runId: string;
+  onBack: () => void;
+  onRemix: () => void;
+  canRemix: boolean;
+}) {
   const { t, i18n } = useTranslation("run");
   const [run, setRun] = useState<ProjectRunView | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactRow[]>([]);
@@ -73,6 +83,11 @@ export function RunView({ runId, onBack }: { runId: string; onBack: () => void }
           </div>
         </div>
         <div className="run-header-actions">
+          {run.status === "COMPLETED" ? (
+            <button type="button" className="primary" disabled={!canRemix} onClick={onRemix}>
+              {t("run.remix")}
+            </button>
+          ) : null}
           <button type="button" className="link-btn run-delete-btn" disabled={deleting} onClick={() => void deleteThisRun()}>
             {deleting ? t("run.deleting") : run.status !== "COMPLETED" ? t("run.deleteProcess") : t("run.delete")}
           </button>

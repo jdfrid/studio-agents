@@ -14,10 +14,12 @@ type RunSummary = {
 
 export function Dashboard({
   onNewVideo,
-  onOpenRun
+  onOpenRun,
+  onRemixRun
 }: {
   onNewVideo: () => void;
   onOpenRun: (id: string) => void;
+  onRemixRun: (id: string) => void;
 }) {
   const { t, i18n } = useTranslation();
   const { user, refresh } = useAuth();
@@ -182,17 +184,32 @@ export function Dashboard({
                 </span>
                 <span className="run-card-arrow" aria-hidden>{i18n.dir() === "rtl" ? "←" : "→"}</span>
               </button>
-              <button
-                type="button"
-                className="link-btn run-delete-btn"
-                disabled={deletingId === r.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void deleteRun(r.id, r.title);
-                }}
-              >
-                {deletingId === r.id ? t("dashboard.deleting") : t("dashboard.delete")}
-              </button>
+              <div className="run-card-actions">
+                {r.status === "COMPLETED" ? (
+                  <button
+                    type="button"
+                    className="link-btn run-remix-btn"
+                    disabled={!canCreate}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemixRun(r.id);
+                    }}
+                  >
+                    {t("dashboard.remix")}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="link-btn run-delete-btn"
+                  disabled={deletingId === r.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void deleteRun(r.id, r.title);
+                  }}
+                >
+                  {deletingId === r.id ? t("dashboard.deleting") : t("dashboard.delete")}
+                </button>
+              </div>
             </li>
           ))}
         </ul>

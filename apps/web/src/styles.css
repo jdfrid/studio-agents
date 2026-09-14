@@ -1441,7 +1441,21 @@ a { color: inherit; }
 .run-card-title-row strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .run-card-content small { color: var(--muted); font-weight: 450; }
 .run-card-arrow { color: #9b8cff; font-size: 1.25rem; }
-.run-delete-btn { padding: 8px 10px; color: #ff9aaa; text-decoration: none; font-size: .75rem; }
+.run-card-actions { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.run-remix-btn { padding: 8px 10px; color: #9b8cff; text-decoration: none; font-size: .75rem; }
+.remix-banner { margin: 0 0 18px; }
+.kept-files-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.kept-file-role {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(117,89,255,.16);
+  color: #cfc6ff;
+  font-size: .68rem;
+  white-space: nowrap;
+}
+.run-header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -1698,8 +1712,9 @@ a { color: inherit; }
   .run-card-thumb { width: 46px; height: 46px; }
   .run-card-title-row { align-items: flex-start; flex-direction: column; gap: 5px; }
   .run-card-content small { font-size: .68rem; }
-  .run-card-row { padding-bottom: 30px; }
-  .run-card-row > .run-delete-btn { position: absolute; bottom: 0; inset-inline-start: 4px; min-height: 28px; padding: 2px 7px; }
+  .run-card-row { padding-bottom: 38px; }
+  .run-card-row > .run-card-actions { position: absolute; bottom: 0; inset-inline-start: 4px; flex-direction: row; }
+  .run-card-row > .run-card-actions .link-btn { min-height: 28px; padding: 2px 7px; }
   .section-title-row { align-items: flex-end; }
 
   .create-page-header { grid-template-columns: 1fr; gap: 16px; }

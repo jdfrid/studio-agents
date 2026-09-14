@@ -5,7 +5,9 @@ import { BriefInputSchema } from "./brief.js";
 
 export const CreateRunRequestSchema = z.object({
   tenantSlug: z.string().optional(),
-  brief: BriefInputSchema
+  brief: BriefInputSchema,
+  /** Completed (or other) run whose settings are being remixed into a new paid video. */
+  parentRunId: z.string().min(1).max(40).optional()
 });
 export type CreateRunRequest = z.infer<typeof CreateRunRequestSchema>;
 
