@@ -7,6 +7,7 @@ import { creativePayloadForRequest } from "./creativePayload.js";
 import { localeFor } from "./i18n/index.js";
 import type { ProjectRunView } from "./types.js";
 import { BrandTemplatePanel } from "./BrandTemplatePanel.js";
+import { CameraCaptureButton, useIsMobileDevice } from "./CameraCaptureButton.js";
 import {
   CREATIVE_FIELD_SECTIONS,
   aspectRatioFromCreative,
@@ -66,6 +67,7 @@ export function CreateVideoForm({
   const uiLocale: Locale = localeFor(i18n.resolvedLanguage);
   const catalog = useCreativeCatalog(uiLocale);
   const { user } = useAuth();
+  const isMobile = useIsMobileDevice();
   const canCreate = user?.canCreateVideo ?? false;
   const freeLeft = user?.freeVideosRemaining ?? 0;
   const [title, setTitle] = useState("");
@@ -965,13 +967,30 @@ export function CreateVideoForm({
           <span className="form-section-icon" aria-hidden>◫</span>
           <div>
             <h2 id="materials-heading">{t("materials.heading")} <span className="optional-mark">{t("common.optional")}</span></h2>
-            <p>{t("materials.help")}</p>
+            <p>{isMobile ? t("materials.mobileHelp") : t("materials.help")}</p>
           </div>
         </div>
+        {isMobile ? (
+          <div className="camera-capture-row">
+            <CameraCaptureButton
+              capture="user"
+              label={t("materials.captureSelf")}
+              disabled={visualFiles.length >= MAX_VISUAL_FILES}
+              onFiles={(files) => addVisualFiles(files)}
+            />
+            <CameraCaptureButton
+              capture="environment"
+              label={t("materials.captureProduct")}
+              disabled={productFiles.length >= MAX_VISUAL_FILES}
+              onFiles={(files) => addProductFiles(files)}
+            />
+            <p className="field-help">{t("materials.captureHint")}</p>
+          </div>
+        ) : null}
         <label className="unified-upload-zone">
           <span className="upload-zone-icon" aria-hidden>↑</span>
-          <strong>{t("materials.drop")}</strong>
-          <small>{t("materials.choose")}</small>
+          <strong>{isMobile ? t("materials.dropMobile") : t("materials.drop")}</strong>
+          <small>{isMobile ? t("materials.chooseMobile") : t("materials.choose")}</small>
           <input
             type="file"
             accept="image/*,video/mp4,video/webm,video/quicktime,audio/*"

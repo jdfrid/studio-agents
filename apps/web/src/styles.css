@@ -2038,6 +2038,41 @@ a { color: inherit; }
   background: none;
   color: #c7c0ff;
 }
+.camera-capture-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.camera-capture-row .field-help {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+}
+.camera-capture-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid rgba(117, 89, 255, 0.45);
+  border-radius: 14px;
+  background: rgba(117, 89, 255, 0.12);
+  color: var(--text);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+.camera-capture-btn:hover { border-color: #8f7cff; background: rgba(117, 89, 255, 0.18); }
+.camera-capture-btn.is-disabled { opacity: .45; pointer-events: none; }
+.camera-capture-btn input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
 .unified-upload-zone {
   position: relative;
   min-height: 150px;
@@ -2374,6 +2409,8 @@ a { color: inherit; }
 }
 
 @media (max-width: 560px) {
+  .camera-capture-row { grid-template-columns: 1fr; }
+
   .create-progress { grid-template-columns: repeat(4, 1fr); }
   .create-progress span { min-width: 0; padding: 7px 3px; font-size: 0.64rem; text-align: center; }
   .create-progress span i { flex: 0 0 auto; }
