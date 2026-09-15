@@ -10,6 +10,19 @@ import { AboutPage, ContactPage, LegalPage, PricingPage } from "./SitePages.js";
 import { applySeo, defaultSeo } from "./seo.js";
 import type { ProjectRunView } from "./types.js";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher.js";
+import { WhatsNewDialog } from "./WhatsNewDialog.js";
+import {
+  WHATS_NEW_ENTRIES,
+  WHATS_NEW_STORAGE_KEY,
+  entriesSince,
+  readReopenEnabled,
+  readStoredDate,
+  storageKeyFor,
+  todayStamp,
+  writeReopenEnabled,
+  writeStoredDate,
+  type WhatsNewEntry
+} from "./whatsNew.js";
 import "./styles.css";
 
 type AppView =
@@ -70,6 +83,10 @@ function AppShell() {
   const [view, setView] = useState<AppView>(initial.view);
   const [runId, setRunId] = useState<string | null>(initial.runId);
   const [fromRunId, setFromRunId] = useState<string | null>(initial.fromRunId ?? null);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const [whatsNewSinceVisit, setWhatsNewSinceVisit] = useState(false);
+  const [whatsNewEntries, setWhatsNewEntries] = useState<WhatsNewEntry[]>([]);
+  const [showWhatsNewReopen, setShowWhatsNewReopen] = useState(false);
 
   const navigate = useCallback((next: AppLocation, mode: "push" | "replace" = "push") => {
     setView(next.view);
@@ -125,6 +142,34 @@ function AppShell() {
       navigate({ view: "dashboard", runId: null }, "replace");
     }
   }, [navigate, user, view]);
+
+  useEffect(() => {
+    if (!user) {
+      setWhatsNewOpen(false);
+      return;
+    }
+    setShowWhatsNewReopen(readReopenEnabled(user.id));
+    const unseen = entriesSince(readStoredDate(storageKeyFor(WHATS_NEW_STORAGE_KEY, user.id)));
+    if (unseen.length === 0) return;
+    setWhatsNewEntries(unseen);
+    setWhatsNewSinceVisit(true);
+    setWhatsNewOpen(true);
+  }, [user?.id]);
+
+  const closeWhatsNew = useCallback(() => {
+    if (user) {
+      writeStoredDate(storageKeyFor(WHATS_NEW_STORAGE_KEY, user.id), todayStamp());
+      writeReopenEnabled(user.id);
+    }
+    setShowWhatsNewReopen(true);
+    setWhatsNewOpen(false);
+  }, [user]);
+
+  const openWhatsNew = useCallback(() => {
+    setWhatsNewEntries(WHATS_NEW_ENTRIES);
+    setWhatsNewSinceVisit(false);
+    setWhatsNewOpen(true);
+  }, []);
 
   useEffect(() => {
     const path = pathFor({ view, runId });
@@ -198,6 +243,17 @@ function AppShell() {
           ) : null}
         </nav>
         <div className="header-user">
+          {showWhatsNewReopen ? (
+            <button
+              type="button"
+              className="whats-new-reopen"
+              onClick={openWhatsNew}
+              title={t("whatsNew.reopen")}
+              aria-label={t("whatsNew.reopen")}
+            >
+              <span aria-hidden>✦</span>
+            </button>
+          ) : null}
           <LanguageSwitcher compact />
           {user.avatarUrl ? (
             <img src={user.avatarUrl} alt="" className="avatar" />
@@ -244,6 +300,12 @@ function AppShell() {
         ) : null}
         {appView === "distribution" && user.role === "ADMIN" ? <DistributionPage /> : null}
       </main>
+      <WhatsNewDialog
+        open={whatsNewOpen}
+        entries={whatsNewEntries}
+        sinceLastVisit={whatsNewSinceVisit}
+        onClose={closeWhatsNew}
+      />
     </div>
   );
 }
