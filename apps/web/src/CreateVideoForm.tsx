@@ -833,10 +833,10 @@ export function CreateVideoForm({
         </div>
       </header>
       <nav className="create-progress" aria-label={t("progress.aria")}>
-        <span className="is-active"><i>1</i>{t("progress.idea")}</span>
-        <span><i>2</i>{t("progress.script")}</span>
-        <span><i>3</i>{t("progress.audio")}</span>
-        <span><i>4</i>{t("progress.review")}</span>
+        <span className="is-active"><i>1</i><span className="progress-label">{t("progress.idea")}</span></span>
+        <span><i>2</i><span className="progress-label">{t("progress.script")}</span></span>
+        <span><i>3</i><span className="progress-label">{t("progress.audio")}</span></span>
+        <span><i>4</i><span className="progress-label">{t("progress.review")}</span></span>
       </nav>
       {isRemix ? (
         <section className="billing-banner remix-banner">

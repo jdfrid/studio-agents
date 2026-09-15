@@ -15,17 +15,19 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
         type="button"
         className={locale === "en" ? "is-active" : ""}
         aria-pressed={locale === "en"}
+        aria-label={t("common.english")}
         onClick={() => void select("en")}
       >
-        English
+        {compact ? "EN" : t("common.english")}
       </button>
       <button
         type="button"
         className={locale === "he" ? "is-active" : ""}
         aria-pressed={locale === "he"}
+        aria-label={t("common.hebrew")}
         onClick={() => void select("he")}
       >
-        עברית
+        {compact ? "HE" : t("common.hebrew")}
       </button>
     </div>
   );

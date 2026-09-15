@@ -217,28 +217,31 @@ function AppShell() {
           <button
             type="button"
             className={appView === "dashboard" ? "nav-active" : ""}
+            aria-label={t("shell.myVideos")}
             onClick={() => navigate({ view: "dashboard", runId: null })}
           >
-            <span aria-hidden>▦</span>
-            {t("shell.myVideos")}
+            <span className="nav-icon" aria-hidden>▦</span>
+            <span className="nav-label">{t("shell.myVideos")}</span>
           </button>
           <button
             type="button"
             className={appView === "create" ? "nav-active" : ""}
             disabled={!user.canCreateVideo}
+            aria-label={t("shell.newCreation")}
             onClick={() => navigate({ view: "create", runId: null })}
           >
-            <span aria-hidden>＋</span>
-            {t("shell.newCreation")}
+            <span className="nav-icon" aria-hidden>＋</span>
+            <span className="nav-label">{t("shell.newCreation")}</span>
           </button>
           {user.role === "ADMIN" ? (
             <button
               type="button"
               className={appView === "distribution" ? "nav-active" : ""}
+              aria-label={t("shell.distribute")}
               onClick={() => navigate({ view: "distribution", runId: null })}
             >
-              <span aria-hidden>↗</span>
-              {t("shell.distribute")}
+              <span className="nav-icon" aria-hidden>↗</span>
+              <span className="nav-label">{t("shell.distribute")}</span>
             </button>
           ) : null}
         </nav>
