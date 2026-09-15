@@ -5,6 +5,7 @@ import {
   ScriptInputSchema,
   ScriptOutputSchema,
   applyContinuityToScript,
+  applyVisualPlateSceneCount,
   contentLanguageEnglishName,
   contentLanguageNativeName,
   formatCreativeConstraints,
@@ -21,6 +22,7 @@ import {
   resolveRenderProfile,
   sanitizeVeoPromptForExternalAudio,
   userFacingLanguageInstruction,
+  visualPlateCount,
   voiceAgeFromCreative,
   voiceSexFromCreative,
   type Agent,
@@ -45,7 +47,19 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const budget = isBudgetMode(brief);
     const renderProfile = resolveRenderProfile(brief);
     const costConfig = profileToProductionCostConfig(renderProfile);
-    const { sceneCount, clipSeconds, totalVideoSeconds } = planSceneLayout(brief.durationSeconds, budget, costConfig);
+    const extendMode = renderProfile.strategy === "extend";
+    const klingMode = renderProfile.provider === "kling";
+    const lipSyncMode = renderProfile.capabilities.nativeAudio === true;
+    const beatI2vMode = klingMode || lipSyncMode || renderProfile.provider === "fal";
+    const plateCount = visualPlateCount(brief.visualAnchors);
+    const castPhotoCount = (brief.visualAnchors ?? []).filter((anchor) => !anchor.role || anchor.role === "anchor").length;
+    const hasCastPhotos = plateCount === 0 && castPhotoCount > 0;
+    const layout = applyVisualPlateSceneCount(
+      planSceneLayout(brief.durationSeconds, budget, costConfig),
+      plateCount,
+      { beatI2v: beatI2vMode, extend: extendMode }
+    );
+    const { sceneCount, clipSeconds, totalVideoSeconds } = layout;
     const narrationLimit = narrationCharLimitForBucket(clipSeconds);
     const productAd = isProductAdBrief({
       ...brief,
@@ -55,10 +69,6 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       creative: (brief as { creative?: { filmTemplate?: string; designStyle?: string } }).creative
     });
     const filmTemplate = brief.creative?.filmTemplate;
-    const extendMode = renderProfile.strategy === "extend";
-    const klingMode = renderProfile.provider === "kling";
-    const lipSyncMode = renderProfile.capabilities.nativeAudio === true;
-    const beatI2vMode = klingMode || lipSyncMode || renderProfile.provider === "fal";
     const contentLang = normalizeContentLanguage(brief.language);
     const langEn = contentLanguageEnglishName(contentLang);
     const langNative = contentLanguageNativeName(contentLang);
@@ -71,7 +81,6 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       userText
     });
     const presenterAge = voiceAgeFromCreative(brief.creative);
-    const hasPhotos = Boolean(brief.visualAnchors?.length);
 
     const systemParts = [
       "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline.",
@@ -79,21 +88,30 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       contentLang === "yi"
         ? "NARRATION MUST be Yiddish (ייִדיש), not Modern Israeli Hebrew. Prefer Yiddish wording even when the brief summary drifted into Hebrew."
         : "",
-      brief.visualAnchors?.length
-        ? `User uploaded ${brief.visualAnchors.length} CHARACTER PHOTO(s). Those people ARE the cast — describe them in characterBible from the photos (gender, age, hair, skin, outfit). visualPrompt/referenceImagePrompt must keep those exact identities; do not invent different faces.`
+      hasCastPhotos
+        ? `User uploaded ${castPhotoCount} CHARACTER PHOTO(s). Those people ARE the cast — describe them in characterBible from the photos (gender, age, hair, skin, outfit). visualPrompt/referenceImagePrompt must keep those exact identities; do not invent different faces.`
+        : "",
+      plateCount >= 2
+        ? `User uploaded ${plateCount} location/B-roll stills. Treat them as a visual POOL — each still is a different place, product, or angle. Write ${sceneCount} distinct scenes so every still can appear. Do NOT collapse them into one locked location or one composite plate.`
         : "",
       `Keep each narration under ${narrationLimit} characters (must fit ${clipSeconds}s of spoken audio) in ${langEn}.`,
       "Keep visualPrompt and veoPrompt under 200 characters each.",
-      "CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette.",
-      `Output characterBible in ${langEn}: a fixed description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes. Explicitly state each character's gender (male/female or זכר/נקבה).`,
+      plateCount >= 2
+        ? "Locations MAY change between scenes to showcase the uploaded stills (hotel lobby, room, pool, restaurant, product angles, etc.). Keep brand palette consistent when people appear."
+        : "CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette.",
+      plateCount >= 2
+        ? `Output characterBible in ${langEn}: brand look and typical guests if any — locations change per still. Explicitly state gender only if people appear.`
+        : `Output characterBible in ${langEn}: a fixed description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes. Explicitly state each character's gender (male/female or זכר/נקבה).`,
       presenterCastInstruction({
         sex: presenterSex,
         userLocked: Boolean(voiceSexFromCreative(brief.creative) || presenterAge),
-        hasPhotos,
+        hasPhotos: hasCastPhotos,
         age: presenterAge
       }),
-      "Each veoPrompt must explicitly continue from the previous scene without changing setting or cast.",
-      brief.visualAnchors?.length
+      plateCount >= 2
+        ? "Each veoPrompt describes motion for THAT beat's still — camera and action may change with the location."
+        : "Each veoPrompt must explicitly continue from the previous scene without changing setting or cast.",
+      hasCastPhotos
         ? "Uploaded photos define the cast identity — keep those faces. Still avoid naming real celebrities in text prompts."
         : "NEVER name real celebrities, politicians, or other recognizable public figures in veoPrompt, visualPrompt, or characterBible — use generic fictional people only (video models block real-person likenesses).",
       "Avoid coded public-figure descriptions (e.g. Israeli leader / US president / named office holders). Describe age, hair, and wardrobe only for fictional characters.",
@@ -121,7 +139,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "Every visualPrompt and veoPrompt must name both characters and who is speaking vs listening (listener still, closed mouth).",
       "Write back-and-forth discussion lines (question/answer, agreement/pushback) — not one long announcer speech split across scenes.",
       "CRITICAL AUDIO: each narration is ONLY one character's spoken words for that beat — never put both characters' lines in the same narration (no overlapping dialogue, no chorus).",
-      "WARDROBE LOCK: coat/jacket/shirt colors and outfits stay identical in every scene — do not invent new clothing colors.",
+      plateCount >= 2
+        ? "Keep brand palette consistent across stills; wardrobe may match each location photo."
+        : "WARDROBE LOCK: coat/jacket/shirt colors and outfits stay identical in every scene — do not invent new clothing colors.",
       contentLang === "he" || contentLang === "yi"
         ? "HEBREW NIKUD (mandatory): every narration line MUST include full niqqud (ניקוד) for correct TTS pronunciation and stress — e.g. שָׁלוֹם not שלום."
         : contentLang === "ar"
@@ -222,8 +242,14 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       {
         scenes: [sceneSchema],
         musicPrompt: `${langNative} music feel`,
-        backgroundVisualPrompt: `${langNative} single location visual direction`,
-        characterBible: `${langNative} locked cast + location (never changes)`
+        backgroundVisualPrompt:
+          plateCount >= 2
+            ? `${langNative} visual tour of the uploaded stills (locations may change)`
+            : `${langNative} single location visual direction`,
+        characterBible:
+          plateCount >= 2
+            ? `${langNative} brand look; locations change per still`
+            : `${langNative} locked cast + location (never changes)`
       },
       null,
       2
@@ -255,7 +281,11 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     ]
       .filter(Boolean)
       .join("\n");
-    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}${creativeBlock}${toneHint ? `\n\n${toneHint}` : ""}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Total video length will be ~${totalVideoSeconds}s (brief asks for ${brief.durationSeconds}s). User-facing text (titles, narration, characterBible, backgroundVisualPrompt, musicPrompt) MUST be in ${langEn}. Narration must sound like it belongs to this specific event/style (not generic ads). For every scene, align narration wording with the motion described in veoPrompt.${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}`;
+    const plateHint =
+      plateCount >= 2
+        ? ` Place each uploaded still on its own beat (round-robin if ${sceneCount} > ${plateCount}); vary location/product per still.`
+        : "";
+    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}${creativeBlock}${toneHint ? `\n\n${toneHint}` : ""}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Total video length will be ~${totalVideoSeconds}s (brief asks for ${brief.durationSeconds}s). User-facing text (titles, narration, characterBible, backgroundVisualPrompt, musicPrompt) MUST be in ${langEn}. Narration must sound like it belongs to this specific event/style (not generic ads). For every scene, align narration wording with the motion described in veoPrompt.${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}${plateHint}`;
 
     const completeJson = provider.type === "GEMINI" ? geminiCompleteJson : llmCompleteJson;
     const { parsed, model } = await completeJson<{
@@ -319,7 +349,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
               narrationCharLimitForBucket(extendMode || beatI2vMode ? clipSeconds : Number(durationBucket))
             );
       const speakerRaw = String((scene as { speaker?: string }).speaker ?? "").toLowerCase();
-      const dialogueCast = Boolean(brief.visualAnchors && brief.visualAnchors.length >= 2);
+      const dialogueCast = Boolean(hasCastPhotos && castPhotoCount >= 2);
       const speaker =
         resolvedKind === "title_card"
           ? undefined
@@ -395,8 +425,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       },
       parsed.characterBible,
       {
-        hasUserCharacterPhotos: hasPhotos,
-        presenterSex: hasPhotos
+        hasUserCharacterPhotos: hasCastPhotos,
+        hasLocationPlates: plateCount >= 2,
+        presenterSex: hasCastPhotos
           ? undefined
           : resolvePresenterSex({
               creative: brief.creative,
@@ -404,7 +435,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
               language: contentLang,
               userText
             }),
-        presenterAge: hasPhotos ? undefined : presenterAge
+        presenterAge: hasCastPhotos ? undefined : presenterAge
       }
     );
 

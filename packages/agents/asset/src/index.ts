@@ -64,7 +64,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
     let anchorReference: ReferenceImageBytes | null = null;
 
-    const MAX_INLINE_ANCHORS = 4;
+    const MAX_INLINE_ANCHORS = 12;
 
     const resolvedAnchorPaths = Array.from(
       new Set(
@@ -94,9 +94,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
     // A single uploaded person can be used directly as the locked cast plate.
     // With multiple people, leave the chain empty so scene 1 generates one
     // composite plate from every uploaded face; later scenes reuse that plate.
-    if (anchorReferences.length === 1) {
-      chainReference = anchorReferences[0]!;
-    }
+    // 3+ unassigned stills are a location pool (see locationPlateRefs), not a cast lock.
 
     const productPaths = Array.from(new Set((input.visualProductGcsPaths ?? []).filter(Boolean)));
     const productReferences: ReferenceImageBytes[] = [];
@@ -108,6 +106,23 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
       await ctx.log.log("asset_product_plates", "Using locked product B-roll plates", {
         count: productReferences.length,
         gcsPaths: productPaths
+      });
+    }
+
+    if (anchorReferences.length === 1 && productReferences.length === 0) {
+      chainReference = anchorReferences[0]!;
+    }
+
+    const locationPlateRefs: ReferenceImageBytes[] =
+      productReferences.length > 0
+        ? productReferences
+        : anchorReferences.length >= 3
+          ? anchorReferences
+          : [];
+    if (locationPlateRefs.length) {
+      await ctx.log.log("asset_location_plates", "Using uploaded stills as scene plates", {
+        count: locationPlateRefs.length,
+        via: productReferences.length ? "product" : "anchor-pool"
       });
     }
 
@@ -131,9 +146,9 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
     for (const [sceneIndex, scene] of input.scenes.entries()) {
 
-      // Locked product / B-roll plate — use the upload pixels directly as the I2V still.
-      if (!scene.uploadedAssetGcsPath && productReferences.length) {
-        const plate = productReferences[sceneIndex % productReferences.length]!;
+      // Locked location / product / B-roll plate — use the upload pixels directly as the I2V still.
+      if (!scene.uploadedAssetGcsPath && locationPlateRefs.length) {
+        const plate = locationPlateRefs[sceneIndex % locationPlateRefs.length]!;
         const plateMime = plate.mimeType.startsWith("image/") ? plate.mimeType : "image/png";
         const referenceArtifact = await ctx.artifacts.save({
           runId: ctx.runId,

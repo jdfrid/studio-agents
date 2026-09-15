@@ -5,6 +5,8 @@ import {
   isCorporateProductFilm,
   isProductAdBrief,
   planSceneLayout,
+  visualPlateCount,
+  applyVisualPlateSceneCount,
   veoGenerateAudio,
   veoModelTier,
   veoSupportsNativeAudio
@@ -155,6 +157,36 @@ describe("veoGenerateAudio", () => {
     expect(veoGenerateAudio()).toBe(true);
     if (prev === undefined) delete process.env.GEMINI_VEO_AUDIO;
     else process.env.GEMINI_VEO_AUDIO = prev;
+  });
+});
+
+describe("visualPlateCount", () => {
+  it("treats product stills as a pool the engine should place", () => {
+    expect(visualPlateCount([{ role: "product" }, { role: "product" }])).toBe(2);
+  });
+
+  it("treats 3+ unassigned uploads as location plates, not a single cast lock", () => {
+    expect(visualPlateCount([{ role: "anchor" }, { role: "anchor" }])).toBe(0);
+    expect(visualPlateCount(Array.from({ length: 8 }, () => ({ role: "anchor" })))).toBe(8);
+  });
+  it("treats scene stills as plates", () => {
+    expect(visualPlateCount([{ role: "scene" }, { role: "scene" }, { role: "scene" }])).toBe(3);
+  });
+});
+
+describe("applyVisualPlateSceneCount", () => {
+  it("adds beats so 8 hotel stills are not truncated to a 30s 6-beat plan", () => {
+    const layout = planSceneLayout(30, true, { renderProfileId: "wan-i2v" });
+    const next = applyVisualPlateSceneCount(layout, 8, { beatI2v: true, extend: false });
+    expect(next.sceneCount).toBe(8);
+    expect(next.totalVideoSeconds).toBe(40);
+  });
+
+  it("does not grow extend chains or shrink existing plans", () => {
+    const layout = planSceneLayout(30, true, { renderProfileId: "wan-i2v" });
+    expect(applyVisualPlateSceneCount(layout, 2, { beatI2v: true, extend: false }).sceneCount).toBe(layout.sceneCount);
+    const extend = planSceneLayout(30, true, { veoMode: "extend", renderProfileId: "veo-extend" });
+    expect(applyVisualPlateSceneCount(extend, 8, { beatI2v: true, extend: true }).sceneCount).toBe(extend.sceneCount);
   });
 });
 

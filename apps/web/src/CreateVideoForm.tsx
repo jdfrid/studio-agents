@@ -414,6 +414,7 @@ export function CreateVideoForm({
   function addMixedFiles(incoming: FileList | File[]) {
     let hasReferenceVideo = Boolean(referenceVideoFile);
     let hasInsertVideo = Boolean(insertFile);
+    const stills: File[] = [];
     for (const file of Array.from(incoming)) {
       const name = file.name.toLowerCase();
       if (file.type.startsWith("audio/")) {
@@ -432,9 +433,10 @@ export function CreateVideoForm({
       }
       if (file.type.startsWith("image/")) {
         if (/logo|לוגו/.test(name) && !logoFile) setLogoFile(file);
-        else addVisualFiles([file]);
+        else stills.push(file);
       }
     }
+    if (stills.length) addProductFiles(stills);
   }
 
   function setCreativeField<K extends keyof CreativeOptions>(key: K, value: CreativeOptions[K] | "") {
@@ -496,6 +498,14 @@ export function CreateVideoForm({
     }
     if (visualFiles.some((f) => f.size > MAX_VISUAL_BYTES)) {
       setError(t("validation.characterAnyTooLarge"));
+      return;
+    }
+    if (productFiles.length > MAX_VISUAL_FILES) {
+      setError(t("validation.productLimit", { count: MAX_VISUAL_FILES }));
+      return;
+    }
+    if (productFiles.some((f) => f.size > MAX_VISUAL_BYTES)) {
+      setError(t("validation.productAnyTooLarge"));
       return;
     }
     setBusy(true);

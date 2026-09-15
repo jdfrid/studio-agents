@@ -93,6 +93,37 @@ export function planSceneLayout(
   return { sceneCount, clipSeconds, totalVideoSeconds: sceneCount * clipSeconds, veoMode: mode };
 }
 
+const MAX_VISUAL_PLATE_SCENES = 12;
+
+/**
+ * Stills the engine should place across beats (product/B-roll, or 3+ unassigned
+ * uploads treated as a location pool — not 1–2 character-face locks).
+ */
+export function visualPlateCount(
+  anchors: Array<{ role?: string }> | undefined
+): number {
+  if (!anchors?.length) return 0;
+  const plates = anchors.filter((anchor) => anchor.role === "product" || anchor.role === "scene").length;
+  if (plates) return plates;
+  const casts = anchors.filter((anchor) => !anchor.role || anchor.role === "anchor").length;
+  return casts >= 3 ? casts : 0;
+}
+
+/** Grow I2V beat count so uploaded stills can each get a scene. */
+export function applyVisualPlateSceneCount<T extends { sceneCount: number; clipSeconds: number; totalVideoSeconds: number }>(
+  layout: T,
+  plateCount: number,
+  opts: { beatI2v: boolean; extend: boolean }
+): T {
+  if (!opts.beatI2v || opts.extend || plateCount <= layout.sceneCount) return layout;
+  const sceneCount = Math.min(MAX_VISUAL_PLATE_SCENES, plateCount);
+  return {
+    ...layout,
+    sceneCount,
+    totalVideoSeconds: sceneCount * layout.clipSeconds
+  };
+}
+
 /** Max narration length so TTS fits a single Veo clip without mid-sentence cuts. */
 export function narrationCharLimitForBucket(bucketSeconds: number): number {
   if (bucketSeconds <= 4) return 55;

@@ -78,6 +78,20 @@ describe("continuity", () => {
     expect(prompt).toContain("On-screen speaker is a child (about 6–10 years old), not an adult.");
   });
 
+  it("lets location stills change setting between beats", () => {
+    const prompt = buildReferenceImagePrompt({
+      characterBible: "Luxury boutique hotel",
+      backgroundVisualPrompt: "Lobby with marble floors",
+      sceneAction: "Slow push toward the reception desk",
+      order: 0,
+      total: 8,
+      hasLocationPlates: true
+    });
+    expect(prompt).toContain("visual POOL");
+    expect(prompt).not.toContain("EXACT same location");
+    expect(prompt).toContain("Setting from this still");
+  });
+
   it("applyContinuityToScript rewrites all scene prompts", () => {
     const out = applyContinuityToScript({
       ...baseScript(),
@@ -87,6 +101,14 @@ describe("continuity", () => {
     for (const scene of out.scenes) {
       expect(scene.referenceImagePrompt).toContain("EXACT same characters");
       expect(scene.visualPrompt).toContain("Same cast & location");
+    }
+  });
+
+  it("applyContinuityToScript tours uploaded stills instead of locking one room", () => {
+    const out = applyContinuityToScript(baseScript(), undefined, { hasLocationPlates: true });
+    for (const scene of out.scenes) {
+      expect(scene.visualPrompt).toContain("Tour uploaded stills");
+      expect(scene.referenceImagePrompt).toContain("visual POOL");
     }
   });
 });

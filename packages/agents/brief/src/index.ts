@@ -17,6 +17,7 @@ import {
   resolvePresenterSex,
   resolveRenderProfile,
   userFacingLanguageInstruction,
+  visualPlateCount,
   voiceAgeFromCreative,
   voiceSexFromCreative,
   type Agent,
@@ -55,9 +56,11 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
     });
     const langEn = contentLanguageEnglishName(contentLang);
     const langNative = contentLanguageNativeName(contentLang);
-    const hasPhotos = Boolean(
-      input.attachments.some((a) => a.role === "anchor" || a.role === "scene")
+    const attachmentPlates = (input.attachments ?? []).filter(
+      (a) => a.role === "anchor" || a.role === "scene" || a.role === "product"
     );
+    const earlyPlateCount = visualPlateCount(attachmentPlates);
+    const hasCastPhotos = earlyPlateCount === 0 && attachmentPlates.some((a) => a.role === "anchor" || a.role === "scene");
     const presenterSex = resolvePresenterSex({
       creative,
       language: contentLang,
@@ -66,16 +69,20 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
 
     const system = [
       "You are a senior creative producer. Convert free-form briefs into a single strict JSON object describing the production requirements for a short promotional video.",
-      "visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots.",
+      earlyPlateCount >= 2
+        ? "visualDirection MUST tour the uploaded stills as distinct places/products (hotel rooms, lobby, pool, restaurant, product angles) — do NOT force a single unchanging location."
+        : "visualDirection MUST define a fixed fictional cast (gender, age, hair, skin tone, wardrobe for each person) and ONE unchanging location/environment — these never change between shots.",
       presenterCastInstruction({
         sex: presenterSex,
         userLocked: Boolean(voiceSexFromCreative(creative) || voiceAgeFromCreative(creative)),
-        hasPhotos,
+        hasPhotos: hasCastPhotos,
         age: voiceAgeFromCreative(creative)
       }),
       "If the user provided instructions (do/don't constraints), honor them strictly in visualDirection and brandConstraints.",
       "If branding.businessName is set, keep the business name consistent in summary, callToAction, and tone — do not invent a competing brand.",
-      "If attachments include role=anchor images, treat them as mandatory visual references for cast and/or setting/background — describe matching looks in visualDirection.",
+      earlyPlateCount >= 2
+        ? "If attachments include product/scene stills or many unassigned photos, treat them as a location/B-roll POOL the engine will place across scenes — not one person's face lock."
+        : "If attachments include role=anchor images, treat them as mandatory visual references for cast and/or setting/background — describe matching looks in visualDirection.",
       "If referenceVideoAnalysis is present, use only its reusable production language (style, pacing, camera, captions and story structure). Never copy its brand, characters, wording, logos or exact scenes.",
       userFacingLanguageInstruction(contentLang),
       `Set the JSON "language" field to "${contentLang}".`
@@ -431,10 +438,14 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       resolvedLanguage === "he" || resolvedLanguage === "yi"
         ? "הוראות משתמש (חובה לכבד)"
         : "User instructions (MUST follow)";
+    const plateCount = visualPlateCount(visualAnchors);
+    const castCount = visualAnchors.filter((a) => !a.role || a.role === "anchor").length;
     const anchorNote =
-      visualAnchors.length > 0
-        ? `User uploaded ${visualAnchors.length} character photo(s) — those people ARE the cast; preserve their faces in every scene.`
-        : "";
+      plateCount >= 2
+        ? `User uploaded ${plateCount} location/product stills. These are a visual POOL — place each still as a distinct beat (rooms, facilities, product shots). Do NOT treat them as one person's face lock. Do NOT force all scenes into the same location.`
+        : castCount > 0
+          ? `User uploaded ${castCount} character photo(s) — those people ARE the cast; preserve their faces in every scene.`
+          : "";
     const referenceDirectionBlock = referenceVideoAnalysis
       ? [
           "Inspiration-video production guidance (create an original execution):",

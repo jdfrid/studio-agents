@@ -8,6 +8,10 @@ export const CONTINUITY_LOCK =
 export const CONTINUITY_LOCK_USER_PHOTOS =
   "CRITICAL: The attached/uploaded photos ARE the cast. Preserve each person's exact face, hair, skin tone, age, identity, AND wardrobe (same coat/jacket color, fabric, and outfit in every scene). Place them in the event location together. Only pose, framing, and micro-action may change — never invent different people or recolor clothing.";
 
+/** Hotel / product stills: the engine places each photo; locations may change. */
+export const CONTINUITY_LOCK_LOCATION_PLATES =
+  "Uploaded stills are a visual POOL. Each scene should use a different still as its setting or product. Locations MAY change between beats. Keep brand palette consistent. Do not collapse all stills into one composite plate or one locked room.";
+
 function presenterSexLock(sex?: "male" | "female"): string {
   if (sex === "female") return "On-screen speaker is a woman (female), not a man.";
   if (sex === "male") return "On-screen speaker is a man (male), not a woman.";
@@ -27,6 +31,8 @@ export type ContinuityContext = {
   total: number;
   /** User uploaded character photos that must stay on screen. */
   hasUserCharacterPhotos?: boolean;
+  /** 2+ location/product stills the engine places across beats. */
+  hasLocationPlates?: boolean;
   /** Locked on-screen speaker sex so visuals match narration. */
   presenterSex?: "male" | "female";
   /** Locked on-screen speaker age when the chosen voice is a child or baby. */
@@ -51,16 +57,24 @@ function clampPrompt(text: string, max = PROMPT_MAX): string {
   return `${t.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
 }
 
+function continuityLock(ctx: Pick<ContinuityContext, "hasUserCharacterPhotos" | "hasLocationPlates">): string {
+  if (ctx.hasLocationPlates) return CONTINUITY_LOCK_LOCATION_PLATES;
+  if (ctx.hasUserCharacterPhotos) return CONTINUITY_LOCK_USER_PHOTOS;
+  return CONTINUITY_LOCK;
+}
+
 export function buildReferenceImagePrompt(
   ctx: ContinuityContext & { sceneAction: string }
 ): string {
   const action = stripContinuityPrefix(ctx.sceneAction).trim();
-  const lock = ctx.hasUserCharacterPhotos ? CONTINUITY_LOCK_USER_PHOTOS : CONTINUITY_LOCK;
-  const sexLock = ctx.hasUserCharacterPhotos ? "" : presenterSexLock(ctx.presenterSex);
-  const ageLock = ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
-  const sameLine = ctx.hasUserCharacterPhotos
-    ? "Composite the uploaded people into the event setting with identical wardrobe/coat colors; prefer speaker close-up or OTS (listener closed mouth)."
-    : "Same people, same clothes, same place — only pose and micro-action change.";
+  const lock = continuityLock(ctx);
+  const sexLock = ctx.hasLocationPlates || ctx.hasUserCharacterPhotos ? "" : presenterSexLock(ctx.presenterSex);
+  const ageLock = ctx.hasLocationPlates || ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
+  const sameLine = ctx.hasLocationPlates
+    ? "Animate this scene's uploaded still; do not reuse a previous room as if it were the only location."
+    : ctx.hasUserCharacterPhotos
+      ? "Composite the uploaded people into the event setting with identical wardrobe/coat colors; prefer speaker close-up or OTS (listener closed mouth)."
+      : "Same people, same clothes, same place — only pose and micro-action change.";
   // Reserve room for lock + action; trim bible/location so Zod max(1600) never fails.
   const fixed = [lock, sexLock, ageLock, `Scene ${ctx.order + 1} of ${ctx.total}.`, sameLine].filter(Boolean).join(" ");
   const budget = PROMPT_MAX - fixed.length - 48;
@@ -75,8 +89,8 @@ export function buildReferenceImagePrompt(
       sexLock,
       ageLock,
       `Scene ${ctx.order + 1} of ${ctx.total}.`,
-      `Characters (locked): ${characters}.`,
-      `Location (locked): ${location}.`,
+      ctx.hasLocationPlates ? `Look (brand palette): ${characters}.` : `Characters (locked): ${characters}.`,
+      ctx.hasLocationPlates ? `Setting from this still: ${location}.` : `Location (locked): ${location}.`,
       `Action for this frame only: ${actionClamped}.`,
       sameLine
     ].filter(Boolean).join(" ")
@@ -84,32 +98,48 @@ export function buildReferenceImagePrompt(
 }
 
 export function buildVeoContinuityPrefix(ctx: ContinuityContext): string {
-  const lock = ctx.hasUserCharacterPhotos ? CONTINUITY_LOCK_USER_PHOTOS : CONTINUITY_LOCK;
-  const sexLock = ctx.hasUserCharacterPhotos ? "" : presenterSexLock(ctx.presenterSex);
-  const ageLock = ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
+  const lock = continuityLock(ctx);
+  const sexLock = ctx.hasLocationPlates || ctx.hasUserCharacterPhotos ? "" : presenterSexLock(ctx.presenterSex);
+  const ageLock = ctx.hasLocationPlates || ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
   return [
     lock,
     sexLock,
     ageLock,
     `Scene ${ctx.order + 1} of ${ctx.total}.`,
-    `Character lock: ${ctx.characterBible.trim()}.`,
-    `Location lock: ${ctx.backgroundVisualPrompt.trim()}.`
+    ctx.hasLocationPlates
+      ? `Brand look: ${ctx.characterBible.trim()}.`
+      : `Character lock: ${ctx.characterBible.trim()}.`,
+    ctx.hasLocationPlates
+      ? `Setting for this beat: ${ctx.backgroundVisualPrompt.trim()}.`
+      : `Location lock: ${ctx.backgroundVisualPrompt.trim()}.`
   ].filter(Boolean).join(" ");
 }
 
 function stripContinuityPrefix(text: string): string {
-  if (!text.includes(CONTINUITY_LOCK) && !text.includes(CONTINUITY_LOCK_USER_PHOTOS)) return text;
+  if (
+    !text.includes(CONTINUITY_LOCK) &&
+    !text.includes(CONTINUITY_LOCK_USER_PHOTOS) &&
+    !text.includes(CONTINUITY_LOCK_LOCATION_PLATES)
+  ) {
+    return text;
+  }
   const idx = text.lastIndexOf("Action for this frame only:");
   if (idx >= 0) return text.slice(idx + "Action for this frame only:".length).trim();
-  return text.replace(CONTINUITY_LOCK_USER_PHOTOS, "").replace(CONTINUITY_LOCK, "").trim();
+  return text
+    .replace(CONTINUITY_LOCK_LOCATION_PLATES, "")
+    .replace(CONTINUITY_LOCK_USER_PHOTOS, "")
+    .replace(CONTINUITY_LOCK, "")
+    .trim();
 }
 
 function prefixScenePrompt(existing: string, ctx: ContinuityContext): string {
   const core = stripContinuityPrefix(existing).trim();
-  const sexLock = ctx.hasUserCharacterPhotos ? "" : presenterSexLock(ctx.presenterSex);
-  const ageLock = ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
+  const sexLock = ctx.hasLocationPlates || ctx.hasUserCharacterPhotos ? "" : presenterSexLock(ctx.presenterSex);
+  const ageLock = ctx.hasLocationPlates || ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
   const extra = [sexLock, ageLock].filter(Boolean).join(" ");
-  const prefix = `Same cast & location. ${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`;
+  const prefix = ctx.hasLocationPlates
+    ? `Tour uploaded stills. ${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`
+    : `Same cast & location. ${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`;
   const combined = `${prefix}${core}`;
   return combined.length <= 1200 ? combined : combined.slice(0, 1200);
 }
@@ -118,13 +148,19 @@ function prefixScenePrompt(existing: string, ctx: ContinuityContext): string {
 export function applyContinuityToScript(
   output: ScriptOutput,
   explicitCharacterBible?: string | null,
-  opts?: { hasUserCharacterPhotos?: boolean; presenterSex?: "male" | "female"; presenterAge?: "child" | "baby" }
+  opts?: {
+    hasUserCharacterPhotos?: boolean;
+    hasLocationPlates?: boolean;
+    presenterSex?: "male" | "female";
+    presenterAge?: "child" | "baby";
+  }
 ): ScriptOutput {
   const characterBible = deriveCharacterBible(output.backgroundVisualPrompt, explicitCharacterBible ?? output.characterBible);
   const total = output.scenes.length;
-  const hasUserCharacterPhotos = opts?.hasUserCharacterPhotos === true;
-  const presenterSex = hasUserCharacterPhotos ? undefined : opts?.presenterSex;
-  const presenterAge = hasUserCharacterPhotos ? undefined : opts?.presenterAge;
+  const hasLocationPlates = opts?.hasLocationPlates === true;
+  const hasUserCharacterPhotos = !hasLocationPlates && opts?.hasUserCharacterPhotos === true;
+  const presenterSex = hasLocationPlates || hasUserCharacterPhotos ? undefined : opts?.presenterSex;
+  const presenterAge = hasLocationPlates || hasUserCharacterPhotos ? undefined : opts?.presenterAge;
 
   const scenes: SceneSpec[] = output.scenes.map((scene, index) => {
     const ctx: ContinuityContext = {
@@ -133,6 +169,7 @@ export function applyContinuityToScript(
       order: index,
       total,
       hasUserCharacterPhotos,
+      hasLocationPlates,
       presenterSex,
       presenterAge
     };
