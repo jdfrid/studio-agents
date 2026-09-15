@@ -24,10 +24,6 @@ export const resources = {
         reopen: "מה חדש",
         hint: "אפשר לפתוח את הרשימה שוב מהסימון בראש העמוד.",
         items: {
-          "credits-pricing": {
-            title: "מחירון לפי קרדיטים",
-            body: "סרטון עד 30 שניות עולה 40 קרדיטים. מסלולים: בודד ₪49, התחלתי ₪179, עסקי ₪449. סנכרון שפתיים מוסיף 20 קרדיטים."
-          },
           "mobile-camera": {
             title: "צילום מהטלפון",
             body: "בנייד אפשר לצלם דמות או מוצר ישירות בטופס היצירה, בלי לעבור קודם לגלריה."
@@ -35,10 +31,6 @@ export const resources = {
           remix: {
             title: "הפקה מחדש",
             body: "מסרטון שהושלם אפשר לשנות הגדרות וליצור סרטון חדש — מחויב כהפקה מלאה."
-          },
-          "public-checkout": {
-            title: "רכישה באתר",
-            body: "אפשר לרכוש קרדיטים ומנוי דרך Lemon Squeezy אחרי התחברות עם Google."
           },
           "brand-templates": {
             title: "תבניות מותג",
@@ -300,10 +292,6 @@ export const resources = {
         reopen: "What's new",
         hint: "You can open this list again from the mark at the top of the page.",
         items: {
-          "credits-pricing": {
-            title: "Credit-based pricing",
-            body: "A video of up to 30 seconds costs 40 credits. Plans: single ₪49, Starter ₪179, Business ₪449. Lip-sync adds 20 credits."
-          },
           "mobile-camera": {
             title: "Capture from your phone",
             body: "On a phone you can photograph a character or product right in the create form, without picking from the gallery first."
@@ -311,10 +299,6 @@ export const resources = {
           remix: {
             title: "Make another version",
             body: "From a completed video you can change settings and create a new one — billed as a full production."
-          },
-          "public-checkout": {
-            title: "Buy on the site",
-            body: "Credits and plans can be purchased through Lemon Squeezy after signing in with Google."
           },
           "brand-templates": {
             title: "Brand templates",

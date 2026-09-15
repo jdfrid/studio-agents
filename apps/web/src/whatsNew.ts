@@ -5,10 +5,8 @@ export type WhatsNewEntry = {
 
 /** User-facing additions, newest first. Dates are YYYY-MM-DD. */
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
-  { id: "credits-pricing", date: "2026-09-15" },
   { id: "mobile-camera", date: "2026-09-15" },
   { id: "remix", date: "2026-09-14" },
-  { id: "public-checkout", date: "2026-09-09" },
   { id: "brand-templates", date: "2026-09-07" }
 ];
 
