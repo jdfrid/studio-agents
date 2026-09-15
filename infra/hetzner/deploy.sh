@@ -18,11 +18,16 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 if [ ! -f /swapfile ]; then
-  echo "Adding 2G swap for Docker build..."
+  echo "Adding 2G swap for Docker build and ffmpeg..."
   fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
   chmod 600 /swapfile
   mkswap /swapfile
-  swapon /swapfile
+fi
+if ! swapon --show | grep -q '/swapfile'; then
+  swapon /swapfile || true
+fi
+if [ -f /etc/fstab ] && ! grep -q '/swapfile' /etc/fstab; then
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache --progress=plain api

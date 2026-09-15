@@ -109,6 +109,16 @@ describe("buildStageErrorRecord", () => {
 });
 
 describe("formatApiErrorMessage", () => {
+  it("maps ffmpeg OOM kills to a render-memory message", () => {
+    const raw =
+      "ffmpeg exited null: : Lavc59.37.100 aac frame= 1 fps=0.0 q=0.0 size= 0kB time=00:00:00.09 bitrate= 4.1kbits/s";
+    const record = buildStageErrorRecord(new Error(raw));
+    const parsed = parseStageError(record);
+    expect(parsed.friendly).toContain("נגמר הזיכרון");
+    expect(parsed.friendly).not.toContain("Lavc");
+    expect(parsed.raw).toContain("ffmpeg exited null");
+  });
+
   it("hides api key", () => {
     const msg = formatApiErrorMessage(
       '429 {"error":"HTTP 429 for https://generativelanguage.googleapis.com?key=AIzaSySecret123: quota exceeded"}'

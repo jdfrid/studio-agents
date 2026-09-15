@@ -1852,15 +1852,14 @@ async function concatClips(
     throw new Error("Cannot concat: no clips rendered");
   }
 
-  const prepared = await Promise.all(
-    clipPaths.map(async (clipPath, index) => {
-      const info = await stat(clipPath).catch(() => null);
-      if (!info || info.size < 512) {
-        throw new Error(`Rendered clip ${index + 1} is empty or missing (${clipPath})`);
-      }
-      return (await finalizeSceneClip(clipPath, dir, `concat-prep-${index}`, dimensions)).path;
-    })
-  );
+  const prepared: string[] = [];
+  for (const [index, clipPath] of clipPaths.entries()) {
+    const info = await stat(clipPath).catch(() => null);
+    if (!info || info.size < 512) {
+      throw new Error(`Rendered clip ${index + 1} is empty or missing (${clipPath})`);
+    }
+    prepared.push((await finalizeSceneClip(clipPath, dir, `concat-prep-${index}`, dimensions)).path);
+  }
 
   if (prepared.length === 1) {
     await runFfmpeg(["-i", prepared[0]!, "-c", "copy", "-movflags", "+faststart", "-y", outputPath]);
@@ -2162,20 +2161,22 @@ async function probeHasAudio(filePath: string): Promise<boolean> {
 }
 
 async function ffmpegStderr(args: string[]): Promise<string> {
-  const bin = resolveFfmpegBinary();
-  return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
-    let stderr = "";
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-    child.on("error", (error) => reject(error));
-    child.on("close", (code) => {
-      if (code === 0 || stderr.includes("Duration:")) {
-        resolve(stderr);
-        return;
-      }
-      reject(new Error(`ffmpeg probe exited ${code}: ${stderr.slice(-1200)}`));
+  return withFfmpegSlot(() => {
+    const bin = resolveFfmpegBinary();
+    return new Promise((resolve, reject) => {
+      const child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
+      let stderr = "";
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
+      child.on("error", (error) => reject(error));
+      child.on("close", (code, signal) => {
+        if (code === 0 || stderr.includes("Duration:")) {
+          resolve(stderr);
+          return;
+        }
+        reject(new Error(`ffmpeg probe exited ${formatFfmpegExit(code, signal)}: ${trimFfmpegLog(stderr)}`));
+      });
     });
   });
 }
@@ -2187,23 +2188,54 @@ function resolveFfmpegBinary(): string {
   return (ffmpegStatic as unknown as string) ?? "ffmpeg";
 }
 
+const ffmpegMaxConcurrency = Math.max(1, Math.min(2, Number(process.env.FFMPEG_MAX_CONCURRENCY ?? 1) || 1));
+let ffmpegInflight = 0;
+const ffmpegWaiters: Array<() => void> = [];
+
+async function withFfmpegSlot<T>(work: () => Promise<T>): Promise<T> {
+  if (ffmpegInflight >= ffmpegMaxConcurrency) {
+    await new Promise<void>((resolve) => ffmpegWaiters.push(resolve));
+  }
+  ffmpegInflight += 1;
+  try {
+    return await work();
+  } finally {
+    ffmpegInflight -= 1;
+    ffmpegWaiters.shift()?.();
+  }
+}
+
+function formatFfmpegExit(code: number | null, signal: NodeJS.Signals | null): string {
+  if (signal) return `signal ${signal}`;
+  return String(code);
+}
+
+function trimFfmpegLog(stderr: string): string {
+  const text = stderr.replace(/\s+/g, " ").trim();
+  if (text.length <= 1200) return text;
+  return `${text.slice(0, 400)} … ${text.slice(-700)}`;
+}
+
 async function runFfmpeg(args: string[]): Promise<void> {
-  const bin = resolveFfmpegBinary();
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
-    let stderr = "";
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-    child.on("error", (error) => reject(error));
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      reject(new Error(`ffmpeg exited ${code}: ${stderr.slice(-1200)}`));
-    });
-  });
+  await withFfmpegSlot(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const bin = resolveFfmpegBinary();
+        const child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
+        let stderr = "";
+        child.stderr.on("data", (chunk: Buffer) => {
+          stderr += chunk.toString();
+        });
+        child.on("error", (error) => reject(error));
+        child.on("close", (code, signal) => {
+          if (code === 0) {
+            resolve();
+            return;
+          }
+          reject(new Error(`ffmpeg exited ${formatFfmpegExit(code, signal)}: ${trimFfmpegLog(stderr)}`));
+        });
+      })
+  );
 }
 
 async function loadExistingSceneClips(

@@ -178,6 +178,7 @@ function looksLikeApiRaw(text: string): boolean {
   if (/api\.heygen\.com/i.test(t)) return true;
   if (/fal\.ai|fal\.media/i.test(t)) return true;
   if (/RESOURCE_EXHAUSTED|PERMISSION_DENIED|INVALID_ARGUMENT|insufficient_credit/i.test(t)) return true;
+  if (/ffmpeg (exited|probe)/i.test(t)) return true;
   return false;
 }
 
@@ -275,6 +276,19 @@ export function formatApiErrorMessage(raw: string, locale: Locale = "he"): strin
   const jsonMessage = extractJsonErrorMessage(body);
   const probe = `${body} ${jsonMessage ?? ""}`;
   const lower = probe.toLowerCase();
+  if (
+    lower.includes("ffmpeg exited null") ||
+    /ffmpeg exited signal sigkill/i.test(lower)
+  ) {
+    return locale === "en"
+      ? "Video assembly ran out of memory on the server while encoding clips. Retry the render stage."
+      : "הרכבת הווידאו נקטעה כי נגמר הזיכרון בשרת בזמן קידוד הקליפים. הרץ מחדש את שלב הרינדור.";
+  }
+  if (lower.includes("ffmpeg exited") || lower.includes("ffmpeg probe exited")) {
+    return locale === "en"
+      ? "Video assembly failed while encoding clips. Retry the render stage."
+      : "הרכבת הווידאו נכשלה בקידוד הקליפים. הרץ מחדש את שלב הרינדור.";
+  }
   if (lower.includes("input token count exceeds") || lower.includes("maximum number of tokens allowed")) {
     return locale === "en"
       ? "The Gemini request is too large (token limit exceeded), usually because audio or video was attached to the prompt by mistake. Update the server and retry the brief stage."
