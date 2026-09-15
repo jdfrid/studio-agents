@@ -1,10 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext.js";
+import { PricingCards } from "./PricingCards.js";
 import { PublicChrome } from "./PublicChrome.js";
 
 export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   const { t, i18n } = useTranslation();
   const { login } = useAuth();
+  const arrow = i18n.dir() === "rtl" ? "←" : "→";
+
   return (
     <PublicChrome onNavigate={onNavigate}>
       <main className="landing-main">
@@ -22,7 +25,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
             <div className="landing-hero-actions">
               <button type="button" className="primary landing-cta" onClick={login}>
                 {t("landing.firstVideo")}
-                <span aria-hidden>{i18n.dir() === "rtl" ? "←" : "→"}</span>
+                <span aria-hidden>{arrow}</span>
               </button>
               <a className="button-link" href="#how-it-works">
                 {t("landing.discover")}
@@ -108,34 +111,25 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
           </div>
         </section>
 
-        <section className="landing-value-grid" aria-label={t("landing.capabilitiesLabel")}>
-          <article>
-            <span className="feature-icon" aria-hidden>
-              ✦
-            </span>
-            <div>
-              <h2>{t("landing.features.oneFlowTitle")}</h2>
-              <p>{t("landing.features.oneFlowBody")}</p>
-            </div>
-          </article>
-          <article>
-            <span className="feature-icon" aria-hidden>
-              ◫
-            </span>
-            <div>
-              <h2>{t("landing.features.assetsTitle")}</h2>
-              <p>{t("landing.features.assetsBody")}</p>
-            </div>
-          </article>
-          <article>
-            <span className="feature-icon" aria-hidden>
-              ◎
-            </span>
-            <div>
-              <h2>{t("landing.features.controlTitle")}</h2>
-              <p>{t("landing.features.controlBody")}</p>
-            </div>
-          </article>
+        <section className="landing-audience" aria-label={t("landing.audience.label")}>
+          <div className="section-heading">
+            <p className="eyebrow">{t("landing.audience.eyebrow")}</p>
+            <h2>{t("landing.audience.title")}</h2>
+          </div>
+          <div className="landing-audience-grid">
+            <article>
+              <h3>{t("landing.audience.localTitle")}</h3>
+              <p>{t("landing.audience.localBody")}</p>
+            </article>
+            <article>
+              <h3>{t("landing.audience.marketerTitle")}</h3>
+              <p>{t("landing.audience.marketerBody")}</p>
+            </article>
+            <article>
+              <h3>{t("landing.audience.phoneTitle")}</h3>
+              <p>{t("landing.audience.phoneBody")}</p>
+            </article>
+          </div>
         </section>
 
         <section className="landing-process" id="how-it-works">
@@ -175,41 +169,65 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
           </ol>
         </section>
 
+        <section className="landing-value-grid" aria-label={t("landing.capabilitiesLabel")}>
+          <article>
+            <span className="feature-icon" aria-hidden>
+              ✦
+            </span>
+            <div>
+              <h2>{t("landing.features.oneFlowTitle")}</h2>
+              <p>{t("landing.features.oneFlowBody")}</p>
+            </div>
+          </article>
+          <article>
+            <span className="feature-icon" aria-hidden>
+              ◫
+            </span>
+            <div>
+              <h2>{t("landing.features.assetsTitle")}</h2>
+              <p>{t("landing.features.assetsBody")}</p>
+            </div>
+          </article>
+          <article>
+            <span className="feature-icon" aria-hidden>
+              ◎
+            </span>
+            <div>
+              <h2>{t("landing.features.controlTitle")}</h2>
+              <p>{t("landing.features.controlBody")}</p>
+            </div>
+          </article>
+          <article>
+            <span className="feature-icon" aria-hidden>
+              ▣
+            </span>
+            <div>
+              <h2>{t("landing.features.creditsTitle")}</h2>
+              <p>{t("landing.features.creditsBody")}</p>
+            </div>
+          </article>
+        </section>
+
         <section className="landing-pricing" id="pricing">
           <div className="section-heading">
             <p className="eyebrow">{t("landing.plans.eyebrow")}</p>
             <h2>{t("landing.plans.title")}</h2>
+            <p className="section-lead">{t("landing.plans.lead")}</p>
           </div>
-          <div className="pricing-cards">
-            <article className="price-card">
-              <span className="price-kicker">{t("landing.plans.try")}</span>
-              <h3>{t("landing.plans.single")}</h3>
-              <p className="price">
-                <strong>₪30</strong>
-                <small>{t("landing.plans.perVideo")}</small>
-              </p>
-              <ul>
-                <li>{t("landing.plans.oneCredit")}</li>
-                <li>{t("landing.plans.fullAccess")}</li>
-                <li>{t("landing.plans.noCommitment")}</li>
-              </ul>
-              <button type="button" onClick={login}>{t("landing.plans.startNow")}</button>
-            </article>
-            <article className="price-card featured">
-              <span className="popular-badge">{t("landing.plans.popular")}</span>
-              <span className="price-kicker">{t("landing.plans.regular")}</span>
-              <h3>{t("landing.plans.monthly")}</h3>
-              <p className="price">
-                <strong>₪600</strong>
-                <small>{t("landing.plans.perMonth")}</small>
-              </p>
-              <ul>
-                <li>{t("landing.plans.videosPerMonth")}</li>
-                <li>{t("landing.plans.approxPerVideo")}</li>
-                <li>{t("landing.plans.teams")}</li>
-              </ul>
-              <button type="button" className="primary" onClick={login}>{t("landing.plans.startCreating")}</button>
-            </article>
+          <PricingCards mode="teaser" onSelect={() => onNavigate("/pricing")} />
+        </section>
+
+        <section className="landing-close">
+          <h2>{t("landing.close.title")}</h2>
+          <p>{t("landing.close.body")}</p>
+          <div className="landing-hero-actions">
+            <button type="button" className="primary landing-cta" onClick={login}>
+              {t("landing.firstVideo")}
+              <span aria-hidden>{arrow}</span>
+            </button>
+            <button type="button" className="button-secondary" onClick={() => onNavigate("/pricing")}>
+              {t("landing.close.pricing")}
+            </button>
           </div>
         </section>
       </main>

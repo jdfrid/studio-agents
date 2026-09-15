@@ -3,7 +3,8 @@ export function isBillingConfigured(): boolean {
     process.env.LEMONSQUEEZY_API_KEY &&
       process.env.LEMONSQUEEZY_STORE_ID &&
       process.env.LEMONSQUEEZY_VARIANT_PAYG &&
-      process.env.LEMONSQUEEZY_VARIANT_SUBSCRIPTION
+      process.env.LEMONSQUEEZY_VARIANT_STARTER &&
+      process.env.LEMONSQUEEZY_VARIANT_BUSINESS
   );
 }
 

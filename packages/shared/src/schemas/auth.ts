@@ -6,7 +6,7 @@ export type ApprovalMode = z.infer<typeof ApprovalModeSchema>;
 export const UserRoleSchema = z.enum(["USER", "ADMIN"]);
 export type UserRole = z.infer<typeof UserRoleSchema>;
 
-export const PlanTypeSchema = z.enum(["PAYG", "SUBSCRIPTION"]);
+export const PlanTypeSchema = z.enum(["PAYG", "SUBSCRIPTION", "STARTER", "BUSINESS"]);
 export type PlanType = z.infer<typeof PlanTypeSchema>;
 
 export const CreditReasonSchema = z.enum([
@@ -21,12 +21,26 @@ export const CreditReasonSchema = z.enum([
 ]);
 export type CreditReason = z.infer<typeof CreditReasonSchema>;
 
-/** Credit cost for a new completed video. */
-export const CREDIT_NEW_VIDEO = 1;
+/** Credit cost for a new completed video (up to 30 seconds). */
+export const CREDIT_NEW_VIDEO = 40;
 /** Correction after COMPLETED — visual regen. */
-export const CREDIT_CORRECTION_ASSET = 0.5;
+export const CREDIT_CORRECTION_ASSET = 20;
 /** Correction after COMPLETED — render only. */
-export const CREDIT_CORRECTION_RENDER = 0.25;
+export const CREDIT_CORRECTION_RENDER = 10;
+/** Extra credits when the brief requests lip-sync. */
+export const CREDIT_LIP_SYNC_SURCHARGE = 20;
+/** Multiply legacy 1-credit-per-video balances by this factor. */
+export const CREDIT_LEGACY_SCALE = 40;
+
+export function creditCostForVideo(options?: { preferLipSync?: boolean }): number {
+  return CREDIT_NEW_VIDEO + (options?.preferLipSync ? CREDIT_LIP_SYNC_SURCHARGE : 0);
+}
+
+export function briefRequestsLipSync(
+  brief: { creative?: { preferHeygenDub?: string } | null } | null | undefined
+): boolean {
+  return brief?.creative?.preferHeygenDub === "on";
+}
 
 export const SubscriptionViewSchema = z.object({
   planType: PlanTypeSchema,

@@ -3,6 +3,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { apiDelete, apiGet, apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 import { formatDate, formatNumber } from "./i18n/format.js";
+import { CREDIT_NEW_VIDEO, type CheckoutPlanId } from "@studio/shared";
 
 type RunSummary = {
   id: string;
@@ -53,7 +54,7 @@ export function Dashboard({
     }
   }
 
-  async function buy(plan: "payg" | "subscription") {
+  async function buy(plan: CheckoutPlanId) {
     setBusy(plan);
     setPurchaseError("");
     try {
@@ -70,7 +71,7 @@ export function Dashboard({
   const freeLeft = user?.freeVideosRemaining ?? 0;
   const canCreate = user?.canCreateVideo ?? false;
   const billingReady = user?.billingConfigured ?? false;
-  const showPurchase = credits < 1 && freeLeft < 1;
+  const showPurchase = credits < CREDIT_NEW_VIDEO && freeLeft < 1;
 
   return (
     <div className="dashboard">
@@ -119,8 +120,11 @@ export function Dashboard({
             <button type="button" className="primary" disabled={busy !== null || !billingReady} onClick={() => void buy("payg")}>
               {busy === "payg" ? t("dashboard.openingPayment") : t("dashboard.singlePrice")}
             </button>
-            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("subscription")}>
-              {busy === "subscription" ? t("dashboard.openingPayment") : t("dashboard.subscriptionPrice")}
+            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("starter")}>
+              {busy === "starter" ? t("dashboard.openingPayment") : t("dashboard.starterPrice")}
+            </button>
+            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("business")}>
+              {busy === "business" ? t("dashboard.openingPayment") : t("dashboard.subscriptionPrice")}
             </button>
           </div>
           {!billingReady ? (
@@ -128,15 +132,18 @@ export function Dashboard({
           ) : null}
           {purchaseError ? <p className="error-inline">{purchaseError}</p> : null}
         </section>
-      ) : credits >= 1 ? (
+      ) : credits >= CREDIT_NEW_VIDEO ? (
         <section className="billing-banner billing-banner-compact">
           <p>{t("dashboard.haveCredits")}</p>
           <div className="stage-actions">
             <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("payg")}>
               {busy === "payg" ? "…" : t("dashboard.buyAnother")}
             </button>
-            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("subscription")}>
-              {busy === "subscription" ? "…" : t("dashboard.monthlySubscription")}
+            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("starter")}>
+              {busy === "starter" ? "…" : t("dashboard.starterPrice")}
+            </button>
+            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("business")}>
+              {busy === "business" ? "…" : t("dashboard.monthlySubscription")}
             </button>
           </div>
         </section>

@@ -2,7 +2,9 @@ import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
+import { PricingCards } from "./PricingCards.js";
 import { PublicChrome } from "./PublicChrome.js";
+import type { CheckoutPlanId } from "@studio/shared";
 
 export function AboutPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   const { t } = useTranslation("site");
@@ -138,7 +140,7 @@ export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void
   const [purchaseError, setPurchaseError] = useState("");
   const billingReady = user?.billingConfigured ?? false;
 
-  async function buy(plan: "payg" | "subscription") {
+  async function buy(plan: CheckoutPlanId) {
     if (!user) {
       login();
       return;
@@ -161,49 +163,15 @@ export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void
         <p className="eyebrow">{t("landing.plans.eyebrow")}</p>
         <h1>{t("landing.plans.title")}</h1>
         <p className="site-lead">{st("pricing.checkoutLead")}</p>
-        <div className="pricing-cards site-pricing-cards">
-          <article className="price-card">
-            <span className="price-kicker">{t("landing.plans.try")}</span>
-            <h3>{t("landing.plans.single")}</h3>
-            <p className="price">
-              <strong>₪30</strong>
-              <small>{t("landing.plans.perVideo")}</small>
-            </p>
-            <ul>
-              <li>{t("landing.plans.oneCredit")}</li>
-              <li>{t("landing.plans.fullAccess")}</li>
-              <li>{t("landing.plans.noCommitment")}</li>
-            </ul>
-            <button
-              type="button"
-              disabled={Boolean(user) && (busy !== null || !billingReady)}
-              onClick={() => void buy("payg")}
-            >
-              {busy === "payg" ? t("dashboard.openingPayment") : t("landing.plans.startNow")}
-            </button>
-          </article>
-          <article className="price-card featured">
-            <span className="popular-badge">{t("landing.plans.popular")}</span>
-            <span className="price-kicker">{t("landing.plans.regular")}</span>
-            <h3>{t("landing.plans.monthly")}</h3>
-            <p className="price">
-              <strong>₪600</strong>
-              <small>{t("landing.plans.perMonth")}</small>
-            </p>
-            <ul>
-              <li>{t("landing.plans.videosPerMonth")}</li>
-              <li>{t("landing.plans.approxPerVideo")}</li>
-              <li>{t("landing.plans.teams")}</li>
-            </ul>
-            <button
-              type="button"
-              className="primary"
-              disabled={Boolean(user) && (busy !== null || !billingReady)}
-              onClick={() => void buy("subscription")}
-            >
-              {busy === "subscription" ? t("dashboard.openingPayment") : t("landing.plans.startCreating")}
-            </button>
-          </article>
+        <div className="site-pricing-cards">
+          <PricingCards
+            mode="checkout"
+            busy={busy}
+            billingReady={billingReady}
+            signedIn={Boolean(user)}
+            onSelect={(plan) => void buy(plan)}
+            onContact={() => onNavigate("/contact")}
+          />
         </div>
         {user && !billingReady ? <p className="muted billing-note">{t("dashboard.billingUnavailable")}</p> : null}
         {purchaseError ? <p className="error-inline">{purchaseError}</p> : null}

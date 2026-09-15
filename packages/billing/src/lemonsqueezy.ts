@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "@studio/infra-prisma";
+import { PAYG_PRICE_NIS, type CheckoutPlanId } from "@studio/shared";
 import { grantCredits } from "./credits.js";
+import { checkoutCopy, checkoutVariantId, extractLemonVariantId, grantForLemonVariant } from "./lemonPlans.js";
 
 const LS_API = "https://api.lemonsqueezy.com/v1";
 
@@ -14,14 +16,13 @@ function lsHeaders(): Record<string, string> {
   };
 }
 
-export async function createCheckout(userId: string, email: string, plan: "payg" | "subscription"): Promise<string> {
+export async function createCheckout(userId: string, email: string, plan: CheckoutPlanId): Promise<string> {
   const storeId = process.env.LEMONSQUEEZY_STORE_ID;
-  const variantPayg = process.env.LEMONSQUEEZY_VARIANT_PAYG;
-  const variantSub = process.env.LEMONSQUEEZY_VARIANT_SUBSCRIPTION;
+  const variantId = checkoutVariantId(plan);
   const appUrl = (process.env.APP_URL ?? "http://localhost:5173").replace(/\/$/, "");
+  const copy = checkoutCopy(plan);
 
   if (!storeId) throw new Error("LEMONSQUEEZY_STORE_ID not configured");
-  const variantId = plan === "payg" ? variantPayg : variantSub;
   if (!variantId) throw new Error(`Lemon Squeezy variant not configured for ${plan}`);
 
   const body = {
@@ -43,11 +44,8 @@ export async function createCheckout(userId: string, email: string, plan: "payg"
           button_color: "#7559FF"
         },
         product_options: {
-          name: plan === "payg" ? "Prompt2Spot — single video" : "Prompt2Spot — monthly plan",
-          description:
-            plan === "payg"
-              ? "One Prompt2Spot video credit for the full brief-to-render studio workflow."
-              : "30 Prompt2Spot video credits per month for the full studio workflow.",
+          name: copy.name,
+          description: copy.description,
           redirect_url: `${appUrl}/?payment=success`,
           receipt_button_text: "Back to Prompt2Spot",
           receipt_thank_you_note: "Thank you. Your credits will appear in Prompt2Spot shortly.",
@@ -98,8 +96,12 @@ export async function handleLemonWebhook(eventName: string, payload: Record<stri
   }
   if (!userId) return;
 
+  const variantId = extractLemonVariantId(payload);
+
   switch (eventName) {
     case "order_created": {
+      const grant = grantForLemonVariant(variantId, "order");
+      if (grant.interval === "month") return;
       const orderId = String(data?.id ?? "");
       const total = Number(attrs.total ?? attrs.total_usd ?? 0) / 100;
       const exists = await prisma.payment.findUnique({ where: { lemonOrderId: orderId } });
@@ -108,13 +110,13 @@ export async function handleLemonWebhook(eventName: string, payload: Record<stri
         data: {
           userId,
           lemonOrderId: orderId,
-          amountNis: total > 0 ? total : 30,
-          planType: "PAYG",
-          creditsGranted: 1,
+          amountNis: total > 0 ? total : PAYG_PRICE_NIS,
+          planType: grant.planType,
+          creditsGranted: grant.credits,
           status: "paid"
         }
       });
-      await grantCredits(userId, 1, "PURCHASE", { lemonOrderId: orderId });
+      await grantCredits(userId, grant.credits, "PURCHASE", { lemonOrderId: orderId, variantId });
       break;
     }
     case "order_refunded": {
@@ -127,6 +129,7 @@ export async function handleLemonWebhook(eventName: string, payload: Record<stri
     }
     case "subscription_created":
     case "subscription_payment_success": {
+      const grant = grantForLemonVariant(variantId, "subscription");
       const subId = String(data?.id ?? "");
       const periodEnd = attrs.renews_at ? new Date(String(attrs.renews_at)) : new Date(Date.now() + 30 * 86400000);
       const periodStart = attrs.created_at ? new Date(String(attrs.created_at)) : new Date();
@@ -135,20 +138,25 @@ export async function handleLemonWebhook(eventName: string, payload: Record<stri
         create: {
           userId,
           lemonSubscriptionId: subId,
-          planType: "SUBSCRIPTION",
+          planType: grant.planType,
           status: "ACTIVE",
-          creditsPerPeriod: 30,
+          creditsPerPeriod: grant.credits,
           currentPeriodStart: periodStart,
           currentPeriodEnd: periodEnd
         },
         update: {
           lemonSubscriptionId: subId,
           status: "ACTIVE",
+          planType: grant.planType,
+          creditsPerPeriod: grant.credits,
           currentPeriodEnd: periodEnd
         }
       });
       if (eventName === "subscription_payment_success" || eventName === "subscription_created") {
-        await grantCredits(userId, 30, "SUBSCRIPTION_GRANT", { lemonSubscriptionId: subId });
+        await grantCredits(userId, grant.credits, "SUBSCRIPTION_GRANT", {
+          lemonSubscriptionId: subId,
+          variantId
+        });
       }
       break;
     }

@@ -7,7 +7,8 @@ describe("isCheckoutEnabled", () => {
     "LEMONSQUEEZY_API_KEY",
     "LEMONSQUEEZY_STORE_ID",
     "LEMONSQUEEZY_VARIANT_PAYG",
-    "LEMONSQUEEZY_VARIANT_SUBSCRIPTION"
+    "LEMONSQUEEZY_VARIANT_STARTER",
+    "LEMONSQUEEZY_VARIANT_BUSINESS"
   ];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 
@@ -22,7 +23,8 @@ describe("isCheckoutEnabled", () => {
     process.env.LEMONSQUEEZY_API_KEY = "key";
     process.env.LEMONSQUEEZY_STORE_ID = "1";
     process.env.LEMONSQUEEZY_VARIANT_PAYG = "2";
-    process.env.LEMONSQUEEZY_VARIANT_SUBSCRIPTION = "3";
+    process.env.LEMONSQUEEZY_VARIANT_STARTER = "3";
+    process.env.LEMONSQUEEZY_VARIANT_BUSINESS = "4";
   }
 
   it("is on when Lemon Squeezy is configured", () => {
@@ -48,7 +50,8 @@ describe("isCheckoutEnabled", () => {
     delete process.env.LEMONSQUEEZY_API_KEY;
     delete process.env.LEMONSQUEEZY_STORE_ID;
     delete process.env.LEMONSQUEEZY_VARIANT_PAYG;
-    delete process.env.LEMONSQUEEZY_VARIANT_SUBSCRIPTION;
+    delete process.env.LEMONSQUEEZY_VARIANT_STARTER;
+    delete process.env.LEMONSQUEEZY_VARIANT_BUSINESS;
     expect(isCheckoutEnabled()).toBe(false);
   });
 });

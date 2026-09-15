@@ -26,7 +26,10 @@ import {
   type BriefOutput,
   type CreativeOptions,
   type Locale,
-  type RemixKeptAttachment
+  type RemixKeptAttachment,
+  CREDIT_LIP_SYNC_SURCHARGE,
+  CREDIT_NEW_VIDEO,
+  creditCostForVideo
 } from "@studio/shared";
 
 const VIDEO_GOALS = ["product", "service", "brand", "social", "explainer", "event", "other"] as const;
@@ -68,7 +71,6 @@ export function CreateVideoForm({
   const catalog = useCreativeCatalog(uiLocale);
   const { user } = useAuth();
   const isMobile = useIsMobileDevice();
-  const canCreate = user?.canCreateVideo ?? false;
   const freeLeft = user?.freeVideosRemaining ?? 0;
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -115,6 +117,11 @@ export function CreateVideoForm({
   const [error, setError] = useState("");
 
   const lipSyncRequested = narrationMode === "lip_sync" || creative.preferHeygenDub === "on";
+  const creditCost = useMemo(
+    () => (freeLeft > 0 ? 0 : creditCostForVideo({ preferLipSync: lipSyncRequested })),
+    [freeLeft, lipSyncRequested]
+  );
+  const enoughCredits = freeLeft > 0 || (user?.credits ?? 0) >= (creditCost || CREDIT_NEW_VIDEO);
   const keptAnchorCount = keptAttachments.filter((item) => item.role === "anchor" || item.role === "scene").length;
   const heygenNeedsAnchor = lipSyncRequested && visualFiles.length === 0 && keptAnchorCount === 0;
   const contentLocale = languageCodeFromCreative(creative) === "en" ? "en" : "he";
@@ -451,7 +458,7 @@ export function CreateVideoForm({
   }
 
   async function submit() {
-    if (!canCreate) {
+    if (!enoughCredits) {
       setError(t("validation.noCredits"));
       return;
     }
@@ -836,7 +843,7 @@ export function CreateVideoForm({
           <span className="banner-icon" aria-hidden>↻</span>
           <div>
             <p className="eyebrow">{t("create.remixFrom", { title: remixSourceTitle || title })}</p>
-            <p>{t("create.remixCredit")}</p>
+            <p>{t("create.remixCredit", { count: CREDIT_NEW_VIDEO })}</p>
           </div>
         </section>
       ) : null}
@@ -1286,11 +1293,18 @@ export function CreateVideoForm({
         <details className="cost-details">
           <summary>
             <span>{t("cost.heading")}</span>
-            <strong>{freeLeft > 0 ? t("credits.freeVideo") : t("credits.oneCredit")}</strong>
+            <strong>
+              {freeLeft > 0
+                ? t("credits.freeVideo")
+                : t("credits.amount", { count: creditCost || CREDIT_NEW_VIDEO })}
+            </strong>
           </summary>
           <p title={t("cost.tooltip", { model: costEstimate.videoModelDisplay, rate: costEstimate.perSecondUsd.toFixed(3) })}>
             {t("cost.system", { cost: formatCostNis(costEstimate.nis), provider: costEstimate.videoProviderLabel, seconds: costEstimate.veoSeconds })}
           </p>
+          {lipSyncRequested && freeLeft <= 0 ? (
+            <p className="muted">{t("credits.lipSyncSurcharge", { extra: CREDIT_LIP_SYNC_SURCHARGE, total: CREDIT_NEW_VIDEO + CREDIT_LIP_SYNC_SURCHARGE })}</p>
+          ) : null}
         </details>
       <fieldset className="approval-fieldset approval-card-picker">
         <legend>{t("approval.heading")}</legend>
@@ -1590,7 +1604,7 @@ export function CreateVideoForm({
                 ))}
                 {group.id === "voice" && (narrationMode === "lip_sync" || visualFiles.length > 0) ? (
                   <p className={heygenNeedsAnchor ? "error-inline accordion-note" : "muted accordion-note"}>
-                    {t("advanced.lipSyncHelp")}
+                    {t("advanced.lipSyncHelp", { extra: CREDIT_LIP_SYNC_SURCHARGE, total: CREDIT_NEW_VIDEO + CREDIT_LIP_SYNC_SURCHARGE })}
                   </p>
                 ) : null}
               </div>
@@ -1649,7 +1663,14 @@ export function CreateVideoForm({
       {error ? <p className="error-inline">{error}</p> : null}
       <div className="stage-actions create-actions">
         <div className="creation-summary-metrics">
-          <span><small>{t("summary.cost")}</small><strong>{freeLeft > 0 ? t("credits.freeVideo") : t("credits.oneCredit")}</strong></span>
+          <span>
+            <small>{t("summary.cost")}</small>
+            <strong>
+              {freeLeft > 0
+                ? t("credits.freeVideo")
+                : t("credits.amount", { count: creditCost || CREDIT_NEW_VIDEO })}
+            </strong>
+          </span>
           <span><small>{t("summary.time")}</small><strong>{t("summary.minutes", { min: estimatedMinutesMin, max: estimatedMinutesMax })}</strong></span>
           <span className={requiredComplete === 3 ? "is-ready" : ""}>
             <small>{t("summary.status")}</small>
@@ -1673,7 +1694,7 @@ export function CreateVideoForm({
           className="primary"
           disabled={
             busy ||
-            !canCreate ||
+            !enoughCredits ||
             !title.trim() ||
             !prompt.trim() ||
             !videoGoal ||

@@ -7,8 +7,10 @@ import {
 import {
   CREDIT_CORRECTION_ASSET,
   CREDIT_CORRECTION_RENDER,
+  CREDIT_LIP_SYNC_SURCHARGE,
   CREDIT_NEW_VIDEO,
-  correctionCreditCost
+  correctionCreditCost,
+  creditCostForVideo
 } from "@studio/shared";
 import { isCheckoutEnabled } from "./payments.js";
 
@@ -68,9 +70,12 @@ export async function getFreeVideosRemaining(userId: string): Promise<number> {
   return Math.max(0, allowance - used);
 }
 
-export async function creditCostForNewRun(userId: string): Promise<number> {
+export async function creditCostForNewRun(
+  userId: string,
+  options?: { preferLipSync?: boolean }
+): Promise<number> {
   const freeRemaining = await getFreeVideosRemaining(userId);
-  return freeRemaining > 0 ? 0 : CREDIT_NEW_VIDEO;
+  return freeRemaining > 0 ? 0 : creditCostForVideo(options);
 }
 
 export async function getCreateVideoEligibility(userId: string): Promise<{
@@ -179,7 +184,7 @@ export async function chargeCorrectionCredits(
     throw new InsufficientCreditsError(
       cost,
       balance,
-      `אין מספיק קרדיטים לתיקון (נדרש ${cost}, זמין ${balance}). ויזואל מחדש = 0.5 קרדיט, רינדור מחדש = 0.25 קרדיט. רכוש קרדיטים מהדשבורד.`
+      `אין מספיק קרדיטים לתיקון (נדרש ${cost}, זמין ${balance}). ויזואל מחדש = ${CREDIT_CORRECTION_ASSET} קרדיטים, רינדור מחדש = ${CREDIT_CORRECTION_RENDER} קרדיטים. רכוש קרדיטים מהדשבורד.`
     );
   }
   await appendLedger(userId, -cost, "CORRECTION", runId, { rerunFrom, cost });
@@ -206,4 +211,11 @@ export function correctionCostForCompletedRun(rerunFrom: "asset" | "render" | nu
   return 0;
 }
 
-export { CREDIT_NEW_VIDEO, CREDIT_CORRECTION_ASSET, CREDIT_CORRECTION_RENDER, correctionCreditCost };
+export {
+  CREDIT_NEW_VIDEO,
+  CREDIT_CORRECTION_ASSET,
+  CREDIT_CORRECTION_RENDER,
+  CREDIT_LIP_SYNC_SURCHARGE,
+  correctionCreditCost,
+  creditCostForVideo
+};

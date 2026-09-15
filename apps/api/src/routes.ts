@@ -12,6 +12,7 @@ import {
   CreativeReorderSchema,
   BrandTemplateWriteSchema,
   applyBrandTemplateToBrief,
+  briefRequestsLipSync,
   ContactRequestSchema,
   type BriefInput
 } from "@studio/shared";
@@ -367,7 +368,9 @@ export async function registerRoutes(app: FastifyInstance) {
     userRoutes.post("/runs", async (request, reply) => {
       const body = CreateRunRequestSchema.parse(request.body);
       const userId = request.user!.sub;
-      const cost = await creditCostForNewRun(userId);
+      const cost = await creditCostForNewRun(userId, {
+        preferLipSync: briefRequestsLipSync(body.brief)
+      });
       try {
         await assertCanStartRun(userId, cost);
       } catch (err) {

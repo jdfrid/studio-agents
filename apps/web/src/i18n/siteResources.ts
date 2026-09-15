@@ -11,8 +11,8 @@ export const siteResources = {
     footer: { legalNav: "קישורים משפטיים" },
     pricing: {
       checkoutLead:
-        "המחירים להלן הם המחירון הנוכחי. הרכישה מתבצעת באתר דרך Lemon Squeezy, אחרי התחברות עם Google.",
-      contactCta: "שאלה על מחיר? פנו אלינו"
+        "המחירים להלן הם המחירון הנוכחי בקרדיטים. הרכישה מתבצעת באתר דרך Lemon Squeezy, אחרי התחברות עם Google. סרטון עד 30 שניות = 40 קרדיטים.",
+      contactCta: "שאלה על מחיר או על מסלול אוטומטי? פנו אלינו"
     },
     about: {
       eyebrow: "הסיפור",
@@ -107,11 +107,11 @@ export const siteResources = {
       commercial: {
         eyebrow: "מסחרי",
         title: "תנאים מסחריים",
-        updated: "עודכן: 9 בספטמבר 2026. תנאים אלה משלימים את תנאי השימוש לגבי מחיר, קרדיטים והחזרים.",
+        updated: "עודכן: 15 בספטמבר 2026. תנאים אלה משלימים את תנאי השימוש לגבי מחיר, קרדיטים והחזרים.",
         sections: [
           {
             title: "מחירון",
-            body: "סרטון בודד: ₪30 לקרדיט אחד. מנוי חודשי: ₪600 עבור 30 קרדיטים בחודש. המחירים כוללים מע״מ אלא אם צוין אחרת בחשבונית."
+            body: "סרטון בודד: ₪49 עבור 49 קרדיטים. מסלול התחלתי: ₪179 לחודש עבור 200 קרדיטים (כ־5 סרטונים עד 30 שניות). מסלול עסקי: ₪449 לחודש עבור 600 קרדיטים (כ־15 סרטונים). המחירים לצרכן כוללים מע״מ; בחשבונית עסקית עשוי להופיע מחיר לפני מע״מ אם צוין במפורש."
           },
           {
             title: "רכישה מקוונת",
@@ -119,7 +119,7 @@ export const siteResources = {
           },
           {
             title: "קרדיטים",
-            body: "קרדיט אחד משמש ליצירת סרטון חדש שהושלם. תיקונים אחרי השלמה עשויים לגבות חלק מקרדיט לפי המפורט בממשק. מכסת ניסיון חינם, אם ניתנה, אינה ניתנת להמרה לכסף."
+            body: "סרטון חדש עד 30 שניות צורך 40 קרדיטים. סנכרון שפתיים מוסיף 20 קרדיטים. תיקון ויזואלי אחרי השלמה צורך 20 קרדיטים, ורינדור מחדש 10. מכסת ניסיון חינם, אם ניתנה, אינה ניתנת להמרה לכסף."
           },
           {
             title: "החזרים",
@@ -127,7 +127,7 @@ export const siteResources = {
           },
           {
             title: "מנויים",
-            body: "מנוי חודשי מתחדש לפי תנאי העסקה אצל ספק התשלומים עד ביטול או סיום תקופה. ביטול נעשה מולנו או מול הספק, לפי ההוראות שקיבלתם בקבלה."
+            body: "מסלול התחלתי ועסקי מתחדשים לפי תנאי העסקה אצל ספק התשלומים עד ביטול או סיום תקופה. ביטול נעשה מולנו או מול הספק, לפי ההוראות שקיבלתם בקבלה. מנוי ישן במחיר ₪600 ממשיך לפי תנאיו עד ביטול."
           }
         ]
       }
@@ -145,8 +145,8 @@ export const siteResources = {
     footer: { legalNav: "Legal links" },
     pricing: {
       checkoutLead:
-        "These are the current list prices. Checkout runs on the site through Lemon Squeezy after you sign in with Google.",
-      contactCta: "Questions about pricing? Contact us"
+        "These are the current credit-based list prices. Checkout runs on the site through Lemon Squeezy after you sign in with Google. A video of up to 30 seconds uses 40 credits.",
+      contactCta: "Questions about pricing or the automatic plan? Contact us"
     },
     about: {
       eyebrow: "The story",
@@ -241,11 +241,11 @@ export const siteResources = {
       commercial: {
         eyebrow: "Commercial",
         title: "Commercial terms",
-        updated: "Updated 9 September 2026. These terms complement the terms of use for price, credits, and refunds.",
+        updated: "Updated 15 September 2026. These terms complement the terms of use for price, credits, and refunds.",
         sections: [
           {
             title: "List prices",
-            body: "Single video: ₪30 for one credit. Monthly plan: ₪600 for 30 credits per month. Prices include VAT unless an invoice states otherwise."
+            body: "Single video: ₪49 for 49 credits. Starter: ₪179 per month for 200 credits (about 5 videos of up to 30 seconds). Business: ₪449 per month for 600 credits (about 15 videos). Consumer prices include VAT; a business invoice may show a price excluding VAT when that is stated clearly."
           },
           {
             title: "Online checkout",
@@ -253,7 +253,7 @@ export const siteResources = {
           },
           {
             title: "Credits",
-            body: "One credit is used for a newly completed video. Corrections after completion may consume a fraction of a credit as shown in the product. Any free trial allowance is not redeemable for cash."
+            body: "A new video of up to 30 seconds uses 40 credits. Lip-sync adds 20 credits. A visual correction after completion uses 20 credits, and a re-render uses 10. Any free trial allowance is not redeemable for cash."
           },
           {
             title: "Refunds",
@@ -261,7 +261,7 @@ export const siteResources = {
           },
           {
             title: "Subscriptions",
-            body: "A monthly plan renews under the payment provider's transaction until cancelled or the period ends. Cancel with us or the provider, following the receipt you received."
+            body: "Starter and Business plans renew under the payment provider's transaction until cancelled or the period ends. Cancel with us or the provider, following the receipt you received. A legacy ₪600 monthly plan continues on its original terms until cancelled."
           }
         ]
       }

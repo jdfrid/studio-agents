@@ -71,7 +71,7 @@ function toUserView(user: {
   avatarUrl: string | null;
   role: "USER" | "ADMIN";
   subscription: {
-    planType: "PAYG" | "SUBSCRIPTION";
+    planType: "PAYG" | "SUBSCRIPTION" | "STARTER" | "BUSINESS";
     status: string;
     creditsPerPeriod: number;
     currentPeriodEnd: Date;

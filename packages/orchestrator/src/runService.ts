@@ -1,6 +1,7 @@
 import { prisma, Prisma } from "@studio/infra-prisma";
 import {
   BriefInputSchema,
+  CREDIT_NEW_VIDEO,
   STAGE_ORDER,
   ScriptOutputSchema,
   VisualCorrectionsRequestSchema,
@@ -66,7 +67,7 @@ export async function createRun(input: {
 
   if (input.userId && !input.skipCreditCheck) {
     const { reserveCredits } = await import("@studio/billing");
-    await reserveCredits(input.userId, run.id, input.creditCost ?? 1);
+    await reserveCredits(input.userId, run.id, input.creditCost ?? CREDIT_NEW_VIDEO);
   }
 
   await audit(tenantId, "run_created", "ProjectRun", run.id, { brief, userId: input.userId });

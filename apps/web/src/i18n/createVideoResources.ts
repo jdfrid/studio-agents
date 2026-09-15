@@ -10,7 +10,7 @@ export const en = {
     remixTitle: "Change one setting and make a new video",
     remixSubtitle: "Every setting from the previous video is here. Change only what you need — for example day to night. This is billed as a new video.",
     remixFrom: "Based on “{{title}}”",
-    remixCredit: "A new version uses one credit, or a remaining free video."
+    remixCredit: "A new version uses {{count}} credits, or a remaining free video."
   },
   progress: {
     aria: "Video setup steps",
@@ -33,7 +33,9 @@ export const en = {
     free_other: "{{count}} free videos available",
     noCharge: "This video will not use any credits.",
     freeVideo: "Free video",
-    oneCredit: "One credit"
+    oneCredit: "One credit",
+    amount: "{{count}} credits",
+    lipSyncSurcharge: "Lip-sync adds {{extra}} credits ({{total}} total)."
   },
   details: {
     heading: "Video details",
@@ -255,7 +257,7 @@ export const en = {
     presetsHeading: "Quick style presets",
     presetsHelp: "One choice updates several professional settings together.",
     auto: "Automatic — based on the brief and mood",
-    lipSyncHelp: "Lip-sync requires a character image and adds rendering cost. The default is automatic.",
+    lipSyncHelp: "Lip-sync requires a character image and adds {{extra}} credits ({{total}} total). The default is automatic.",
     groups: {
       format: { title: "Format & audience", description: "Pacing, communication style, and format extensions" },
       visualStyle: { title: "Visual style", description: "Design, color, realism, logo, and lighting" },
@@ -475,11 +477,11 @@ export const he = {
     draftSaved: "נשמר אוטומטית לפני רגע", draftActive: "שמירה אוטומטית פעילה",
     remixEyebrow: "גרסה חדשה", remixTitle: "שנו פרמטר וצרו סרטון חדש",
     remixSubtitle: "כל ההגדרות מהסרטון הקודם כאן. שנו רק מה שצריך — למשל יום ללילה. זו הפקה חדשה ותחויב כסרטון חדש.",
-    remixFrom: "על בסיס «{{title}}»", remixCredit: "גרסה חדשה משתמשת בקרדיט אחד, או בסרטון חינם אם נותר."
+    remixFrom: "על בסיס «{{title}}»", remixCredit: "גרסה חדשה משתמשת ב־{{count}} קרדיטים, או בסרטון חינם אם נותר."
   },
   progress: { aria: "שלבי הגדרת הסרטון", idea: "רעיון וסגנון", script: "תסריט וסצנות", audio: "קול ומוזיקה", review: "סקירה ויצירה" },
   common: { required: "חובה", optional: "לא חובה", remove: "הסר", automatic: "אוטומטי — לפי הבריף והאווירה", secondsShort: "{{count}} שנ׳", recommended: "מומלץ", custom: "מותאם" },
-  credits: { free_one: "סרטון חינם אחד זמין", free_other: "{{count}} סרטונים חינם זמינים", noCharge: "הסרטון הנוכחי לא יפחית מהקרדיטים.", freeVideo: "סרטון חינם", oneCredit: "קרדיט אחד" },
+  credits: { free_one: "סרטון חינם אחד זמין", free_other: "{{count}} סרטונים חינם זמינים", noCharge: "הסרטון הנוכחי לא יפחית מהקרדיטים.", freeVideo: "סרטון חינם", oneCredit: "קרדיט אחד", amount: "{{count}} קרדיטים", lipSyncSurcharge: "סנכרון שפתיים מוסיף {{extra}} קרדיטים (סה״כ {{total}})." },
   details: {
     heading: "פרטי הסרטון", help: "שלושה פרטים מספיקים כדי להתחיל. אפשר לדייק את השאר רק אם צריך.",
     title: "כותרת הסרטון", titlePlaceholder: "לדוגמה: מבצע קיץ למוצרי היוקרה של Luxy", goal: "מה מטרת הסרטון?",
@@ -570,7 +572,7 @@ export const he = {
   advanced: {
     heading: "הגדרות מתקדמות", summaryHelp: "שליטה מקצועית בסגנון, תסריט, קול, צילום ועריכה",
     presetsHeading: "תבניות סגנון מהירות", presetsHelp: "בחירה אחת תעדכן מספר הגדרות מקצועיות יחד.",
-    auto: "אוטומטי — לפי הבריף והאווירה", lipSyncHelp: "סנכרון שפתיים דורש תמונת דמות ומוסיף עלות רינדור. ברירת המחדל היא אוטומטית.",
+    auto: "אוטומטי — לפי הבריף והאווירה", lipSyncHelp: "סנכרון שפתיים דורש תמונת דמות ומוסיף {{extra}} קרדיטים (סה״כ {{total}}). ברירת המחדל היא אוטומטית.",
     groups: {
       format: { title: "פורמט וקהל", description: "קצב, סגנון תקשורת והרחבות לפורמט" },
       visualStyle: { title: "סגנון חזותי", description: "עיצוב, צבעוניות, מציאותיות, לוגו ותאורה" },

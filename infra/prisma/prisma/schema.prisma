@@ -16,6 +16,8 @@ enum UserRole {
 enum PlanType {
   PAYG
   SUBSCRIPTION
+  STARTER
+  BUSINESS
 }
 
 enum SubscriptionStatus {
@@ -144,7 +146,7 @@ model Subscription {
   lemonSubscriptionId String             @unique
   planType            PlanType           @default(SUBSCRIPTION)
   status              SubscriptionStatus @default(ACTIVE)
-  creditsPerPeriod    Int                @default(30)
+  creditsPerPeriod    Int                @default(200)
   currentPeriodStart  DateTime
   currentPeriodEnd    DateTime
   createdAt           DateTime           @default(now())
