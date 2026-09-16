@@ -251,6 +251,10 @@ export const resources = {
         noProducts: "אין מוצרים עדיין. סרקו את האתר או הדביקו כתובות.",
         noJobs: "עדיין לא הופק סרטון אוטומטי.",
         holdNote: "הסרטונים נשמרים כמוכנים. אין פרסום אוטומטי בשלב זה.",
+        lastError: "הסריקה לא מצאה מוצרים: {{message}}",
+        errors: {
+          no_products_found: "לא נמצאו מוצרים. אפשר להדביק כתובות עמוד מוצר למטה."
+        },
         openRun: "פתח סרטון",
         used: "הופק",
         status: {
@@ -588,6 +592,10 @@ export const resources = {
         noProducts: "No products yet. Scan the site or paste URLs.",
         noJobs: "No automated video has been produced yet.",
         holdNote: "Videos are stored as ready. There is no automatic publishing in this experiment.",
+        lastError: "Scan found no products: {{message}}",
+        errors: {
+          no_products_found: "No products found. You can paste product page URLs below."
+        },
         openRun: "Open video",
         used: "Used",
         status: {

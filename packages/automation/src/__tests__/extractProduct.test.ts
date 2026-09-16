@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractProduct, looksLikeProductUrl } from "../extractProduct.js";
+import { productsFromJson } from "../extractJsonCatalog.js";
 import { parseSitemapLocs } from "../parseSitemap.js";
 
 describe("extractProduct", () => {
@@ -36,6 +37,32 @@ describe("extractProduct", () => {
   });
 });
 
+describe("productsFromJson", () => {
+  it("reads a public deals feed with on-site deal URLs", () => {
+    const products = productsFromJson(
+      {
+        deals: [
+          {
+            id: 5982,
+            title: "Gold coin bezel",
+            image_url: "https://cdn.example/bezel.jpg",
+            current_price: 818.99,
+            currency: "USD",
+            ebay_url: "https://www.ebay.com/itm/1"
+          }
+        ]
+      },
+      "https://dealsluxy.com",
+      "/api/public/deals"
+    );
+    expect(products).toHaveLength(1);
+    expect(products[0]?.title).toBe("Gold coin bezel");
+    expect(products[0]?.canonicalUrl).toBe("https://dealsluxy.com/deal/5982");
+    expect(products[0]?.priceText).toBe("818.99 USD");
+    expect(products[0]?.imageUrls[0]).toContain("bezel.jpg");
+  });
+});
+
 describe("looksLikeProductUrl", () => {
   it("accepts room and product paths on the same origin", () => {
     expect(looksLikeProductUrl("https://a.example/rooms/deluxe", "https://a.example")).toBe(true);
@@ -45,6 +72,12 @@ describe("looksLikeProductUrl", () => {
 });
 
 describe("parseSitemapLocs", () => {
+  it("ignores SPA HTML that is not a sitemap", () => {
+    const parsed = parseSitemapLocs("<!DOCTYPE html><html><body>no locs</body></html>", "https://a.example");
+    expect(parsed.pages).toEqual([]);
+    expect(parsed.nestedSitemaps).toEqual([]);
+  });
+
   it("splits page urls from nested sitemaps", () => {
     const xml = `
       <sitemapindex>

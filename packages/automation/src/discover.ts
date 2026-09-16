@@ -1,4 +1,5 @@
 import { extractLinks, extractProduct, looksLikeProductUrl } from "./extractProduct.js";
+import { discoverJsonCatalog } from "./extractJsonCatalog.js";
 import { absoluteUrl, canonicalKey, fetchText, originOf, type DiscoveredProduct } from "./fetchPage.js";
 import { parseSitemapLocs } from "./parseSitemap.js";
 
@@ -8,6 +9,9 @@ const MAX_PRODUCTS = 60;
 export async function discoverProducts(websiteUrl: string, extraUrls: string[] = []): Promise<DiscoveredProduct[]> {
   const origin = originOf(websiteUrl);
   if (!origin) return [];
+  const jsonProducts = await discoverJsonCatalog(websiteUrl);
+  if (jsonProducts.length && extraUrls.length === 0) return jsonProducts.slice(0, MAX_PRODUCTS);
+
   const home = absoluteUrl(websiteUrl, origin) ?? origin;
   const extraKeys = new Set<string>();
   const candidates = new Set<string>();
@@ -67,6 +71,10 @@ export async function discoverProducts(websiteUrl: string, extraUrls: string[] =
       continue;
     }
     products.set(product.canonicalUrl, product);
+  }
+  for (const product of jsonProducts) {
+    if (products.size >= MAX_PRODUCTS) break;
+    if (!products.has(product.canonicalUrl)) products.set(product.canonicalUrl, product);
   }
   return [...products.values()];
 }

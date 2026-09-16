@@ -45,6 +45,7 @@ export function AutomationPage({ onOpenRun }: { onOpenRun: (runId: string) => vo
       setProducts([]);
       setJobs([]);
     }
+    return next;
   }, []);
 
   useEffect(() => {
@@ -88,7 +89,11 @@ export function AutomationPage({ onOpenRun }: { onOpenRun: (runId: string) => vo
     setError("");
     try {
       await apiPost("/automation/campaign/scan");
-      await load();
+      for (let i = 0; i < 25; i++) {
+        const next = await load();
+        if (!next || next.status !== "running") break;
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -200,6 +205,11 @@ export function AutomationPage({ onOpenRun }: { onOpenRun: (runId: string) => vo
         ) : null}
         <p className="muted">{t("automationPage.holdNote")}</p>
         {error ? <p className="error-inline">{error}</p> : null}
+        {campaign?.lastError ? (
+          <p className="error-inline">
+            {t(`automationPage.errors.${campaign.lastError}`, { defaultValue: campaign.lastError })}
+          </p>
+        ) : null}
         <div className="stage-actions">
           <button type="button" className="primary" disabled={Boolean(busy) || !websiteUrl.trim()} onClick={() => void save()}>
             {busy === "save" ? t("automationPage.saving") : t("automationPage.save")}

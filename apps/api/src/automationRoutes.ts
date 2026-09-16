@@ -138,6 +138,10 @@ export async function registerAutomationRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
+      await prisma.automationCampaign.update({
+        where: { id: campaign.id },
+        data: { status: "running", lastError: null }
+      });
       await enqueueAutomationScan(campaign.id);
       return { ok: true, queued: true };
     });
@@ -154,6 +158,10 @@ export async function registerAutomationRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
+      await prisma.automationCampaign.update({
+        where: { id: campaign.id },
+        data: { status: "running", lastError: null }
+      });
       await enqueueAutomationScan(campaign.id, body.urls);
       return { ok: true, queued: true };
     });

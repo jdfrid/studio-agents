@@ -1,6 +1,9 @@
 const LOC_RE = /<loc>\s*([^<]+)\s*<\/loc>/gi;
 
 export function parseSitemapLocs(xml: string, baseUrl: string): { pages: string[]; nestedSitemaps: string[] } {
+  if (/<html[\s>]|<!doctype html/i.test(xml) && !/<urlset|<sitemapindex/i.test(xml)) {
+    return { pages: [], nestedSitemaps: [] };
+  }
   const pages: string[] = [];
   const nestedSitemaps: string[] = [];
   const seen = new Set<string>();
