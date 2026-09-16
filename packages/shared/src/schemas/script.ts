@@ -38,7 +38,9 @@ export const SceneSpecSchema = z.object({
    */
   speaker: z.enum(["a", "b", "narrator"]).optional(),
   /** Display name of the speaking character (for script clarity; not spoken if narration is clean). */
-  speakerName: z.string().max(80).optional()
+  speakerName: z.string().max(80).optional(),
+  location: z.string().max(120).optional(),
+  action: z.string().max(200).optional()
 });
 export type SceneSpec = z.infer<typeof SceneSpecSchema>;
 

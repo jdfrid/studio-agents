@@ -3,11 +3,13 @@ export const en = {
     back: "Back",
     eyebrow: "New creation",
     title: "Let's build your next video",
-    subtitle: "Describe the idea, choose a style, and upload materials. We'll prepare the remaining settings for you.",
-    draftSaved: "Autosaved just now",
+    subtitle: "Start from a short idea. We propose language, format, and length — open more only if you need control.",
+    draftSaved: "Saved",
+    draftSaving: "Saving…",
+    draftFailed: "Not saved — try again",
     draftActive: "Autosave is on",
     remixEyebrow: "New version",
-    remixTitle: "Change one setting and make a new video",
+    remixTitle: "Create another version",
     remixSubtitle: "Every setting from the previous video is here. Change only what you need — for example day to night. This is billed as a new video.",
     remixFrom: "Based on “{{title}}”",
     remixCredit: "A new version uses {{count}} credits, or a remaining free video."
@@ -38,11 +40,15 @@ export const en = {
     lipSyncSurcharge: "Lip-sync adds {{extra}} credits ({{total}} total)."
   },
   details: {
-    heading: "Video details",
-    help: "Three details are enough to begin. Refine the rest only if needed.",
-    title: "Video title",
-    titlePlaceholder: "For example: A summer sale for Luxy's premium products",
-    goal: "What is the video's goal?",
+    heading: "The idea",
+    help: "One description is enough to begin. Title and goal are suggested for you.",
+    promptLabel: "What should the video show or achieve?",
+    promptExample: "For example: A video that presents our café and invites people for coffee and pastry in the morning.",
+    title: "Project name",
+    titleHelp: "Suggested from your description. You can change it.",
+    titlePlaceholder: "For example: Morning at our café",
+    goal: "Suggested goal",
+    goalHelp: "Helps structure the video. It is not a second required choice.",
     subject: "What is the video about?",
     subjectProduct: "What is the product, what is its main benefit, and what should the viewer do?",
     subjectService: "What service do you offer, who is it for, and what problem does it solve?",
@@ -91,22 +97,22 @@ export const en = {
   },
   materials: {
     heading: "Source materials",
-    help: "Drop stills in one place. The engine places them across the film — you do not have to assign a photo to each scene. Use the character slot below only to lock specific faces.",
-    drop: "Drag images, videos, a logo, or an audio file here",
-    choose: "or click to choose multiple files",
-    dropMobile: "Tap to choose files from the gallery",
+    help: "We'll place your images and videos automatically. You can choose where they appear.",
+    drop: "Choose photos, a logo, or a video",
+    choose: "You can also drag files here. Limits: images up to 5 MB, video up to 40 MB.",
+    dropMobile: "Choose files from the gallery",
     chooseMobile: "or photograph yourself / a product above",
-    mobileHelp: "On a phone you can photograph yourself or a product with the camera, or pick files from the gallery. Dropped photos are placed across scenes automatically.",
+    mobileHelp: "Add photos or videos. We'll place them automatically; you can choose where they appear.",
     captureSelf: "Photograph yourself",
     captureProduct: "Photograph a product",
     captureHint: "A selfie opens the front camera. A product photo opens the rear camera.",
-    classification: "Photos dropped here become a stills pool the engine places across the video. Optional per-scene images are only if you want a specific shot locked. Use the character slot below only to lock 1–2 faces as cast.",
+    classification: "Default is automatic placement. Optional roles: product, logo, character, or background — you do not have to assign a scene.",
     manage: "Manage and classify source materials",
     uploaded_one: "{{count}} file uploaded",
     uploaded_other: "{{count}} files uploaded",
     manual: "Choose manually by role",
-    characters: "Character photos (optional — lock 1–2 faces)",
-    charactersHelp: "Up to {{count}} images. Use this only to lock specific people as cast (image 1 = character A, image 2 = character B). For hotel rooms, products, or B-roll, drop them in the main zone instead — the engine will place them.",
+    characters: "Character photos (optional)",
+    charactersHelp: "Up to {{count}} images if you want specific people to appear. Image 1 is character A, image 2 is character B.",
     characterAlt: "Character or background image: {{name}}",
     products: "Product / location / B-roll stills (optional)",
     productsHelp: "Up to {{count}} stills per request (size limit). The engine places them across scenes automatically — you do not assign one photo per scene.",
@@ -133,6 +139,36 @@ export const en = {
       reference_video: "Reference video",
       logo: "Logo"
     }
+  },
+  quick: {
+    language: "Language",
+    format: "Format",
+    portrait: "Vertical",
+    landscape: "Horizontal",
+    duration: "{{count}} sec",
+    proposalHelp: "We'll show a script and scenes before producing the video.",
+    moreAdjustments: "More adjustments",
+    closeAdjustments: "Back to the idea",
+    messageAudience: "Message & audience",
+    look: "Look",
+    voice: "Voice",
+    brand: "Brand",
+    guidance: "Instructions",
+    customized: "Customized",
+    summaryVoiceMusic: "Automatic voice and music",
+    summaryCaptions: "Captions on"
+  },
+  voice: {
+    preview: "Play sample",
+    previewing: "Playing…",
+    previewError: "Could not play a sample for this voice.",
+    lipSyncLabel: "Match mouth movement to speech",
+    noneHides: "No speech hides voice settings but keeps them if you turn speech back on.",
+    pickHelp: "Choose a voice, then play a sample. Accent and speed appear after you pick a voice."
+  },
+  origin: {
+    brand: "Brand",
+    project: "This video"
   },
   basic: {
     heading: "Basic settings",
@@ -194,10 +230,10 @@ export const en = {
   },
   approval: {
     heading: "Creation mode",
-    autoTitle: "Automatic creation",
-    autoHelp: "The system will prepare the full video from your settings. · Basic control",
-    previewTitle: "Review script and draft first — recommended",
-    previewHelp: "Review the script, scenes, and narration before rendering. · Balanced control",
+    autoTitle: "Automatic production",
+    autoHelp: "Skip the proposal and produce the video. Cost is shown before you confirm.",
+    previewTitle: "Script and scenes first — recommended",
+    previewHelp: "We'll prepare a proposal to review before producing the video.",
     manualTitle: "Approve every stage",
     manualHelp: "For creators who want full control of the process. · Maximum control"
   },
@@ -246,6 +282,7 @@ export const en = {
       voice: "Voice",
       visual: "Visual style",
       productHint: "The brand stays fixed. Change only the product title, photo, and copy for this video.",
+      replaceConfirm: "Applying this template will update: {{fields}}. Locked choices stay. Continue?",
       loadError: "Could not load templates.",
       saveError: "Could not save the template.",
       signIn: "Sign in to save templates to your account."
@@ -417,7 +454,7 @@ export const en = {
       lowerThirds: { on: "On — scene / product title", off: "Off" },
       preferHeygenDub: {
         off: "Off — TTS dubbing over video (recommended)",
-        on: "On — lip-sync via fal (~$0.056/sec)"
+        on: "On — match mouth movement to speech (extra credits)"
       }
     }
   },
@@ -426,25 +463,26 @@ export const en = {
     time: "Estimated time",
     minutes: "{{min}}–{{max}} minutes",
     status: "Completion status",
-    ready: "Ready to create a draft",
+    ready: "Ready for a proposal",
     missing: "Missing: {{fields}}",
     titleField: "title",
     goalField: "goal",
     descriptionField: "description",
-    saveDraft: "Save draft",
+    saveDraft: "Save",
     preview: "Summary preview",
     untitled: "Untitled",
     noGoal: "No goal selected",
     autoAudience: "Automatic target audience",
     autoMood: "Automatic mood",
-    create: "Create script and draft",
-    creating: "Preparing script and draft…",
-    createRemix: "Create new video",
-    creatingRemix: "Preparing the new video…"
+    create: "Prepare a proposal",
+    creating: "Preparing the proposal…",
+    createRemix: "Create another version",
+    creatingRemix: "Preparing the new version…",
+    createAuto: "Produce the video"
   },
   validation: {
     noCredits: "You don't have enough credits to create a video. Buy credits or use the free video from the dashboard.",
-    required: "Enter a title, choose a video goal, and describe the video.",
+    required: "Describe what the video should show or achieve.",
     voiceConsent: "Confirm that you have the right to use this voice before cloning it.",
     voiceSize: "The audio file is too large (maximum 10 MB).",
     insertSize: "The inserted video is too large (maximum 40 MB).",
@@ -474,9 +512,9 @@ export const en = {
 export const he = {
   create: {
     back: "חזרה", eyebrow: "יצירה חדשה", title: "בואו נבנה את הסרטון הבא",
-    subtitle: "תארו את הרעיון, בחרו סגנון והעלו חומרים. את שאר ההגדרות נכין עבורכם.",
-    draftSaved: "נשמר אוטומטית לפני רגע", draftActive: "שמירה אוטומטית פעילה",
-    remixEyebrow: "גרסה חדשה", remixTitle: "שנו פרמטר וצרו סרטון חדש",
+    subtitle: "מתחילים מרעיון קצר. נציע שפה, פורמט ואורך — ותוכלו להעמיק רק במקום שצריך.",
+    draftSaved: "נשמר", draftSaving: "שומר…", draftFailed: "לא נשמר — נסו שוב", draftActive: "שמירה אוטומטית פעילה",
+    remixEyebrow: "גרסה חדשה", remixTitle: "יצירת גרסה נוספת",
     remixSubtitle: "כל ההגדרות מהסרטון הקודם כאן. שנו רק מה שצריך — למשל יום ללילה. זו הפקה חדשה ותחויב כסרטון חדש.",
     remixFrom: "על בסיס «{{title}}»", remixCredit: "גרסה חדשה משתמשת ב־{{count}} קרדיטים, או בסרטון חינם אם נותר."
   },
@@ -484,8 +522,11 @@ export const he = {
   common: { required: "חובה", optional: "לא חובה", remove: "הסר", automatic: "אוטומטי — לפי הבריף והאווירה", secondsShort: "{{count}} שנ׳", recommended: "מומלץ", custom: "מותאם" },
   credits: { free_one: "סרטון חינם אחד זמין", free_other: "{{count}} סרטונים חינם זמינים", noCharge: "הסרטון הנוכחי לא יפחית מהקרדיטים.", freeVideo: "סרטון חינם", oneCredit: "קרדיט אחד", amount: "{{count}} קרדיטים", lipSyncSurcharge: "סנכרון שפתיים מוסיף {{extra}} קרדיטים (סה״כ {{total}})." },
   details: {
-    heading: "פרטי הסרטון", help: "שלושה פרטים מספיקים כדי להתחיל. אפשר לדייק את השאר רק אם צריך.",
-    title: "כותרת הסרטון", titlePlaceholder: "לדוגמה: מבצע קיץ למוצרי היוקרה של Luxy", goal: "מה מטרת הסרטון?",
+    heading: "הרעיון", help: "תיאור אחד מספיק כדי להתחיל. כותרת ומטרה מוצעות עבורכם.",
+    promptLabel: "מה תרצו שהסרטון יציג או ישיג?",
+    promptExample: "לדוגמה: סרטון שמציג את בית הקפה שלנו ומזמין לקפה ומאפה בבוקר.",
+    title: "שם הפרויקט", titleHelp: "מוצע מהתיאור. אפשר לשנות.", titlePlaceholder: "לדוגמה: בוקר בבית הקפה",
+    goal: "מטרה מוצעת", goalHelp: "עוזרת לבנות את הסרטון, בלי בחירה כפולה חובה.",
     subject: "על מה הסרטון?", subjectProduct: "מהו המוצר, מה היתרון המרכזי שלו ומה תרצו שהצופה יעשה?",
     subjectService: "איזה שירות אתם מציעים, למי הוא מתאים ואיזו בעיה הוא פותר?",
     subjectDefault: "תארו בקצרה את המסר, האנשים, המקום והתוצאה הרצויה.", audience: "למי הסרטון מיועד?",
@@ -501,16 +542,16 @@ export const he = {
   moods: { professional: "מקצועי ואמין", luxury: "יוקרתי", emotional: "מרגש", energetic: "צעיר ואנרגטי", modern: "נקי ומודרני", dramatic: "דרמטי", calm: "רגוע", other: "אחר" },
   materials: {
     heading: "חומרי גלם",
-    help: "העלו תמונות במקום אחד — המנוע ישבץ אותן לאורך הסרטון. אין צורך לשייך תמונה לכל סצנה. חריץ הדמויות למטה מיועד רק לנעילת פנים ספציפיות.",
-    drop: "גררו לכאן תמונות, סרטונים, לוגו או קובץ קול", choose: "או לחצו לבחירת מספר קבצים",
+    help: "נוסיף את התמונות והסרטונים אוטומטית. אפשר לבחור היכן יופיעו.",
+    drop: "בחירת תמונות, לוגו או סרטון", choose: "אפשר גם לגרור לכאן. מגבלות: תמונה עד 5MB, סרטון עד 40MB.",
     dropMobile: "לחצו לבחירת קבצים מהגלריה", chooseMobile: "או צלמו את עצמכם / מוצר בכפתורים למעלה",
-    mobileHelp: "בטלפון אפשר לצלם את עצמכם או מוצר במצלמה, או לבחור קבצים מהגלריה. תמונות שמועלות כאן משובצות אוטומטית בין הסצנות.",
+    mobileHelp: "הוסיפו תמונות וסרטונים. נשבץ אותם אוטומטית; אפשר לבחור היכן יופיעו.",
     captureSelf: "צלמו את עצמכם", captureProduct: "צלמו מוצר",
     captureHint: "סלפי נפתח במצלמה הקדמית. צילום מוצר נפתח במצלמה האחורית.",
-    classification: "תמונות שגוררים לכאן הופכות לבריכת סצנות — המנוע מחליט איפה לשלב כל אחת. תמונה לסצנה ספציפית היא אופציונלית. חריץ הדמויות מיועד רק לנעילת 1–2 פרצופים.",
+    classification: "ברירת המחדל היא שיבוץ אוטומטי. תפקידים אופציונליים: מוצר, לוגו, דמות או רקע — אין חובה לשייך לסצנה.",
     manage: "ניהול וסיווג חומרי הגלם", uploaded_one: "קובץ אחד הועלה", uploaded_other: "{{count}} קבצים הועלו", manual: "בחירה ידנית לפי תפקיד",
-    characters: "תמונות דמויות (אופציונלי — נעילת 1–2 פנים)",
-    charactersHelp: "עד {{count}} תמונות. השתמשו בזה רק כדי לנעול אנשים ספציפיים כצוות (תמונה 1 = דמות א׳, תמונה 2 = דמות ב׳). חדרי מלון, מוצרים ו־B-roll — גררו לאזור הראשי והמנוע ישבץ.",
+    characters: "תמונות דמויות (אופציונלי)",
+    charactersHelp: "עד {{count}} תמונות אם תרצו שאנשים ספציפיים יופיעו. תמונה 1 = דמות א׳, תמונה 2 = דמות ב׳.",
     characterAlt: "תמונת דמות או רקע: {{name}}", products: "תמונות מוצר / מיקום / B-roll (אופציונלי)",
     productsHelp: "עד {{count}} תמונות בבקשה אחת (מגבלת גודל). המנוע משבץ אותן בין הסצנות — אין צורך לשייך תמונה לכל סצנה.",
     productAlt: "תמונת מוצר: {{name}}", voice: "שיבוט קול (אופציונלי)",
@@ -531,6 +572,20 @@ export const he = {
       logo: "לוגו"
     }
   },
+  quick: {
+    language: "שפה", format: "פורמט", portrait: "אנכי", landscape: "אופקי", duration: "{{count}} שנ׳",
+    proposalHelp: "נציג תסריט וסקיצה לפני הפקת הסרטון.",
+    moreAdjustments: "התאמות נוספות", closeAdjustments: "חזרה לרעיון",
+    messageAudience: "מסר וקהל", look: "מראה", voice: "קול", brand: "מותג", guidance: "הנחיות",
+    customized: "מותאם", summaryVoiceMusic: "קול ומוזיקה אוטומטיים", summaryCaptions: "כתוביות פעילות"
+  },
+  voice: {
+    preview: "השמעת דוגמה", previewing: "משמיע…", previewError: "לא ניתן להשמיע דוגמה לקול הזה.",
+    lipSyncLabel: "התאמת תנועות הפה לדיבור",
+    noneHides: "ללא דיבור מסתיר הגדרות קול אך שומר אותן אם תחזרו לדיבור.",
+    pickHelp: "בחרו קול והשמיעו דוגמה. מבטא ומהירות מופיעים אחרי בחירת הקול."
+  },
+  origin: { brand: "מותג", project: "הסרטון הזה" },
   basic: {
     heading: "הגדרות בסיסיות", help: "הבחירות הנפוצות שמשפיעות על אורך הסרטון, הפורמט והחוויה.",
     duration: "משך הסרטון", durationHelp: "משך ארוך יותר יגדיל את מספר הסצנות, זמן הייצור והעלות.",
@@ -546,8 +601,8 @@ export const he = {
   captions: { on: "כתוביות פעילות", off: "ללא כתוביות" },
   cost: { heading: "עלות משוערת", system: "עלות הפקה משוערת למערכת: {{cost}} · {{provider}} · כ־{{seconds}} שניות וידאו.", tooltip: "{{model}} · ${{rate}}/s" },
   approval: {
-    heading: "מצב יצירה", autoTitle: "יצירה אוטומטית", autoHelp: "המערכת תכין את הסרטון המלא לפי ההגדרות. · שליטה בסיסית",
-    previewTitle: "תסריט וסקיצה לפני יצירה — מומלץ", previewHelp: "תראו את התסריט, הסצנות והקריינות לפני הרינדור. · שליטה מאוזנת",
+    heading: "מצב יצירה",     autoTitle: "הפקה אוטומטית", autoHelp: "דילוג על ההצעה והפקת הסרטון. העלות מוצגת לפני האישור.",
+    previewTitle: "תסריט וסצנות לפני הפקה — מומלץ", previewHelp: "נציג הצעה לבדיקה לפני הפקת הסרטון.",
     manualTitle: "אישור בכל שלב", manualHelp: "מתאים למי שרוצה שליטה מלאה בתהליך. · שליטה מרבית"
   },
   branding: {
@@ -568,6 +623,7 @@ export const he = {
       mustSay: "חובה לכלול", mustAvoid: "חובה להימנע", variation: "מה יכול להשתנות בכל סרטון",
       lock: "תמיד אותו דבר", vary: "חדש בכל סרטון", music: "מוזיקה", voice: "קול", visual: "סגנון ויזואלי",
       productHint: "המותג נשאר קבוע. בסרטון הזה משנים רק כותרת, תמונה וטקסט של המוצר.",
+      replaceConfirm: "החלת התבנית תעדכן: {{fields}}. בחירות נעולות יישמרו. להמשיך?",
       loadError: "לא ניתן לטעון תבניות.", saveError: "לא ניתן לשמור את התבנית.",
       signIn: "יש להתחבר כדי לשמור תבניות לחשבון."
     }
@@ -628,20 +684,20 @@ export const he = {
       lowerThirds: { on: "פעיל — כותרת סצנה / מוצר", off: "כבוי" },
       preferHeygenDub: {
         off: "כבוי — דיבוב TTS על וידאו (מומלץ)",
-        on: "פעיל — סנכרון שפתיים דרך fal (~$0.056/ש׳)"
+        on: "פעיל — התאמת תנועות הפה לדיבור (קרדיטים נוספים)"
       }
     }
   },
   summary: {
-    cost: "עלות", time: "זמן משוער", minutes: "{{min}}–{{max}} דקות", status: "סטטוס מילוי", ready: "מוכן ליצירת סקיצה",
-    missing: "חסר: {{fields}}", titleField: "כותרת", goalField: "מטרה", descriptionField: "תיאור", saveDraft: "שמירת טיוטה",
+    cost: "עלות", time: "זמן משוער", minutes: "{{min}}–{{max}} דקות", status: "סטטוס מילוי",     ready: "מוכן להצעה",
+    missing: "חסר: {{fields}}", titleField: "כותרת", goalField: "מטרה", descriptionField: "תיאור", saveDraft: "שמירה",
     preview: "תצוגת סיכום", untitled: "ללא כותרת", noGoal: "לא נבחרה מטרה", autoAudience: "קהל יעד אוטומטי",
-    autoMood: "אווירה אוטומטית", create: "יצירת תסריט וסקיצה", creating: "מכין תסריט וסקיצה…",
-    createRemix: "צרו סרטון חדש", creatingRemix: "מכין את הסרטון החדש…"
+    autoMood: "אווירה אוטומטית", create: "הכינו לי הצעה", creating: "מכין הצעה…",
+    createRemix: "יצירת גרסה נוספת", creatingRemix: "מכין את הגרסה החדשה…", createAuto: "הפקת הסרטון"
   },
   validation: {
     noCredits: "אין מספיק קרדיטים ליצירת סרטון. רכוש קרדיטים או השתמש בסרטון החינמי מהדשבורד.",
-    required: "יש למלא כותרת, לבחור מטרת סרטון ולתאר את הסרטון.", voiceConsent: "יש לאשר שיש לך זכות להשתמש בקול לפני שיבוט.",
+    required: "תארו מה הסרטון צריך להציג או להשיג.", voiceConsent: "יש לאשר שיש לך זכות להשתמש בקול לפני שיבוט.",
     voiceSize: "קובץ הקול גדול מדי (מקסימום 10MB).", insertSize: "סרטון השילוב גדול מדי (מקסימום 40MB).",
     referenceSize: "סרטון ההשראה גדול מדי (מקסימום 15MB).", logoSize: "קובץ הלוגו גדול מדי (מקסימום 5MB).",
     anchorRequired: "לסנכרון שפתיים נדרשת לפחות תמונת דמות אחת.", characterTooLarge: "תמונת דמות גדולה מדי (מקסימום 5MB): {{name}}",

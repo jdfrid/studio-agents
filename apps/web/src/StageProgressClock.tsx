@@ -62,6 +62,7 @@ export function StageProgressClock({ run }: { run: ProjectRunView }) {
         : t("progress.waiting");
 
   const percent = Math.round(progress * 100);
+  if (run.status === "COMPLETED") return null;
 
   return (
     <aside

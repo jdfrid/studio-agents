@@ -33,6 +33,7 @@ function rowToView(row: {
   geminiMusicModel: string | null;
   geminiVideoModel: string | null;
   freeVideosPerUser: number;
+  allowDurationOver30: boolean;
   updatedAt: Date;
 }): PlatformSettingsView {
   const profile = isRenderProfileId(row.defaultRenderProfile)
@@ -46,6 +47,7 @@ function rowToView(row: {
     geminiMusicModel: row.geminiMusicModel,
     geminiVideoModel: row.geminiVideoModel,
     freeVideosPerUser: row.freeVideosPerUser,
+    allowDurationOver30: row.allowDurationOver30,
     updatedAt: row.updatedAt.toISOString()
   };
 }
@@ -84,6 +86,7 @@ export function getPlatformSettingsSync(): PlatformSettingsView {
     geminiMusicModel: process.env.GEMINI_MUSIC_MODEL?.trim() || null,
     geminiVideoModel: process.env.GEMINI_VIDEO_MODEL?.trim() || null,
     freeVideosPerUser: envFreeVideos(),
+    allowDurationOver30: false,
     updatedAt: new Date(0).toISOString()
   };
 }

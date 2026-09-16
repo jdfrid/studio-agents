@@ -30,6 +30,7 @@ type Props = {
   onApply: (template: BrandTemplateView, creative: CreativeOptions) => void;
   onClear: () => void;
   onHydrateLogo?: (template: BrandTemplateView) => void;
+  lockedCreativeKeys?: string[];
 };
 
 function lines(value: string): string[] {
@@ -60,7 +61,12 @@ function starterView(starter: (typeof BRAND_TEMPLATE_STARTERS)[number], locale: 
     filmTemplate: starter.draft.filmTemplate,
     durationSeconds: starter.draft.durationSeconds,
     platform: starter.draft.platform,
-    variationPolicy: starter.draft.variationPolicy ?? { music: "vary", voice: "vary", visual: "vary" },
+    variationPolicy: {
+      music: starter.draft.variationPolicy?.music ?? "vary",
+      voice: starter.draft.variationPolicy?.voice ?? "vary",
+      visual: starter.draft.variationPolicy?.visual ?? "vary",
+      lockedCreativeKeys: starter.draft.variationPolicy?.lockedCreativeKeys ?? []
+    },
     defaultCreative: starter.draft.defaultCreative,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -86,7 +92,8 @@ export function BrandTemplatePanel({
   logoFile,
   onApply,
   onClear,
-  onHydrateLogo
+  onHydrateLogo,
+  lockedCreativeKeys = []
 }: Props) {
   const { t } = useTranslation("createVideo");
   const { user } = useAuth();
@@ -143,7 +150,13 @@ export function BrandTemplatePanel({
 
   function applyTemplate(template: BrandTemplateView) {
     fillEditor(template);
-    onApply(template, applyBrandVariation(template));
+    const next = applyBrandVariation(template, Math.random, {
+      preserve: creative,
+      preserveKeys: lockedCreativeKeys
+    });
+    const replaced = describeReplacedCreative(creative, next, t);
+    if (replaced && !window.confirm(t("branding.templates.replaceConfirm", { fields: replaced }))) return;
+    onApply(template, next);
   }
 
   async function save() {
@@ -323,6 +336,24 @@ export function BrandTemplatePanel({
       ) : null}
     </div>
   );
+}
+
+function describeReplacedCreative(
+  previous: CreativeOptions,
+  next: CreativeOptions,
+  t: (key: string) => string
+): string {
+  const labels: string[] = [];
+  if (previous.voiceCharacter && previous.voiceCharacter !== next.voiceCharacter) {
+    labels.push(t("branding.templates.voice"));
+  }
+  if (previous.musicTempo && previous.musicTempo !== next.musicTempo) {
+    labels.push(t("branding.templates.music"));
+  }
+  if (previous.designStyle && previous.designStyle !== next.designStyle) {
+    labels.push(t("branding.templates.visual"));
+  }
+  return labels.join(", ");
 }
 
 function VariationRow({

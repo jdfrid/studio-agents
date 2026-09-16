@@ -5,6 +5,7 @@ import { LandingPage } from "./LandingPage.js";
 import { Dashboard } from "./Dashboard.js";
 import { CreateVideoForm } from "./CreateVideoForm.js";
 import { RunView } from "./RunView.js";
+import { BrandPage } from "./BrandPage.js";
 import { DistributionPage } from "./DistributionPage.js";
 import { AboutPage, ContactPage, LegalPage, PricingPage } from "./SitePages.js";
 import { applySeo, defaultSeo } from "./seo.js";
@@ -31,6 +32,7 @@ type AppView =
   | "create"
   | "run"
   | "distribution"
+  | "brand"
   | "about"
   | "contact"
   | "terms"
@@ -52,7 +54,8 @@ function parseLocation(): AppLocation {
     if (id) return { view: "run", runId: id };
   }
   if (path === "/create") return { view: "create", runId: null, fromRunId };
-  if (path.startsWith("/distribution")) return { view: "distribution", runId: null };
+  if (path === "/brand") return { view: "brand", runId: null };
+  if (path.startsWith("/distribution")) return { view: "distribution", runId: fromRunId };
   if (path === "/about") return { view: "about", runId: null };
   if (path === "/contact") return { view: "contact", runId: null };
   if (path === "/terms") return { view: "terms", runId: null };
@@ -65,7 +68,11 @@ function parseLocation(): AppLocation {
 function pathFor(loc: AppLocation): string {
   if (loc.view === "run" && loc.runId) return `/runs/${loc.runId}`;
   if (loc.view === "create") return loc.fromRunId ? `/create?from=${encodeURIComponent(loc.fromRunId)}` : "/create";
-  if (loc.view === "distribution") return "/distribution";
+  if (loc.view === "brand") return "/brand";
+  if (loc.view === "distribution") {
+    const run = loc.runId ? `?from=${encodeURIComponent(loc.runId)}` : "";
+    return `/distribution${run}`;
+  }
   if (loc.view === "about") return "/about";
   if (loc.view === "contact") return "/contact";
   if (loc.view === "terms") return "/terms";
@@ -233,17 +240,15 @@ function AppShell() {
             <span className="nav-icon" aria-hidden>＋</span>
             <span className="nav-label">{t("shell.newCreation")}</span>
           </button>
-          {user.role === "ADMIN" ? (
-            <button
-              type="button"
-              className={appView === "distribution" ? "nav-active" : ""}
-              aria-label={t("shell.distribute")}
-              onClick={() => navigate({ view: "distribution", runId: null })}
-            >
-              <span className="nav-icon" aria-hidden>↗</span>
-              <span className="nav-label">{t("shell.distribute")}</span>
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className={appView === "brand" ? "nav-active" : ""}
+            aria-label={t("shell.brand")}
+            onClick={() => navigate({ view: "brand", runId: null })}
+          >
+            <span className="nav-icon" aria-hidden>◆</span>
+            <span className="nav-label">{t("shell.brand")}</span>
+          </button>
         </nav>
         <div className="header-user">
           {showWhatsNewReopen ? (
@@ -299,9 +304,13 @@ function AppShell() {
               if (user.canCreateVideo) navigate({ view: "create", runId: null, fromRunId: runId });
             }}
             canRemix={user.canCreateVideo}
+            canDistribute={user.role === "ADMIN"}
+            onDistribute={() => navigate({ view: "distribution", runId: runId })}
+            onOpenRun={(id) => navigate({ view: "run", runId: id })}
           />
         ) : null}
-        {appView === "distribution" && user.role === "ADMIN" ? <DistributionPage /> : null}
+        {appView === "brand" ? <BrandPage /> : null}
+        {appView === "distribution" && user.role === "ADMIN" ? <DistributionPage sourceRunId={runId} /> : null}
       </main>
       <WhatsNewDialog
         open={whatsNewOpen}

@@ -23,7 +23,7 @@ export function VisualCorrectionsPanel({
     scenes?: ScriptScene[];
   };
   runStatus?: string;
-  onSaved: () => void;
+  onSaved: (nextRunId?: string) => void;
 }) {
   const { t, i18n } = useTranslation("run");
   const [open, setOpen] = useState(false);
@@ -60,13 +60,13 @@ export function VisualCorrectionsPanel({
         }))
         .filter((row) => row.visualNotes.length > 0);
 
-      await apiPost<ProjectRunView>(`/runs/${runId}/visual-corrections`, {
+      const view = await apiPost<ProjectRunView>(`/runs/${runId}/visual-corrections`, {
         characterBible: characterBible.trim() || undefined,
         corrections: corrections.trim() || undefined,
         sceneOverrides: overrides.length ? overrides : undefined,
         rerunFrom
       });
-      onSaved();
+      onSaved(view.id !== runId ? view.id : undefined);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -120,7 +120,7 @@ export function VisualCorrectionsPanel({
             </details>
           ) : null}
           {isCompleted ? (
-            <p className="muted">{t("corrections.completedHint", { assetCredits, renderCredits })}</p>
+            <p className="muted">{t("corrections.forkHint", { assetCredits, renderCredits })}</p>
           ) : null}
           {error ? <p className="error-inline">{error}</p> : null}
           <div className="stage-actions">

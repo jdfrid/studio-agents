@@ -83,7 +83,7 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export function DistributionPage() {
+export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null } = {}) {
   const { t } = useTranslation();
   const [networks, setNetworks] = useState<NetworkView[]>([]);
   const [connections, setConnections] = useState<ConnectionView[]>([]);
@@ -98,7 +98,7 @@ export function DistributionPage() {
   const [body, setBody] = useState("");
   const [hashtags, setHashtags] = useState("");
   const [link, setLink] = useState("");
-  const [runId, setRunId] = useState("");
+  const [runId, setRunId] = useState(sourceRunId ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [mode, setMode] = useState<"now" | "schedule" | "draft">("now");
@@ -126,6 +126,10 @@ export function DistributionPage() {
     const telegram = c.find((item) => item.network === "telegram");
     if (telegram) setTelegramConnectionId(telegram.id);
   }, []);
+
+  useEffect(() => {
+    if (sourceRunId) setRunId(sourceRunId);
+  }, [sourceRunId]);
 
   useEffect(() => {
     void refresh().catch((err) => setMessage((err as Error).message));
@@ -268,6 +272,13 @@ export function DistributionPage() {
         <p className="muted">{t("distribution.description")}</p>
       </header>
       {message ? <p className="warn-inline">{message}</p> : null}
+      <ol className="distribution-steps">
+        <li className={connections.length ? "is-done" : "is-active"}>{t("distribution.stepConnect")}</li>
+        <li className={runId ? "is-done" : connections.length ? "is-active" : ""}>{t("distribution.stepVideo")}</li>
+        <li className={previews.length ? "is-done" : runId ? "is-active" : ""}>{t("distribution.stepPreview")}</li>
+        <li>{t("distribution.stepPublish")}</li>
+      </ol>
+      {connections.length === 0 ? <p className="muted">{t("distribution.whereToPublish")}</p> : null}
 
       <section className="panel">
         <h2>{t("distribution.networks")}</h2>
@@ -445,7 +456,11 @@ export function DistributionPage() {
               disabled={!selectedDestinations.length || Boolean(busy)}
               onClick={() => void publish()}
             >
-              {t("distribution.publish")}
+              {selectedDestinations.length === 1
+                ? t("distribution.publishTo", {
+                    target: destinations.find((item) => item.id === selectedDestinations[0])?.name ?? ""
+                  })
+                : t("distribution.publish")}
             </button>
           </div>
         </div>
@@ -465,8 +480,8 @@ export function DistributionPage() {
         ) : null}
       </section>
 
-      <section className="panel">
-        <h2>{t("distribution.automation")}</h2>
+      <details className="panel distribution-automation">
+        <summary><h2>{t("distribution.automation")}</h2></summary>
         <label>
           <input
             type="checkbox"
@@ -495,7 +510,7 @@ export function DistributionPage() {
         >
           {t("distribution.saveRule")}
         </button>
-      </section>
+      </details>
 
       <section className="panel">
         <h2>{t("distribution.jobs")}</h2>

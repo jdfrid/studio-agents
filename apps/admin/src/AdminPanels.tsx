@@ -114,7 +114,8 @@ export function AdminSettingsPanel() {
         geminiImageModel: settings.geminiImageModel,
         geminiMusicModel: settings.geminiMusicModel,
         geminiVideoModel: settings.geminiVideoModel,
-        freeVideosPerUser: settings.freeVideosPerUser
+        freeVideosPerUser: settings.freeVideosPerUser,
+        allowDurationOver30: settings.allowDurationOver30
       });
       setSettings(updated);
       setMessage("נשמר בהצלחה.");
@@ -223,6 +224,18 @@ export function AdminSettingsPanel() {
         </small>
       </label>
 
+      <label>
+        <input
+          type="checkbox"
+          checked={Boolean(settings.allowDurationOver30)}
+          onChange={(e) => setSettings({ ...settings, allowDurationOver30: e.target.checked })}
+        />
+        אפשר סרטונים ארוכים מ־30 שניות
+        <small className="muted">
+          כבוי כברירת מחדל. כשזה פעיל, ביצירה יופיעו 45 ו־60 שניות ומשך מותאם אישית עד 180 שניות.
+        </small>
+      </label>
+
       <div className="stage-actions">
         <button type="button" className="primary" disabled={busy} onClick={() => void save()}>
           {busy ? "שומר…" : "שמור הגדרות"}
@@ -253,6 +266,7 @@ type PlatformSettingsView = {
   geminiMusicModel: string | null;
   geminiVideoModel: string | null;
   freeVideosPerUser: number;
+  allowDurationOver30: boolean;
   updatedAt: string;
 };
 

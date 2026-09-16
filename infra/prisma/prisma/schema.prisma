@@ -573,6 +573,7 @@ model PlatformSettings {
   geminiMusicModel     String?
   geminiVideoModel     String?
   freeVideosPerUser    Int      @default(0)
+  allowDurationOver30  Boolean  @default(false)
   updatedAt            DateTime @updatedAt
 }
 

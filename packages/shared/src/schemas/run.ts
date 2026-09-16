@@ -32,13 +32,15 @@ export const ProjectRunViewSchema = z.object({
   currentStage: StageNameSchema.nullable(),
   brief: BriefInputSchema,
   approvalMode: ApprovalModeSchema.optional(),
+  parentRunId: z.string().nullable().optional(),
+  isCorrectionRun: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   stages: z.array(StageExecutionViewSchema)
 });
 export type ProjectRunView = z.infer<typeof ProjectRunViewSchema>;
 
-/** Per-stage policy when approvalMode is manual (or auto_until_render before render). */
+/** Per-stage policy when approvalMode is manual. */
 export const STAGE_REQUIRES_APPROVAL: Record<string, boolean> = {
   brief: true,
   script: true,
@@ -55,8 +57,8 @@ export function stageRequiresApproval(
 ): boolean {
   if (approvalMode === "auto") return false;
   if (approvalMode === "auto_until_render") {
-    if (stage === "render" || stage === "series") return true;
-    return false;
+    // Proposal-first: pause after script so the user can review scenes before production.
+    return stage === "script";
   }
   return STAGE_REQUIRES_APPROVAL[stage] === true;
 }

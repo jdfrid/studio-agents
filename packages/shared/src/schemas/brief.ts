@@ -82,7 +82,7 @@ export const BriefInputSchema = z.object({
   budgetMode: z.boolean().default(false),
   /** Video render profile (provider + strategy). Falls back to RENDER_PROFILE env. */
   renderProfile: RenderProfileIdSchema.optional(),
-  /** Pipeline approval: manual stops at each gate; auto runs all; auto_until_render pauses before render. */
+  /** Pipeline approval: manual stops at each gate; auto runs all; auto_until_render pauses after script (proposal review). */
   approvalMode: z.enum(["manual", "auto", "auto_until_render"]).default("auto"),
   /** Optional advanced creative controls from the user form. */
   creative: CreativeOptionsSchema.optional(),

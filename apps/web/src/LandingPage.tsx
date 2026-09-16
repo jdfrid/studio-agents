@@ -31,6 +31,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
                 {t("landing.discover")}
               </a>
             </div>
+            <p className="muted landing-auth-hint">{t("landing.firstVideoHint")}</p>
             <ul className="landing-assurances" aria-label={t("landing.benefitsLabel")}>
               <li>
                 <span aria-hidden>✓</span> {t("landing.guided")}
@@ -225,6 +226,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
               {t("landing.firstVideo")}
               <span aria-hidden>{arrow}</span>
             </button>
+            <p className="muted landing-auth-hint">{t("landing.firstVideoHint")}</p>
             <button type="button" className="button-secondary" onClick={() => onNavigate("/pricing")}>
               {t("landing.close.pricing")}
             </button>

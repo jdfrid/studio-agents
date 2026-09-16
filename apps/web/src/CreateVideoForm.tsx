@@ -8,8 +8,17 @@ import { localeFor } from "./i18n/index.js";
 import type { ProjectRunView } from "./types.js";
 import { BrandTemplatePanel } from "./BrandTemplatePanel.js";
 import { CameraCaptureButton, useIsMobileDevice } from "./CameraCaptureButton.js";
+import { VoicePicker } from "./VoicePreview.js";
+import {
+  readStoredContentLanguage,
+  storeContentLanguage,
+  suggestGoalFromPrompt,
+  suggestTitleFromPrompt
+} from "./suggestBrief.js";
 import {
   CREATIVE_FIELD_SECTIONS,
+  durationOptionsFor,
+  clampVideoDurationSeconds,
   aspectRatioFromCreative,
   contrastTextHex,
   estimateRunCost,
@@ -72,6 +81,9 @@ export function CreateVideoForm({
   const { user } = useAuth();
   const isMobile = useIsMobileDevice();
   const freeLeft = user?.freeVideosRemaining ?? 0;
+  const allowDurationOver30 = user?.allowDurationOver30 === true;
+  const durationOptions = durationOptionsFor(allowDurationOver30);
+  const maxDuration = allowDurationOver30 ? 180 : 30;
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -104,12 +116,17 @@ export function CreateVideoForm({
   const [brandingOpen, setBrandingOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [showExclusions, setShowExclusions] = useState(false);
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [goalTouched, setGoalTouched] = useState(false);
+  const [adjustmentsOpen, setAdjustmentsOpen] = useState(false);
+  const [lockedCreativeKeys, setLockedCreativeKeys] = useState<string[]>([]);
+  const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
-  const [creative, setCreative] = useState<CreativeOptions>({
+  const [creative, setCreative] = useState<CreativeOptions>(() => ({
     karaokeCaptions: "on",
     preferHeygenDub: "off",
-    language: "en"
-  });
+    language: readStoredContentLanguage(uiLocale === "he" ? "he" : "en")
+  }));
   const [catalogSelections, setCatalogSelections] = useState<Record<string, string | number>>({});
   const [keptAttachments, setKeptAttachments] = useState<RemixKeptAttachment[]>([]);
   const [remixSourceTitle, setRemixSourceTitle] = useState("");
@@ -269,6 +286,8 @@ export function CreateVideoForm({
         setBrandTemplateId(form.brandTemplateId);
         setKeptAttachments(form.keptAttachments);
         setRemixSourceTitle(run.brief.title);
+        setTitleTouched(true);
+        setGoalTouched(true);
         if (form.businessName || form.brandTemplateId) setBrandingOpen(true);
         if (remixHasAdvancedCreative(form.creative)) setAdvancedOpen(true);
         const keptInsert = form.keptAttachments.find((item) => item.role === "insert_clip");
@@ -285,6 +304,7 @@ export function CreateVideoForm({
 
   useEffect(() => {
     if (sourceRunId) return;
+    setDraftStatus("saving");
     const timer = window.setTimeout(() => {
       const draft = {
         title,
@@ -309,8 +329,13 @@ export function CreateVideoForm({
         secondaryColor,
         brandTemplateId
       };
-      window.localStorage.setItem("prompt2spot:create-draft", JSON.stringify(draft));
-      setDraftSavedAt(new Date());
+      try {
+        window.localStorage.setItem("prompt2spot:create-draft", JSON.stringify(draft));
+        setDraftSavedAt(new Date());
+        setDraftStatus("saved");
+      } catch {
+        setDraftStatus("failed");
+      }
     }, 700);
     return () => window.clearTimeout(timer);
   }, [
@@ -338,6 +363,26 @@ export function CreateVideoForm({
     brandTemplateId
   ]);
 
+  useEffect(() => {
+    if (sourceRunId) return;
+    if (!titleTouched) {
+      const suggested = suggestTitleFromPrompt(prompt);
+      if (suggested) setTitle(suggested);
+    }
+    if (!goalTouched && prompt.trim().length > 12) {
+      setVideoGoal(suggestGoalFromPrompt(prompt));
+    }
+  }, [prompt, sourceRunId, titleTouched, goalTouched]);
+
+  useEffect(() => {
+    const language = languageCodeFromCreative(creative);
+    if (language) storeContentLanguage(language);
+  }, [creative.language]);
+
+  useEffect(() => {
+    setDurationSeconds((current) => clampVideoDurationSeconds(current, allowDurationOver30));
+  }, [allowDurationOver30]);
+
   const previewAspect = aspectRatioFromCreative(creative) ?? "9:16";
   const previewLogoSrc = logoPreviewUrl || templateLogoUrl;
   const previewBg = normalizeHexColor(secondaryColor) ?? "";
@@ -354,12 +399,23 @@ export function CreateVideoForm({
     if (template.websiteUrl?.trim()) setWebsiteUrl(template.websiteUrl.trim());
     if (template.primaryColor) setPrimaryColor(template.primaryColor);
     if (template.secondaryColor) setSecondaryColor(template.secondaryColor);
-    if (template.durationSeconds) setDurationSeconds(template.durationSeconds);
+    if (template.durationSeconds) {
+      setDurationSeconds(clampVideoDurationSeconds(template.durationSeconds, allowDurationOver30));
+    }
     if (template.platform) setPlatform(template.platform);
     if (template.filmTemplate === "product_demo") setVideoGoal("product");
     setTemplateLogoUrl(template.logoUrl ?? null);
     if (template.logoUrl) setLogoFile(null);
-    setCreative((previous) => ({ ...previous, ...varied }));
+    setCreative((previous) => {
+      const next = { ...previous, ...varied };
+      for (const key of lockedCreativeKeys) {
+        const value = previous[key as keyof CreativeOptions];
+        if (value != null && value !== "") {
+          (next as Record<string, unknown>)[key] = value;
+        }
+      }
+      return next;
+    });
     setBrandingOpen(true);
   }
 
@@ -440,6 +496,7 @@ export function CreateVideoForm({
   }
 
   function setCreativeField<K extends keyof CreativeOptions>(key: K, value: CreativeOptions[K] | "") {
+    setLockedCreativeKeys((current) => (current.includes(String(key)) ? current : [...current, String(key)]));
     setCreative((prev) => {
       const next = { ...prev };
       if (value === "" || value == null) {
@@ -460,11 +517,12 @@ export function CreateVideoForm({
   }
 
   async function submit() {
+    if (busy) return;
     if (!enoughCredits) {
       setError(t("validation.noCredits"));
       return;
     }
-    if (!title.trim() || !prompt.trim() || !videoGoal) {
+    if (!prompt.trim()) {
       setError(t("validation.required"));
       return;
     }
@@ -662,12 +720,14 @@ export function CreateVideoForm({
               ...(secondaryHex ? { secondaryColor: secondaryHex } : {})
             }
           : undefined;
+      const resolvedTitle = title.trim() || suggestTitleFromPrompt(prompt) || t("summary.untitled");
+      const resolvedGoal = videoGoal || suggestGoalFromPrompt(prompt);
       const run = await apiPost<ProjectRunView>("/runs", {
         ...(sourceRunId ? { parentRunId: sourceRunId } : {}),
         brief: {
-          title,
+          title: resolvedTitle,
           sourceText: [
-            videoGoal ? contentT("brief.goal", { value: contentT(`goals.${videoGoal}`) }) : "",
+            resolvedGoal ? contentT("brief.goal", { value: contentT(`goals.${resolvedGoal}`) }) : "",
             prompt.trim(),
             desiredAction ? contentT("brief.action", { value: contentT(`actions.${desiredAction}`) }) : "",
             moods.length ? contentT("brief.mood", { value: moods.map((mood) => contentT(`moods.${mood}`)).join(", ") }) : "",
@@ -693,7 +753,7 @@ export function CreateVideoForm({
             : {}),
           ...(targetAudience.trim() ? { targetAudience: targetAudience.trim() } : {}),
           language: languageCodeFromCreative(creativeWithBasics) ?? "en",
-          durationSeconds,
+          durationSeconds: clampVideoDurationSeconds(durationSeconds, allowDurationOver30),
           aspectRatio: aspectRatioFromCreative(creativeWithBasics) ?? "9:16",
           budgetMode: true,
           approvalMode,
@@ -806,12 +866,8 @@ export function CreateVideoForm({
       ]
     }
   ];
-  const requiredMissing = [
-    !title.trim() ? t("summary.titleField") : "",
-    !videoGoal ? t("summary.goalField") : "",
-    !prompt.trim() ? t("summary.descriptionField") : ""
-  ].filter(Boolean);
-  const requiredComplete = 3 - requiredMissing.length;
+  const requiredMissing = [!prompt.trim() ? t("summary.descriptionField") : ""].filter(Boolean);
+  const requiredComplete = requiredMissing.length ? 0 : 1;
   const estimatedMinutesMin = Math.max(4, Math.ceil(durationSeconds / 15) * 2);
   const estimatedMinutesMax = estimatedMinutesMin + 4;
   const materialCount =
@@ -827,7 +883,7 @@ export function CreateVideoForm({
   const isRemix = Boolean(sourceRunId);
 
   return (
-    <div className="create-form" dir={i18n.dir()}>
+    <div className={`create-form${adjustmentsOpen ? " adjustments-open" : ""}`} dir={i18n.dir()}>
       <header className="create-page-header">
         <button type="button" className="button-secondary back-button" onClick={onCancel}>
           <span aria-hidden>{i18n.dir() === "rtl" ? "→" : "←"}</span>
@@ -838,7 +894,15 @@ export function CreateVideoForm({
           <h1>{isRemix ? t("create.remixTitle") : t("create.title")}</h1>
           <p className="muted">{isRemix ? t("create.remixSubtitle") : t("create.subtitle")}</p>
           {isRemix ? null : (
-            <small className="draft-status">{draftSavedAt ? t("create.draftSaved") : t("create.draftActive")}</small>
+            <small className="draft-status" aria-live="polite">
+              {draftStatus === "saving"
+                ? t("create.draftSaving")
+                : draftStatus === "failed"
+                  ? t("create.draftFailed")
+                  : draftSavedAt
+                    ? t("create.draftSaved")
+                    : t("create.draftActive")}
+            </small>
           )}
         </div>
       </header>
@@ -874,49 +938,132 @@ export function CreateVideoForm({
         </div>
 
         <label className="field-block">
-          {t("details.title")} <span className="required-mark">{t("common.required")}</span>
+          {t("details.promptLabel")} <span className="required-mark">{t("common.required")}</span>
+          <textarea
+            rows={6}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder={t("details.promptExample")}
+          />
+        </label>
+
+        <div className="quick-choice-row" aria-label={t("quick.language")}>
+          <fieldset className="choice-fieldset">
+            <legend>{t("quick.language")}</legend>
+            <div className="choice-chips">
+              {CONTENT_LANGUAGES.map(([value, labelKey]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={String(creative.language ?? "en") === value ? "is-selected" : ""}
+                  onClick={() => setCreativeField("language", value as never)}
+                >
+                  {t(`languages.${labelKey}`)}
+                </button>
+              ))}
+            </div>
+            <small className="field-help">{t("basic.contentLanguageHelp")}</small>
+          </fieldset>
+          <fieldset className="choice-fieldset">
+            <legend>{t("quick.format")}</legend>
+            <div className="choice-chips">
+              <button
+                type="button"
+                className={previewAspect !== "16:9" ? "is-selected" : ""}
+                onClick={() => {
+                  setPlatform("instagram_reels");
+                  setCreativeField("videoOrientation", "portrait");
+                }}
+              >
+                {t("quick.portrait")}
+              </button>
+              <button
+                type="button"
+                className={previewAspect === "16:9" ? "is-selected" : ""}
+                onClick={() => {
+                  setPlatform("youtube");
+                  setCreativeField("videoOrientation", "landscape");
+                }}
+              >
+                {t("quick.landscape")}
+              </button>
+            </div>
+          </fieldset>
+        </div>
+
+        <fieldset className="choice-fieldset duration-picker">
+          <legend>{t("basic.duration")}</legend>
+          <div className="choice-chips">
+            {[...durationOptions].map((seconds) => (
+              <button
+                key={seconds}
+                type="button"
+                className={durationSeconds === seconds ? "is-selected" : ""}
+                onClick={() => setDurationSeconds(seconds)}
+              >
+                {t("quick.duration", { count: seconds })} {seconds === 30 ? <small>{t("common.recommended")}</small> : null}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        {brandTemplateId ? <p className="brand-template-run-hint">{t("branding.templates.productHint")}</p> : null}
+
+        <label className="field-block">
+          {t("details.title")}
           <input
             value={title}
             maxLength={200}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitleTouched(true);
+              setTitle(e.target.value);
+            }}
             placeholder={t("details.titlePlaceholder")}
           />
-          {title.length > 170 ? <small className="field-counter">{title.length}/200</small> : null}
+          <small className="field-help">{t("details.titleHelp")}</small>
         </label>
-        {brandTemplateId ? <p className="brand-template-run-hint">{t("branding.templates.productHint")}</p> : null}
 
         <fieldset className="choice-fieldset">
-          <legend>{t("details.goal")} <span className="required-mark">{t("common.required")}</span></legend>
+          <legend>{t("details.goal")}</legend>
           <div className="choice-chips">
             {VIDEO_GOALS.map((goal) => (
               <button
                 key={goal}
                 type="button"
                 className={videoGoal === goal ? "is-selected" : ""}
-                onClick={() => setVideoGoal(goal)}
+                onClick={() => {
+                  setGoalTouched(true);
+                  setVideoGoal(goal);
+                }}
               >
                 {t(`goals.${goal}`)}
               </button>
             ))}
           </div>
+          <small className="field-help">{t("details.goalHelp")}</small>
         </fieldset>
 
-        <label className="field-block">
-          {t("details.subject")} <span className="required-mark">{t("common.required")}</span>
-          <textarea
-            rows={6}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder={
-              videoGoal === "product"
-                ? t("details.subjectProduct")
-                : videoGoal === "service"
-                  ? t("details.subjectService")
-                  : t("details.subjectDefault")
-            }
-          />
-        </label>
+        <p className="active-settings-summary">
+          {t(`languages.${CONTENT_LANGUAGES.find(([value]) => value === String(creative.language ?? "en"))?.[1] ?? "English"}`)}
+          {" · "}
+          {previewAspect === "16:9" ? t("quick.landscape") : t("quick.portrait")}
+          {" · "}
+          {t("quick.duration", { count: durationSeconds })}
+          {" · "}
+          {t("quick.summaryVoiceMusic")}
+          {lockedCreativeKeys.length ? <span className="origin-tag">{t("quick.customized")}</span> : null}
+        </p>
+        <button type="button" className="button-secondary adjustments-open-btn" onClick={() => setAdjustmentsOpen(true)}>
+          {t("quick.moreAdjustments")}
+        </button>
 
+        <div className={`create-adjustments-sheet${adjustmentsOpen ? " is-open" : ""}`}>
+          <header className="adjustments-sheet-header">
+            <h2>{t("quick.moreAdjustments")}</h2>
+            <button type="button" className="button-secondary" onClick={() => setAdjustmentsOpen(false)}>
+              {t("quick.closeAdjustments")}
+            </button>
+          </header>
         <div className="common-fields-grid">
           <label className="field-block">
             {t("details.audience")} <span className="optional-mark">{t("common.optional")}</span>
@@ -978,6 +1125,7 @@ export function CreateVideoForm({
             />
           </label>
         ) : null}
+        </div>
       </section>
       <section className="create-topic-card materials-section" aria-labelledby="materials-heading">
         <div className="form-section-heading">
@@ -1205,7 +1353,7 @@ export function CreateVideoForm({
           </div>
         </details>
       </section>
-      <section className="create-topic-card basic-settings-section" aria-labelledby="basic-settings-heading">
+      <section className="create-topic-card basic-settings-section adjustments-only" aria-labelledby="basic-settings-heading">
         <div className="form-section-heading">
           <span className="form-section-icon" aria-hidden>◎</span>
           <div>
@@ -1216,7 +1364,7 @@ export function CreateVideoForm({
         <fieldset className="choice-fieldset duration-picker">
           <legend>{t("basic.duration")}</legend>
           <div className="choice-chips">
-            {[15, 30, 45, 60].map((seconds) => (
+            {[...durationOptions].map((seconds) => (
               <button
                 key={seconds}
                 type="button"
@@ -1226,16 +1374,18 @@ export function CreateVideoForm({
                 {t("common.secondsShort", { count: seconds })} {seconds === 30 ? <small>{t("common.recommended")}</small> : null}
               </button>
             ))}
-            <label className={![15, 30, 45, 60].includes(durationSeconds) ? "custom-duration is-selected" : "custom-duration"}>
+            {allowDurationOver30 ? (
+            <label className={!durationOptions.includes(durationSeconds) ? "custom-duration is-selected" : "custom-duration"}>
               {t("common.custom")}
               <input
                 type="number"
                 min={5}
-                max={180}
+                max={maxDuration}
                 value={durationSeconds}
-                onChange={(e) => setDurationSeconds(Math.min(180, Math.max(5, Number(e.target.value) || 30)))}
+                onChange={(e) => setDurationSeconds(clampVideoDurationSeconds(Number(e.target.value) || 30, true))}
               />
             </label>
+            ) : null}
           </div>
           <small className="field-help">{t("basic.durationHelp")}</small>
         </fieldset>
@@ -1338,7 +1488,7 @@ export function CreateVideoForm({
       </section>
 
       <details
-        className="branding-section optional-disclosure"
+        className="branding-section optional-disclosure adjustments-only"
         open={brandingOpen}
         onToggle={(event) => setBrandingOpen((event.currentTarget as HTMLDetailsElement).open)}
       >
@@ -1373,6 +1523,7 @@ export function CreateVideoForm({
           onHydrateLogo={(template) => {
             if (!logoFile) setTemplateLogoUrl(template.logoUrl ?? null);
           }}
+          lockedCreativeKeys={lockedCreativeKeys}
         />
         <label>
           {t("branding.businessName")}
@@ -1482,7 +1633,7 @@ export function CreateVideoForm({
       </details>
 
       <details
-        className="advanced-disclosure"
+        className="advanced-disclosure adjustments-only"
         open={advancedOpen}
         onToggle={(event) => setAdvancedOpen((event.currentTarget as HTMLDetailsElement).open)}
       >
@@ -1582,39 +1733,76 @@ export function CreateVideoForm({
                 <span aria-hidden>⌄</span>
               </summary>
               <div className="advanced-grid">
-                {group.fields.map((field) => (
-                  <label key={`${group.id}-${field.key}`}>
-                    {field.labelHe}
-                    {field.kind === "number" ? (
-                      <input
-                        type="number"
-                        min={field.min}
-                        max={field.max}
-                        step={field.step ?? 1}
-                        value={creative[field.key] == null ? "" : String(creative[field.key])}
-                        onChange={(event) => {
-                          const raw = event.target.value;
-                          setCreativeField(field.key, raw ? (Number(raw) as never) : "");
-                        }}
-                      />
-                    ) : (
-                      <select
-                        value={String(creative[field.key] ?? "")}
-                        onChange={(event) => setCreativeField(field.key, (event.target.value || "") as never)}
-                      >
-                        <option value="">{t("advanced.auto")}</option>
-                        {(field.options ?? []).map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.labelHe}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </label>
-                ))}
+                {group.id === "voice" && narrationMode === "none" ? (
+                  <p className="muted accordion-note">{t("voice.noneHides")}</p>
+                ) : (
+                  group.fields.map((field) => {
+                    if (group.id === "voice" && field.key === "voiceCharacter") {
+                      return (
+                        <div key={`${group.id}-${field.key}`} className="voice-field">
+                          <span>
+                            {field.labelHe}
+                            {brandTemplateId ? <small className="origin-tag">{t("origin.brand")}</small> : null}
+                            {lockedCreativeKeys.includes("voiceCharacter") ? (
+                              <small className="origin-tag">{t("origin.project")}</small>
+                            ) : null}
+                          </span>
+                          <VoicePicker
+                            value={String(creative.voiceCharacter ?? "")}
+                            language={String(creative.language ?? "he")}
+                            disabled={busy}
+                            onChange={(id) => setCreativeField("voiceCharacter", id)}
+                          />
+                        </div>
+                      );
+                    }
+                    if (
+                      group.id === "voice" &&
+                      (field.key === "accent" || field.key === "speechStyle" || field.key === "speechSpeed") &&
+                      !creative.voiceCharacter
+                    ) {
+                      return null;
+                    }
+                    return (
+                      <label key={`${group.id}-${field.key}`}>
+                        {field.labelHe}
+                        {lockedCreativeKeys.includes(String(field.key)) ? (
+                          <small className="origin-tag">{t("origin.project")}</small>
+                        ) : brandTemplateId ? (
+                          <small className="origin-tag">{t("origin.brand")}</small>
+                        ) : null}
+                        {field.kind === "number" ? (
+                          <input
+                            type="number"
+                            min={field.min}
+                            max={field.max}
+                            step={field.step ?? 1}
+                            value={creative[field.key] == null ? "" : String(creative[field.key])}
+                            onChange={(event) => {
+                              const raw = event.target.value;
+                              setCreativeField(field.key, raw ? (Number(raw) as never) : "");
+                            }}
+                          />
+                        ) : (
+                          <select
+                            value={String(creative[field.key] ?? "")}
+                            onChange={(event) => setCreativeField(field.key, (event.target.value || "") as never)}
+                          >
+                            <option value="">{t("advanced.auto")}</option>
+                            {(field.options ?? []).map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.labelHe}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </label>
+                    );
+                  })
+                )}
                 {group.id === "voice" && (narrationMode === "lip_sync" || visualFiles.length > 0) ? (
                   <p className={heygenNeedsAnchor ? "error-inline accordion-note" : "muted accordion-note"}>
-                    {t("advanced.lipSyncHelp", { extra: CREDIT_LIP_SYNC_SURCHARGE, total: CREDIT_NEW_VIDEO + CREDIT_LIP_SYNC_SURCHARGE })}
+                    {t("voice.lipSyncLabel")} · {t("credits.lipSyncSurcharge", { extra: CREDIT_LIP_SYNC_SURCHARGE, total: CREDIT_NEW_VIDEO + CREDIT_LIP_SYNC_SURCHARGE })}
                   </p>
                 ) : null}
               </div>
@@ -1682,9 +1870,9 @@ export function CreateVideoForm({
             </strong>
           </span>
           <span><small>{t("summary.time")}</small><strong>{t("summary.minutes", { min: estimatedMinutesMin, max: estimatedMinutesMax })}</strong></span>
-          <span className={requiredComplete === 3 ? "is-ready" : ""}>
+          <span className={requiredComplete === 1 ? "is-ready" : ""}>
             <small>{t("summary.status")}</small>
-            <strong>{requiredComplete === 3 ? t("summary.ready") : t("summary.missing", { fields: requiredMissing.join(", ") })}</strong>
+            <strong>{requiredComplete === 1 ? t("summary.ready") : t("summary.missing", { fields: requiredMissing.join(", ") })}</strong>
           </span>
         </div>
         <div className="creation-summary-actions">
@@ -1705,15 +1893,19 @@ export function CreateVideoForm({
           disabled={
             busy ||
             !enoughCredits ||
-            !title.trim() ||
             !prompt.trim() ||
-            !videoGoal ||
             (!!voiceFile && !voiceConsent) ||
             heygenNeedsAnchor
           }
           onClick={() => void submit()}
         >
-          {busy ? (isRemix ? t("summary.creatingRemix") : t("summary.creating")) : isRemix ? t("summary.createRemix") : t("summary.create")}
+          {busy
+            ? (isRemix ? t("summary.creatingRemix") : t("summary.creating"))
+            : isRemix
+              ? t("summary.createRemix")
+              : approvalMode === "auto"
+                ? t("summary.createAuto")
+                : t("summary.create")}
           {!busy ? <span aria-hidden>{i18n.dir() === "rtl" ? "←" : "→"}</span> : null}
         </button>
         </div>

@@ -199,19 +199,76 @@ export async function updateStageOutput(
   return getRun(runId);
 }
 
+async function cloneRunForCorrection(sourceId: string): Promise<string> {
+  const source = await prisma.projectRun.findUnique({
+    where: { id: sourceId },
+    include: { stages: true, artifacts: true }
+  });
+  if (!source) throw new Error("run_not_found");
+
+  const child = await prisma.projectRun.create({
+    data: {
+      tenantId: source.tenantId,
+      userId: source.userId,
+      status: source.status,
+      currentStage: source.currentStage,
+      brief: source.brief as Prisma.InputJsonValue,
+      approvalMode: source.approvalMode,
+      isCorrectionRun: true,
+      parentRunId: source.id,
+      stages: {
+        create: source.stages.map((stage) => ({
+          stage: stage.stage,
+          status: stage.status,
+          attempts: 0,
+          input: (stage.input ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+          output: (stage.output ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+          startedAt: stage.startedAt,
+          completedAt: stage.completedAt
+        }))
+      }
+    }
+  });
+
+  if (source.artifacts.length) {
+    await prisma.artifact.createMany({
+      data: source.artifacts.map((artifact) => ({
+        runId: child.id,
+        stage: artifact.stage,
+        kind: artifact.kind,
+        gcsPath: artifact.gcsPath,
+        mimeType: artifact.mimeType,
+        sizeBytes: artifact.sizeBytes,
+        metadata: artifact.metadata as Prisma.InputJsonValue
+      }))
+    });
+  }
+
+  await audit(source.tenantId, "run_correction_forked", "ProjectRun", child.id, {
+    parentRunId: source.id
+  });
+  return child.id;
+}
+
 /**
  * Persist visual correction notes on the script, then optionally re-run asset/render
  * without wiping audio (previous bug: invalidating from script cleared voice clips).
+ * Significant corrections on a completed video fork a child run so the original file stays available.
  */
 export async function applyVisualCorrectionsToRun(
   runId: string,
   body: unknown,
-  userId?: string
+  userId?: string,
+  options?: { alreadyForked?: boolean }
 ): Promise<ProjectRunView | null> {
   const input = VisualCorrectionsRequestSchema.parse(body);
   const run = await prisma.projectRun.findUnique({ where: { id: runId }, include: { stages: true } });
   if (!run) return null;
   if (userId && run.userId && run.userId !== userId) return null;
+  if (run.status === "COMPLETED" && input.rerunFrom && !options?.alreadyForked) {
+    const childId = await cloneRunForCorrection(runId);
+    return applyVisualCorrectionsToRun(childId, input, userId, { alreadyForked: true });
+  }
   const scriptRow = run.stages.find((s) => fromPrismaStage(s.stage) === "script");
   if (!scriptRow?.output) throw new Error("שלב התסריט עדיין לא הושלם — לא ניתן להחיל תיקונים");
 
@@ -699,6 +756,8 @@ function toView(run: {
     currentStage: run.currentStage ? (fromPrismaStage(run.currentStage as any) as StageName) : null,
     brief: BriefInputSchema.parse(run.brief),
     approvalMode: (run.approvalMode as ApprovalMode) ?? undefined,
+    parentRunId: "parentRunId" in run ? ((run as { parentRunId?: string | null }).parentRunId ?? null) : null,
+    isCorrectionRun: "isCorrectionRun" in run ? Boolean((run as { isCorrectionRun?: boolean }).isCorrectionRun) : false,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
     stages: run.stages.map((s) => ({

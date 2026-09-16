@@ -389,7 +389,7 @@ function FreshSignedMedia({
   );
 }
 
-function SignedMedia({
+export function SignedMedia({
   label,
   url,
   mimeType,
@@ -400,11 +400,37 @@ function SignedMedia({
   mimeType: string;
   onError?: () => void;
 }) {
+  const { t } = useTranslation("run");
+  const [failed, setFailed] = useState(false);
+
+  function handleError() {
+    setFailed(true);
+    onError?.();
+  }
+
+  if (failed) {
+    return (
+      <div className="media-unavailable" role="alert">
+        <p>{t("outputs.playbackFailed")}</p>
+        <button
+          type="button"
+          className="button-secondary"
+          onClick={() => {
+            setFailed(false);
+            onError?.();
+          }}
+        >
+          {t("outputs.retryPlayback")}
+        </button>
+      </div>
+    );
+  }
+
   if (mimeType.startsWith("video/")) {
     return (
-      <figure className="media-preview">
+      <figure className="media-preview media-preview-hero">
         <figcaption>{label}</figcaption>
-        <video controls src={url} onError={onError} />
+        <video controls playsInline src={url} onError={handleError} />
       </figure>
     );
   }
@@ -412,14 +438,14 @@ function SignedMedia({
     return (
       <figure className="media-preview">
         <figcaption>{label}</figcaption>
-        <audio controls src={url} onError={onError} />
+        <audio controls src={url} onError={handleError} />
       </figure>
     );
   }
   return (
     <figure className="media-preview">
       <figcaption>{label}</figcaption>
-      <img src={url} alt={label} loading="lazy" onError={onError} />
+      <img src={url} alt={label} loading="lazy" onError={handleError} />
     </figure>
   );
 }

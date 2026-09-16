@@ -1,6 +1,6 @@
 import { prisma } from "@studio/infra-prisma";
 import type { UserView } from "@studio/shared";
-import { getCreateVideoEligibility } from "@studio/billing";
+import { getCreateVideoEligibility, getPlatformSettingsSync } from "@studio/billing";
 import { adminEmails } from "./jwt.js";
 
 export interface GoogleProfile {
@@ -87,6 +87,7 @@ function toUserView(user: {
     freeVideosRemaining: 0,
     canCreateVideo: false,
     billingConfigured: false,
+    allowDurationOver30: false,
     subscription: user.subscription
       ? {
           planType: user.subscription.planType,
@@ -107,6 +108,7 @@ export async function getUserViewWithCredits(userId: string): Promise<UserView |
     credits: eligibility.credits,
     freeVideosRemaining: eligibility.freeVideosRemaining,
     canCreateVideo: eligibility.canCreateVideo,
-    billingConfigured: eligibility.billingConfigured
+    billingConfigured: eligibility.billingConfigured,
+    allowDurationOver30: getPlatformSettingsSync().allowDurationOver30
   };
 }

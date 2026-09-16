@@ -12,7 +12,9 @@ export const BrandVariationPolicySchema = z
   .object({
     music: VariationModeSchema.default("vary"),
     voice: VariationModeSchema.default("vary"),
-    visual: VariationModeSchema.default("vary")
+    visual: VariationModeSchema.default("vary"),
+    /** Creative keys the user locked; applying a template must not overwrite them. */
+    lockedCreativeKeys: z.array(z.string().trim().min(1).max(80)).max(40).optional()
   })
   .strict();
 export type BrandVariationPolicy = z.infer<typeof BrandVariationPolicySchema>;
@@ -190,7 +192,8 @@ export function contrastTextHex(background?: string | null): string {
 
 export function applyBrandVariation(
   template: Pick<BrandTemplateView, "variationPolicy" | "defaultCreative" | "filmTemplate" | "primaryColor">,
-  random: () => number = Math.random
+  random: () => number = Math.random,
+  options?: { preserve?: Partial<CreativeOptions>; preserveKeys?: string[] }
 ): CreativeOptions {
   const locked = template.defaultCreative ?? {};
   const policy = template.variationPolicy;
@@ -213,6 +216,18 @@ export function applyBrandVariation(
     if (locked.designStyle) next.designStyle = locked.designStyle;
   } else {
     next.designStyle = pickOne(VARY_VISUAL, random);
+  }
+
+  const preserveKeys = new Set([
+    ...(policy.lockedCreativeKeys ?? []),
+    ...(options?.preserveKeys ?? [])
+  ]);
+  const preserve = options?.preserve ?? {};
+  for (const key of preserveKeys) {
+    const value = preserve[key as keyof CreativeOptions];
+    if (value != null && value !== "") {
+      (next as Record<string, unknown>)[key] = value;
+    }
   }
   return next;
 }
@@ -263,7 +278,7 @@ export function applyBrandTemplateToBrief(
   const varied =
     options?.applyVariation === false
       ? (template.defaultCreative ?? {})
-      : applyBrandVariation(template, options?.random);
+      : applyBrandVariation(template, options?.random, { preserve: brief.creative });
   const creative: CreativeOptions = {
     ...varied,
     ...(brief.creative ?? {})

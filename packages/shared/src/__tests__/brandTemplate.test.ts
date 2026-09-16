@@ -23,7 +23,7 @@ const template = (): BrandTemplateView => ({
   filmTemplate: "product_demo",
   durationSeconds: 30,
   platform: "instagram_reels",
-  variationPolicy: { music: "vary", voice: "vary", visual: "lock" },
+  variationPolicy: { music: "vary", voice: "vary", visual: "lock", lockedCreativeKeys: [] },
   defaultCreative: { designStyle: "יוקרתי", voiceCharacter: "female_warm" },
   logoGcsPath: "tenants/t1/brand-templates/tmpl_1/logo.png",
   logoName: "logo.png",
@@ -59,6 +59,15 @@ describe("brand templates", () => {
     expect(creative.voiceCharacter).toBeTruthy();
     expect(creative.filmTemplate).toBe("product_demo");
     expect(creative.colorPalette).toBe("צבעי מותג");
+  });
+
+  it("does not overwrite user-locked creative keys when applying a template", () => {
+    const creative = applyBrandVariation(template(), () => 0, {
+      preserve: { voiceCharacter: "male_news", designStyle: "יוקרתי" },
+      preserveKeys: ["voiceCharacter"]
+    });
+    expect(creative.voiceCharacter).toBe("male_news");
+    expect(creative.designStyle).toBe("יוקרתי");
   });
 
   it("hydrates branding, logo, and constraints without replacing the product story", () => {

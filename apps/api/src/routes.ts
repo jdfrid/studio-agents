@@ -54,10 +54,11 @@ import {
   updateCreativeField,
   updateCreativeOption
 } from "@studio/infra-prisma";
-import { checkGeminiCapabilities, geminiModels, gcsClient } from "@studio/providers";
+import { checkGeminiCapabilities, geminiModels, geminiSynthesizeSpeech, gcsClient } from "@studio/providers";
 import {
   buildProductionCostConfig,
   estimateRunCost,
+  geminiVoiceNameFromCreative,
   listRenderProfiles,
   profileToProductionCostConfig,
   resolveRenderProfile
@@ -81,7 +82,7 @@ import {
   getPlatformSettings,
   updatePlatformSettings
 } from "@studio/billing";
-import { PlatformSettingsPatchSchema, AdminUserUpdateSchema } from "@studio/shared";
+import { PlatformSettingsPatchSchema, AdminUserUpdateSchema, clampVideoDurationSeconds } from "@studio/shared";
 import { getProviderInventory, officialBillingUrl, pollProviderMonitors } from "@studio/providers";
 import { registerDistributionRoutes } from "./distributionRoutes.js";
 import { consumeRateLimit } from "./rateLimit.js";
@@ -350,6 +351,46 @@ export async function registerRoutes(app: FastifyInstance) {
       return { template: toBrandTemplateView(updated, await signedBrandLogoUrl(updated.logoGcsPath)) };
     });
 
+    userRoutes.post("/tts/preview", async (request, reply) => {
+      const body = z
+        .object({
+          voiceCharacter: z.string().max(80).optional(),
+          language: z.string().min(2).max(10).default("he"),
+          text: z.string().max(200).optional()
+        })
+        .parse(request.body ?? {});
+      const tenantId = await tenantIdForUser(request.user!.sub);
+      if (!tenantId) {
+        reply.code(404);
+        return { error: "not_found" };
+      }
+      const provider = await createProvidersRepo(tenantId).primary("GEMINI");
+      if (!provider) {
+        reply.code(503);
+        return { error: "tts_unavailable" };
+      }
+      const sample =
+        body.text?.trim() ||
+        (body.language.toLowerCase().startsWith("he")
+          ? "שלום, כך נשמע הקול בסרטון."
+          : "Hello, this is how the voice will sound.");
+      try {
+        const audio = await geminiSynthesizeSpeech(provider, {
+          text: sample,
+          language: body.language,
+          voiceName: geminiVoiceNameFromCreative({
+            voiceCharacter: body.voiceCharacter,
+            language: body.language
+          })
+        });
+        return { mimeType: audio.mimeType, audioBase64: audio.body.toString("base64") };
+      } catch (error) {
+        request.log.warn({ err: error }, "tts preview failed");
+        reply.code(502);
+        return { error: "tts_preview_failed" };
+      }
+    });
+
     userRoutes.delete("/brand-templates/:id", async (request, reply) => {
       const tenantId = await tenantIdForUser(request.user!.sub);
       if (!tenantId) {
@@ -381,6 +422,11 @@ export async function registerRoutes(app: FastifyInstance) {
         throw err;
       }
       let incomingBrief = body.brief;
+      const settings = await getPlatformSettings();
+      incomingBrief = {
+        ...incomingBrief,
+        durationSeconds: clampVideoDurationSeconds(incomingBrief.durationSeconds, settings.allowDurationOver30)
+      };
       if (body.parentRunId) {
         const allowedPaths = await reusableGcsPathsForRun(body.parentRunId, userId);
         if (!allowedPaths) {
