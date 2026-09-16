@@ -374,6 +374,8 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         finalPath = await downscaleVideo(finalPath, outputScale, dir);
       }
 
+      totalDurationSeconds = await probeDuration(finalPath).catch(() => totalDurationSeconds);
+
       const finalArtifact = await ctx.artifacts.save({
         runId: ctx.runId,
         stage: "render",
@@ -612,6 +614,8 @@ async function renderExtendChain(
   if (outputScale > 0) {
     finalPath = await downscaleVideo(finalPath, outputScale, dir);
   }
+
+  totalDurationSecondsOut = await probeDuration(finalPath).catch(() => totalDurationSecondsOut);
 
   const finalArtifact = await ctx.artifacts.save({
     runId: ctx.runId,
@@ -1802,11 +1806,20 @@ async function appendBrandingEndCard(
 
     const out = path.join(dir, `with-end-${nanoid(4)}.mp4`);
     const mainDur = await probeDuration(videoPath);
-    const fade = Math.min(BRANDING_END_FADE_SECONDS, Math.max(0.2, mainDur / 3));
+    const endDur = await probeDuration(endClip);
+    // Short visual fade only. acrossfade mixed the last scene TTS with the end-card
+    // CTA (often the same URL) and sounded like noise at the tail.
+    const fade = Math.min(0.35, Math.max(0.15, Math.min(BRANDING_END_FADE_SECONDS, mainDur / 8, endDur / 2)));
     const offset = Math.max(0, mainDur - fade);
+    const outDur = Math.max(mainDur, offset + endDur);
+    const offsetMs = Math.max(0, Math.round(offset * 1000));
 
     try {
-      const filter = `[0:v][1:v]xfade=transition=fade:duration=${fade}:offset=${offset}[vout];[0:a][1:a]acrossfade=d=${fade}[aout]`;
+      const filter =
+        `[0:v][1:v]xfade=transition=fade:duration=${fade.toFixed(3)}:offset=${offset.toFixed(3)}[vout];` +
+        `[0:a]afade=t=out:st=${offset.toFixed(3)}:d=${fade.toFixed(3)},apad=whole_dur=${outDur.toFixed(3)}[a0];` +
+        `[1:a]adelay=${offsetMs}|${offsetMs}:all=1,afade=t=in:st=0:d=0.12,atrim=0:${outDur.toFixed(3)}[a1];` +
+        `[a0][a1]amix=inputs=2:duration=first:normalize=0:dropout_transition=0,atrim=0:${outDur.toFixed(3)}[aout]`;
       await runFfmpeg([
         "-i",
         videoPath,
@@ -1826,6 +1839,8 @@ async function appendBrandingEndCard(
         "23",
         "-c:a",
         "aac",
+        "-t",
+        String(outDur),
         "-movflags",
         "+faststart",
         "-y",

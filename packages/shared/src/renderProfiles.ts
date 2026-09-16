@@ -266,7 +266,6 @@ export function predictRenderProfileId(input: {
   if (input.preferLipSync) {
     return falOk ? "kling-avatar-i2v" : "heygen-i2v";
   }
-  if (input.hasPhotoPlates && falOk) return "wan-i2v";
   if (typeof input.briefRenderProfile === "string" && isRenderProfileId(input.briefRenderProfile)) {
     return input.briefRenderProfile;
   }

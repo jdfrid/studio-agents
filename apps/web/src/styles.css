@@ -2519,7 +2519,7 @@ a { color: inherit; }
   .advanced-disclosure > summary { grid-template-columns: auto 1fr; }
   .disclosure-status { display: none; }
   .preset-cards { grid-template-columns: 1fr 1fr; }
-  .creation-summary-metrics > span:nth-child(3) { display: none; }
+  .creation-summary-metrics > span:nth-child(2) { display: none; }
   .creation-summary-actions { grid-template-columns: auto minmax(150px, 1fr); }
   .creation-summary-popover { display: none; }
   .creation-summary-actions > .button-secondary { font-size: 0.72rem; padding-inline: 10px; }

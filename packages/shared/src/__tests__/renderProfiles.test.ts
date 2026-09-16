@@ -72,8 +72,8 @@ describe("predictRenderProfileId", () => {
     expect(predictRenderProfileId({ preferLipSync: true })).toBe("kling-avatar-i2v");
   });
 
-  it("picks wan when photos are present", () => {
-    expect(predictRenderProfileId({ hasPhotoPlates: true })).toBe("wan-i2v");
+  it("keeps the platform default when photos are present", () => {
+    expect(predictRenderProfileId({ hasPhotoPlates: true })).toBe(defaultRenderProfileId());
   });
 
   it("preserves an explicitly selected historical Veo profile", () => {

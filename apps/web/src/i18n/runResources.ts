@@ -74,6 +74,7 @@ export const runResources = {
         ended: "Ended",
         stillRunning: "Still running…",
         requestedDuration: "Requested duration",
+        fileDuration: "File duration",
         aspectRatio: "Aspect ratio",
         landscape: "Landscape (16:9)",
         square: "Square",
@@ -378,7 +379,7 @@ export const runResources = {
       rerunning: "מריץ…",
       rerunStage: "הפעל מחדש את השלב",
       dubbing: { title: "התאמת דיבוב", description: "כתיבה מחדש של הקריינות לפי התיאור הוויזואלי של כל סצנה, ואז דיבוב TTS מחדש (בלי לייצר קליפים מחדש כשאין שינוי בפרומפט).", confirm: "לכתוב מחדש את הדיבוב לפי הסצנות הוויזואליות ולהריץ TTS מחדש? קליפי הווידאו יישמרו אם הפרומפטים לא השתנו.", busy: "מתאים…", action: "התאם דיבוב לוויזואל" },
-      settings: { title: "סיכום ההגדרות", renderModel: "מודל רינדור", systemDefault: "ברירת מחדל של המערכת", started: "התחלה", ended: "סיום", stillRunning: "עדיין רץ…", requestedDuration: "משך מבוקש", aspectRatio: "יחס תמונה", landscape: "לרוחב (16:9)", square: "ריבוע", portrait: "לאורך (9:16)", creationMode: "מצב יצירה", approvalManual: "אישור בכל שלב", approvalBeforeRender: "תסריט וסצנות לפני הפקה", approvalAutomatic: "אוטומטי", ttsVoice: "קול TTS", description: "תיאור", instructions: "הוראות", branding: "מיתוג העסק", advanced: "מתקדם", attachments: "קבצים שצורפו", lipSync: "התאמת תנועות הפה לדיבור", narrationOn: "קריינות", captionsOn: "כתוביות פעילות", captionsOff: "ללא כתוביות", attachmentRoles: { voice_clone: "שיבוט קול", insert_clip: "שילוב סרטון{{time}}", reference_video: "סרטון השראה — לניתוח בלבד", product: "תמונת מוצר", logo: "לוגו", character: "תמונת דמות / השראה" }, insertedAt: " @{{seconds}}ש׳" }
+      settings: { title: "סיכום ההגדרות", renderModel: "מודל רינדור", systemDefault: "ברירת מחדל של המערכת", started: "התחלה", ended: "סיום", stillRunning: "עדיין רץ…", requestedDuration: "משך מבוקש", fileDuration: "משך הקובץ", aspectRatio: "יחס תמונה", landscape: "לרוחב (16:9)", square: "ריבוע", portrait: "לאורך (9:16)", creationMode: "מצב יצירה", approvalManual: "אישור בכל שלב", approvalBeforeRender: "תסריט וסצנות לפני הפקה", approvalAutomatic: "אוטומטי", ttsVoice: "קול TTS", description: "תיאור", instructions: "הוראות", branding: "מיתוג העסק", advanced: "מתקדם", attachments: "קבצים שצורפו", lipSync: "התאמת תנועות הפה לדיבור", narrationOn: "קריינות", captionsOn: "כתוביות פעילות", captionsOff: "ללא כתוביות", attachmentRoles: { voice_clone: "שיבוט קול", insert_clip: "שילוב סרטון{{time}}", reference_video: "סרטון השראה — לניתוח בלבד", product: "תמונת מוצר", logo: "לוגו", character: "תמונת דמות / השראה" }, insertedAt: " @{{seconds}}ש׳" }
     },
     proposal: {
       heading: "כך הסרטון ייראה",

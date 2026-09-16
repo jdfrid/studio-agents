@@ -632,13 +632,22 @@ function RunSettingsSummary({ run, artifacts, compact }: { run: ProjectRunView; 
         } | null;
       }
     | undefined;
+  const renderOut = run.stages.find((s) => s.stage === "render")?.output as
+    | { totalDurationSeconds?: number; renderProfile?: string }
+    | undefined;
   const profileId =
-    (typeof brief.renderProfile === "string" && isRenderProfileId(brief.renderProfile)
-      ? brief.renderProfile
-      : null) ??
     (typeof briefOut?.renderProfile === "string" && isRenderProfileId(briefOut.renderProfile)
       ? briefOut.renderProfile
+      : null) ??
+    (typeof brief.renderProfile === "string" && isRenderProfileId(brief.renderProfile)
+      ? brief.renderProfile
       : null);
+  const fileDurationSeconds = Number(renderOut?.totalDurationSeconds);
+  const requestedDurationSeconds = Number(brief.durationSeconds) || 0;
+  const showFileDuration =
+    Number.isFinite(fileDurationSeconds) &&
+    fileDurationSeconds > 0 &&
+    Math.abs(fileDurationSeconds - requestedDurationSeconds) >= 1;
   const profile = profileId ? getRenderProfile(profileId) : null;
   const creativeLines = [
     ...formatCreativeConstraints(brief.creative, locale),
@@ -674,7 +683,8 @@ function RunSettingsSummary({ run, artifacts, compact }: { run: ProjectRunView; 
     <section className="run-settings-summary">
       <h3>{t("run.settings.title")}</h3>
       <p className="run-settings-short">
-        {language} · {format} · {t("common.seconds", { count: brief.durationSeconds })}
+        {language} · {format} · {t("common.seconds", { count: requestedDurationSeconds })}
+        {showFileDuration ? ` · ${t("run.settings.fileDuration")} ${t("common.seconds", { count: Math.round(fileDurationSeconds) })}` : ""}
         {businessName ? ` · ${businessName}` : ""} · {speech} · {captions}
       </p>
       <details className="run-settings-more" open={!compact}>
@@ -684,6 +694,16 @@ function RunSettingsSummary({ run, artifacts, compact }: { run: ProjectRunView; 
             <dt>{t("run.settings.renderModel")}</dt>
             <dd>{profile ? (locale === "he" ? profile.labelHe : profile.label) : t("run.settings.systemDefault")}</dd>
           </div>
+          <div>
+            <dt>{t("run.settings.requestedDuration")}</dt>
+            <dd>{t("common.seconds", { count: requestedDurationSeconds })}</dd>
+          </div>
+          {showFileDuration ? (
+            <div>
+              <dt>{t("run.settings.fileDuration")}</dt>
+              <dd>{t("common.seconds", { count: Math.round(fileDurationSeconds) })}</dd>
+            </div>
+          ) : null}
           <div>
             <dt>{t("run.settings.started")}</dt>
             <dd>{formatDateTime(startedAt)}</dd>

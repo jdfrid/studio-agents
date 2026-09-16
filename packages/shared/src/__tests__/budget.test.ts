@@ -109,6 +109,22 @@ describe("estimateRunCost", () => {
     expect(est.veoSeconds).toBe(12);
   });
 
+  it("estimates Hailuo 30s well below Omni ₪13", () => {
+    const hailuo = estimateRunCost(
+      { budgetMode: true, durationSeconds: 30 },
+      { usdToIls: 3.6, renderProfileId: "hailuo-i2v" }
+    );
+    const omni = estimateRunCost(
+      { budgetMode: true, durationSeconds: 30 },
+      { usdToIls: 3.6, renderProfileId: "omni-multiclip" }
+    );
+    expect(hailuo.renderProfileId).toBe("hailuo-i2v");
+    expect(hailuo.perSecondUsd).toBe(0.045);
+    expect(hailuo.nis).toBeLessThan(8);
+    expect(omni.perSecondUsd).toBe(0.1);
+    expect(omni.nis).toBeGreaterThan(hailuo.nis);
+  });
+
   it("estimates Wan photo runs near fal 720p list price", () => {
     const est = estimateRunCost(
       { budgetMode: true, durationSeconds: 30 },
@@ -175,11 +191,12 @@ describe("visualPlateCount", () => {
 });
 
 describe("applyVisualPlateSceneCount", () => {
-  it("adds beats so 8 hotel stills are not truncated to a 30s 6-beat plan", () => {
+  it("keeps the duration-planned beat count when extra stills are uploaded", () => {
     const layout = planSceneLayout(30, true, { renderProfileId: "wan-i2v" });
     const next = applyVisualPlateSceneCount(layout, 8, { beatI2v: true, extend: false });
-    expect(next.sceneCount).toBe(8);
-    expect(next.totalVideoSeconds).toBe(40);
+    expect(next.sceneCount).toBe(layout.sceneCount);
+    expect(next.totalVideoSeconds).toBe(layout.totalVideoSeconds);
+    expect(next.totalVideoSeconds).toBe(30);
   });
 
   it("does not grow extend chains or shrink existing plans", () => {

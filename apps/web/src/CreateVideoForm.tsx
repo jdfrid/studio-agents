@@ -21,13 +21,8 @@ import {
   clampVideoDurationSeconds,
   aspectRatioFromCreative,
   contrastTextHex,
-  estimateRunCost,
-  formatCostNis,
-  getRenderProfile,
   languageCodeFromCreative,
   normalizeHexColor,
-  predictRenderProfileId,
-  profileToProductionCostConfig,
   remixFormFromBrief,
   remixHasAdvancedCreative,
   type ApprovalMode,
@@ -143,16 +138,6 @@ export function CreateVideoForm({
   const heygenNeedsAnchor = lipSyncRequested && visualFiles.length === 0 && keptAnchorCount === 0;
   const contentLocale = languageCodeFromCreative(creative) === "en" ? "en" : "he";
   const contentT = i18n.getFixedT(contentLocale, "createVideo");
-  const costEstimate = useMemo(() => {
-    const profileId = predictRenderProfileId({
-      preferLipSync: lipSyncRequested,
-      hasPhotoPlates: visualFiles.length > 0 || productFiles.length > 0
-    });
-    return estimateRunCost(
-      { budgetMode: true, durationSeconds },
-      profileToProductionCostConfig(getRenderProfile(profileId))
-    );
-  }, [lipSyncRequested, visualFiles.length, productFiles.length, durationSeconds]);
 
   const MAX_VOICE_BYTES = 10 * 1024 * 1024;
   const MAX_REFERENCE_VIDEO_BYTES = 15 * 1024 * 1024;
@@ -1449,23 +1434,6 @@ export function CreateVideoForm({
             </select>
           </label>
         </div>
-
-        <details className="cost-details">
-          <summary>
-            <span>{t("cost.heading")}</span>
-            <strong>
-              {freeLeft > 0
-                ? t("credits.freeVideo")
-                : t("credits.amount", { count: creditCost || CREDIT_NEW_VIDEO })}
-            </strong>
-          </summary>
-          <p title={t("cost.tooltip", { model: costEstimate.videoModelDisplay, rate: costEstimate.perSecondUsd.toFixed(3) })}>
-            {t("cost.system", { cost: formatCostNis(costEstimate.nis), provider: costEstimate.videoProviderLabel, seconds: costEstimate.veoSeconds })}
-          </p>
-          {lipSyncRequested && freeLeft <= 0 ? (
-            <p className="muted">{t("credits.lipSyncSurcharge", { extra: CREDIT_LIP_SYNC_SURCHARGE, total: CREDIT_NEW_VIDEO + CREDIT_LIP_SYNC_SURCHARGE })}</p>
-          ) : null}
-        </details>
       <fieldset className="approval-fieldset approval-card-picker">
         <legend>{t("approval.heading")}</legend>
         <label>
@@ -1861,14 +1829,6 @@ export function CreateVideoForm({
       {error ? <p className="error-inline">{error}</p> : null}
       <div className="stage-actions create-actions">
         <div className="creation-summary-metrics">
-          <span>
-            <small>{t("summary.cost")}</small>
-            <strong>
-              {freeLeft > 0
-                ? t("credits.freeVideo")
-                : t("credits.amount", { count: creditCost || CREDIT_NEW_VIDEO })}
-            </strong>
-          </span>
           <span><small>{t("summary.time")}</small><strong>{t("summary.minutes", { min: estimatedMinutesMin, max: estimatedMinutesMax })}</strong></span>
           <span className={requiredComplete === 1 ? "is-ready" : ""}>
             <small>{t("summary.status")}</small>
