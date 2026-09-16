@@ -1,7 +1,7 @@
 import { Worker, type Job, type WorkerOptions } from "bullmq";
 import { STAGE_ORDER, type StageName } from "@studio/shared";
 import { refreshPlatformSettingsCache } from "@studio/billing";
-import { redisConnection, registerAgent, runStage, queueName, DISTRIBUTION_QUEUE_NAME, runDistributionJob } from "@studio/orchestrator";
+import { redisConnection, registerAgent, runStage, queueName, DISTRIBUTION_QUEUE_NAME, runDistributionJob, AUTOMATION_QUEUE_NAME, runAutomationJob, ensureAutomationRepeatable } from "@studio/orchestrator";
 import { briefAgent } from "@studio/agent-brief";
 import { scriptAgent } from "@studio/agent-script";
 import { audioAgent } from "@studio/agent-audio";
@@ -120,6 +120,31 @@ async function main() {
   });
   // eslint-disable-next-line no-console
   console.log(`Worker started for queue: ${DISTRIBUTION_QUEUE_NAME}`);
+
+  await ensureAutomationRepeatable().catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error("Failed to register automation tick:", error);
+  });
+  const automationWorker = new Worker(
+    AUTOMATION_QUEUE_NAME,
+    async (job: Job<{ type: string }>) => {
+      await runAutomationJob(job.data as Parameters<typeof runAutomationJob>[0]);
+    },
+    {
+      connection: redisConnection() as WorkerOptions["connection"],
+      concurrency: 1,
+      lockDuration: 15 * 60_000,
+      stalledInterval: 60_000,
+      maxStalledCount: 2
+    }
+  );
+  workers.push(automationWorker);
+  automationWorker.on("failed", (job, err) => {
+    // eslint-disable-next-line no-console
+    console.error(`[worker:automation] job ${job?.id ?? "?"} failed:`, err);
+  });
+  // eslint-disable-next-line no-console
+  console.log(`Worker started for queue: ${AUTOMATION_QUEUE_NAME}`);
 }
 
 void main().catch((err) => {

@@ -34,8 +34,11 @@ export const runResources = {
     run: {
       deleteConfirm: "Delete “{{title}}”? Processing will stop and will not retry.",
       back: "Back to videos",
+      backAutomation: "Back to automation",
       remix: "Create another version",
       projectEyebrow: "Video project",
+      automationEyebrow: "Daily automation",
+      automationTag: "Automation",
       actions: "Actions",
       actionsMenu: "Project actions",
       download: "Download video",
@@ -353,8 +356,11 @@ export const runResources = {
     run: {
       deleteConfirm: "למחוק את «{{title}}»? התהליך ייעצר ולא ימשיך לנסות.",
       back: "חזרה לסרטונים",
+      backAutomation: "חזרה לאוטומציה",
       remix: "יצירת גרסה נוספת",
       projectEyebrow: "פרויקט וידאו",
+      automationEyebrow: "אוטומציה יומית",
+      automationTag: "אוטומציה",
       actions: "פעולות",
       actionsMenu: "פעולות הפרויקט",
       download: "הורדת הסרטון",

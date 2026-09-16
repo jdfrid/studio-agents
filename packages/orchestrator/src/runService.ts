@@ -27,6 +27,7 @@ export async function createRun(input: {
   skipCreditCheck?: boolean;
   creditCost?: number;
   parentRunId?: string;
+  automationJobId?: string;
 }): Promise<ProjectRunView> {
   let tenantId: string;
   if (input.userId) {
@@ -55,6 +56,7 @@ export async function createRun(input: {
       brief: brief as object,
       approvalMode,
       parentRunId: input.parentRunId ?? null,
+      automationJobId: input.automationJobId ?? null,
       stages: {
         create: STAGE_ORDER.map((stage) => ({
           stage: toPrismaStage(stage),
@@ -679,13 +681,31 @@ export async function setRunStatus(
   if (status === "COMPLETED") {
     const { commitCredits } = await import("@studio/billing");
     await commitCredits(runId).catch(() => undefined);
+    await syncAutomationJobFromRun(runId, "ready").catch(() => undefined);
     const { maybeAutoDistribute } = await import("./distribution/auto.js");
     await maybeAutoDistribute(runId).catch(() => undefined);
   }
   if (status === "FAILED" || status === "CANCELLED") {
     const { releaseCredits } = await import("@studio/billing");
     await releaseCredits(runId).catch(() => undefined);
+    await syncAutomationJobFromRun(runId, "failed").catch(() => undefined);
   }
+}
+
+async function syncAutomationJobFromRun(runId: string, status: "ready" | "failed"): Promise<void> {
+  const run = await prisma.projectRun.findUnique({
+    where: { id: runId },
+    select: { automationJobId: true }
+  });
+  if (!run?.automationJobId) return;
+  await prisma.automationJob.update({
+    where: { id: run.automationJobId },
+    data: {
+      status,
+      runId,
+      ...(status === "failed" ? { error: "run_failed" } : { error: null })
+    }
+  });
 }
 
 /** Stop queue work and remove the run so it cannot keep retrying. */
@@ -758,6 +778,8 @@ function toView(run: {
     approvalMode: (run.approvalMode as ApprovalMode) ?? undefined,
     parentRunId: "parentRunId" in run ? ((run as { parentRunId?: string | null }).parentRunId ?? null) : null,
     isCorrectionRun: "isCorrectionRun" in run ? Boolean((run as { isCorrectionRun?: boolean }).isCorrectionRun) : false,
+    automationJobId:
+      "automationJobId" in run ? ((run as { automationJobId?: string | null }).automationJobId ?? null) : null,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
     stages: run.stages.map((s) => ({

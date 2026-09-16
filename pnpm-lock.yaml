@@ -72,6 +72,9 @@ importers:
       '@studio/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@studio/automation':
+        specifier: workspace:*
+        version: link:../../packages/automation
       '@studio/billing':
         specifier: workspace:*
         version: link:../../packages/billing
@@ -210,6 +213,9 @@ importers:
       '@studio/agent-series':
         specifier: workspace:*
         version: link:../../packages/agents/series
+      '@studio/automation':
+        specifier: workspace:*
+        version: link:../../packages/automation
       '@studio/billing':
         specifier: workspace:*
         version: link:../../packages/billing
@@ -387,6 +393,8 @@ importers:
         specifier: ^5.6.3
         version: 5.10.0
 
+  packages/automation: {}
+
   packages/billing:
     dependencies:
       '@studio/infra-prisma':
@@ -398,6 +406,9 @@ importers:
 
   packages/orchestrator:
     dependencies:
+      '@studio/automation':
+        specifier: workspace:*
+        version: link:../automation
       '@studio/billing':
         specifier: workspace:*
         version: link:../billing

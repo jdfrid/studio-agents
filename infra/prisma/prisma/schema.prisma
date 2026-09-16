@@ -68,6 +68,7 @@ model Tenant {
   publishJobs        PublishJob[]
   distributeRules    DistributeRule[]
   brandTemplates     BrandTemplate[]
+  automationCampaign AutomationCampaign?
 }
 
 model BrandTemplate {
@@ -94,6 +95,7 @@ model BrandTemplate {
   updatedAt        DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaigns AutomationCampaign[]
 
   @@index([tenantId, updatedAt])
 }
@@ -124,6 +126,7 @@ model User {
   adminDevices  AdminDevice[]
   socialConnections SocialConnection[]
   contentPackages   ContentPackage[]
+  automationCampaigns AutomationCampaign[]
 
   @@index([email])
 }
@@ -331,6 +334,7 @@ model ProjectRun {
   isCorrectionRun Boolean     @default(false)
   parentRunId    String?
   creditReserved Float        @default(0)
+  automationJobId String?     @unique
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -343,6 +347,7 @@ model ProjectRun {
   costEvents   CostEvent[]
   creditEntries CreditLedger[]
   contentPackages ContentPackage[]
+  automationJob AutomationJob? @relation("AutomationRun", fields: [automationJobId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status])
   @@index([userId, status])
@@ -822,5 +827,89 @@ model DistributeRule {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId])
+}
+
+enum AutomationCampaignStatus {
+  idle
+  running
+  paused
+  needs_catalog
+}
+
+enum AutomationJobStatus {
+  queued
+  scraping
+  producing
+  ready
+  failed
+}
+
+model AutomationCampaign {
+  id                 String                   @id @default(cuid())
+  tenantId           String                   @unique
+  userId             String
+  brandTemplateId    String
+  websiteUrl         String
+  enabled            Boolean                  @default(false)
+  timezone           String                   @default("Asia/Jerusalem")
+  hourLocal          Int                      @default(9)
+  lockedCreativeKeys String[]                 @default([])
+  status             AutomationCampaignStatus @default(needs_catalog)
+  /// v1 is always "hold" — ready for distribution, never auto-publish.
+  distributeMode     String                   @default("hold")
+  lastError          String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandTemplate BrandTemplate       @relation(fields: [brandTemplateId], references: [id], onDelete: Restrict)
+  products      AutomationProduct[]
+  jobs          AutomationJob[]
+
+  @@index([enabled, hourLocal])
+  @@index([userId])
+}
+
+model AutomationProduct {
+  id            String    @id @default(cuid())
+  campaignId    String
+  canonicalUrl  String
+  title         String
+  priceText     String?
+  description   String?
+  imageUrls     String[]  @default([])
+  lastFetchedAt DateTime?
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  campaign AutomationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  jobs     AutomationJob[]
+
+  @@unique([campaignId, canonicalUrl])
+  @@index([campaignId, usedAt])
+}
+
+model AutomationJob {
+  id           String              @id @default(cuid())
+  campaignId   String
+  productId    String
+  runId        String?
+  dayKey       String
+  scheduledFor DateTime
+  status       AutomationJobStatus @default(queued)
+  error        String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  campaign AutomationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  product  AutomationProduct  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  /// Reverse of ProjectRun.automationJobId. `runId` is a denormalized copy, not this relation's FK.
+  run      ProjectRun?        @relation("AutomationRun")
+
+  @@unique([campaignId, dayKey])
+  @@index([campaignId, createdAt])
+  @@index([runId])
 }
 

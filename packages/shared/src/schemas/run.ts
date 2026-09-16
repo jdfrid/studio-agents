@@ -34,6 +34,7 @@ export const ProjectRunViewSchema = z.object({
   approvalMode: ApprovalModeSchema.optional(),
   parentRunId: z.string().nullable().optional(),
   isCorrectionRun: z.boolean().optional(),
+  automationJobId: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   stages: z.array(StageExecutionViewSchema)

@@ -6,6 +6,7 @@ import { Dashboard } from "./Dashboard.js";
 import { CreateVideoForm } from "./CreateVideoForm.js";
 import { RunView } from "./RunView.js";
 import { BrandPage } from "./BrandPage.js";
+import { AutomationPage } from "./AutomationPage.js";
 import { DistributionPage } from "./DistributionPage.js";
 import { AboutPage, ContactPage, LegalPage, PricingPage } from "./SitePages.js";
 import { applySeo, defaultSeo } from "./seo.js";
@@ -33,6 +34,7 @@ type AppView =
   | "run"
   | "distribution"
   | "brand"
+  | "automation"
   | "about"
   | "contact"
   | "terms"
@@ -44,17 +46,20 @@ type AppLocation = {
   view: AppView;
   runId: string | null;
   fromRunId?: string | null;
+  fromAutomation?: boolean;
 };
 
 function parseLocation(): AppLocation {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   const fromRunId = new URLSearchParams(window.location.search).get("from");
+  const fromAutomation = fromRunId === "automation";
   if (path.startsWith("/runs/")) {
     const id = path.slice("/runs/".length).split("/")[0] ?? "";
-    if (id) return { view: "run", runId: id };
+    if (id) return { view: "run", runId: id, fromAutomation };
   }
   if (path === "/create") return { view: "create", runId: null, fromRunId };
   if (path === "/brand") return { view: "brand", runId: null };
+  if (path === "/automation") return { view: "automation", runId: null };
   if (path.startsWith("/distribution")) return { view: "distribution", runId: fromRunId };
   if (path === "/about") return { view: "about", runId: null };
   if (path === "/contact") return { view: "contact", runId: null };
@@ -66,9 +71,12 @@ function parseLocation(): AppLocation {
 }
 
 function pathFor(loc: AppLocation): string {
-  if (loc.view === "run" && loc.runId) return `/runs/${loc.runId}`;
+  if (loc.view === "run" && loc.runId) {
+    return loc.fromAutomation ? `/runs/${loc.runId}?from=automation` : `/runs/${loc.runId}`;
+  }
   if (loc.view === "create") return loc.fromRunId ? `/create?from=${encodeURIComponent(loc.fromRunId)}` : "/create";
   if (loc.view === "brand") return "/brand";
+  if (loc.view === "automation") return "/automation";
   if (loc.view === "distribution") {
     const run = loc.runId ? `?from=${encodeURIComponent(loc.runId)}` : "";
     return `/distribution${run}`;
@@ -90,6 +98,7 @@ function AppShell() {
   const [view, setView] = useState<AppView>(initial.view);
   const [runId, setRunId] = useState<string | null>(initial.runId);
   const [fromRunId, setFromRunId] = useState<string | null>(initial.fromRunId ?? null);
+  const [fromAutomation, setFromAutomation] = useState(Boolean(initial.fromAutomation));
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [whatsNewSinceVisit, setWhatsNewSinceVisit] = useState(false);
   const [whatsNewEntries, setWhatsNewEntries] = useState<WhatsNewEntry[]>([]);
@@ -99,7 +108,8 @@ function AppShell() {
     setView(next.view);
     setRunId(next.runId);
     setFromRunId(next.fromRunId ?? null);
-    const path = pathFor({ ...next, fromRunId: next.fromRunId ?? null });
+    setFromAutomation(Boolean(next.fromAutomation));
+    const path = pathFor({ ...next, fromRunId: next.fromRunId ?? null, fromAutomation: next.fromAutomation });
     const current = `${window.location.pathname}${window.location.search}`;
     if (path !== current) {
       if (mode === "replace") window.history.replaceState(next, "", path);
@@ -249,6 +259,15 @@ function AppShell() {
             <span className="nav-icon" aria-hidden>◆</span>
             <span className="nav-label">{t("shell.brand")}</span>
           </button>
+          <button
+            type="button"
+            className={appView === "automation" ? "nav-active" : ""}
+            aria-label={t("shell.automation")}
+            onClick={() => navigate({ view: "automation", runId: null })}
+          >
+            <span className="nav-icon" aria-hidden>⟳</span>
+            <span className="nav-label">{t("shell.automation")}</span>
+          </button>
         </nav>
         <div className="header-user">
           {showWhatsNewReopen ? (
@@ -299,17 +318,28 @@ function AppShell() {
         {appView === "run" && runId ? (
           <RunView
             runId={runId}
-            onBack={() => navigate({ view: "dashboard", runId: null })}
+            onBack={() =>
+              navigate({
+                view: fromAutomation ? "automation" : "dashboard",
+                runId: null
+              })
+            }
             onRemix={() => {
               if (user.canCreateVideo) navigate({ view: "create", runId: null, fromRunId: runId });
             }}
             canRemix={user.canCreateVideo}
             canDistribute={user.role === "ADMIN"}
             onDistribute={() => navigate({ view: "distribution", runId: runId })}
-            onOpenRun={(id) => navigate({ view: "run", runId: id })}
+            onOpenRun={(id) => navigate({ view: "run", runId: id, fromAutomation })}
+            fromAutomation={fromAutomation}
           />
         ) : null}
         {appView === "brand" ? <BrandPage /> : null}
+        {appView === "automation" ? (
+          <AutomationPage
+            onOpenRun={(id) => navigate({ view: "run", runId: id, fromAutomation: true })}
+          />
+        ) : null}
         {appView === "distribution" && user.role === "ADMIN" ? <DistributionPage sourceRunId={runId} /> : null}
       </main>
       <WhatsNewDialog

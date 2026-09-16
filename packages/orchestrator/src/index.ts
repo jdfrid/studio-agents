@@ -9,3 +9,5 @@ export * from "./stageOutput.js";
 export * from "./registry.js";
 export * from "./alignDubbing.js";
 export * from "./distribution/index.js";
+export * from "./automation/index.js";
+export * from "./automation/queue.js";

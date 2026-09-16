@@ -85,6 +85,7 @@ import {
 import { PlatformSettingsPatchSchema, AdminUserUpdateSchema, clampVideoDurationSeconds } from "@studio/shared";
 import { getProviderInventory, officialBillingUrl, pollProviderMonitors } from "@studio/providers";
 import { registerDistributionRoutes } from "./distributionRoutes.js";
+import { registerAutomationRoutes } from "./automationRoutes.js";
 import { consumeRateLimit } from "./rateLimit.js";
 import { createHash } from "node:crypto";
 
@@ -193,6 +194,7 @@ export async function registerRoutes(app: FastifyInstance) {
   app.addHook("onRequest", mobileAdminRateLimit());
   await registerAuthRoutes(app);
   await registerDistributionRoutes(app);
+  await registerAutomationRoutes(app);
 
   app.get("/health", async () => ({ ok: true }));
   app.get("/config/creative-catalog", async (request) => {
@@ -470,7 +472,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
     userRoutes.get("/runs", async (request) => {
       const rows = await prisma.projectRun.findMany({
-        where: { userId: request.user!.sub },
+        where: { userId: request.user!.sub, automationJobId: null },
         orderBy: { updatedAt: "desc" },
         take: 100
       });

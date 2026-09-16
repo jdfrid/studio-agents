@@ -113,6 +113,8 @@ export async function getQueueStats(): Promise<
   }
   const { getDistributionQueueStats } = await import("./distribution/queue.js");
   stats.push(await getDistributionQueueStats());
+  const { getAutomationQueueStats } = await import("./automation/queue.js");
+  stats.push(await getAutomationQueueStats());
   return stats;
 }
 
@@ -123,6 +125,8 @@ export async function shutdownQueues(): Promise<void> {
   queues.clear();
   const { closeDistributionQueue } = await import("./distribution/queue.js");
   await closeDistributionQueue();
+  const { closeAutomationQueue } = await import("./automation/queue.js");
+  await closeAutomationQueue();
   if (connection) {
     connection.disconnect();
     connection = null;

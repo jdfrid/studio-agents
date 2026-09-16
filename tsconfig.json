@@ -3,6 +3,7 @@
   "include": [],
   "references": [
     { "path": "./packages/shared" },
+    { "path": "./packages/automation" },
     { "path": "./packages/providers" },
     { "path": "./packages/orchestrator" },
     { "path": "./packages/agents/brief" },

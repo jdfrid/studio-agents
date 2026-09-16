@@ -33,7 +33,8 @@ export function RunView({
   canRemix,
   onDistribute,
   canDistribute,
-  onOpenRun
+  onOpenRun,
+  fromAutomation
 }: {
   runId: string;
   onBack: () => void;
@@ -42,6 +43,7 @@ export function RunView({
   onDistribute?: () => void;
   canDistribute?: boolean;
   onOpenRun?: (id: string) => void;
+  fromAutomation?: boolean;
 }) {
   const { t, i18n } = useTranslation("run");
   const [run, setRun] = useState<ProjectRunView | null>(null);
@@ -112,14 +114,15 @@ export function RunView({
       <header className="run-view-header run-view-header-stack">
         <button type="button" className="button-secondary back-button" onClick={onBack}>
           <span aria-hidden>{i18n.dir() === "rtl" ? "→" : "←"}</span>
-          {t("run.back")}
+          {t(fromAutomation ? "run.backAutomation" : "run.back")}
         </button>
         <div className="run-title-block">
-          <p className="eyebrow">{t("run.projectEyebrow")}</p>
+          <p className="eyebrow">{t(run.automationJobId ? "run.automationEyebrow" : "run.projectEyebrow")}</p>
           <h1>{run.brief.title}</h1>
           <span className={`status-pill status-${run.status.toLowerCase()}`}>
             {t(`statuses.${run.status}`, { defaultValue: run.status })}
           </span>
+          {run.automationJobId ? <span className="status-pill status-automation">{t("run.automationTag")}</span> : null}
         </div>
         <div className="run-header-menu" ref={menuRef}>
           <button
