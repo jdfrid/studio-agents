@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" role="img" aria-label="Reelmino">
+  <rect width="64" height="64" rx="16" fill="#FFFFFF"/>
+  <path fill="#173D35" d="M20 16h16.5c8.4 0 14.5 5.2 14.5 12.6 0 5.4-3.2 9.6-8.4 11.4L54 48h-9.2L35.6 36.4H26V48h-6V16zm6 5.6V31h9c4.2 0 6.8-2.2 6.8-5.2S39.2 21.6 35 21.6H26z"/>
+  <polygon fill="#173D35" points="38,24 38,40 52,32"/>
+  <text x="80" y="42" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Reelmino</text>
+</svg>

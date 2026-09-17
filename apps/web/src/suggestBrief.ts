@@ -1,3 +1,5 @@
+import { storageGet, storageSet } from "./brand/storage.js";
+
 export function suggestTitleFromPrompt(prompt: string): string {
   const first = prompt.trim().split(/[\n.!?]/)[0]?.trim() ?? "";
   const source = first.length >= 2 ? first : prompt.trim();
@@ -16,19 +18,11 @@ export function suggestGoalFromPrompt(prompt: string): string {
 }
 
 export function readStoredContentLanguage(fallback: string): string {
-  try {
-    const last = window.localStorage.getItem("prompt2spot:content-language");
-    if (last && ["en", "he", "ar", "ru", "fr", "es", "yi"].includes(last)) return last;
-  } catch {
-    /* ignore */
-  }
+  const last = storageGet("reelmino:content-language", "prompt2spot:content-language");
+  if (last && ["en", "he", "ar", "ru", "fr", "es", "yi"].includes(last)) return last;
   return fallback;
 }
 
 export function storeContentLanguage(language: string): void {
-  try {
-    window.localStorage.setItem("prompt2spot:content-language", language);
-  } catch {
-    /* ignore */
-  }
+  storageSet("reelmino:content-language", language);
 }

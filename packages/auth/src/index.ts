@@ -1,5 +1,6 @@
 export * from "./jwt.js";
 export * from "./users.js";
+export * from "./emailAuth.js";
 export * from "./google.js";
 export * from "./routes.js";
 export * from "./mobileAuth.js";

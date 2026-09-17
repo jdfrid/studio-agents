@@ -7,6 +7,7 @@ import { creativePayloadForRequest } from "./creativePayload.js";
 import { localeFor } from "./i18n/index.js";
 import type { ProjectRunView } from "./types.js";
 import { BrandTemplatePanel } from "./BrandTemplatePanel.js";
+import { storageGet, storageRemove, storageSet } from "./brand/storage.js";
 import { CameraCaptureButton, useIsMobileDevice } from "./CameraCaptureButton.js";
 import { VoicePicker } from "./VoicePreview.js";
 import {
@@ -176,7 +177,7 @@ export function CreateVideoForm({
   useEffect(() => {
     if (sourceRunId) return;
     try {
-      const saved = window.localStorage.getItem("prompt2spot:create-draft");
+      const saved = storageGet("reelmino:create-draft", "prompt2spot:create-draft");
       if (!saved) return;
       const draft = JSON.parse(saved) as {
         title?: string;
@@ -315,7 +316,7 @@ export function CreateVideoForm({
         brandTemplateId
       };
       try {
-        window.localStorage.setItem("prompt2spot:create-draft", JSON.stringify(draft));
+        storageSet("reelmino:create-draft", JSON.stringify(draft));
         setDraftSavedAt(new Date());
         setDraftStatus("saved");
       } catch {
@@ -749,7 +750,7 @@ export function CreateVideoForm({
           ...(brandTemplateId ? { brandTemplateId } : {})
         }
       });
-      window.localStorage.removeItem("prompt2spot:create-draft");
+      storageRemove("reelmino:create-draft", "prompt2spot:create-draft");
       onCreated(run);
     } catch (err) {
       const e = err as Error & { code?: string };
@@ -994,40 +995,6 @@ export function CreateVideoForm({
 
         {brandTemplateId ? <p className="brand-template-run-hint">{t("branding.templates.productHint")}</p> : null}
 
-        <label className="field-block">
-          {t("details.title")}
-          <input
-            value={title}
-            maxLength={200}
-            onChange={(e) => {
-              setTitleTouched(true);
-              setTitle(e.target.value);
-            }}
-            placeholder={t("details.titlePlaceholder")}
-          />
-          <small className="field-help">{t("details.titleHelp")}</small>
-        </label>
-
-        <fieldset className="choice-fieldset">
-          <legend>{t("details.goal")}</legend>
-          <div className="choice-chips">
-            {VIDEO_GOALS.map((goal) => (
-              <button
-                key={goal}
-                type="button"
-                className={videoGoal === goal ? "is-selected" : ""}
-                onClick={() => {
-                  setGoalTouched(true);
-                  setVideoGoal(goal);
-                }}
-              >
-                {t(`goals.${goal}`)}
-              </button>
-            ))}
-          </div>
-          <small className="field-help">{t("details.goalHelp")}</small>
-        </fieldset>
-
         <p className="active-settings-summary">
           {t(`languages.${CONTENT_LANGUAGES.find(([value]) => value === String(creative.language ?? "en"))?.[1] ?? "English"}`)}
           {" · "}
@@ -1049,6 +1016,38 @@ export function CreateVideoForm({
               {t("quick.closeAdjustments")}
             </button>
           </header>
+        <label className="field-block">
+          {t("details.title")}
+          <input
+            value={title}
+            maxLength={200}
+            onChange={(e) => {
+              setTitleTouched(true);
+              setTitle(e.target.value);
+            }}
+            placeholder={t("details.titlePlaceholder")}
+          />
+          <small className="field-help">{t("details.titleHelp")}</small>
+        </label>
+        <fieldset className="choice-fieldset">
+          <legend>{t("details.goal")}</legend>
+          <div className="choice-chips">
+            {VIDEO_GOALS.map((goal) => (
+              <button
+                key={goal}
+                type="button"
+                className={videoGoal === goal ? "is-selected" : ""}
+                onClick={() => {
+                  setGoalTouched(true);
+                  setVideoGoal(goal);
+                }}
+              >
+                {t(`goals.${goal}`)}
+              </button>
+            ))}
+          </div>
+          <small className="field-help">{t("details.goalHelp")}</small>
+        </fieldset>
         <div className="common-fields-grid">
           <label className="field-block">
             {t("details.audience")} <span className="optional-mark">{t("common.optional")}</span>
@@ -1593,7 +1592,7 @@ export function CreateVideoForm({
                   {websiteUrl.trim().replace(/^https?:\/\//i, "")}
                 </p>
               ) : null}
-              <p className="branding-preview-credit">prompt2spot.com</p>
+              <p className="branding-preview-credit">reelmino.com</p>
             </div>
           </div>
         ) : null}

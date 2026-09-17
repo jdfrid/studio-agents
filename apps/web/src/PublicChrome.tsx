@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext.js";
+import { BrandLockup } from "./BrandLockup.js";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher.js";
 
 export function PublicChrome({
@@ -18,13 +19,7 @@ export function PublicChrome({
     <div className="landing site-shell">
       <header className="landing-header">
         <button type="button" className="brand-lockup" onClick={() => onNavigate("/")} aria-label={t("landing.homeLabel")}>
-          <span className="brand-mark" aria-hidden>
-            P2
-          </span>
-          <span className="brand-copy">
-            <strong className="brand">Prompt2Spot</strong>
-            <small>{t("common.brandTagline")}</small>
-          </span>
+          <BrandLockup tagline={t("common.brandTagline")} />
         </button>
         <nav className="landing-nav" aria-label={t("landing.siteNav")}>
           <button type="button" className="nav-text" onClick={() => onNavigate("/about")}>
@@ -51,10 +46,7 @@ export function PublicChrome({
       {children}
       <footer className="landing-footer">
         <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden>
-            P2
-          </span>
-          <strong>Prompt2Spot</strong>
+          <BrandLockup />
         </div>
         <nav className="footer-links" aria-label={st("footer.legalNav")}>
           <button type="button" className="nav-text" onClick={() => onNavigate("/about")}>

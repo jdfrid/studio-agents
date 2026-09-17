@@ -21,7 +21,7 @@ describe("youtube adapter", () => {
     delete process.env.YOUTUBE_CLIENT_SECRET;
 
     const { authorizeUrl } = await createYoutubeAdapter().startOAuth!({
-      redirectUri: "https://prompt2spot.com/auth/google/callback",
+      redirectUri: "https://reelmino.com/auth/google/callback",
       state: "st"
     });
     const params = new URL(authorizeUrl).searchParams;

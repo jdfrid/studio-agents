@@ -102,8 +102,9 @@ model BrandTemplate {
 
 model User {
   id        String   @id @default(cuid())
-  googleId  String   @unique
+  googleId  String?  @unique
   email     String   @unique
+  passwordHash String?
   name      String?
   avatarUrl String?
   role      UserRole @default(USER)
@@ -129,6 +130,20 @@ model User {
   automationCampaigns AutomationCampaign[]
 
   @@index([email])
+}
+
+model EmailOtp {
+  id           String   @id @default(cuid())
+  email        String
+  codeHash     String
+  passwordHash String?
+  purpose      String
+  expiresAt    DateTime
+  attempts     Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([email, purpose])
+  @@index([expiresAt])
 }
 
 model UserLoginEvent {

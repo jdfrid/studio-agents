@@ -48,13 +48,13 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 if command -v caddy >/dev/null 2>&1 && [ -f /etc/caddy/Caddyfile ]; then
   if grep -q 'localhost:8080' /etc/caddy/Caddyfile && ! grep -q 'localhost:8081' /etc/caddy/Caddyfile; then
     echo "Updating Caddyfile so admin.* proxies to port 8081..."
-    bash "$(dirname "$0")/setup-domain.sh" prompt2spot.com || true
+    bash "$(dirname "$0")/setup-domain.sh" reelmino.com || true
   fi
 fi
 
 echo "Studio Agents is up."
 echo "  Git HEAD: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-echo "  User app:  http://prompt2spot.com (or http://$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'))"
-echo "  Admin app: http://admin.prompt2spot.com (docker port ${ADMIN_HTTP_PORT:-8081})"
+echo "  User app:  http://reelmino.com (or http://$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'))"
+echo "  Admin app: http://admin.reelmino.com (docker port ${ADMIN_HTTP_PORT:-8081})"
 echo ""
 echo "If deploy was run elsewhere: on this VPS use: cd ~/studio-agents && git pull && bash infra/hetzner/deploy.sh"

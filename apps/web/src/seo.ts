@@ -1,4 +1,6 @@
-const SITE = "https://prompt2spot.com";
+import { PRODUCT_NAME, PRODUCT_URL } from "@studio/shared";
+
+const SITE = PRODUCT_URL;
 
 export type SeoInput = {
   title: string;
@@ -36,7 +38,7 @@ export function applySeo({ title, description, path }: SeoInput): void {
 }
 
 export const defaultSeo = {
-  title: "Prompt2Spot — AI video studio for business videos",
+  title: `${PRODUCT_NAME} — Your story. Now in motion.`,
   description:
-    "Turn a brief and brand assets into a publish-ready business video. Script, voice, visuals, captions, and render in one guided studio."
+    "An AI video studio for your business. Describe the story, add optional materials, and get a publish-ready video."
 };

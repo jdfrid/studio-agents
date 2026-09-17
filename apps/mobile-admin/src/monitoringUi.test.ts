@@ -86,7 +86,7 @@ describe("mobile monitoring UI", () => {
       metadata: { technicalMessage: "fetch failed", errorCode: "monitor_failed" },
       monitor: { provider: "api", displayName: "API" }
     } satisfies ProviderAlert;
-    expect(localizedAlert(alert).title).toContain("תשתית Prompt2Spot");
+    expect(localizedAlert(alert).title).toContain("תשתית Reelmino");
     expect(localizedAlert(alert).message).toContain("אינה בעיית יתרה");
   });
 });

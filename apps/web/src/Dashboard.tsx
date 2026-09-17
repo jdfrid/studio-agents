@@ -14,7 +14,7 @@ type RunSummary = {
 };
 
 type DashFilter = "all" | "drafts" | "running" | "ready" | "action";
-const SCROLL_KEY = "prompt2spot:dash-scroll";
+const SCROLL_KEY = "reelmino:dash-scroll";
 
 export function Dashboard({
   onNewVideo,

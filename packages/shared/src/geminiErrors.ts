@@ -108,8 +108,8 @@ export function userFacingGeminiError(
     case "billing_quota":
       if (provider === "heygen") {
         return [
-          "נגמרו הקרדיטים בחשבון HeyGen — זה לא התשלום ל-Prompt2Spot.",
-          "תשלום ₪ ב-Prompt2Spot מכסה יצירת סרטונים במערכת; סנכרון שפתיים (HeyGen) הוא שירות נפרד שדורש קרדיטים ב-HeyGen.",
+          "נגמרו הקרדיטים בחשבון HeyGen — זה לא התשלום ל-Reelmino.",
+          "תשלום ₪ ב-Reelmino מכסה יצירת סרטונים במערכת; סנכרון שפתיים (HeyGen) הוא שירות נפרד שדורש קרדיטים ב-HeyGen.",
           "אפשרויות: (1) HeyGen → Billing / Credits → רכוש קרדיטים, ואז «הפעל מחדש את השלב»;",
           "או (2) צור סרטון חדש עם «תנועות שפתיים» כבוי — ואז הרינדור רץ על Veo/Wan בלי HeyGen."
         ].join(" ");

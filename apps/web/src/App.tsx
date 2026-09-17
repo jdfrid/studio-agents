@@ -9,7 +9,9 @@ import { BrandPage } from "./BrandPage.js";
 import { AutomationPage } from "./AutomationPage.js";
 import { DistributionPage } from "./DistributionPage.js";
 import { AboutPage, ContactPage, LegalPage, PricingPage } from "./SitePages.js";
+import { BrandLockup } from "./BrandLockup.js";
 import { applySeo, defaultSeo } from "./seo.js";
+import { PRODUCT_NAME } from "@studio/shared";
 import type { ProjectRunView } from "./types.js";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher.js";
 import { WhatsNewDialog } from "./WhatsNewDialog.js";
@@ -25,7 +27,6 @@ import {
   writeStoredDate,
   type WhatsNewEntry
 } from "./whatsNew.js";
-import "./styles.css";
 
 type AppView =
   | "landing"
@@ -190,12 +191,12 @@ function AppShell() {
 
   useEffect(() => {
     const path = pathFor({ view, runId });
-    if (view === "about") applySeo({ title: `${st("about.title")} | Prompt2Spot`, description: st("about.lead"), path });
-    else if (view === "contact") applySeo({ title: `${st("contact.title")} | Prompt2Spot`, description: st("contact.lead"), path });
-    else if (view === "terms") applySeo({ title: `${st("legal.terms.title")} | Prompt2Spot`, description: st("legal.terms.updated"), path });
-    else if (view === "privacy") applySeo({ title: `${st("legal.privacy.title")} | Prompt2Spot`, description: st("legal.privacy.updated"), path });
-    else if (view === "legal") applySeo({ title: `${st("legal.commercial.title")} | Prompt2Spot`, description: st("legal.commercial.updated"), path });
-    else if (view === "pricing") applySeo({ title: `${t("landing.plans.title")} | Prompt2Spot`, description: st("pricing.checkoutLead"), path });
+    if (view === "about") applySeo({ title: `${st("about.title")} | ${PRODUCT_NAME}`, description: st("about.lead"), path });
+    else if (view === "contact") applySeo({ title: `${st("contact.title")} | ${PRODUCT_NAME}`, description: st("contact.lead"), path });
+    else if (view === "terms") applySeo({ title: `${st("legal.terms.title")} | ${PRODUCT_NAME}`, description: st("legal.terms.updated"), path });
+    else if (view === "privacy") applySeo({ title: `${st("legal.privacy.title")} | ${PRODUCT_NAME}`, description: st("legal.privacy.updated"), path });
+    else if (view === "legal") applySeo({ title: `${st("legal.commercial.title")} | ${PRODUCT_NAME}`, description: st("legal.commercial.updated"), path });
+    else if (view === "pricing") applySeo({ title: `${t("landing.plans.title")} | ${PRODUCT_NAME}`, description: st("pricing.checkoutLead"), path });
     else applySeo({ ...defaultSeo, path: path === "/" ? "/" : path });
   }, [st, t, view, runId]);
 
@@ -222,13 +223,7 @@ function AppShell() {
           onClick={() => navigate({ view: "dashboard", runId: null })}
           aria-label={t("shell.homeLabel")}
         >
-          <span className="brand-mark" aria-hidden>
-            P2
-          </span>
-          <span className="brand-copy">
-            <strong className="brand">Prompt2Spot</strong>
-            <small>{t("common.brandTagline")}</small>
-          </span>
+          <BrandLockup tagline={t("common.brandTagline")} />
         </button>
         <nav className="saas-nav" aria-label={t("shell.primaryNav")}>
           <button

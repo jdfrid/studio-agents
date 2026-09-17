@@ -10,8 +10,9 @@ export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   { id: "brand-templates", date: "2026-09-07" }
 ];
 
-export const WHATS_NEW_STORAGE_KEY = "prompt2spot:whatsNew:lastVisit";
-export const WHATS_NEW_REOPEN_KEY = "prompt2spot:whatsNew:reopen";
+export const WHATS_NEW_STORAGE_KEY = "reelmino:whatsNew:lastVisit";
+export const WHATS_NEW_REOPEN_KEY = "reelmino:whatsNew:reopen";
+const LEGACY_WHATS_NEW_REOPEN_KEY = "prompt2spot:whatsNew:reopen";
 
 export function storageKeyFor(base: string, userId?: string | null): string {
   return userId ? `${base}:${userId}` : base;
@@ -31,7 +32,10 @@ export function entriesSince(lastVisit: string | null, catalog = WHATS_NEW_ENTRI
 
 export function readStoredDate(key: string): string | null {
   try {
-    const value = window.localStorage.getItem(key);
+    const value = window.localStorage.getItem(key)
+      ?? (key.startsWith("reelmino:")
+        ? window.localStorage.getItem(key.replace(/^reelmino:/, "prompt2spot:"))
+        : null);
     return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
   } catch {
     return null;
@@ -48,7 +52,9 @@ export function writeStoredDate(key: string, value: string): void {
 
 export function readReopenEnabled(userId?: string | null): boolean {
   try {
-    return window.localStorage.getItem(storageKeyFor(WHATS_NEW_REOPEN_KEY, userId)) === "1";
+    const key = storageKeyFor(WHATS_NEW_REOPEN_KEY, userId);
+    const legacy = storageKeyFor(LEGACY_WHATS_NEW_REOPEN_KEY, userId);
+    return window.localStorage.getItem(key) === "1" || window.localStorage.getItem(legacy) === "1";
   } catch {
     return false;
   }

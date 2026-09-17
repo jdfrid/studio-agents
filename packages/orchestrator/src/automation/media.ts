@@ -34,7 +34,7 @@ async function downloadImageDataUrl(url: string): Promise<{ mimeType: string; da
     const res = await fetch(url, {
       signal: controller.signal,
       redirect: "follow",
-      headers: { "user-agent": "Prompt2SpotBot/0.1 (+https://prompt2spot.com)", accept: "image/*" }
+      headers: { "user-agent": "ReelminoBot/0.1 (+https://reelmino.com)", accept: "image/*" }
     });
     if (!res.ok) return null;
     const mimeType = (res.headers.get("content-type") ?? "image/jpeg").split(";")[0]!.trim();

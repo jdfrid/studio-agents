@@ -103,7 +103,7 @@ const PROVIDER_NAMES_HE: Record<string, string> = {
   freesound: "Freesound — אפקטים קוליים",
   postgresql: "מסד הנתונים PostgreSQL",
   redis: "Redis",
-  api: "תשתית Prompt2Spot — שרת API",
+  api: "תשתית Reelmino — שרת API",
   worker: "מעבד המשימות"
 };
 
@@ -210,7 +210,7 @@ const SYSTEM_INVENTORY: ProviderInventoryEntry[] = [
   {
     provider: "api",
     displayName: providerNameHe("api"),
-    company: "Prompt2Spot",
+    company: "Reelmino",
     capability: "API פנימי לאפליקציות ולניהול",
     category: "SYSTEM_INFRASTRUCTURE",
     configured: true,
@@ -219,7 +219,7 @@ const SYSTEM_INVENTORY: ProviderInventoryEntry[] = [
   {
     provider: "worker",
     displayName: providerNameHe("worker"),
-    company: "Prompt2Spot",
+    company: "Reelmino",
     capability: "עיבוד משימות היצירה ברקע",
     category: "SYSTEM_INFRASTRUCTURE",
     configured: true,

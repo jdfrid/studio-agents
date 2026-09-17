@@ -2,11 +2,15 @@ import { OAuth2Client } from "google-auth-library";
 
 let client: OAuth2Client | null = null;
 
+export function googleRedirectUri(): string {
+  return `${appUrl()}/auth/google/callback`;
+}
+
 function getClient(): OAuth2Client {
   if (!client) {
     const id = process.env.GOOGLE_CLIENT_ID;
     const secret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirect = `${appUrl()}/auth/google/callback`;
+    const redirect = googleRedirectUri();
     if (!id || !secret) throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required");
     client = new OAuth2Client(id, secret, redirect);
   }
@@ -18,16 +22,18 @@ export function appUrl(): string {
 }
 
 export function googleAuthUrl(state: string): string {
+  const redirect_uri = googleRedirectUri();
   return getClient().generateAuthUrl({
     access_type: "offline",
     scope: ["openid", "email", "profile"],
     prompt: "select_account",
-    state
+    state,
+    redirect_uri
   });
 }
 
 export async function exchangeGoogleCode(code: string) {
-  const { tokens } = await getClient().getToken(code);
+  const { tokens } = await getClient().getToken({ code, redirect_uri: googleRedirectUri() });
   if (!tokens.id_token) throw new Error("Missing id_token from Google");
   const ticket = await getClient().verifyIdToken({
     idToken: tokens.id_token,

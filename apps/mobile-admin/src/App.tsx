@@ -38,7 +38,7 @@ function Login({ error }: { error: string }) {
   return (
     <main className="login">
       <div className="brand">P2S</div>
-      <h1>ניהול Prompt2Spot</h1>
+      <h1>ניהול Reelmino</h1>
       <p>אפליקציה פרטית למנהלי המערכת בלבד</p>
       {error && <div className="error">{error}</div>}
       <button className="primary" onClick={() => void beginLogin()}>
@@ -186,7 +186,7 @@ export default function App() {
     <div className="app-shell">
       <header>
         <div>
-          <small>Prompt2Spot</small>
+          <small>Reelmino</small>
           <h1>{tabs.find((tab) => tab.id === screen)?.label}</h1>
         </div>
         <button className="icon" aria-label="רענון" onClick={() => void loadScreen()}>

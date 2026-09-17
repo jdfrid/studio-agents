@@ -39,16 +39,16 @@ export async function createCheckout(userId: string, email: string, plan: Checko
           logo: true,
           desc: true,
           discount: false,
-          dark: true,
+          dark: false,
           subscription_preview: true,
-          button_color: "#7559FF"
+          button_color: "#173D35"
         },
         product_options: {
           name: copy.name,
           description: copy.description,
           redirect_url: `${appUrl}/?payment=success`,
-          receipt_button_text: "Back to Prompt2Spot",
-          receipt_thank_you_note: "Thank you. Your credits will appear in Prompt2Spot shortly.",
+          receipt_button_text: "Back to Reelmino",
+          receipt_thank_you_note: "Thank you. Your credits will appear in Reelmino shortly.",
           receipt_link_url: `${appUrl}/`
         }
       },

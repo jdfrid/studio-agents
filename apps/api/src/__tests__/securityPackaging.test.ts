@@ -18,8 +18,8 @@ describe("corsOrigins", () => {
     const prevApp = process.env.APP_URL;
     process.env.NODE_ENV = "production";
     delete process.env.CORS_ORIGINS;
-    process.env.APP_URL = "https://prompt2spot.com";
-    expect(corsOrigins()).toEqual(["https://prompt2spot.com"]);
+    process.env.APP_URL = "https://reelmino.com";
+    expect(corsOrigins()).toEqual(["https://reelmino.com"]);
     process.env.NODE_ENV = prevNode;
     if (prevCors === undefined) delete process.env.CORS_ORIGINS;
     else process.env.CORS_ORIGINS = prevCors;

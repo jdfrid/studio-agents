@@ -16,7 +16,7 @@ export function corsOrigins(): string[] | boolean {
   if (configured?.length) return configured;
   if (process.env.NODE_ENV === "production") {
     const appUrl = process.env.APP_URL?.trim();
-    return appUrl ? [appUrl] : ["https://prompt2spot.com"];
+    return appUrl ? [appUrl] : ["https://reelmino.com"];
   }
   return true;
 }

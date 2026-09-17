@@ -387,7 +387,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
           renderProfileId: renderProfile.id,
           provider: renderProfile.provider,
           strategy: renderProfile.strategy,
-          endCard: input.branding && shouldUseBusinessEndCard(input.branding) ? "business" : "Prompt2Spot",
+          endCard: input.branding && shouldUseBusinessEndCard(input.branding) ? "business" : "Reelmino",
           branding: input.branding ?? null,
           subtitleStyle: input.karaokeCaptions ? resolveSubtitleStyle(input.subtitleStyle) : null,
           videoInsert: input.videoInsert
@@ -628,7 +628,7 @@ async function renderExtendChain(
       renderProfileId: renderProfile.id,
       provider: renderProfile.provider,
       strategy: renderProfile.strategy,
-      endCard: input.branding && shouldUseBusinessEndCard(input.branding) ? "business" : "Prompt2Spot",
+      endCard: input.branding && shouldUseBusinessEndCard(input.branding) ? "business" : "Reelmino",
       branding: input.branding ?? null,
       subtitleStyle: input.karaokeCaptions ? resolveSubtitleStyle(input.subtitleStyle) : null,
       videoInsert: input.videoInsert
@@ -1228,13 +1228,16 @@ async function downscaleVideo(videoPath: string, width: number, dir: string): Pr
 const BRANDING_END_CARD_SECONDS = 2.8;
 const BRANDING_END_CARD_WITH_VOICE_SECONDS = 5.5;
 const BRANDING_END_FADE_SECONDS = 0.85;
-const BRANDING_END_TEXT = "prompt2spot.com";
+const BRANDING_END_TEXT = "reelmino.com";
 
 function resolveBrandingOutroImage(): string | null {
   const envPath = process.env.BRANDING_OUTRO_IMAGE?.trim();
   const here = path.dirname(fileURLToPath(import.meta.url));
   const candidates = [
     envPath,
+    path.join(here, "..", "assets", "reelmino-outro.png"),
+    path.join(process.cwd(), "packages", "agents", "render", "assets", "reelmino-outro.png"),
+    path.join(process.cwd(), "assets", "reelmino-outro.png"),
     path.join(here, "..", "assets", "prompt2spot-outro.png"),
     path.join(process.cwd(), "packages", "agents", "render", "assets", "prompt2spot-outro.png"),
     path.join(process.cwd(), "assets", "prompt2spot-outro.png")
@@ -1667,7 +1670,7 @@ async function burnKaraokeAndWatermark(
     const defaultFont = resolveDrawtextFont();
     if (wantMark) {
       const mark =
-        input.branding?.businessName?.trim() || input.branding?.slogan?.trim() || "prompt2spot.com";
+        input.branding?.businessName?.trim() || input.branding?.slogan?.trim() || "reelmino.com";
       const size = Math.max(18, Math.round(Math.min(dimensions.width, dimensions.height) * 0.028));
       generatedLayers.push({
         text: mark,
@@ -1785,7 +1788,7 @@ async function burnKaraokeAndWatermark(
 }
 
 /**
- * Fade from the last frame into branding outro (business card or Prompt2Spot).
+ * Fade from the last frame into branding outro (business card or Reelmino).
  * Best-effort: on failure returns the input video unchanged.
  */
 async function appendBrandingEndCard(

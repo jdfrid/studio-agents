@@ -25,18 +25,18 @@ export function checkoutCopy(plan: CheckoutPlanId): { name: string; description:
   const catalog = CHECKOUT_PLANS[plan];
   if (plan === "payg") {
     return {
-      name: "Prompt2Spot — single video",
+      name: "Reelmino — single video",
       description: `${catalog.credits} credits for one video of up to 30 seconds.`
     };
   }
   if (plan === "starter") {
     return {
-      name: "Prompt2Spot — Starter",
+      name: "Reelmino — Starter",
       description: `${catalog.credits} credits per month, about ${catalog.equivalentVideos} videos of up to 30 seconds.`
     };
   }
   return {
-    name: "Prompt2Spot — Business",
+    name: "Reelmino — Business",
     description: `${catalog.credits} credits per month, about ${catalog.equivalentVideos} videos of up to 30 seconds.`
   };
 }

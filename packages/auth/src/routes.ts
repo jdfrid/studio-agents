@@ -6,8 +6,9 @@ import {
   appUrl
 } from "./google.js";
 import { SocialNetworkSchema, type UserView } from "@studio/shared";
-import { getUserViewWithCredits, findOrCreateUser } from "./users.js";
-import { recordUserLogin } from "./loginAudit.js";
+import { startEmailAuth, verifyEmailAuth, EmailAuthFailed } from "./emailAuth.js";
+import { clientIp, recordUserLogin } from "./loginAudit.js";
+import { findOrCreateUser, getUserViewWithCredits } from "./users.js";
 import { isAuthDisabled, sessionCookieName, sessionCookieOptions, sessionCookieClearOptions, signSession, verifySession, type SessionPayload } from "./jwt.js";
 import {
   createMobileAuthCode,
@@ -146,6 +147,42 @@ export async function registerAuthRoutes(app: FastifyInstance) {
           ? oauthReturn
           : appUrl();
     reply.redirect(dest);
+  });
+
+  app.post("/auth/email/start", async (request, reply) => {
+    const body = (request.body ?? {}) as { email?: string; password?: string; locale?: string };
+    try {
+      await startEmailAuth({
+        email: body.email ?? "",
+        password: body.password ?? "",
+        locale: body.locale,
+        ip: clientIp(request)
+      });
+      return { ok: true };
+    } catch (err) {
+      if (err instanceof EmailAuthFailed) {
+        return reply.code(err.status).send({ error: err.code });
+      }
+      request.log.error({ err }, "email auth start failed");
+      return reply.code(500).send({ error: "mail_failed" });
+    }
+  });
+
+  app.post("/auth/email/verify", async (request, reply) => {
+    const body = (request.body ?? {}) as { email?: string; code?: string };
+    try {
+      const user = await verifyEmailAuth({ email: body.email ?? "", code: body.code ?? "" });
+      await recordUserLogin(user.id, request);
+      const token = await signSession({ sub: user.id, email: user.email, role: user.role });
+      reply.setCookie(sessionCookieName(), token, sessionCookieOptions(isSecure()));
+      return user;
+    } catch (err) {
+      if (err instanceof EmailAuthFailed) {
+        return reply.code(err.status).send({ error: err.code });
+      }
+      request.log.error({ err }, "email auth verify failed");
+      return reply.code(500).send({ error: "otp_invalid" });
+    }
   });
 
   app.get("/auth/me", async (request, reply) => {

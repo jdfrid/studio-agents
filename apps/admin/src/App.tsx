@@ -22,6 +22,142 @@ import {
 
 type AppView = "runs" | "users" | "log" | "settings" | "catalog";
 
+const ADMIN_AUTH_ERRORS: Record<string, string> = {
+  invalid_email: "כתובת המייל לא תקינה.",
+  invalid_password: "הסיסמה חייבת להיות לפחות 8 תווים.",
+  invalid_credentials: "מייל או סיסמה שגויים.",
+  use_google: "החשבון הזה נוצר עם Google. היכנסו דרך Google.",
+  rate_limited: "יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.",
+  mail_not_configured: "שליחת המייל לא מוגדרת בשרת.",
+  otp_invalid: "הקוד שגוי.",
+  otp_expired: "הקוד פג. בקשו קוד חדש.",
+  mail_failed: "לא הצלחנו לשלוח את המייל."
+};
+
+function adminAuthMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : "";
+  return ADMIN_AUTH_ERRORS[raw] ?? "הכניסה נכשלה. נסו שוב.";
+}
+
+function AdminLogin({ onAuthed }: { onAuthed: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function start() {
+    setBusy(true);
+    setError("");
+    try {
+      await apiPost("/auth/email/start", { email, password, locale: "he" });
+      setCodeSent(true);
+    } catch (err) {
+      setError(adminAuthMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify() {
+    setBusy(true);
+    setError("");
+    try {
+      const user = await apiPost<UserView>("/auth/email/verify", { email, code });
+      if (user.role !== "ADMIN") {
+        await apiPost("/auth/logout").catch(() => undefined);
+        setError("נדרשת הרשאת מנהל.");
+        return;
+      }
+      onAuthed();
+    } catch (err) {
+      setError(adminAuthMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-login">
+      <h1>Reelmino Admin</h1>
+      <p>נדרשת הרשאת מנהל.</p>
+      <form
+        className="admin-login-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (codeSent) void verify();
+          else void start();
+        }}
+      >
+        <label>
+          אימייל
+          <input
+            type="email"
+            autoComplete="username"
+            required
+            value={email}
+            disabled={busy || codeSent}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </label>
+        {codeSent ? (
+          <label>
+            קוד בן 6 ספרות
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="\d{6}"
+              maxLength={6}
+              required
+              value={code}
+              disabled={busy}
+              onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            />
+          </label>
+        ) : (
+          <label>
+            סיסמה
+            <input
+              type="password"
+              autoComplete="current-password"
+              minLength={8}
+              required
+              value={password}
+              disabled={busy}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+        )}
+        {codeSent ? <p className="muted">שלחנו קוד למייל. בדקו גם בספאם.</p> : null}
+        {error ? <p className="error-inline">{error}</p> : null}
+        <button type="submit" className="primary" disabled={busy}>
+          {busy ? "עובדים על זה…" : codeSent ? "אישור וכניסה" : "שלחו קוד למייל"}
+        </button>
+      </form>
+      {codeSent ? (
+        <button
+          type="button"
+          className="link-btn"
+          disabled={busy}
+          onClick={() => {
+            setCodeSent(false);
+            setCode("");
+            setError("");
+          }}
+        >
+          מייל אחר
+        </button>
+      ) : null}
+      <p className="admin-login-or">או</p>
+      <a className="primary" href={authLoginUrl()}>
+        התחבר עם Google
+      </a>
+    </div>
+  );
+}
+
 export function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -71,13 +207,7 @@ export function App() {
   if (authed === null) return <p className="muted">טוען…</p>;
   if (!authed) {
     return (
-      <div className="admin-login">
-        <h1>Prompt2Spot Admin</h1>
-        <p>נדרשת הרשאת מנהל.</p>
-        <a className="primary" href={authLoginUrl()}>
-          התחבר עם Google
-        </a>
-      </div>
+      <AdminLogin onAuthed={() => setAuthed(true)} />
     );
   }
 
@@ -86,7 +216,7 @@ export function App() {
   return (
     <div className="layout">
       <header>
-        <h1>Prompt2Spot — ניהול</h1>
+        <h1>Reelmino — ניהול</h1>
         <nav className="app-nav">
           <button type="button" className={view === "runs" ? "nav-active" : ""} onClick={() => setView("runs")}>
             ריצות

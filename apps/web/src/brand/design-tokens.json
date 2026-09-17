@@ -1,0 +1,32 @@
+{
+  "name": "Reelmino",
+  "version": "2026-09",
+  "note": "Reconstructed from the brand book. Path-based wordmark from the original kit was not in this repo; the UI typesets the name next to the symbol without flipping in RTL.",
+  "color": {
+    "forest": "#173D35",
+    "lime": "#D9F279",
+    "paper": "#F6F7F2",
+    "white": "#FFFFFF",
+    "ink": "#172C26",
+    "muted": "#596A62",
+    "border": "#D8DED6",
+    "error": "#AD2F38",
+    "errorBg": "#FFF0F0",
+    "warning": "#805A12",
+    "warningBg": "#FFF5D6",
+    "success": "#206747",
+    "successBg": "#E7F4E9",
+    "focus": "#276DCA"
+  },
+  "type": {
+    "latin": "Manrope",
+    "hebrew": "Heebo",
+    "fallback": "Arial, sans-serif"
+  },
+  "space": [4, 8, 12, 16, 24, 32, 48, 64, 96],
+  "radius": { "control": 12, "card": 20, "modal": 24 },
+  "controlHeight": 48,
+  "motionMs": { "ui": [120, 200], "panel": 300 },
+  "contentMax": 1200,
+  "formMax": 680
+}

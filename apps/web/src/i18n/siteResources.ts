@@ -11,13 +11,13 @@ export const siteResources = {
     footer: { legalNav: "קישורים משפטיים" },
     pricing: {
       checkoutLead:
-        "המחירים להלן הם המחירון הנוכחי בקרדיטים. הרכישה מתבצעת באתר דרך Lemon Squeezy, אחרי התחברות עם Google. סרטון עד 30 שניות = 40 קרדיטים.",
+        "המחירים להלן הם המחירון הנוכחי בקרדיטים. הרכישה מתבצעת באתר דרך Lemon Squeezy, אחרי התחברות. סרטון עד 30 שניות = 40 קרדיטים.",
       contactCta: "שאלה על מחיר או על מסלול אוטומטי? פנו אלינו"
     },
     about: {
       eyebrow: "הסיפור",
       title: "סטודיו וידאו עסקי, בלי לנהל חמישה כלי AI",
-      lead: "Prompt2Spot נועד לעסקים שצריכים סרטון מוכן לפרסום — ממוצר יומי ועד שירות מקומי — בלי להעביר קבצים בין מערכות.",
+      lead: "Reelmino נועד לעסקים שצריכים סרטון מוכן לפרסום — ממוצר יומי ועד שירות מקומי — בלי להעביר קבצים בין מערכות.",
       whatTitle: "מה המערכת עושה",
       whatBody:
         "אתם מתארים מטרה, קהל ומסר, מעלים תמונות מותג, והמערכת מובילה תהליך מודרך: בריף, תסריט, קול, ויזואל, כתוביות ורינדור. אפשר לאשר כל שלב או לרוץ אוטומטית.",
@@ -26,7 +26,7 @@ export const siteResources = {
         "חנויות, עסקים מקומיים, נותני שירות וצוותי שיווק שרוצים סרטונים קצרים לרשתות — עם מיתוג עקבי, בלי צוות הפקה מלא לכל סרטון.",
       howTitle: "איך אנחנו עובדים",
       howBody:
-        "השירות פועל באתר prompt2spot.com. חשבון נפתח עם Google. קרדיטים ומכסת ניסיון מנוהלים בחשבון. הפצה לרשתות חברתיות זמינה כרגע למנהלי המערכת בלבד."
+        "השירות פועל באתר reelmino.com. חשבון נפתח עם מייל או Google. קרדיטים ומכסת ניסיון מנוהלים בחשבון. הפצה לרשתות חברתיות זמינה כרגע למנהלי המערכת בלבד."
     },
     contact: {
       eyebrow: "שיחה",
@@ -45,15 +45,15 @@ export const siteResources = {
       terms: {
         eyebrow: "משפטי",
         title: "תנאי שימוש",
-        updated: "עודכן: 9 בספטמבר 2026. השימוש באתר ובשירות Prompt2Spot מהווה הסכמה לתנאים אלה.",
+        updated: "עודכן: 9 בספטמבר 2026. השימוש באתר ובשירות Reelmino מהווה הסכמה לתנאים אלה.",
         sections: [
           {
             title: "השירות",
-            body: "Prompt2Spot הוא סטודיו מקוון ליצירת סרטונים עסקיים בעזרת בינה מלאכותית. השירות ניתן כפי שהוא, לפי זמינות ספקי עיבוד חיצוניים, ויכול להשתנות."
+            body: "Reelmino הוא סטודיו מקוון ליצירת סרטונים עסקיים בעזרת בינה מלאכותית. השירות ניתן כפי שהוא, לפי זמינות ספקי עיבוד חיצוניים, ויכול להשתנות."
           },
           {
             title: "חשבון וגישה",
-            body: "ההתחברות מתבצעת באמצעות Google. אתם אחראים לשמור על סודיות החשבון ולמסור מידע נכון. אנחנו רשאים להשעות חשבון שפוגע בשירות, במשתמשים אחרים או בחוק."
+            body: "ההתחברות מתבצעת באמצעות מייל וסיסמה (עם קוד אימות שנשלח למייל) או Google. אתם אחראים לשמור על סודיות החשבון ולמסור מידע נכון. אנחנו רשאים להשעות חשבון שפוגע בשירות, במשתמשים אחרים או בחוק."
           },
           {
             title: "תוכן שהועלה",
@@ -69,7 +69,7 @@ export const siteResources = {
           },
           {
             title: "אחריות",
-            body: "במידה המרבית שמותרת בחוק, Prompt2Spot אינו אחראי לנזק עקיף, אובדן רווחים, או כשל אצל ספקי ענן ובינה מלאכותית. האחריות המצטברת מוגבלת לסכום ששולם לשירות ב־90 הימים שקדמו לתביעה, או לאפס אם לא שולם תשלום."
+            body: "במידה המרבית שמותרת בחוק, Reelmino אינו אחראי לנזק עקיף, אובדן רווחים, או כשל אצל ספקי ענן ובינה מלאכותית. האחריות המצטברת מוגבלת לסכום ששולם לשירות ב־90 הימים שקדמו לתביעה, או לאפס אם לא שולם תשלום."
           },
           {
             title: "דין וסמכות",
@@ -80,11 +80,11 @@ export const siteResources = {
       privacy: {
         eyebrow: "פרטיות",
         title: "מדיניות פרטיות",
-        updated: "עודכן: 9 בספטמבר 2026. מדיניות זו מסבירה איך Prompt2Spot אוסף ומשתמש במידע.",
+        updated: "עודכן: 9 בספטמבר 2026. מדיניות זו מסבירה איך Reelmino אוסף ומשתמש במידע.",
         sections: [
           {
             title: "מידע שנאסף",
-            body: "אנחנו אוספים פרטי חשבון מ-Google (שם, אימייל, תמונת פרופיל), תוכן שאתם מעלים או יוצרים בשירות, נתוני שימוש טכניים, ופניות מטופס יצירת הקשר."
+            body: "אנחנו אוספים פרטי חשבון (אימייל, ואם נכנסתם עם Google גם שם ותמונת פרופיל), תוכן שאתם מעלים או יוצרים בשירות, נתוני שימוש טכניים, ופניות מטופס יצירת הקשר."
           },
           {
             title: "למה זה משמש",
@@ -145,13 +145,13 @@ export const siteResources = {
     footer: { legalNav: "Legal links" },
     pricing: {
       checkoutLead:
-        "These are the current credit-based list prices. Checkout runs on the site through Lemon Squeezy after you sign in with Google. A video of up to 30 seconds uses 40 credits.",
+        "These are the current credit-based list prices. Checkout runs on the site through Lemon Squeezy after you sign in. A video of up to 30 seconds uses 40 credits.",
       contactCta: "Questions about pricing or the automatic plan? Contact us"
     },
     about: {
       eyebrow: "The story",
       title: "A business video studio without juggling five AI tools",
-      lead: "Prompt2Spot is for businesses that need a publish-ready video — from a daily product to a local service — without moving files between systems.",
+      lead: "Reelmino is for businesses that need a publish-ready video — from a daily product to a local service — without moving files between systems.",
       whatTitle: "What the product does",
       whatBody:
         "You describe the goal, audience, and message, upload brand images, and the system runs a guided workflow: brief, script, voice, visuals, captions, and render. Approve each stage or run automatically.",
@@ -160,7 +160,7 @@ export const siteResources = {
         "Shops, local businesses, service providers, and marketing teams that want short videos for social platforms — with consistent branding, without a full production crew for every clip.",
       howTitle: "How we work",
       howBody:
-        "The service runs at prompt2spot.com. Accounts sign in with Google. Credits and any trial allowance live on the account. Social distribution is currently limited to platform administrators."
+        "The service runs at reelmino.com. Accounts sign in with email or Google. Credits and any trial allowance live on the account. Social distribution is currently limited to platform administrators."
     },
     contact: {
       eyebrow: "A conversation",
@@ -179,15 +179,15 @@ export const siteResources = {
       terms: {
         eyebrow: "Legal",
         title: "Terms of use",
-        updated: "Updated 9 September 2026. Using the Prompt2Spot site and service means you agree to these terms.",
+        updated: "Updated 9 September 2026. Using the Reelmino site and service means you agree to these terms.",
         sections: [
           {
             title: "The service",
-            body: "Prompt2Spot is an online studio for creating business videos with AI. It is provided as available, depends on third-party processing providers, and may change."
+            body: "Reelmino is an online studio for creating business videos with AI. It is provided as available, depends on third-party processing providers, and may change."
           },
           {
             title: "Accounts",
-            body: "Sign-in uses Google. You must keep the account secure and provide accurate information. We may suspend an account that harms the service, other users, or the law."
+            body: "Sign-in uses email and password (with a one-time code sent to your inbox) or Google. You must keep the account secure and provide accurate information. We may suspend an account that harms the service, other users, or the law."
           },
           {
             title: "Uploaded content",
@@ -203,7 +203,7 @@ export const siteResources = {
           },
           {
             title: "Liability",
-            body: "To the fullest extent allowed by law, Prompt2Spot is not liable for indirect loss, lost profits, or failures at cloud and AI vendors. Aggregate liability is limited to amounts paid for the service in the 90 days before a claim, or zero if nothing was paid."
+            body: "To the fullest extent allowed by law, Reelmino is not liable for indirect loss, lost profits, or failures at cloud and AI vendors. Aggregate liability is limited to amounts paid for the service in the 90 days before a claim, or zero if nothing was paid."
           },
           {
             title: "Governing law",
@@ -214,11 +214,11 @@ export const siteResources = {
       privacy: {
         eyebrow: "Privacy",
         title: "Privacy policy",
-        updated: "Updated 9 September 2026. This policy explains how Prompt2Spot collects and uses information.",
+        updated: "Updated 9 September 2026. This policy explains how Reelmino collects and uses information.",
         sections: [
           {
             title: "Information we collect",
-            body: "We collect Google account details (name, email, profile photo), content you upload or create, technical usage data, and messages sent through the contact form."
+            body: "We collect account details (email, and if you sign in with Google also name and profile photo), content you upload or create, technical usage data, and messages sent through the contact form."
           },
           {
             title: "How we use it",

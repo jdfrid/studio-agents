@@ -9,7 +9,7 @@ describe("distribution oauth state", () => {
       userId: "u1",
       network: "youtube",
       codeVerifier: "abc",
-      redirectUri: "https://prompt2spot.com/api/distribution/oauth/youtube/callback"
+      redirectUri: "https://reelmino.com/api/distribution/oauth/youtube/callback"
     });
     const parsed = verifyOAuthState(token);
     expect(parsed.tenantId).toBe("t1");
@@ -37,12 +37,12 @@ describe("oauthCallbackUrl", () => {
     delete process.env.API_PUBLIC_URL;
     delete process.env.DISTRIBUTION_OAUTH_CALLBACK_BASE;
     delete process.env.YOUTUBE_CLIENT_ID;
-    process.env.APP_URL = "https://prompt2spot.com";
+    process.env.APP_URL = "https://reelmino.com";
     process.env.GOOGLE_CLIENT_ID = "site-google-client";
     try {
-      expect(oauthCallbackUrl("youtube")).toBe("https://prompt2spot.com/auth/google/callback");
+      expect(oauthCallbackUrl("youtube")).toBe("https://reelmino.com/auth/google/callback");
       expect(oauthCallbackUrl("facebook")).toBe(
-        "https://prompt2spot.com/api/distribution/oauth/facebook/callback"
+        "https://reelmino.com/api/distribution/oauth/facebook/callback"
       );
     } finally {
       for (const [key, value] of Object.entries(prev)) {

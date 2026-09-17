@@ -10,6 +10,10 @@ export default defineConfig({
         target: `http://localhost:${process.env.API_PORT ?? 4000}`,
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, "")
+      },
+      "/auth": {
+        target: `http://localhost:${process.env.API_PORT ?? 4000}`,
+        changeOrigin: true
       }
     }
   },

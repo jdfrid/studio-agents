@@ -50,7 +50,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
             <div className="showcase-window">
               <div className="showcase-topbar">
                 <span className="showcase-brand">
-                  <i>P2</i> {t("landing.showcase.newProductVideo")}
+                  <i>R</i> {t("landing.showcase.newProductVideo")}
                 </span>
                 <span className="showcase-status">{t("landing.showcase.creating")}</span>
               </div>

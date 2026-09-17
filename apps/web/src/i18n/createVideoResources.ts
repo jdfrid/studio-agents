@@ -2,8 +2,8 @@ export const en = {
   create: {
     back: "Back",
     eyebrow: "New creation",
-    title: "Let's build your next video",
-    subtitle: "Start from a short idea. We propose language, format, and length — open more only if you need control.",
+    title: "Let's make the next video",
+    subtitle: "One description is enough. Language, format, and length stay visible. Open adjustments only where they change the result.",
     draftSaved: "Saved",
     draftSaving: "Saving…",
     draftFailed: "Not saved — try again",
@@ -41,7 +41,7 @@ export const en = {
   },
   details: {
     heading: "The idea",
-    help: "One description is enough to begin. Title and goal are suggested for you.",
+    help: "One description is enough to begin. Title and goal stay in adjustments.",
     promptLabel: "What should the video show or achieve?",
     promptExample: "For example: A video that presents our café and invites people for coffee and pastry in the morning.",
     title: "Project name",
@@ -511,8 +511,8 @@ export const en = {
 
 export const he = {
   create: {
-    back: "חזרה", eyebrow: "יצירה חדשה", title: "בואו נבנה את הסרטון הבא",
-    subtitle: "מתחילים מרעיון קצר. נציע שפה, פורמט ואורך — ותוכלו להעמיק רק במקום שצריך.",
+    back: "חזרה", eyebrow: "יצירה חדשה", title: "בואו נכין את הסרטון הבא",
+    subtitle: "תיאור אחד מספיק. שפה, פורמט ואורך נשארים גלויים. התאמות נפתחות רק במקום שבו הן משנות את התוצאה.",
     draftSaved: "נשמר", draftSaving: "שומר…", draftFailed: "לא נשמר — נסו שוב", draftActive: "שמירה אוטומטית פעילה",
     remixEyebrow: "גרסה חדשה", remixTitle: "יצירת גרסה נוספת",
     remixSubtitle: "כל ההגדרות מהסרטון הקודם כאן. שנו רק מה שצריך — למשל יום ללילה. זו הפקה חדשה ותחויב כסרטון חדש.",
@@ -522,7 +522,7 @@ export const he = {
   common: { required: "חובה", optional: "לא חובה", remove: "הסר", automatic: "אוטומטי — לפי הבריף והאווירה", secondsShort: "{{count}} שנ׳", recommended: "מומלץ", custom: "מותאם" },
   credits: { free_one: "סרטון חינם אחד זמין", free_other: "{{count}} סרטונים חינם זמינים", noCharge: "הסרטון הנוכחי לא יפחית מהקרדיטים.", freeVideo: "סרטון חינם", oneCredit: "קרדיט אחד", amount: "{{count}} קרדיטים", lipSyncSurcharge: "סנכרון שפתיים מוסיף {{extra}} קרדיטים (סה״כ {{total}})." },
   details: {
-    heading: "הרעיון", help: "תיאור אחד מספיק כדי להתחיל. כותרת ומטרה מוצעות עבורכם.",
+    heading: "הרעיון", help: "תיאור אחד מספיק כדי להתחיל. כותרת ומטרה נשארות בהתאמות.",
     promptLabel: "מה תרצו שהסרטון יציג או ישיג?",
     promptExample: "לדוגמה: סרטון שמציג את בית הקפה שלנו ומזמין לקפה ומאפה בבוקר.",
     title: "שם הפרויקט", titleHelp: "מוצע מהתיאור. אפשר לשנות.", titlePlaceholder: "לדוגמה: בוקר בבית הקפה",

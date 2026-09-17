@@ -2,14 +2,43 @@ export const resources = {
   he: {
     translation: {
       common: {
-        brandTagline: "AI video studio",
+        brandTagline: "הסיפור שלכם. עכשיו בווידאו.",
         language: "שפה",
         hebrew: "עברית",
         english: "English"
       },
+      auth: {
+        eyebrow: "חשבון",
+        title: "כניסה ל-Reelmino",
+        lead: "מייל וסיסמה — נשלח קוד אימות למייל. אפשר גם להמשיך עם Google.",
+        email: "אימייל",
+        password: "סיסמה",
+        passwordHint: "לפחות 8 תווים. בחשבון חדש זו הסיסמה שתישמר.",
+        sendCode: "שלחו קוד למייל",
+        code: "קוד בן 6 ספרות",
+        verify: "אישור וכניסה",
+        working: "עובדים על זה…",
+        sent: "שלחנו קוד למייל. בדקו גם בתיקיית הספאם.",
+        changeEmail: "מייל אחר",
+        or: "או",
+        google: "המשך עם Google",
+        close: "סגירה",
+        errors: {
+          invalid_email: "כתובת המייל לא תקינה.",
+          invalid_password: "הסיסמה חייבת להיות לפחות 8 תווים.",
+          invalid_credentials: "מייל או סיסמה שגויים.",
+          use_google: "החשבון הזה נוצר עם Google. היכנסו דרך Google.",
+          rate_limited: "יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.",
+          mail_not_configured: "שליחת המייל לא מוגדרת בשרת.",
+          otp_invalid: "הקוד שגוי.",
+          otp_expired: "הקוד פג. בקשו קוד חדש.",
+          mail_failed: "לא הצלחנו לשלוח את המייל.",
+          generic: "הכניסה נכשלה. נסו שוב."
+        }
+      },
       shell: {
         loading: "טוען…",
-        homeLabel: "Prompt2Spot — מעבר למסך הבית",
+        homeLabel: "Reelmino — מעבר למסך הבית",
         primaryNav: "ניווט ראשי",
         myVideos: "הסרטונים שלי",
         newCreation: "יצירה",
@@ -41,18 +70,18 @@ export const resources = {
         }
       },
       landing: {
-        homeLabel: "Prompt2Spot — דף הבית",
+        homeLabel: "Reelmino — דף הבית",
         siteNav: "ניווט באתר",
         howItWorks: "איך זה עובד",
         pricing: "מחירים",
         login: "כניסה",
         eyebrow: "סטודיו וידאו לעסק שעובד כל שבוע",
-        heroTitle: "מסיפור קצר",
-        heroTitleAccent: "לסרטון שמוכן לרשת",
+        heroTitle: "הסיפור שלכם.",
+        heroTitleAccent: "עכשיו בווידאו.",
         tagline:
-          "צריך רילס חדש, בלי צוות צילום. מתארים את המטרה, מעלים תמונות מוצר או פנים — Prompt2Spot כותב תסריט, מקריין, מעצב ומוריד MP4.",
-        firstVideo: "מתחילים עם Google",
-        firstVideoHint: "הכניסה עם חשבון Google. אחרי האישור תגיעו לסטודיו ותוכלו לתאר את הסרטון הראשון.",
+          "מתארים מה צריך לקרות, מוסיפים חומרים אם יש — ו-Reelmino מגיש הצעה לסרטון מוכן לרשת.",
+        firstVideo: "מתחילים",
+        firstVideoHint: "כניסה עם מייל או Google. אחרי האישור תגיעו לסטודיו ותוכלו לתאר את הסרטון הראשון.",
         discover: "גלו איך זה עובד",
         benefitsLabel: "יתרונות",
         guided: "תהליך מודרך, בעברית",
@@ -154,10 +183,10 @@ export const resources = {
         },
         close: {
           title: "הסרטון הבא לא צריך לחכות להפקה",
-          body: "נכנסים עם Google, רוכשים קרדיטים, ומתחילים מבריף קצר. אפשר לנסות בסרטון בודד ולעבור למסלול חודשי כשהקצב עולה.",
+          body: "נכנסים עם מייל או Google, רוכשים קרדיטים, ומתחילים מבריף קצר. אפשר לנסות בסרטון בודד ולעבור למסלול חודשי כשהקצב עולה.",
           pricing: "למחירון המלא"
         },
-        footer: "מערכת AI להפקת סרטונים עסקיים — מרעיון ועד רינדור."
+        footer: "הסיפור שלכם. עכשיו בווידאו."
       },
       dashboard: {
         studio: "הסטודיו שלי",
@@ -343,14 +372,43 @@ export const resources = {
   en: {
     translation: {
       common: {
-        brandTagline: "AI video studio",
+        brandTagline: "Your story. Now in motion.",
         language: "Language",
         hebrew: "עברית",
         english: "English"
       },
+      auth: {
+        eyebrow: "Account",
+        title: "Sign in to Reelmino",
+        lead: "Email and password — we send a verification code to your inbox. You can also continue with Google.",
+        email: "Email",
+        password: "Password",
+        passwordHint: "At least 8 characters. For a new account this is the password we save.",
+        sendCode: "Send code to email",
+        code: "6-digit code",
+        verify: "Confirm and sign in",
+        working: "Working on it…",
+        sent: "We sent a code to your email. Check spam if you do not see it.",
+        changeEmail: "Use a different email",
+        or: "or",
+        google: "Continue with Google",
+        close: "Close",
+        errors: {
+          invalid_email: "That email address is not valid.",
+          invalid_password: "Password must be at least 8 characters.",
+          invalid_credentials: "Email or password is incorrect.",
+          use_google: "This account was created with Google. Sign in with Google.",
+          rate_limited: "Too many attempts. Try again in a few minutes.",
+          mail_not_configured: "Email sending is not configured on the server.",
+          otp_invalid: "That code is incorrect.",
+          otp_expired: "The code expired. Request a new one.",
+          mail_failed: "We could not send the email.",
+          generic: "Sign-in failed. Please try again."
+        }
+      },
       shell: {
         loading: "Loading…",
-        homeLabel: "Prompt2Spot — go to home",
+        homeLabel: "Reelmino — go to home",
         primaryNav: "Primary navigation",
         myVideos: "My videos",
         newCreation: "Create",
@@ -382,18 +440,18 @@ export const resources = {
         }
       },
       landing: {
-        homeLabel: "Prompt2Spot — home",
+        homeLabel: "Reelmino — home",
         siteNav: "Site navigation",
         howItWorks: "How it works",
         pricing: "Pricing",
         login: "Log in",
         eyebrow: "A video studio for businesses that publish every week",
-        heroTitle: "From a short brief",
-        heroTitleAccent: "to a video ready for social",
+        heroTitle: "Your story.",
+        heroTitleAccent: "Now in motion.",
         tagline:
-          "You need a new reel, without a film crew. Describe the goal, upload product or face photos — Prompt2Spot writes the script, narrates, designs, and exports an MP4.",
-        firstVideo: "Start with Google",
-        firstVideoHint: "Sign in with Google. After you approve access you reach the studio and can describe your first video.",
+          "Describe what should happen, add materials if you have them — Reelmino prepares a video ready for social.",
+        firstVideo: "Get started",
+        firstVideoHint: "Sign in with email or Google. After you confirm, you reach the studio and can describe your first video.",
         discover: "See how it works",
         benefitsLabel: "Benefits",
         guided: "Guided workflow, in your language",
@@ -495,10 +553,10 @@ export const resources = {
         },
         close: {
           title: "The next video shouldn't wait for a production day",
-          body: "Sign in with Google, buy credits, and start from a short brief. Try a single video, then move to a monthly plan when the pace picks up.",
+          body: "Sign in with email or Google, buy credits, and start from a short brief. Try a single video, then move to a monthly plan when the pace picks up.",
           pricing: "See full pricing"
         },
-        footer: "An AI platform for producing business videos—from idea to render."
+        footer: "Your story. Now in motion."
       },
       dashboard: {
         studio: "My studio",

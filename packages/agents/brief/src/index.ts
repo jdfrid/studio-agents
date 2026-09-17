@@ -426,8 +426,8 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
 
     const endCardCredit =
       resolvedLanguage === "he" || resolvedLanguage === "yi"
-        ? "בכרטיס הסיום יש לציין prompt2spot.com"
-        : "End card must credit prompt2spot.com";
+        ? "בכרטיס הסיום יש לציין reelmino.com"
+        : "End card must credit reelmino.com";
     const brandNameConstraint =
       businessName && (resolvedLanguage === "he" || resolvedLanguage === "yi")
         ? `שם העסק לשימוש עקבי בדיבוב וב-CTA: ${businessName}`
@@ -520,7 +520,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
       ]
         .filter(Boolean)
         .join("; "),
-      callToAction: parsed.callToAction ?? businessName ?? "prompt2spot.com",
+      callToAction: parsed.callToAction ?? businessName ?? "reelmino.com",
       budgetMode: input.budgetMode ?? false,
       renderProfile: (() => {
         const falOk = Boolean(process.env.FAL_API_KEY?.trim());

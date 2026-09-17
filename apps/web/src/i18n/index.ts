@@ -1,11 +1,13 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import { storageGet, storageSet } from "../brand/storage.js";
 import { resources } from "./resources.js";
 import { createVideoResources } from "./createVideoResources.js";
 import { runResources } from "./runResources.js";
 import { siteResources } from "./siteResources.js";
 
-export const UI_LOCALE_STORAGE_KEY = "prompt2spot:ui-locale-v2";
+export const UI_LOCALE_STORAGE_KEY = "reelmino:ui-locale-v2";
+const LEGACY_UI_LOCALE_STORAGE_KEY = "prompt2spot:ui-locale-v2";
 export type UiLocale = "he" | "en";
 
 function isUiLocale(value: string | null): value is UiLocale {
@@ -13,12 +15,8 @@ function isUiLocale(value: string | null): value is UiLocale {
 }
 
 function storedLocale(): UiLocale {
-  try {
-    const value = window.localStorage.getItem(UI_LOCALE_STORAGE_KEY);
-    return isUiLocale(value) ? value : "en";
-  } catch {
-    return "en";
-  }
+  const value = storageGet(UI_LOCALE_STORAGE_KEY, LEGACY_UI_LOCALE_STORAGE_KEY);
+  return isUiLocale(value) ? value : "en";
 }
 
 export function localeFor(language = i18n.resolvedLanguage): UiLocale {
@@ -58,11 +56,7 @@ syncDocument(localeFor());
 i18n.on("languageChanged", (language) => {
   const locale = localeFor(language);
   syncDocument(locale);
-  try {
-    window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, locale);
-  } catch {
-    // Keep the in-memory preference when storage is unavailable.
-  }
+  storageSet(UI_LOCALE_STORAGE_KEY, locale);
 });
 
 export { i18n };

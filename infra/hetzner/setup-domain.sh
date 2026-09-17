@@ -3,12 +3,14 @@
 # Run on Hetzner after DNS points to this server.
 set -euo pipefail
 
-DOMAIN="${1:-prompt2spot.com}"
+DOMAIN="${1:-reelmino.com}"
 ADMIN_DOMAIN="admin.${DOMAIN}"
+LEGACY_DOMAIN="prompt2spot.com"
 
 echo "=== Domain setup for ${DOMAIN} ==="
-echo "1. Ensure GoDaddy A records point @ and www and admin to this server IP"
+echo "1. Ensure A records point @, www, and admin to this server IP"
 echo "2. Update infra/hetzner/.env: APP_URL=https://${DOMAIN}, ADMIN_URL=https://${ADMIN_DOMAIN}"
+echo "3. Keep ${LEGACY_DOMAIN} DNS on this server until 301s and OAuth clients are cut over"
 echo ""
 
 if ! command -v caddy >/dev/null 2>&1; then
@@ -31,6 +33,21 @@ if [ -f "$ENV_FILE" ]; then
   fi
 fi
 
+LEGACY_REDIRECT=""
+if [ "${DOMAIN}" != "${LEGACY_DOMAIN}" ]; then
+  LEGACY_REDIRECT=$(cat <<LEGACY
+${LEGACY_DOMAIN}, www.${LEGACY_DOMAIN} {
+    redir https://${DOMAIN}{uri} permanent
+}
+
+admin.${LEGACY_DOMAIN} {
+    redir https://${ADMIN_DOMAIN}{uri} permanent
+}
+
+LEGACY
+)
+fi
+
 # User app on 8080, admin SPA on 8081 (docker maps ADMIN_HTTP_PORT→81).
 # Keep Host headers so cookies / redirects stay on the correct subdomain.
 tee /etc/caddy/Caddyfile <<EOF
@@ -49,6 +66,8 @@ ${ADMIN_DOMAIN} {
         header_up X-Forwarded-Proto {scheme}
     }
 }
+
+${LEGACY_REDIRECT}
 EOF
 
 systemctl enable caddy
@@ -61,3 +80,6 @@ systemctl reload caddy 2>/dev/null || systemctl restart caddy
 echo ""
 echo "Done. Caddy will obtain Let's Encrypt certificates automatically."
 echo "Verify: https://${DOMAIN} and https://${ADMIN_DOMAIN}"
+if [ -n "${LEGACY_REDIRECT}" ]; then
+  echo "Legacy 301: https://${LEGACY_DOMAIN} → https://${DOMAIN}"
+fi

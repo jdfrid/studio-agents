@@ -43,7 +43,7 @@ describe("provider monitoring", () => {
 
   it("uses clear Hebrew provider names", () => {
     expect(providerNameHe("gcs")).toBe("Google Cloud Storage");
-    expect(providerNameHe("api")).toContain("תשתית Prompt2Spot");
+    expect(providerNameHe("api")).toContain("תשתית Reelmino");
   });
 
   it("distinguishes HeyGen wallet money from subscription credits", () => {

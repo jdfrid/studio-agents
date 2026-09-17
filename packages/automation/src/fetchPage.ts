@@ -8,7 +8,7 @@ export type DiscoveredProduct = {
 
 const FETCH_TIMEOUT_MS = 12_000;
 const MAX_HTML_BYTES = 1_500_000;
-const USER_AGENT = "Prompt2SpotBot/0.1 (+https://prompt2spot.com)";
+const USER_AGENT = "ReelminoBot/0.1 (+https://reelmino.com)";
 
 export async function fetchText(url: string, opts?: { accept?: string }): Promise<string | null> {
   const controller = new AbortController();

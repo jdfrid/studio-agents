@@ -15,8 +15,8 @@ const PROVIDERS: Record<string, string> = {
   freesound: "Freesound — אפקטים קוליים",
   postgresql: "תשתית המערכת — PostgreSQL",
   redis: "תשתית המערכת — Redis",
-  api: "תשתית Prompt2Spot — שרת API",
-  worker: "תשתית Prompt2Spot — מעבד משימות"
+  api: "תשתית Reelmino — שרת API",
+  worker: "תשתית Reelmino — מעבד משימות"
 };
 
 const INFRASTRUCTURE = new Set(["api", "worker", "postgresql", "redis"]);

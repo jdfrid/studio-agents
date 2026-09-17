@@ -11,12 +11,13 @@ export interface GoogleProfile {
 }
 
 export async function findOrCreateUser(profile: GoogleProfile): Promise<UserView> {
+  const email = profile.email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({
     where: { googleId: profile.googleId },
     include: { subscription: true }
   });
   if (existing) {
-    const shouldBeAdmin = adminEmails().has(profile.email.toLowerCase());
+    const shouldBeAdmin = adminEmails().has(email);
     if (shouldBeAdmin && existing.role !== "ADMIN") {
       const updated = await prisma.user.update({
         where: { id: existing.id },
@@ -28,18 +29,36 @@ export async function findOrCreateUser(profile: GoogleProfile): Promise<UserView
     return toUserView(existing);
   }
 
-  const isAdmin = adminEmails().has(profile.email.toLowerCase());
+  const byEmail = await prisma.user.findUnique({
+    where: { email },
+    include: { subscription: true }
+  });
+  if (byEmail) {
+    const linked = await prisma.user.update({
+      where: { id: byEmail.id },
+      data: {
+        googleId: profile.googleId,
+        name: byEmail.name ?? profile.name,
+        avatarUrl: byEmail.avatarUrl ?? profile.avatarUrl,
+        role: adminEmails().has(email) ? "ADMIN" : byEmail.role
+      },
+      include: { subscription: true }
+    });
+    return toUserView(linked);
+  }
+
+  const isAdmin = adminEmails().has(email);
   const tenant = await prisma.tenant.create({
     data: {
       slug: `user_${Date.now()}`,
-      name: profile.name ?? profile.email
+      name: profile.name ?? email
     }
   });
 
   const user = await prisma.user.create({
     data: {
       googleId: profile.googleId,
-      email: profile.email,
+      email,
       name: profile.name,
       avatarUrl: profile.avatarUrl,
       role: isAdmin ? "ADMIN" : "USER",
@@ -54,6 +73,49 @@ export async function findOrCreateUser(profile: GoogleProfile): Promise<UserView
   });
 
   return toUserView(user);
+}
+
+export async function getUserByEmail(email: string): Promise<{
+  id: string;
+  email: string;
+  passwordHash: string | null;
+  googleId: string | null;
+} | null> {
+  const user = await prisma.user.findUnique({
+    where: { email: email.trim().toLowerCase() },
+    select: { id: true, email: true, passwordHash: true, googleId: true }
+  });
+  return user;
+}
+
+export async function createEmailUser(email: string, passwordHash: string): Promise<UserView> {
+  const normalized = email.trim().toLowerCase();
+  const isAdmin = adminEmails().has(normalized);
+  const tenant = await prisma.tenant.create({
+    data: {
+      slug: `user_${Date.now()}`,
+      name: normalized
+    }
+  });
+  const user = await prisma.user.create({
+    data: {
+      email: normalized,
+      passwordHash,
+      name: normalized.split("@")[0],
+      role: isAdmin ? "ADMIN" : "USER",
+      tenantId: tenant.id
+    },
+    include: { subscription: true }
+  });
+  await prisma.tenant.update({
+    where: { id: tenant.id },
+    data: { slug: `user_${user.id}` }
+  });
+  return toUserView(user);
+}
+
+export async function setUserPasswordHash(userId: string, passwordHash: string): Promise<void> {
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
 }
 
 export async function getUserById(userId: string): Promise<UserView | null> {
