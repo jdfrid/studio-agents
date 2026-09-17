@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-label="Created with reelmino.com">
+  <rect width="1920" height="1080" fill="#173D35"/>
+  <circle cx="960" cy="430" r="280" fill="#1F5248"/>
+  <g transform="translate(896 366)">
+    <rect width="128" height="128" rx="32" fill="#173D35"/>
+    <path fill="#F6F7F2" d="M40 32h33c16.8 0 29 10.4 29 25.2 0 10.8-6.4 19.2-16.8 22.8L108 96H89.6L71.2 72.8H52V96H40V32zm12 11.2V62h18c8.4 0 13.6-4.4 13.6-10.4S78.4 43.2 70 43.2H52z"/>
+    <polygon fill="#D9F279" points="76,48 76,80 104,64"/>
+  </g>
+  <text x="960" y="640" text-anchor="middle" fill="#F6F7F2" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="700">Created with reelmino.com</text>
+  <text x="960" y="700" text-anchor="middle" fill="#D9F279" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="600" letter-spacing="4">YOUR STORY. NOW IN MOTION.</text>
+</svg>

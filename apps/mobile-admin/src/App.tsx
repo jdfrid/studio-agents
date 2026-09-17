@@ -37,7 +37,7 @@ function money(value: number) {
 function Login({ error }: { error: string }) {
   return (
     <main className="login">
-      <div className="brand">P2S</div>
+      <div className="brand">Reelmino</div>
       <h1>ניהול Reelmino</h1>
       <p>אפליקציה פרטית למנהלי המערכת בלבד</p>
       {error && <div className="error">{error}</div>}

@@ -1237,10 +1237,7 @@ function resolveBrandingOutroImage(): string | null {
     envPath,
     path.join(here, "..", "assets", "reelmino-outro.png"),
     path.join(process.cwd(), "packages", "agents", "render", "assets", "reelmino-outro.png"),
-    path.join(process.cwd(), "assets", "reelmino-outro.png"),
-    path.join(here, "..", "assets", "prompt2spot-outro.png"),
-    path.join(process.cwd(), "packages", "agents", "render", "assets", "prompt2spot-outro.png"),
-    path.join(process.cwd(), "assets", "prompt2spot-outro.png")
+    path.join(process.cwd(), "assets", "reelmino-outro.png")
   ].filter((p): p is string => Boolean(p));
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate;

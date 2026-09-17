@@ -38,7 +38,7 @@ utm_term=<search-keyword-or-audience>
 ### Example
 
 ```text
-https://prompt2spot.com/for-business
+https://reelmino.com/for-business
 ?utm_source=instagram
 &utm_medium=organic
 &utm_campaign=202609-smb-uk-demo

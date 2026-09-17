@@ -283,7 +283,7 @@ main.layout-log { grid-template-columns: 1fr; }
   grid-template-columns: unset;
 }
 .saas-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
-.saas-header .brand { font-size: 1.25rem; color: #7ab5ff; }
+.saas-header .brand { font-size: 1.25rem; color: var(--text); }
 .saas-header nav button { margin-inline-end: 8px; }
 .header-user { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; }
 .avatar { width: 32px; height: 32px; border-radius: 50%; }

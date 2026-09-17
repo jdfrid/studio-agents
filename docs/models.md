@@ -1,4 +1,4 @@
-# מיפוי מודלים וספקים — Prompt2Spot / studio-agents
+# מיפוי מודלים וספקים — Reelmino / studio-agents
 
 מקור אמת בקוד: [`packages/shared/src/renderProfiles.ts`](../packages/shared/src/renderProfiles.ts), [`packages/providers/src/gemini/common.ts`](../packages/providers/src/gemini/common.ts), [`infra/hetzner/env.example`](../infra/hetzner/env.example).
 
