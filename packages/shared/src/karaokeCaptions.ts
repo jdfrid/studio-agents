@@ -190,7 +190,10 @@ const PDI = "\u2069";
 
 /** Keep phone numbers, prices and Latin product names readable inside RTL captions. */
 export function isolateLtrRuns(text: string): string {
-  return text.replace(/[A-Za-z0-9][A-Za-z0-9.,:%+/#@_-]*/g, (run) => `${LRI}${run}${PDI}`);
+  return text.replace(
+    /\(?[A-Za-z0-9][A-Za-z0-9.,:%+/#@_-]*(?:\s+[A-Za-z0-9][A-Za-z0-9.,:%+/#@_-]*)*\)?/g,
+    (run) => `${LRI}${run}${PDI}`
+  );
 }
 
 const RLE = "\u202B";
@@ -236,6 +239,9 @@ export function buildRenderedTextAss(
   opts?: { fontName?: string; rtl?: boolean }
 ): string {
   const defaultFont = opts?.fontName ?? "Arial";
+  const sample = input.layers.map((layer) => layer.text).join(" ");
+  const rtl = opts?.rtl ?? isRtlRenderedText(sample, input.language);
+  const langLine = rtl ? `Language: ${assLanguageTag(input.language)}\n` : "";
   const styles = input.layers
     .map((layer, index) => {
       const font = layer.fontName ?? defaultFont;
@@ -246,7 +252,7 @@ export function buildRenderedTextAss(
     .map((layer, index) => {
       const position =
         Number.isFinite(layer.x) && Number.isFinite(layer.y) ? `{\\pos(${layer.x},${layer.y})}` : "";
-      const text = assBidiText(layer.text, input.language, opts?.rtl);
+      const text = assBidiText(layer.text, input.language, rtl);
       return `Dialogue: 0,${assTime(layer.startSecond ?? 0)},${assTime(layer.endSecond)},Text${index},,0,0,0,,${position}${text}`;
     })
     .join("\n");
@@ -254,7 +260,7 @@ export function buildRenderedTextAss(
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
-PlayResX: ${input.width}
+${langLine}PlayResX: ${input.width}
 PlayResY: ${input.height}
 
 [V4+ Styles]

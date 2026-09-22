@@ -16,7 +16,9 @@ import {
   buildRenderedTextAss,
   buildTitleCardAss,
   buildKaraokeAss,
+  displayWebsiteHost,
   getRenderProfile,
+  splitBrandDisplayLines,
   isRtlRenderedText,
   resolveSubtitleStyle,
   sanitizeVeoPromptForExternalAudio,
@@ -1312,16 +1314,16 @@ async function createBusinessEndCardClip(
   const { width, height } = dimensions;
   const name = branding.businessName?.trim() || "";
   const slogan = branding.slogan?.trim() || "";
-  const website = (branding.websiteUrl?.trim() || "").replace(/^https?:\/\//i, "");
+  const website = displayWebsiteHost(branding.websiteUrl ?? "");
   const bgColor = hexToFfmpegColor(branding.secondaryColor);
   const titleAss = hexToAssColor(contrastTextHex(branding.secondaryColor));
   const accentAss = hexToAssColor(branding.primaryColor, "&H00FFB57A");
   const font = resolveDrawtextFont();
-  const nameSize = Math.max(28, Math.round(Math.min(width, height) * 0.06));
-  const sloganSize = Math.max(18, Math.round(Math.min(width, height) * 0.035));
-  const urlSize = Math.max(16, Math.round(Math.min(width, height) * 0.032));
-  const creditSize = Math.max(14, Math.round(Math.min(width, height) * 0.028));
-  const logoMax = Math.round(Math.min(width, height) * 0.28);
+  const nameSize = Math.max(32, Math.round(Math.min(width, height) * 0.055));
+  const secondarySize = Math.max(22, Math.round(Math.min(width, height) * 0.036));
+  const urlSize = Math.max(18, Math.round(Math.min(width, height) * 0.032));
+  const creditSize = Math.max(14, Math.round(Math.min(width, height) * 0.026));
+  const logoMax = Math.round(Math.min(width, height) * 0.22);
   const hasLogo = Boolean(branding.logo?.gcsPath);
   const voiceDur = Number(brandVoice?.durationSeconds);
   const cardSeconds = brandVoice?.gcsPath
@@ -1347,49 +1349,40 @@ async function createBusinessEndCardClip(
     await downloadMediaToFile(storage, brandVoice.gcsPath, voiceLocal);
   }
 
-  const layers: Parameters<typeof buildRenderedTextAss>[0]["layers"] = [];
-  if (name) {
-    const y = hasLogo
-      ? Math.round(height / 2 + logoMax * 0.55)
-      : Math.round(height / 2 - nameSize * 0.4);
-    layers.push({ text: name, endSecond: cardSeconds, fontSize: nameSize, alignment: 8, x: width / 2, y, color: titleAss });
-  }
-  if (slogan) {
-    const y = hasLogo
-      ? Math.round(height / 2 + logoMax * 0.55 + nameSize * 1.35)
-      : name
-        ? Math.round(height / 2 + nameSize * 0.9)
-        : Math.round(height / 2);
-    layers.push({
-      text: slogan,
-      endSecond: cardSeconds,
-      fontSize: sloganSize,
+  const stack: Array<{ text: string; fontSize: number; color: string; bold?: boolean }> = [];
+  for (const [index, line] of splitBrandDisplayLines(name).entries()) {
+    stack.push({
+      text: line,
+      fontSize: index === 0 ? nameSize : secondarySize,
       color: titleAss,
-      bold: false,
-      alignment: 8,
-      x: width / 2,
-      y
+      bold: index === 0
     });
+  }
+  if (slogan && !stack.some((line) => line.text === slogan)) {
+    stack.push({ text: slogan, fontSize: secondarySize, color: titleAss, bold: false });
   }
   if (website) {
-    const yBase = hasLogo
-      ? Math.round(logoMax * 0.55 + nameSize * 1.35 + (slogan ? sloganSize * 1.4 : 0))
-      : Math.round(nameSize * (slogan ? 2.2 : 0.9));
-    const y = hasLogo
-      ? Math.round(height / 2 + yBase)
-      : name || slogan
-        ? Math.round(height / 2 + yBase)
-        : Math.round(height / 2);
+    stack.push({ text: website, fontSize: urlSize, color: accentAss, bold: false });
+  }
+  const gap = Math.round(Math.min(width, height) * 0.03);
+  const textBlock = stack.reduce((sum, line) => sum + line.fontSize, 0) + gap * Math.max(0, stack.length - 1);
+  const logoBlock = hasLogo ? logoMax + gap * 2 : 0;
+  const blockHeight = logoBlock + textBlock;
+  let y = Math.round(height / 2 - blockHeight / 2 + (hasLogo ? logoMax + gap : 0) + (stack[0]?.fontSize ?? 0) / 2);
+
+  const layers: Parameters<typeof buildRenderedTextAss>[0]["layers"] = [];
+  for (const line of stack) {
     layers.push({
-      text: website,
+      text: line.text,
       endSecond: cardSeconds,
-      fontSize: urlSize,
-      color: accentAss,
-      bold: false,
-      alignment: 8,
+      fontSize: line.fontSize,
+      color: line.color,
+      bold: line.bold !== false,
+      alignment: 5,
       x: width / 2,
       y
     });
+    y += line.fontSize + gap;
   }
   layers.push({
     text: BRANDING_END_TEXT,
@@ -1414,13 +1407,16 @@ async function createBusinessEndCardClip(
   const audioArgs = voiceLocal
     ? ["-i", voiceLocal]
     : ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"];
+  const audioFilter = `[${logoLocal ? 2 : 1}:a]aformat=sample_rates=44100:channel_layouts=stereo,apad=whole_dur=${cardSeconds},atrim=0:${cardSeconds}[aout]`;
 
   if (logoLocal) {
+    const logoY = Math.round(height / 2 - blockHeight / 2);
     const filter = [
       `[0:v]scale=${width}:${height},format=yuv420p[bg]`,
       `[1:v]scale=w='min(iw\\,${logoMax})':h='min(ih\\,${logoMax})':force_original_aspect_ratio=decrease[logo]`,
-      `[bg][logo]overlay=(W-w)/2:(H-h)/2-${Math.round(logoMax * 0.35)},fade=t=in:st=0:d=0.35[base]`,
-      `[base]${assFilter}[vout]`
+      `[bg][logo]overlay=(W-w)/2:${logoY},fade=t=in:st=0:d=0.4[base]`,
+      `[base]${assFilter}[vout]`,
+      audioFilter
     ].join(";");
     await runFfmpeg([
       "-f",
@@ -1437,7 +1433,7 @@ async function createBusinessEndCardClip(
       "-map",
       "[vout]",
       "-map",
-      "2:a",
+      "[aout]",
       "-t",
       String(cardSeconds),
       "-c:v",
@@ -1448,7 +1444,10 @@ async function createBusinessEndCardClip(
       "23",
       "-c:a",
       "aac",
-      "-shortest",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
       "-movflags",
       "+faststart",
       "-y",
@@ -1457,17 +1456,21 @@ async function createBusinessEndCardClip(
     return endClip;
   }
 
-  const vf = [`scale=${width}:${height}`, "format=yuv420p", "fade=t=in:st=0:d=0.35", assFilter].join(",");
+  const vf = [`scale=${width}:${height}`, "format=yuv420p", "fade=t=in:st=0:d=0.4", assFilter].join(",");
   await runFfmpeg([
     "-f",
     "lavfi",
     "-i",
     `color=c=${bgColor}:s=${width}x${height}:d=${cardSeconds}`,
     ...audioArgs,
+    "-filter_complex",
+    `[0:v]${vf}[vout];${audioFilter}`,
+    "-map",
+    "[vout]",
+    "-map",
+    "[aout]",
     "-t",
     String(cardSeconds),
-    "-vf",
-    vf,
     "-c:v",
     "libx264",
     "-preset",
@@ -1476,7 +1479,10 @@ async function createBusinessEndCardClip(
     "23",
     "-c:a",
     "aac",
-    "-shortest",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
     "-movflags",
     "+faststart",
     "-y",
@@ -1523,7 +1529,12 @@ async function createEndCardClip(
     "23",
     "-c:a",
     "aac",
-    "-shortest",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
+    "-t",
+    String(BRANDING_END_CARD_SECONDS),
     "-movflags",
     "+faststart",
     "-y",
@@ -1807,19 +1818,19 @@ async function appendBrandingEndCard(
     const out = path.join(dir, `with-end-${nanoid(4)}.mp4`);
     const mainDur = await probeDuration(videoPath);
     const endDur = await probeDuration(endClip);
-    // Short visual fade only. acrossfade mixed the last scene TTS with the end-card
-    // CTA (often the same URL) and sounded like noise at the tail.
-    const fade = Math.min(0.35, Math.max(0.15, Math.min(BRANDING_END_FADE_SECONDS, mainDur / 8, endDur / 2)));
+    // Fade film audio out before the CTA so they never overlap. Video goes through black.
+    const fade = Math.min(0.55, Math.max(0.35, Math.min(BRANDING_END_FADE_SECONDS, mainDur / 10, endDur / 3)));
     const offset = Math.max(0, mainDur - fade);
-    const outDur = Math.max(mainDur, offset + endDur);
-    const offsetMs = Math.max(0, Math.round(offset * 1000));
+    const outDur = offset + endDur;
+    const joinMs = Math.round(mainDur * 1000);
+    const fadeOutStart = Math.max(0, mainDur - 0.55);
 
     try {
       const filter =
-        `[0:v][1:v]xfade=transition=fade:duration=${fade.toFixed(3)}:offset=${offset.toFixed(3)}[vout];` +
-        `[0:a]afade=t=out:st=${offset.toFixed(3)}:d=${fade.toFixed(3)},apad=whole_dur=${outDur.toFixed(3)}[a0];` +
-        `[1:a]adelay=${offsetMs}|${offsetMs}:all=1,afade=t=in:st=0:d=0.12,atrim=0:${outDur.toFixed(3)}[a1];` +
-        `[a0][a1]amix=inputs=2:duration=first:normalize=0:dropout_transition=0,atrim=0:${outDur.toFixed(3)}[aout]`;
+        `[0:v][1:v]xfade=transition=fadeblack:duration=${fade.toFixed(3)}:offset=${offset.toFixed(3)}[vout];` +
+        `[0:a]afade=t=out:st=${fadeOutStart.toFixed(3)}:d=0.55,atrim=0:${mainDur.toFixed(3)},apad=pad_dur=${endDur.toFixed(3)}[a0];` +
+        `[1:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:${endDur.toFixed(3)},asetpts=PTS-STARTPTS,adelay=${joinMs}|${joinMs}:all=1[a1];` +
+        `[a0][a1]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,atrim=0:${outDur.toFixed(3)},apad=whole_dur=${outDur.toFixed(3)}[aout]`;
       await runFfmpeg([
         "-i",
         videoPath,
@@ -1839,6 +1850,10 @@ async function appendBrandingEndCard(
         "23",
         "-c:a",
         "aac",
+        "-ar",
+        "44100",
+        "-ac",
+        "2",
         "-t",
         String(outDur),
         "-movflags",
@@ -1848,8 +1863,47 @@ async function appendBrandingEndCard(
       ]);
       return out;
     } catch {
-      await concatClipsHardCut([videoPath, endClip], out, dimensions);
-      return out;
+      try {
+        const fadeFilter =
+          `[0:v][1:v]xfade=transition=fade:duration=${fade.toFixed(3)}:offset=${offset.toFixed(3)}[vout];` +
+          `[0:a]afade=t=out:st=${fadeOutStart.toFixed(3)}:d=0.55,atrim=0:${mainDur.toFixed(3)},apad=pad_dur=${endDur.toFixed(3)}[a0];` +
+          `[1:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:${endDur.toFixed(3)},asetpts=PTS-STARTPTS,adelay=${joinMs}|${joinMs}:all=1[a1];` +
+          `[a0][a1]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,atrim=0:${outDur.toFixed(3)},apad=whole_dur=${outDur.toFixed(3)}[aout]`;
+        await runFfmpeg([
+          "-i",
+          videoPath,
+          "-i",
+          endClip,
+          "-filter_complex",
+          fadeFilter,
+          "-map",
+          "[vout]",
+          "-map",
+          "[aout]",
+          "-c:v",
+          "libx264",
+          "-preset",
+          "fast",
+          "-crf",
+          "23",
+          "-c:a",
+          "aac",
+          "-ar",
+          "44100",
+          "-ac",
+          "2",
+          "-t",
+          String(outDur),
+          "-movflags",
+          "+faststart",
+          "-y",
+          out
+        ]);
+        return out;
+      } catch {
+        await concatClipsHardCut([videoPath, endClip], out, dimensions);
+        return out;
+      }
     }
   } catch {
     return videoPath;

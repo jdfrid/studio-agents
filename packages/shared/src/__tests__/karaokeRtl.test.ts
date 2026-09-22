@@ -42,6 +42,8 @@ describe("RTL karaoke", () => {
     expect(isolateLtrRuns("מבצע 25% על iPhone-15 היום")).toBe(
       "מבצע \u206625%\u2069 על \u2066iPhone-15\u2069 היום"
     );
+    expect(isolateLtrRuns("מלון שאטו בנסקו (Chateau Bansko)")).toContain("\u2066(Chateau Bansko)\u2069");
+    expect(isolateLtrRuns("מלון שאטו בנסקו (Chateau Bansko)")).not.toContain("\u2066Chateau\u2069");
     const ass = buildKaraokeAss(buildKaraokeCues("מבצע 25% על iPhone-15 היום", 0, 3), {
       language: "he"
     });

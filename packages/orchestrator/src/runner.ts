@@ -9,6 +9,7 @@ import {
   geminiDialogueVoicePair,
   voicePitchSemitonesFromCreative,
   voiceSexFromCreative,
+  brandEndSpokenLine,
   nextStage,
   resolveRenderProfile,
   resolveSubtitleStyle,
@@ -174,17 +175,7 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
         style: briefData.style
       });
       const voicePitchSemitones = voicePitchSemitonesFromCreative(creative);
-      const brand = briefData.branding;
-      const lang = (briefData.language ?? "en").toLowerCase();
-      const visitPrefix = lang.startsWith("en") ? "Visit" : "בקרו ב־";
-      const brandParts = [
-        brand?.businessName?.trim(),
-        brand?.slogan?.trim(),
-        brand?.websiteUrl?.trim()
-          ? `${visitPrefix} ${brand.websiteUrl.trim().replace(/^https?:\/\//i, "")}`
-          : null
-      ].filter(Boolean);
-      const brandEndNarration = brandParts.length ? brandParts.join(". ") : undefined;
+      const brandEndNarration = brandEndSpokenLine(briefData.branding, briefData.language);
       return {
         language: briefData.language ?? "en",
         scenes: (script?.scenes ?? []).map((scene) => {
