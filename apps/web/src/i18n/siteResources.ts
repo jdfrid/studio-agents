@@ -245,7 +245,7 @@ export const siteResources = {
         sections: [
           {
             title: "List prices",
-            body: "Single video: ₪49 for 49 credits. Starter: ₪179 per month for 200 credits (about 5 videos of up to 30 seconds). Business: ₪449 per month for 600 credits (about 15 videos). Consumer prices include VAT; a business invoice may show a price excluding VAT when that is stated clearly."
+            body: "Single video: $15 for 49 credits. Starter: $49 per month for 200 credits (about 5 videos of up to 30 seconds). Business: $119 per month for 600 credits (about 15 videos). Prices are shown in US dollars; local tax may be added at checkout depending on your country."
           },
           {
             title: "Online checkout",

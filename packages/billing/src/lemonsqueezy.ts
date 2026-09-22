@@ -1,8 +1,19 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "@studio/infra-prisma";
-import { PAYG_PRICE_NIS, type CheckoutPlanId } from "@studio/shared";
+import {
+  checkoutCurrencyFromLocale,
+  type CheckoutCurrency,
+  type CheckoutPlanId
+} from "@studio/shared";
 import { grantCredits } from "./credits.js";
-import { checkoutCopy, checkoutVariantId, extractLemonVariantId, grantForLemonVariant } from "./lemonPlans.js";
+import {
+  checkoutCopy,
+  checkoutStoreId,
+  checkoutVariantId,
+  extractLemonVariantId,
+  grantForLemonVariant,
+  orderAmountNis
+} from "./lemonPlans.js";
 
 const LS_API = "https://api.lemonsqueezy.com/v1";
 
@@ -16,14 +27,20 @@ function lsHeaders(): Record<string, string> {
   };
 }
 
-export async function createCheckout(userId: string, email: string, plan: CheckoutPlanId): Promise<string> {
-  const storeId = process.env.LEMONSQUEEZY_STORE_ID;
-  const variantId = checkoutVariantId(plan);
+export async function createCheckout(
+  userId: string,
+  email: string,
+  plan: CheckoutPlanId,
+  locale?: string | null
+): Promise<string> {
+  const currency: CheckoutCurrency = checkoutCurrencyFromLocale(locale);
+  const storeId = checkoutStoreId(currency);
+  const variantId = checkoutVariantId(plan, currency)?.trim();
   const appUrl = (process.env.APP_URL ?? "http://localhost:5173").replace(/\/$/, "");
   const copy = checkoutCopy(plan);
 
-  if (!storeId) throw new Error("LEMONSQUEEZY_STORE_ID not configured");
-  if (!variantId) throw new Error(`Lemon Squeezy variant not configured for ${plan}`);
+  if (!storeId) throw new Error(`Lemon Squeezy store not configured for ${currency}`);
+  if (!variantId) throw new Error(`Lemon Squeezy variant not configured for ${plan} (${currency})`);
 
   const body = {
     data: {
@@ -103,14 +120,13 @@ export async function handleLemonWebhook(eventName: string, payload: Record<stri
       const grant = grantForLemonVariant(variantId, "order");
       if (grant.interval === "month") return;
       const orderId = String(data?.id ?? "");
-      const total = Number(attrs.total ?? attrs.total_usd ?? 0) / 100;
       const exists = await prisma.payment.findUnique({ where: { lemonOrderId: orderId } });
       if (exists) return;
       await prisma.payment.create({
         data: {
           userId,
           lemonOrderId: orderId,
-          amountNis: total > 0 ? total : PAYG_PRICE_NIS,
+          amountNis: orderAmountNis(attrs, grant.checkoutPlan),
           planType: grant.planType,
           creditsGranted: grant.credits,
           status: "paid"

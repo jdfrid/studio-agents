@@ -12,7 +12,7 @@ import {
   correctionCreditCost,
   creditCostForVideo
 } from "@studio/shared";
-import { enabledCheckoutPlans, isCheckoutEnabled } from "./payments.js";
+import { enabledCheckoutPlans, enabledCheckoutPlansByCurrency, isCheckoutEnabled } from "./payments.js";
 
 export class InsufficientCreditsError extends Error {
   readonly required: number;
@@ -84,19 +84,21 @@ export async function getCreateVideoEligibility(userId: string): Promise<{
   canCreateVideo: boolean;
   billingConfigured: boolean;
   checkoutPlans: ReturnType<typeof enabledCheckoutPlans>;
+  checkoutPlansByCurrency: ReturnType<typeof enabledCheckoutPlansByCurrency>;
 }> {
   const [credits, freeVideosRemaining] = await Promise.all([
     getCreditBalance(userId),
     getFreeVideosRemaining(userId)
   ]);
   const canCreateVideo = freeVideosRemaining > 0 || credits >= CREDIT_NEW_VIDEO;
-  const checkoutPlans = enabledCheckoutPlans();
+  const checkoutPlansByCurrency = enabledCheckoutPlansByCurrency();
   return {
     credits,
     freeVideosRemaining,
     canCreateVideo,
     billingConfigured: isCheckoutEnabled(),
-    checkoutPlans
+    checkoutPlans: checkoutPlansByCurrency.ils,
+    checkoutPlansByCurrency
   };
 }
 

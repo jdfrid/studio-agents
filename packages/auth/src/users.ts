@@ -150,6 +150,7 @@ function toUserView(user: {
     canCreateVideo: false,
     billingConfigured: false,
     checkoutPlans: [],
+    checkoutPlansByCurrency: { ils: [], usd: [] },
     allowDurationOver30: false,
     subscription: user.subscription
       ? {
@@ -173,6 +174,7 @@ export async function getUserViewWithCredits(userId: string): Promise<UserView |
     canCreateVideo: eligibility.canCreateVideo,
     billingConfigured: eligibility.billingConfigured,
     checkoutPlans: eligibility.checkoutPlans,
+    checkoutPlansByCurrency: eligibility.checkoutPlansByCurrency,
     allowDurationOver30: getPlatformSettingsSync().allowDurationOver30
   };
 }

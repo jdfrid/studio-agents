@@ -7,6 +7,8 @@ import {
   CREDIT_LIP_SYNC_SURCHARGE,
   CREDIT_NEW_VIDEO,
   PAYG_CREDITS,
+  PAYG_PRICE_NIS,
+  PAYG_PRICE_USD,
   STARTER_CREDITS,
   briefRequestsLipSync,
   creditCostForVideo
@@ -39,5 +41,8 @@ describe("credit catalog", () => {
     expect(PAYG_CREDITS).toBe(49);
     expect(STARTER_CREDITS).toBe(200);
     expect(BUSINESS_CREDITS).toBe(600);
+    expect(CHECKOUT_PLANS.payg.priceNis).toBe(PAYG_PRICE_NIS);
+    expect(CHECKOUT_PLANS.payg.priceUsd).toBe(PAYG_PRICE_USD);
+    expect(PAYG_PRICE_USD).toBe(15);
   });
 });

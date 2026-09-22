@@ -1,9 +1,13 @@
 import {
   BUSINESS_CREDITS,
   CHECKOUT_PLANS,
+  DEFAULT_USD_TO_ILS,
   LEGACY_SUBSCRIPTION_CREDITS,
   PAYG_CREDITS,
+  PAYG_PRICE_NIS,
+  PAYG_PRICE_USD,
   STARTER_CREDITS,
+  type CheckoutCurrency,
   type CheckoutPlanId,
   type PlanType
 } from "@studio/shared";
@@ -15,7 +19,17 @@ export type LemonPlanGrant = {
   interval: "once" | "month";
 };
 
-export function checkoutVariantId(plan: CheckoutPlanId): string | undefined {
+export function checkoutStoreId(currency: CheckoutCurrency = "ils"): string | undefined {
+  if (currency === "usd") return process.env.LEMONSQUEEZY_STORE_ID_USD?.trim() || undefined;
+  return process.env.LEMONSQUEEZY_STORE_ID?.trim() || undefined;
+}
+
+export function checkoutVariantId(plan: CheckoutPlanId, currency: CheckoutCurrency = "ils"): string | undefined {
+  if (currency === "usd") {
+    if (plan === "payg") return process.env.LEMONSQUEEZY_VARIANT_PAYG_USD;
+    if (plan === "starter") return process.env.LEMONSQUEEZY_VARIANT_STARTER_USD;
+    return process.env.LEMONSQUEEZY_VARIANT_BUSINESS_USD;
+  }
   if (plan === "payg") return process.env.LEMONSQUEEZY_VARIANT_PAYG;
   if (plan === "starter") return process.env.LEMONSQUEEZY_VARIANT_STARTER;
   return process.env.LEMONSQUEEZY_VARIANT_BUSINESS;
@@ -69,15 +83,18 @@ export function grantForLemonVariant(
   const payg = process.env.LEMONSQUEEZY_VARIANT_PAYG?.trim();
   const starter = process.env.LEMONSQUEEZY_VARIANT_STARTER?.trim();
   const business = process.env.LEMONSQUEEZY_VARIANT_BUSINESS?.trim();
+  const paygUsd = process.env.LEMONSQUEEZY_VARIANT_PAYG_USD?.trim();
+  const starterUsd = process.env.LEMONSQUEEZY_VARIANT_STARTER_USD?.trim();
+  const businessUsd = process.env.LEMONSQUEEZY_VARIANT_BUSINESS_USD?.trim();
   const legacy = process.env.LEMONSQUEEZY_VARIANT_SUBSCRIPTION?.trim();
 
-  if (id && payg && id === payg) {
+  if (id && ((payg && id === payg) || (paygUsd && id === paygUsd))) {
     return { planType: "PAYG", credits: PAYG_CREDITS, checkoutPlan: "payg", interval: "once" };
   }
-  if (id && starter && id === starter) {
+  if (id && ((starter && id === starter) || (starterUsd && id === starterUsd))) {
     return { planType: "STARTER", credits: STARTER_CREDITS, checkoutPlan: "starter", interval: "month" };
   }
-  if (id && business && id === business) {
+  if (id && ((business && id === business) || (businessUsd && id === businessUsd))) {
     return { planType: "BUSINESS", credits: BUSINESS_CREDITS, checkoutPlan: "business", interval: "month" };
   }
   if (id && legacy && id === legacy) {
@@ -87,4 +104,15 @@ export function grantForLemonVariant(
     return { planType: "SUBSCRIPTION", credits: LEGACY_SUBSCRIPTION_CREDITS, interval: "month" };
   }
   return { planType: "PAYG", credits: PAYG_CREDITS, checkoutPlan: "payg", interval: "once" };
+}
+
+export function orderAmountNis(attrs: Record<string, unknown>, checkoutPlan?: CheckoutPlanId): number {
+  const currency = String(attrs.currency ?? "ILS").toUpperCase();
+  const total = Number(attrs.total ?? 0) / 100;
+  if (currency === "USD") {
+    const usd = total > 0 ? total : checkoutPlan ? CHECKOUT_PLANS[checkoutPlan].priceUsd : PAYG_PRICE_USD;
+    return Math.round(usd * DEFAULT_USD_TO_ILS * 100) / 100;
+  }
+  if (total > 0) return total;
+  return checkoutPlan ? CHECKOUT_PLANS[checkoutPlan].priceNis : PAYG_PRICE_NIS;
 }

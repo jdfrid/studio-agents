@@ -266,7 +266,8 @@ export async function registerRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
-      if (!isCheckoutPlanEnabled(body.plan)) {
+      const currency = body.locale === "en" ? "usd" : "ils";
+      if (!isCheckoutPlanEnabled(body.plan, currency)) {
         reply.code(503);
         return {
           error: isCheckoutEnabled() ? "plan_unavailable" : "payments_paused",
@@ -276,10 +277,10 @@ export async function registerRoutes(app: FastifyInstance) {
         };
       }
       try {
-        const url = await createCheckout(user.id, user.email, body.plan);
+        const url = await createCheckout(user.id, user.email, body.plan, body.locale);
         return { checkoutUrl: url };
       } catch (err) {
-        request.log.error({ err, plan: body.plan, userId: user.id }, "checkout failed");
+        request.log.error({ err, plan: body.plan, locale: body.locale, userId: user.id }, "checkout failed");
         reply.code(502);
         return {
           error: "checkout_failed",

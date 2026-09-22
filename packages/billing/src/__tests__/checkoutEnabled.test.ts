@@ -6,9 +6,13 @@ describe("isCheckoutEnabled", () => {
     "PAYMENTS_ENABLED",
     "LEMONSQUEEZY_API_KEY",
     "LEMONSQUEEZY_STORE_ID",
+    "LEMONSQUEEZY_STORE_ID_USD",
     "LEMONSQUEEZY_VARIANT_PAYG",
     "LEMONSQUEEZY_VARIANT_STARTER",
-    "LEMONSQUEEZY_VARIANT_BUSINESS"
+    "LEMONSQUEEZY_VARIANT_BUSINESS",
+    "LEMONSQUEEZY_VARIANT_PAYG_USD",
+    "LEMONSQUEEZY_VARIANT_STARTER_USD",
+    "LEMONSQUEEZY_VARIANT_BUSINESS_USD"
   ];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 
@@ -67,5 +71,32 @@ describe("isCheckoutEnabled", () => {
     expect(isCheckoutPlanEnabled("payg")).toBe(true);
     expect(isCheckoutPlanEnabled("starter")).toBe(false);
     expect(isCheckoutPlanEnabled("business")).toBe(false);
+  });
+
+  it("keeps ILS and USD plans independent", () => {
+    delete process.env.PAYMENTS_ENABLED;
+    process.env.LEMONSQUEEZY_API_KEY = "key";
+    process.env.LEMONSQUEEZY_STORE_ID = "1";
+    process.env.LEMONSQUEEZY_VARIANT_PAYG = "2";
+    delete process.env.LEMONSQUEEZY_VARIANT_STARTER;
+    delete process.env.LEMONSQUEEZY_VARIANT_BUSINESS;
+    process.env.LEMONSQUEEZY_STORE_ID_USD = "9";
+    process.env.LEMONSQUEEZY_VARIANT_PAYG_USD = "15";
+    delete process.env.LEMONSQUEEZY_VARIANT_STARTER_USD;
+    delete process.env.LEMONSQUEEZY_VARIANT_BUSINESS_USD;
+    expect(isCheckoutEnabled()).toBe(true);
+    expect(configuredCheckoutPlans("ils")).toEqual(["payg"]);
+    expect(configuredCheckoutPlans("usd")).toEqual(["payg"]);
+    expect(isCheckoutPlanEnabled("payg", "usd")).toBe(true);
+    expect(isCheckoutPlanEnabled("starter", "usd")).toBe(false);
+  });
+
+  it("does not enable USD checkout when the USD store is missing", () => {
+    setLemonKeys();
+    delete process.env.LEMONSQUEEZY_STORE_ID_USD;
+    process.env.LEMONSQUEEZY_VARIANT_PAYG_USD = "15";
+    expect(configuredCheckoutPlans("usd")).toEqual([]);
+    expect(isCheckoutPlanEnabled("payg", "usd")).toBe(false);
+    expect(isCheckoutPlanEnabled("payg", "ils")).toBe(true);
   });
 });

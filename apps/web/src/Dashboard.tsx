@@ -3,7 +3,13 @@ import { Trans, useTranslation } from "react-i18next";
 import { apiDelete, apiGet, apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 import { formatDate, formatNumber } from "./i18n/format.js";
-import { CREDIT_NEW_VIDEO, type CheckoutPlanId } from "@studio/shared";
+import {
+  CREDIT_NEW_VIDEO,
+  checkoutLocaleFromLanguage,
+  checkoutCurrencyFromLocale,
+  formatCheckoutPrice,
+  type CheckoutPlanId
+} from "@studio/shared";
 import { canCheckoutPlan, enabledCheckoutPlansForUser } from "./checkoutPlans.js";
 
 type RunSummary = {
@@ -83,7 +89,10 @@ export function Dashboard({
     setBusy(plan);
     setPurchaseError("");
     try {
-      const { checkoutUrl } = await apiPost<{ checkoutUrl: string }>("/billing/checkout", { plan });
+      const { checkoutUrl } = await apiPost<{ checkoutUrl: string }>("/billing/checkout", {
+        plan,
+        locale: checkoutLocaleFromLanguage(i18n.resolvedLanguage)
+      });
       window.location.href = checkoutUrl;
     } catch (err) {
       setPurchaseError((err as Error).message || t("dashboard.purchaseError"));
@@ -95,7 +104,8 @@ export function Dashboard({
   const credits = user?.credits ?? 0;
   const freeLeft = user?.freeVideosRemaining ?? 0;
   const canCreate = user?.canCreateVideo ?? false;
-  const billingReady = enabledCheckoutPlansForUser(user).length > 0;
+  const currency = checkoutCurrencyFromLocale(i18n.resolvedLanguage);
+  const billingReady = enabledCheckoutPlansForUser(user, currency).length > 0;
   const showPurchase = credits < CREDIT_NEW_VIDEO && freeLeft < 1;
   const visible = useMemo(
     () =>
@@ -164,27 +174,27 @@ export function Dashboard({
             <button
               type="button"
               className="primary"
-              disabled={busy !== null || !canCheckoutPlan(user, "payg")}
-              title={!canCheckoutPlan(user, "payg") ? t("dashboard.planUnavailable") : undefined}
+              disabled={busy !== null || !canCheckoutPlan(user, "payg", currency)}
+              title={!canCheckoutPlan(user, "payg", currency) ? t("dashboard.planUnavailable") : undefined}
               onClick={() => void buy("payg")}
             >
-              {busy === "payg" ? t("dashboard.openingPayment") : t("dashboard.singlePrice")}
+              {busy === "payg" ? t("dashboard.openingPayment") : t("dashboard.singlePrice", { price: formatCheckoutPrice("payg", currency) })}
             </button>
             <button
               type="button"
-              disabled={busy !== null || !canCheckoutPlan(user, "starter")}
-              title={!canCheckoutPlan(user, "starter") ? t("dashboard.planUnavailable") : undefined}
+              disabled={busy !== null || !canCheckoutPlan(user, "starter", currency)}
+              title={!canCheckoutPlan(user, "starter", currency) ? t("dashboard.planUnavailable") : undefined}
               onClick={() => void buy("starter")}
             >
-              {busy === "starter" ? t("dashboard.openingPayment") : t("dashboard.starterPrice")}
+              {busy === "starter" ? t("dashboard.openingPayment") : t("dashboard.starterPrice", { price: formatCheckoutPrice("starter", currency) })}
             </button>
             <button
               type="button"
-              disabled={busy !== null || !canCheckoutPlan(user, "business")}
-              title={!canCheckoutPlan(user, "business") ? t("dashboard.planUnavailable") : undefined}
+              disabled={busy !== null || !canCheckoutPlan(user, "business", currency)}
+              title={!canCheckoutPlan(user, "business", currency) ? t("dashboard.planUnavailable") : undefined}
               onClick={() => void buy("business")}
             >
-              {busy === "business" ? t("dashboard.openingPayment") : t("dashboard.subscriptionPrice")}
+              {busy === "business" ? t("dashboard.openingPayment") : t("dashboard.subscriptionPrice", { price: formatCheckoutPrice("business", currency) })}
             </button>
             <button type="button" className="button-secondary" onClick={onContact}>
               {t("dashboard.contactToTopUp")}
@@ -201,24 +211,24 @@ export function Dashboard({
           <div className="stage-actions">
             <button
               type="button"
-              disabled={busy !== null || !canCheckoutPlan(user, "payg")}
-              title={!canCheckoutPlan(user, "payg") ? t("dashboard.planUnavailable") : undefined}
+              disabled={busy !== null || !canCheckoutPlan(user, "payg", currency)}
+              title={!canCheckoutPlan(user, "payg", currency) ? t("dashboard.planUnavailable") : undefined}
               onClick={() => void buy("payg")}
             >
               {busy === "payg" ? "…" : t("dashboard.buyAnother")}
             </button>
             <button
               type="button"
-              disabled={busy !== null || !canCheckoutPlan(user, "starter")}
-              title={!canCheckoutPlan(user, "starter") ? t("dashboard.planUnavailable") : undefined}
+              disabled={busy !== null || !canCheckoutPlan(user, "starter", currency)}
+              title={!canCheckoutPlan(user, "starter", currency) ? t("dashboard.planUnavailable") : undefined}
               onClick={() => void buy("starter")}
             >
-              {busy === "starter" ? "…" : t("dashboard.starterPrice")}
+              {busy === "starter" ? "…" : t("dashboard.starterPrice", { price: formatCheckoutPrice("starter", currency) })}
             </button>
             <button
               type="button"
-              disabled={busy !== null || !canCheckoutPlan(user, "business")}
-              title={!canCheckoutPlan(user, "business") ? t("dashboard.planUnavailable") : undefined}
+              disabled={busy !== null || !canCheckoutPlan(user, "business", currency)}
+              title={!canCheckoutPlan(user, "business", currency) ? t("dashboard.planUnavailable") : undefined}
               onClick={() => void buy("business")}
             >
               {busy === "business" ? "…" : t("dashboard.monthlySubscription")}

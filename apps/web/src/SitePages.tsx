@@ -5,6 +5,7 @@ import { useAuth } from "./AuthContext.js";
 import { PricingCards } from "./PricingCards.js";
 import { PublicChrome } from "./PublicChrome.js";
 import type { CheckoutPlanId } from "@studio/shared";
+import { checkoutCurrencyFromLocale, checkoutLocaleFromLanguage } from "@studio/shared";
 import { enabledCheckoutPlansForUser } from "./checkoutPlans.js";
 
 export function AboutPage({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -134,12 +135,13 @@ export function LegalPage({
 }
 
 export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { t: st } = useTranslation("site");
   const { login, user } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState("");
-  const billingReady = enabledCheckoutPlansForUser(user).length > 0;
+  const currency = checkoutCurrencyFromLocale(i18n.resolvedLanguage);
+  const billingReady = enabledCheckoutPlansForUser(user, currency).length > 0;
 
   async function buy(plan: CheckoutPlanId) {
     if (!user) {
@@ -149,7 +151,10 @@ export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void
     setBusy(plan);
     setPurchaseError("");
     try {
-      const { checkoutUrl } = await apiPost<{ checkoutUrl: string }>("/billing/checkout", { plan });
+      const { checkoutUrl } = await apiPost<{ checkoutUrl: string }>("/billing/checkout", {
+        plan,
+        locale: checkoutLocaleFromLanguage(i18n.resolvedLanguage)
+      });
       window.location.href = checkoutUrl;
     } catch (err) {
       setPurchaseError((err as Error).message || t("dashboard.purchaseError"));

@@ -161,7 +161,7 @@ export const resources = {
             credits: "{{count}} קרדיטים בחודש",
             videos: "כ־5 סרטונים עד 30 שניות",
             flow: "תבניות מותג, קריינות וכתוביות",
-            extra: "עלות אפקטיבית כ־₪35.80 לסרטון",
+            extra: "עלות אפקטיבית כ־{{price}} לסרטון",
             cta: "בחרו התחלתי"
           },
           business: {
@@ -171,7 +171,7 @@ export const resources = {
             credits: "{{count}} קרדיטים בחודש",
             videos: "כ־15 סרטונים עד 30 שניות",
             flow: "כל הפורמטים, תבניות מותג וסנכרון שפתיים כשיש קרדיטים",
-            extra: "עלות אפקטיבית כ־₪29.93 לסרטון",
+            extra: "עלות אפקטיבית כ־{{price}} לסרטון",
             cta: "בחרו עסקי"
           },
           auto: {
@@ -203,9 +203,9 @@ export const resources = {
         outOfCredits: "הקרדיטים נגמרו",
         choosePlan: "בחרו סרטון בודד, מסלול התחלתי או עסקי — לפי הקצב שלכם.",
         openingPayment: "פותח תשלום…",
-        singlePrice: "סרטון בודד · ₪49",
-        starterPrice: "התחלתי · ₪179",
-        subscriptionPrice: "עסקי · ₪449",
+        singlePrice: "סרטון בודד · {{price}}",
+        starterPrice: "התחלתי · {{price}}",
+        subscriptionPrice: "עסקי · {{price}}",
         billingUnavailable: "מערכת התשלומים בהגדרה — נסה שוב בקרוב או פנה לתמיכה.",
         contactToTopUp: "צרו קשר לרכישה",
         planUnavailable: "המסלול הזה עדיין לא פתוח לרכישה",
@@ -513,9 +513,9 @@ export const resources = {
         plans: {
           eyebrow: "Clear pricing",
           title: "Credits, not surprises",
-          lead: "A video of up to 30 seconds costs 40 credits. Lip-sync adds 20. Monthly plans give more credits per shekel.",
+          lead: "A video of up to 30 seconds costs 40 credits. Lip-sync adds 20. Monthly plans give more credits per dollar.",
           popular: "Most popular",
-          vat: "Consumer prices include VAT. A business invoice may show a price excluding VAT when that is stated clearly.",
+          vat: "Prices are shown in US dollars. Local tax may be added at checkout depending on your country.",
           payg: {
             kicker: "No commitment",
             name: "Single video",
@@ -533,7 +533,7 @@ export const resources = {
             credits: "{{count}} credits / month",
             videos: "About 5 videos of up to 30 seconds",
             flow: "Brand templates, narration, and captions",
-            extra: "Effective cost about ₪35.80 per video",
+            extra: "Effective cost about {{price}} per video",
             cta: "Choose Starter"
           },
           business: {
@@ -543,7 +543,7 @@ export const resources = {
             credits: "{{count}} credits / month",
             videos: "About 15 videos of up to 30 seconds",
             flow: "All formats, brand templates, and lip-sync when you have credits",
-            extra: "Effective cost about ₪29.93 per video",
+            extra: "Effective cost about {{price}} per video",
             cta: "Choose Business"
           },
           auto: {
@@ -575,9 +575,9 @@ export const resources = {
         outOfCredits: "You're out of credits",
         choosePlan: "Choose a single video, Starter, or Business — whichever matches your pace.",
         openingPayment: "Opening checkout…",
-        singlePrice: "Single video · ₪49",
-        starterPrice: "Starter · ₪179",
-        subscriptionPrice: "Business · ₪449",
+        singlePrice: "Single video · {{price}}",
+        starterPrice: "Starter · {{price}}",
+        subscriptionPrice: "Business · {{price}}",
         billingUnavailable: "Payments are being configured—try again soon or contact support.",
         contactToTopUp: "Contact us to buy credits",
         planUnavailable: "This plan is not available for checkout yet",
