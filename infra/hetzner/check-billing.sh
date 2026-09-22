@@ -24,7 +24,10 @@ echo "=== Lemon Squeezy env (api container) ==="
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T api sh -c '
   echo "STORE=${LEMONSQUEEZY_STORE_ID:-MISSING}"
   echo "PAYG=${LEMONSQUEEZY_VARIANT_PAYG:-MISSING}"
+  echo "STARTER=${LEMONSQUEEZY_VARIANT_STARTER:-MISSING}"
+  echo "BUSINESS=${LEMONSQUEEZY_VARIANT_BUSINESS:-MISSING}"
   echo "SUB=${LEMONSQUEEZY_VARIANT_SUBSCRIPTION:-MISSING}"
+  echo "PAYMENTS_ENABLED=${PAYMENTS_ENABLED:-unset}"
   test -n "${LEMONSQUEEZY_API_KEY:-}" && echo "API_KEY=set" || echo "API_KEY=MISSING"
 ' 2>/dev/null || echo "(api not running)"
 

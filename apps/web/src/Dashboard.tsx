@@ -4,6 +4,7 @@ import { apiDelete, apiGet, apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 import { formatDate, formatNumber } from "./i18n/format.js";
 import { CREDIT_NEW_VIDEO, type CheckoutPlanId } from "@studio/shared";
+import { canCheckoutPlan, enabledCheckoutPlansForUser } from "./checkoutPlans.js";
 
 type RunSummary = {
   id: string;
@@ -19,11 +20,13 @@ const SCROLL_KEY = "reelmino:dash-scroll";
 export function Dashboard({
   onNewVideo,
   onOpenRun,
-  onRemixRun
+  onRemixRun,
+  onContact
 }: {
   onNewVideo: () => void;
   onOpenRun: (id: string) => void;
   onRemixRun: (id: string) => void;
+  onContact: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const { user, refresh } = useAuth();
@@ -92,7 +95,7 @@ export function Dashboard({
   const credits = user?.credits ?? 0;
   const freeLeft = user?.freeVideosRemaining ?? 0;
   const canCreate = user?.canCreateVideo ?? false;
-  const billingReady = user?.billingConfigured ?? false;
+  const billingReady = enabledCheckoutPlansForUser(user).length > 0;
   const showPurchase = credits < CREDIT_NEW_VIDEO && freeLeft < 1;
   const visible = useMemo(
     () =>
@@ -158,14 +161,33 @@ export function Dashboard({
             <p>{t("dashboard.choosePlan")}</p>
           </div>
           <div className="stage-actions billing-actions">
-            <button type="button" className="primary" disabled={busy !== null || !billingReady} onClick={() => void buy("payg")}>
+            <button
+              type="button"
+              className="primary"
+              disabled={busy !== null || !canCheckoutPlan(user, "payg")}
+              title={!canCheckoutPlan(user, "payg") ? t("dashboard.planUnavailable") : undefined}
+              onClick={() => void buy("payg")}
+            >
               {busy === "payg" ? t("dashboard.openingPayment") : t("dashboard.singlePrice")}
             </button>
-            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("starter")}>
+            <button
+              type="button"
+              disabled={busy !== null || !canCheckoutPlan(user, "starter")}
+              title={!canCheckoutPlan(user, "starter") ? t("dashboard.planUnavailable") : undefined}
+              onClick={() => void buy("starter")}
+            >
               {busy === "starter" ? t("dashboard.openingPayment") : t("dashboard.starterPrice")}
             </button>
-            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("business")}>
+            <button
+              type="button"
+              disabled={busy !== null || !canCheckoutPlan(user, "business")}
+              title={!canCheckoutPlan(user, "business") ? t("dashboard.planUnavailable") : undefined}
+              onClick={() => void buy("business")}
+            >
               {busy === "business" ? t("dashboard.openingPayment") : t("dashboard.subscriptionPrice")}
+            </button>
+            <button type="button" className="button-secondary" onClick={onContact}>
+              {t("dashboard.contactToTopUp")}
             </button>
           </div>
           {!billingReady ? (
@@ -177,13 +199,28 @@ export function Dashboard({
         <section className="billing-banner billing-banner-compact">
           <p>{t("dashboard.haveCredits")}</p>
           <div className="stage-actions">
-            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("payg")}>
+            <button
+              type="button"
+              disabled={busy !== null || !canCheckoutPlan(user, "payg")}
+              title={!canCheckoutPlan(user, "payg") ? t("dashboard.planUnavailable") : undefined}
+              onClick={() => void buy("payg")}
+            >
               {busy === "payg" ? "…" : t("dashboard.buyAnother")}
             </button>
-            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("starter")}>
+            <button
+              type="button"
+              disabled={busy !== null || !canCheckoutPlan(user, "starter")}
+              title={!canCheckoutPlan(user, "starter") ? t("dashboard.planUnavailable") : undefined}
+              onClick={() => void buy("starter")}
+            >
               {busy === "starter" ? "…" : t("dashboard.starterPrice")}
             </button>
-            <button type="button" disabled={busy !== null || !billingReady} onClick={() => void buy("business")}>
+            <button
+              type="button"
+              disabled={busy !== null || !canCheckoutPlan(user, "business")}
+              title={!canCheckoutPlan(user, "business") ? t("dashboard.planUnavailable") : undefined}
+              onClick={() => void buy("business")}
+            >
               {busy === "business" ? "…" : t("dashboard.monthlySubscription")}
             </button>
           </div>

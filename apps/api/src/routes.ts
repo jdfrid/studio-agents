@@ -70,6 +70,7 @@ import {
   createCheckout,
   getBillingStatus,
   isCheckoutEnabled,
+  isCheckoutPlanEnabled,
   handleLemonWebhook,
   verifyWebhookSignature,
   getAdminDashboard,
@@ -265,11 +266,13 @@ export async function registerRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
-      if (!isCheckoutEnabled()) {
+      if (!isCheckoutPlanEnabled(body.plan)) {
         reply.code(503);
         return {
-          error: "payments_paused",
-          message: "Online payments are paused. Contact us to add credits."
+          error: isCheckoutEnabled() ? "plan_unavailable" : "payments_paused",
+          message: isCheckoutEnabled()
+            ? "This plan is not available for checkout yet. Choose another plan or contact us to add credits."
+            : "Online payments are paused. Contact us to add credits."
         };
       }
       try {

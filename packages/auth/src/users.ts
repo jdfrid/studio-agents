@@ -149,6 +149,7 @@ function toUserView(user: {
     freeVideosRemaining: 0,
     canCreateVideo: false,
     billingConfigured: false,
+    checkoutPlans: [],
     allowDurationOver30: false,
     subscription: user.subscription
       ? {
@@ -171,6 +172,7 @@ export async function getUserViewWithCredits(userId: string): Promise<UserView |
     freeVideosRemaining: eligibility.freeVideosRemaining,
     canCreateVideo: eligibility.canCreateVideo,
     billingConfigured: eligibility.billingConfigured,
+    checkoutPlans: eligibility.checkoutPlans,
     allowDurationOver30: getPlatformSettingsSync().allowDurationOver30
   };
 }

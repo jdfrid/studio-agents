@@ -5,6 +5,7 @@ import { useAuth } from "./AuthContext.js";
 import { PricingCards } from "./PricingCards.js";
 import { PublicChrome } from "./PublicChrome.js";
 import type { CheckoutPlanId } from "@studio/shared";
+import { enabledCheckoutPlansForUser } from "./checkoutPlans.js";
 
 export function AboutPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   const { t } = useTranslation("site");
@@ -138,7 +139,7 @@ export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void
   const { login, user } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState("");
-  const billingReady = user?.billingConfigured ?? false;
+  const billingReady = enabledCheckoutPlansForUser(user).length > 0;
 
   async function buy(plan: CheckoutPlanId) {
     if (!user) {
@@ -167,6 +168,7 @@ export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void
           <PricingCards
             mode="checkout"
             busy={busy}
+            user={user}
             billingReady={billingReady}
             signedIn={Boolean(user)}
             onSelect={(plan) => void buy(plan)}

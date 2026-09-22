@@ -300,6 +300,7 @@ function AppShell() {
             onRemixRun={(id) => {
               if (user.canCreateVideo) navigate({ view: "create", runId: null, fromRunId: id });
             }}
+            onContact={() => navigate({ view: "contact", runId: null })}
           />
         )}
         {appView === "create" && (

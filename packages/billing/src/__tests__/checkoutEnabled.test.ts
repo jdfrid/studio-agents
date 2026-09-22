@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { isCheckoutEnabled } from "../payments.js";
+import { configuredCheckoutPlans, isCheckoutEnabled, isCheckoutPlanEnabled } from "../payments.js";
 
 describe("isCheckoutEnabled", () => {
   const keys = [
@@ -53,5 +53,19 @@ describe("isCheckoutEnabled", () => {
     delete process.env.LEMONSQUEEZY_VARIANT_STARTER;
     delete process.env.LEMONSQUEEZY_VARIANT_BUSINESS;
     expect(isCheckoutEnabled()).toBe(false);
+  });
+
+  it("enables checkout when only the PAYG variant is set", () => {
+    delete process.env.PAYMENTS_ENABLED;
+    process.env.LEMONSQUEEZY_API_KEY = "key";
+    process.env.LEMONSQUEEZY_STORE_ID = "1";
+    process.env.LEMONSQUEEZY_VARIANT_PAYG = "2";
+    delete process.env.LEMONSQUEEZY_VARIANT_STARTER;
+    delete process.env.LEMONSQUEEZY_VARIANT_BUSINESS;
+    expect(isCheckoutEnabled()).toBe(true);
+    expect(configuredCheckoutPlans()).toEqual(["payg"]);
+    expect(isCheckoutPlanEnabled("payg")).toBe(true);
+    expect(isCheckoutPlanEnabled("starter")).toBe(false);
+    expect(isCheckoutPlanEnabled("business")).toBe(false);
   });
 });

@@ -7,14 +7,17 @@ import {
   PAYG_PRICE_NIS,
   STARTER_CREDITS,
   STARTER_PRICE_NIS,
-  type CheckoutPlanId
+  type CheckoutPlanId,
+  type UserView
 } from "@studio/shared";
+import { canCheckoutPlan } from "./checkoutPlans.js";
 
 const PLAN_ORDER: CheckoutPlanId[] = ["payg", "starter", "business"];
 
 export function PricingCards({
   mode,
   busy,
+  user,
   billingReady,
   signedIn,
   onSelect,
@@ -22,6 +25,7 @@ export function PricingCards({
 }: {
   mode: "teaser" | "checkout";
   busy?: string | null;
+  user?: UserView | null;
   billingReady?: boolean;
   signedIn?: boolean;
   onSelect: (plan: CheckoutPlanId) => void;
@@ -45,7 +49,9 @@ export function PricingCards({
         {PLAN_ORDER.map((plan) => {
           const featured = plan === "business";
           const catalog = CHECKOUT_PLANS[plan];
-          const checkoutDisabled = mode === "checkout" && Boolean(signedIn) && (Boolean(busy) || !billingReady);
+          const planReady = user ? canCheckoutPlan(user, plan) : Boolean(billingReady);
+          const checkoutDisabled =
+            mode === "checkout" && Boolean(signedIn) && (Boolean(busy) || !planReady);
           return (
             <article key={plan} className={featured ? "price-card featured" : "price-card"}>
               {featured ? <span className="popular-badge">{t("landing.plans.popular")}</span> : null}
@@ -65,6 +71,7 @@ export function PricingCards({
                 type="button"
                 className={featured ? "primary" : undefined}
                 disabled={checkoutDisabled}
+                title={checkoutDisabled && signedIn && !planReady ? t("dashboard.planUnavailable") : undefined}
                 onClick={() => onSelect(plan)}
               >
                 {busy === plan ? t("dashboard.openingPayment") : t(`landing.plans.${plan}.cta`)}

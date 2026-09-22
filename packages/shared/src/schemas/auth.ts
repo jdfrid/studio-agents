@@ -60,6 +60,7 @@ export const UserViewSchema = z.object({
   freeVideosRemaining: z.number(),
   canCreateVideo: z.boolean(),
   billingConfigured: z.boolean(),
+  checkoutPlans: z.array(z.enum(["payg", "starter", "business"])).default([]),
   allowDurationOver30: z.boolean().optional(),
   subscription: SubscriptionViewSchema.nullable()
 });
