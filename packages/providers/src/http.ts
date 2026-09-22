@@ -17,6 +17,12 @@ function throwHttpError(url: string, status: number, text: string, retryAfter?: 
     });
   }
   const lower = text.toLowerCase();
+  if (lower.includes("image_too_small") || lower.includes("minimum dimensions are 300")) {
+    throw new ProviderError(
+      "תמונת הייחוס קטנה מדי לספק הווידאו (נדרש לפחות 300×300 פיקסלים). העלו תמונה גדולה יותר או הרץ מחדש אחרי עדכון השרת — התמונות הקטנות מוגדלות אוטומטית.",
+      { provider: "fal", metadata: { status, raw: text.slice(0, 4000), kind: "image_too_small", url } }
+    );
+  }
   if (
     lower.includes("content_policy_violation") ||
     lower.includes("copyright") ||

@@ -30,7 +30,7 @@ import {
 
 import type { ProviderCredentialView } from "@studio/shared";
 
-import { geminiGenerateImage, searchMedia } from "@studio/providers";
+import { geminiGenerateImage, searchMedia, ensureMinImageForFal } from "@studio/providers";
 
 
 
@@ -150,13 +150,18 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
       if (!scene.uploadedAssetGcsPath && locationPlateRefs.length) {
         const plate = locationPlateRefs[sceneIndex % locationPlateRefs.length]!;
         const plateMime = plate.mimeType.startsWith("image/") ? plate.mimeType : "image/png";
+        const preparedPlate =
+          (await ensureMinImageForFal({ body: plate.data, mimeType: plateMime })) ?? {
+            body: plate.data,
+            mimeType: plateMime
+          };
         const referenceArtifact = await ctx.artifacts.save({
           runId: ctx.runId,
           stage: "asset",
           kind: "scene_reference_frame",
-          body: plate.data,
-          mimeType: plateMime,
-          filename: `scene-${scene.sceneId}-product-plate.png`,
+          body: preparedPlate.body,
+          mimeType: preparedPlate.mimeType,
+          filename: `scene-${scene.sceneId}-product-plate.jpg`,
           metadata: {
             sceneId: scene.sceneId,
             viaProductPlate: true,
@@ -164,7 +169,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
           }
         });
         const referenceSignedUrl = await ctx.storage.signedUrl(referenceArtifact.gcsPath);
-        const frameRef: ReferenceImageBytes = { data: plate.data, mimeType: plateMime };
+        const frameRef: ReferenceImageBytes = { data: preparedPlate.body, mimeType: preparedPlate.mimeType };
         if (!anchorReference) anchorReference = frameRef;
         chainReference = frameRef;
         perScene.push({
@@ -191,8 +196,13 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
       if (scene.uploadedAssetGcsPath) {
 
         const uploaded = await ctx.storage.download(scene.uploadedAssetGcsPath);
-
-        const uploadedMime = uploaded.mimeType.startsWith("video/") ? uploaded.mimeType : "image/png";
+        const isVideoUpload = uploaded.mimeType.startsWith("video/");
+        const preparedUpload = isVideoUpload
+          ? { body: uploaded.body, mimeType: uploaded.mimeType }
+          : ((await ensureMinImageForFal({
+              body: uploaded.body,
+              mimeType: uploaded.mimeType.startsWith("image/") ? uploaded.mimeType : "image/png"
+            })) ?? { body: uploaded.body, mimeType: "image/png" });
 
         const referenceArtifact = await ctx.artifacts.save({
 
@@ -202,11 +212,11 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
           kind: "scene_reference_frame",
 
-          body: uploaded.body,
+          body: preparedUpload.body,
 
-          mimeType: uploadedMime,
+          mimeType: preparedUpload.mimeType,
 
-          filename: `scene-${scene.sceneId}-uploaded-reference.png`,
+          filename: `scene-${scene.sceneId}-uploaded-reference.jpg`,
 
           metadata: { sceneId: scene.sceneId, viaUpload: true, originalGcsPath: scene.uploadedAssetGcsPath }
 
@@ -214,7 +224,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
         const referenceSignedUrl = await ctx.storage.signedUrl(referenceArtifact.gcsPath);
 
-        const frameRef: ReferenceImageBytes = { data: uploaded.body, mimeType: uploadedMime };
+        const frameRef: ReferenceImageBytes = { data: preparedUpload.body, mimeType: preparedUpload.mimeType };
 
         if (!anchorReference) anchorReference = frameRef;
 
@@ -234,7 +244,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
           gcsPath: referenceArtifact.gcsPath,
 
-          mimeType: uploadedMime,
+          mimeType: preparedUpload.mimeType,
 
           width: null,
 

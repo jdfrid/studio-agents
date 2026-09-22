@@ -2,6 +2,7 @@ import type { ProviderCredentialView, RenderProfile } from "@studio/shared";
 import { ProviderError } from "@studio/shared";
 import { httpBytes, httpJson } from "../http.js";
 import type { VideoBeatGenerator, VideoBeatHooks, VideoBeatRequest, VideoBeatResult } from "./types.js";
+import { ensureMinImageForFal } from "./minStill.js";
 
 function resolveFalModel(profile: RenderProfile): string {
   if (profile.falModel) return profile.falModel;
@@ -201,9 +202,17 @@ export function createFalI2vBeatGenerator(profile: RenderProfile, credential: Pr
         });
       }
 
+      const referenceImage = await ensureMinImageForFal(req.referenceImage);
+      if (!referenceImage) {
+        throw new ProviderError(`${profile.label} requires a reference image per beat`, {
+          provider: providerTag,
+          metadata: { sceneId: req.sceneId }
+        });
+      }
+
       await hooks?.onPoll?.({ operationName, model, status: "queued" });
 
-      const imageUrl = `data:${req.referenceImage.mimeType};base64,${req.referenceImage.body.toString("base64")}`;
+      const imageUrl = `data:${referenceImage.mimeType};base64,${referenceImage.body.toString("base64")}`;
       const duration = durationForModel(profile, req.durationSeconds);
       const baseUrl = String(credential.config.baseUrl ?? "https://queue.fal.run");
       const prompts = [req.prompt, motionOnlyFallbackPrompt(req.prompt)];

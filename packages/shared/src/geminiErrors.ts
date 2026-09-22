@@ -289,6 +289,11 @@ export function formatApiErrorMessage(raw: string, locale: Locale = "he"): strin
       ? "Video assembly failed while encoding clips. Retry the render stage."
       : "הרכבת הווידאו נכשלה בקידוד הקליפים. הרץ מחדש את שלב הרינדור.";
   }
+  if (lower.includes("image_too_small") || lower.includes("minimum dimensions are 300")) {
+    return locale === "en"
+      ? "A reference image is smaller than 300×300 pixels, which Hailuo cannot animate. Upload a larger photo or retry render — small stills are now upscaled automatically."
+      : "תמונת הייחוס קטנה מ־300×300 פיקסלים, ו-Hailuo לא יכול להנפיש אותה. העלו תמונה גדולה יותר או הרץ מחדש את הרינדור — תמונות קטנות מוגדלות עכשיו אוטומטית.";
+  }
   if (lower.includes("input token count exceeds") || lower.includes("maximum number of tokens allowed")) {
     return locale === "en"
       ? "The Gemini request is too large (token limit exceeded), usually because audio or video was attached to the prompt by mistake. Update the server and retry the brief stage."

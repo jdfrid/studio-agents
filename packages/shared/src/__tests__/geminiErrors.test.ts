@@ -119,6 +119,14 @@ describe("formatApiErrorMessage", () => {
     expect(parsed.raw).toContain("ffmpeg exited null");
   });
 
+  it("maps fal image_too_small to a Hailuo still-size message", () => {
+    const raw =
+      'HTTP 422 for https://queue.fal.run/fal-ai/minimax/requests/x: {"detail":[{"msg":"Image dimensions are too small. Minimum dimensions are 300x300 pixels.","type":"image_too_small"}]}';
+    const msg = formatApiErrorMessage(raw);
+    expect(msg).toContain("300");
+    expect(msg).not.toContain("data:image");
+  });
+
   it("hides api key", () => {
     const msg = formatApiErrorMessage(
       '429 {"error":"HTTP 429 for https://generativelanguage.googleapis.com?key=AIzaSySecret123: quota exceeded"}'

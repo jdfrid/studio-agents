@@ -13,6 +13,7 @@ export { createKlingBeatGenerator } from "./kling.js";
 export { createFalI2vBeatGenerator } from "./falI2v.js";
 export { createHeygenBeatGenerator } from "./heygen.js";
 export { createOmniBeatGenerator } from "./omni.js";
+export { ensureMinImageForFal, probeImageDimensions, FAL_MIN_STILL_PX } from "./minStill.js";
 
 export function getVideoBeatGenerator(
   profile: RenderProfile,
