@@ -21,7 +21,11 @@ export type VoiceCharacterId =
   | "funny"
   | "distorted"
   | "formal"
-  | "silly";
+  | "silly"
+  | "airport_pa"
+  | "hotel_pa"
+  | "beach_lifeguard"
+  | "retro_radio";
 
 export type VoiceCharacterPreset = {
   id: VoiceCharacterId;
@@ -230,6 +234,50 @@ export const VOICE_CHARACTER_PRESETS: readonly VoiceCharacterPreset[] = [
     timbrePrompt: "Silly goofy voice, slightly foolish and over-the-top, light comic character",
     labelHe: "דמות — טיפשי / מטופש",
     labelEn: "Character — silly"
+  },
+  {
+    id: "airport_pa",
+    group: "character",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Orus",
+    timbrePrompt:
+      "Airport public-address announcer over a terminal PA speaker, slightly distant and reverberant, measured gate-style cadence, very clear diction",
+    labelHe: "כרוז בשדה התעופה",
+    labelEn: "Airport PA announcer"
+  },
+  {
+    id: "hotel_pa",
+    group: "character",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Algieba",
+    timbrePrompt:
+      "Hotel lobby public-address announcer, warm hospitality, polite and unhurried, slight indoor PA reverb",
+    labelHe: "כרוז בבית מלון",
+    labelEn: "Hotel PA announcer"
+  },
+  {
+    id: "beach_lifeguard",
+    group: "character",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Fenrir",
+    timbrePrompt:
+      "Beach lifeguard calling over open sand, outdoor projection, sun-bleached and energetic, megaphone-like presence without unintelligible shouting",
+    labelHe: "מציל בחוף הים",
+    labelEn: "Beach lifeguard"
+  },
+  {
+    id: "retro_radio",
+    group: "character",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Umbriel",
+    timbrePrompt:
+      "1950s–60s retro radio announcer, warm tube-amp color, vintage broadcast cadence, slightly over-enunciated commercial charm",
+    labelHe: "קול רדיו רטרו",
+    labelEn: "Retro radio voice"
   }
 ] as const;
 

@@ -17,6 +17,10 @@ describe("voice character catalog", () => {
     expect(geminiVoiceNameFromCreative({ voiceCharacter: "child_boy" })).toBe("Puck");
     expect(geminiVoiceNameFromCreative({ voiceCharacter: "baby" })).toBe("Leda");
     expect(geminiVoiceNameFromCreative({ voiceCharacter: "distorted" })).toBe("Algenib");
+    expect(geminiVoiceNameFromCreative({ voiceCharacter: "airport_pa" })).toBe("Orus");
+    expect(geminiVoiceNameFromCreative({ voiceCharacter: "hotel_pa" })).toBe("Algieba");
+    expect(geminiVoiceNameFromCreative({ voiceCharacter: "beach_lifeguard" })).toBe("Fenrir");
+    expect(geminiVoiceNameFromCreative({ voiceCharacter: "retro_radio" })).toBe("Umbriel");
     expect(voicePitchSemitonesFromCreative({ voiceCharacter: "baby" })).toBe(5);
     expect(voicePitchSemitonesFromCreative({ voiceCharacter: "distorted" })).toBe(-3);
     expect(voicePitchSemitonesFromCreative({ voiceCharacter: "male_clear" })).toBeUndefined();

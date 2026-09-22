@@ -376,6 +376,10 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
           { value: "משפחה", labelHe: "משפחה" },
           { value: "זוג", labelHe: "זוג" },
           { value: "צוות", labelHe: "צוות" },
+          { value: "חרדי", labelHe: "חרדי" },
+          { value: "היפי", labelHe: "היפי" },
+          { value: "נזיר", labelHe: "נזיר" },
+          { value: "דיג'יי", labelHe: "דיג'יי" },
           { value: "ללא דמות", labelHe: "ללא דמות — מוצר בלבד" }
         ]
       },
@@ -971,6 +975,10 @@ const OPTION_LABEL_EN_BY_HE: Record<string, string> = {
   משפחה: "Family",
   זוג: "Couple",
   צוות: "Team",
+  חרדי: "Haredi",
+  היפי: "Hippie",
+  נזיר: "Monk",
+  "דיג'יי": "DJ",
   "ללא דמות — מוצר בלבד": "No character — product only",
   ילד: "Child",
   צעיר: "Young",
@@ -1323,6 +1331,18 @@ export function formatCreativeConstraints(
           "corporate B2B product film — clean product hero shots, office/secure facility, professional VO pacing"
       };
       const hint = styleHints[normalizedValue];
+      lines.push(hint ? `${label}: ${displayValue} (${hint})` : `${label}: ${displayValue}`);
+      continue;
+    }
+    if (key === "characterType") {
+      const characterHints: Record<string, string> = {
+        חרדי:
+          "Haredi Orthodox Jewish man, black suit, white shirt, black hat, beard; dignified and respectful, not a caricature",
+        היפי: "1960s–70s hippie look, long hair, colorful loose clothes, beads, relaxed outdoor presence",
+        נזיר: "Monk in simple robes, shaved or tonsured head, calm contemplative presence",
+        "דיג'יי": "Club DJ, over-ear headphones, mixer booth, urban nightlife lighting"
+      };
+      const hint = characterHints[normalizedValue];
       lines.push(hint ? `${label}: ${displayValue} (${hint})` : `${label}: ${displayValue}`);
       continue;
     }

@@ -32,6 +32,11 @@ describe("shared localization helpers", () => {
       sections.flatMap((section) => section.fields).find((field) => field.key === "targetAudience")?.label
     ).toBe("Target audience");
     expect(creativeOptionLabel("language", "עברית", "en")).toBe("Hebrew");
+    expect(creativeOptionLabel("characterType", "חרדי", "en")).toBe("Haredi");
+    expect(creativeOptionLabel("characterType", "דיג'יי", "he")).toBe("דיג'יי");
+    expect(
+      formatCreativeConstraints({ characterType: "היפי" }, "en").some((line) => line.includes("Hippie"))
+    ).toBe(true);
     expect(
       CREATIVE_FIELD_DEFS.flatMap((field) => field.options ?? []).every(
         (option) => option.code && option.labelEn && !/[\u0590-\u05ff]/.test(option.labelEn)
