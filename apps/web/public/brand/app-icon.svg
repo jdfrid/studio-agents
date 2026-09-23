@@ -1,5 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Reelmino">
-  <rect width="64" height="64" rx="16" fill="#173D35"/>
-  <path fill="#F6F7F2" d="M20 16h16.5c8.4 0 14.5 5.2 14.5 12.6 0 5.4-3.2 9.6-8.4 11.4L54 48h-9.2L35.6 36.4H26V48h-6V16zm6 5.6V31h9c4.2 0 6.8-2.2 6.8-5.2S39.2 21.6 35 21.6H26z"/>
-  <polygon fill="#D9F279" points="38,24 38,40 52,32"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-label="Reelmino app icon"><title>Reelmino app icon</title><rect width="96" height="96" rx="23" fill="#D9F279"/><g transform="translate(8 8) scale(.8333)"><path d="M18 12H46Q78 12 78 38Q78 54 63 61L82 84H58L39 62H36V84H18Z M36 27V49L57 38Z" fill="#173D35" fill-rule="evenodd"/></g></svg>

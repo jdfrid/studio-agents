@@ -9,8 +9,8 @@ export const resources = {
       },
       auth: {
         eyebrow: "חשבון",
-        title: "כניסה ל-Reelmino",
-        lead: "מייל וסיסמה — נשלח קוד אימות למייל. אפשר גם להמשיך עם Google.",
+        title: "מכאן מתחיל הסיפור.",
+        lead: "היכנסו כדי לשמור רעיונות וליצור סרטונים למותג שלכם.",
         email: "אימייל",
         password: "סיסמה",
         passwordHint: "לפחות 8 תווים. בחשבון חדש זו הסיסמה שתישמר.",
@@ -40,9 +40,9 @@ export const resources = {
         loading: "טוען…",
         homeLabel: "Reelmino — מעבר למסך הבית",
         primaryNav: "ניווט ראשי",
-        myVideos: "הסרטונים שלי",
-        newCreation: "יצירה",
-        brand: "מותג",
+        myVideos: "הסטודיו שלי",
+        newCreation: "יצירה חדשה",
+        brand: "המותג שלי",
         automation: "אוטומציה",
         distribute: "הפצה",
         logout: "יציאה"
@@ -75,19 +75,19 @@ export const resources = {
         howItWorks: "איך זה עובד",
         pricing: "מחירים",
         login: "כניסה",
-        eyebrow: "סטודיו וידאו לעסק שעובד כל שבוע",
-        heroTitle: "הסיפור שלכם.",
-        heroTitleAccent: "עכשיו בווידאו.",
-        tagline:
-          "מתארים מה צריך לקרות, מוסיפים חומרים אם יש — ו-Reelmino מגיש הצעה לסרטון מוכן לרשת.",
-        firstVideo: "מתחילים",
+        eyebrow: "הסיפור שלכם. עכשיו בווידאו.",
+        heroTitle: "העסק שלכם.",
+        heroTitleAccent: "סיפור ששווה לראות.",
+        tagline: "הופכים רעיון קטן לסרטון עם אופי. תסריט, קול, סצנות והמותג שלכם — בתהליך אחד פשוט.",
+        firstVideo: "מתחילים ליצור",
         firstVideoHint: "כניסה עם מייל או Google. אחרי האישור תגיעו לסטודיו ותוכלו לתאר את הסרטון הראשון.",
-        discover: "גלו איך זה עובד",
+        discover: "איך זה עובד",
         benefitsLabel: "יתרונות",
         guided: "תהליך מודרך, בעברית",
         productAndCharacters: "התמונות והמיתוג שלכם",
         brandingAndCaptions: "קרדיטים ברורים, בלי מסלול חינם שמסתיר עלויות",
         previewLabel: "תצוגה מקדימה של המערכת",
+        platforms: { web: "לאתר ולמצגת" },
         showcase: {
           newProductVideo: "סרטון מוצר חדש",
           creating: "בתהליך יצירה",
@@ -97,12 +97,14 @@ export const resources = {
           render: "רינדור",
           yourIdea: "הרעיון שלכם.",
           yourVideo: "הסרטון שלכם.",
+          previewLine: "הבוקר מתחיל כאן.",
+          conceptArt: "איור להמחשה",
           brief: "בריף",
           voice: "קול",
           costEstimate: "עלות בקרדיטים",
           transparent: "שקופה לפני היצירה",
-          ready: "הווידאו מוכן",
-          watchAndDownload: "לצפייה והורדה"
+          ready: "מתאים למותג שלכם",
+          watchAndDownload: "הלוגו, הצבעים והסיפור. יחד."
         },
         audience: {
           label: "למי זה מיועד",
@@ -127,14 +129,14 @@ export const resources = {
           creditsBody: "שינוי הגדרות וסרטון חדש מחויב כסרטון חדש. תיקונים אחרי סיום צורכים קרדיטים נוספים, בשקיפות."
         },
         process: {
-          eyebrow: "הסיפור של ההפקה",
-          title: "מגדירים פעם אחת. המערכת בונה את הסרטון.",
-          defineTitle: "מגדירים את הסרטון",
-          defineBody: "מטרה, קהל, מסר, משך וסגנון — בעברית, בלי ללמוד חמישה כלי AI.",
-          assetsTitle: "מוסיפים חומרי מותג",
-          assetsBody: "תמונות מוצר, דמויות, קול ולוגו. אפשר גם לצלם מהטלפון.",
-          approveTitle: "מאשרים נקודות ביקורת",
-          approveBody: "אתם בוחרים כמה שליטה להשאיר: אוטומטי, סקירת תסריט, או אישור בכל שלב.",
+          eyebrow: "אתם מביאים את הרעיון.",
+          title: "מספרים בקצרה, מדייקים, מקבלים סרטון.",
+          defineTitle: "מספרים בקצרה",
+          defineBody: "מה מציגים, למי ולמה. אפשר להוסיף תמונות ולוגו.",
+          assetsTitle: "מסתכלים ומדייקים",
+          assetsBody: "רואים תסריט וסצנות. מאשרים או משנים בדיוק מה שצריך.",
+          approveTitle: "מקבלים סרטון",
+          approveBody: "המחיר מוצג לפני ההפקה. כשהסרטון מוכן, מורידים ומשתפים.",
           receiveTitle: "מורידים MP4 לרשתות",
           receiveBody: "קריינות, כתוביות, מיתוג וקובץ סופי לרילס, טיקטוק, שורטס או אתר."
         },
@@ -182,8 +184,8 @@ export const resources = {
           }
         },
         close: {
-          title: "הסרטון הבא לא צריך לחכות להפקה",
-          body: "נכנסים עם מייל או Google, רוכשים קרדיטים, ומתחילים מבריף קצר. אפשר לנסות בסרטון בודד ולעבור למסלול חודשי כשהקצב עולה.",
+          title: "פשוט כשאפשר. מפורט כשצריך.",
+          body: "נכנסים עם מייל או Google, רוכשים קרדיטים, ומתחילים מבריף קצר.",
           pricing: "למחירון המלא"
         },
         footer: "הסיפור שלכם. עכשיו בווידאו."
@@ -381,8 +383,8 @@ export const resources = {
       },
       auth: {
         eyebrow: "Account",
-        title: "Sign in to Reelmino",
-        lead: "Email and password — we send a verification code to your inbox. You can also continue with Google.",
+        title: "Your story starts here.",
+        lead: "Sign in to save ideas and create videos for your brand.",
         email: "Email",
         password: "Password",
         passwordHint: "At least 8 characters. For a new account this is the password we save.",
@@ -412,9 +414,9 @@ export const resources = {
         loading: "Loading…",
         homeLabel: "Reelmino — go to home",
         primaryNav: "Primary navigation",
-        myVideos: "My videos",
-        newCreation: "Create",
-        brand: "Brand",
+        myVideos: "My studio",
+        newCreation: "Create video",
+        brand: "Brand kit",
         automation: "Automation",
         distribute: "Distribute",
         logout: "Log out"
@@ -447,12 +449,11 @@ export const resources = {
         howItWorks: "How it works",
         pricing: "Pricing",
         login: "Log in",
-        eyebrow: "A video studio for businesses that publish every week",
-        heroTitle: "Your story.",
-        heroTitleAccent: "Now in motion.",
-        tagline:
-          "Describe what should happen, add materials if you have them — Reelmino prepares a video ready for social.",
-        firstVideo: "Get started",
+        eyebrow: "Your story. Now in motion.",
+        heroTitle: "Your business.",
+        heroTitleAccent: "A story worth watching.",
+        tagline: "Turn a small idea into a video with character. Script, voice, scenes and your brand — in one simple flow.",
+        firstVideo: "Start creating",
         firstVideoHint: "Sign in with email or Google. After you confirm, you reach the studio and can describe your first video.",
         discover: "See how it works",
         benefitsLabel: "Benefits",
@@ -460,6 +461,7 @@ export const resources = {
         productAndCharacters: "Your photos and branding",
         brandingAndCaptions: "Clear credits — no free plan that hides production cost",
         previewLabel: "Product preview",
+        platforms: { web: "Web & presentations" },
         showcase: {
           newProductVideo: "New product video",
           creating: "Creating",
@@ -469,12 +471,14 @@ export const resources = {
           render: "Render",
           yourIdea: "Your idea.",
           yourVideo: "Your video.",
+          previewLine: "A good day starts here.",
+          conceptArt: "Concept artwork",
           brief: "Brief",
           voice: "Voice",
           costEstimate: "Credit cost",
           transparent: "Shown before you create",
-          ready: "Your video is ready",
-          watchAndDownload: "Watch and download"
+          ready: "Made for your brand",
+          watchAndDownload: "Your logo, colors and story. Together."
         },
         audience: {
           label: "Who it's for",
@@ -499,14 +503,14 @@ export const resources = {
           creditsBody: "Changing settings and creating another video is billed as a new video. Corrections after completion use extra credits, shown up front."
         },
         process: {
-          eyebrow: "The production story",
-          title: "Set it up once. The system builds the video.",
-          defineTitle: "Define your video",
-          defineBody: "Goal, audience, message, duration, and style — without learning five AI tools.",
-          assetsTitle: "Add brand materials",
-          assetsBody: "Product images, characters, voice, and logo. You can also capture from your phone.",
-          approveTitle: "Approve checkpoints",
-          approveBody: "You choose how much control to keep: automatic, script review, or approval at every stage.",
+          eyebrow: "You bring the idea.",
+          title: "Tell us a little, review, and make it a video.",
+          defineTitle: "Tell us a little",
+          defineBody: "What it’s about, who it’s for, and why. Add photos and a logo if you like.",
+          assetsTitle: "Review and refine",
+          assetsBody: "See the script and scenes. Approve them or make them your own.",
+          approveTitle: "Make it a video",
+          approveBody: "Review the price before generation. When it’s ready, download and share.",
           receiveTitle: "Download an MP4 for social",
           receiveBody: "Narration, captions, branding, and a final file for Reels, TikTok, Shorts, or your site."
         },
@@ -554,8 +558,8 @@ export const resources = {
           }
         },
         close: {
-          title: "The next video shouldn't wait for a production day",
-          body: "Sign in with email or Google, buy credits, and start from a short brief. Try a single video, then move to a monthly plan when the pace picks up.",
+          title: "Simple when you want it. Detailed when you need it.",
+          body: "Sign in with email or Google, buy credits, and start from a short brief.",
           pricing: "See full pricing"
         },
         footer: "Your story. Now in motion."
