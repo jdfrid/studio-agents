@@ -1093,7 +1093,7 @@ a { color: inherit; }
   margin: 14px 0 22px;
   font-size: clamp(2.8rem, 5.4vw, 4.05rem);
   line-height: 1.1;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
   font-weight: 650;
 }
 .landing-hero h1 em {
@@ -1137,9 +1137,11 @@ a { color: inherit; }
   aspect-ratio: 9/12;
   border-radius: 16px;
   overflow: hidden;
+  background: #ae8058;
+}
+.hero-art .mini-preview {
   transform: rotate(-5deg);
   box-shadow: 0 24px 50px rgba(24, 55, 41, 0.11);
-  background: #ae8058;
 }
 .mini-preview img {
   width: 100%;
@@ -3121,4 +3123,144 @@ a { color: inherit; }
 .voice-card.is-selected {
   border-color: var(--forest);
   box-shadow: 0 0 0 1px var(--forest);
+}
+
+.welcome-strip {
+  background: #e6ecd9;
+  border-radius: 16px;
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+}
+.welcome-strip p { margin: 0; font-size: 14px; }
+.welcome-strip .text-button {
+  background: none;
+  border: 0;
+  color: var(--forest);
+  font-weight: 650;
+  min-height: 40px;
+  white-space: nowrap;
+}
+.project-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.project-card-wrap { position: relative; min-width: 0; }
+.project-card-wrap .run-card-actions {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  z-index: 2;
+}
+.project-card {
+  display: grid;
+  width: 100%;
+  padding: 0;
+  text-align: start;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  min-height: 0;
+  font-weight: 500;
+}
+.project-card:hover { transform: translateY(-3px); border-color: var(--forest); background: var(--white); }
+.project-cover {
+  display: block;
+  height: 260px;
+  position: relative;
+  overflow: hidden;
+}
+.project-cover img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 48%; }
+.project-cover .badge {
+  position: absolute;
+  top: 14px;
+  inset-inline-start: 14px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: #e5f0e5;
+  color: #295b3c;
+  border: 0;
+  font-weight: 700;
+}
+.project-cover .badge.wait { background: var(--warning-bg); color: var(--warning); }
+.play {
+  height: 48px;
+  width: 48px;
+  background: #fffef0ee;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--forest);
+  font-size: 20px;
+  position: absolute;
+  inset-inline-end: 16px;
+  bottom: 16px;
+}
+.project-info { display: grid; gap: 6px; padding: 18px 20px; }
+.project-info strong { font-size: 1.05rem; }
+.project-info small { color: var(--muted); font-weight: 450; }
+.empty-poster {
+  width: min(180px, 50%);
+  aspect-ratio: 9/12;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.empty-poster img { width: 100%; height: 100%; object-fit: cover; }
+.poster-grid {
+  width: min(1200px, calc(100% - 40px));
+  margin: 48px auto 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.poster-grid figure { margin: 0; }
+.poster-grid .mini-preview { max-width: none; width: 100%; }
+.poster-grid figcaption {
+  margin-top: 12px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.create-form { width: min(1200px, 100%); }
+.create-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 32px;
+  align-items: start;
+}
+.create-inspire { position: sticky; top: 96px; display: grid; gap: 16px; }
+.create-inspire .mini-preview { max-width: none; width: 100%; }
+.suggestion {
+  background: #edf3e4;
+  border-radius: 14px;
+  padding: 18px;
+}
+.suggestion p { color: #435749; font-size: 14px; margin: 7px 0 0; }
+
+@media (max-width: 1024px) {
+  .project-cards { grid-template-columns: repeat(2, 1fr); }
+  .poster-grid { grid-template-columns: 1fr 1fr; }
+  .create-layout { grid-template-columns: minmax(0, 1fr) 260px; }
+}
+@media (max-width: 720px) {
+  .project-cards, .poster-grid, .create-layout { grid-template-columns: 1fr; }
+  .project-cover { height: 240px; }
+  .create-inspire { display: none; }
+  .welcome-strip { align-items: flex-start; }
+  .poster-grid, .brand-banner { width: min(100% - 28px, 1080px); }
 }

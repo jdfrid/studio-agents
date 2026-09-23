@@ -11,6 +11,7 @@ import {
   type CheckoutPlanId
 } from "@studio/shared";
 import { canCheckoutPlan, enabledCheckoutPlansForUser } from "./checkoutPlans.js";
+import { brandPosterFor } from "./brand/posters.js";
 
 type RunSummary = {
   id: string;
@@ -27,12 +28,14 @@ export function Dashboard({
   onNewVideo,
   onOpenRun,
   onRemixRun,
-  onContact
+  onContact,
+  onBrand
 }: {
   onNewVideo: () => void;
   onOpenRun: (id: string) => void;
   onRemixRun: (id: string) => void;
   onContact: () => void;
+  onBrand: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const { user, refresh } = useAuth();
@@ -132,7 +135,7 @@ export function Dashboard({
       <header className="dash-header">
         <div className="page-heading">
           <p className="eyebrow">{t("dashboard.studio")}</p>
-          <h1>{t("dashboard.hello")}{user?.name ? `, ${user.name}` : ""}</h1>
+          <h1>{t("dashboard.whatToday")}</h1>
           <p className="muted">{t("dashboard.description")}</p>
         </div>
         <div className="dash-header-actions">
@@ -155,11 +158,17 @@ export function Dashboard({
       </header>
 
       {freeLeft > 0 ? (
-        <section className="billing-banner billing-banner-free">
-          <span className="banner-icon" aria-hidden>🎬</span>
-          <p>
-            <Trans i18nKey="dashboard.freeBanner" count={freeLeft} components={{ strong: <strong /> }} />
-          </p>
+        <section className="welcome-strip">
+          <div>
+            <p>
+              <strong>{t("dashboard.welcomeTitle")}</strong>
+              <br />
+              <Trans i18nKey="dashboard.freeBanner" count={freeLeft} components={{ strong: <strong /> }} />
+            </p>
+          </div>
+          <button type="button" className="text-button" onClick={onBrand}>
+            {t("dashboard.viewBrand")} ↗
+          </button>
         </section>
       ) : null}
 
@@ -286,7 +295,9 @@ export function Dashboard({
         ) : null}
         {!loading && !loadError && runs.length === 0 ? (
           <div className="empty-state">
-            <span className="empty-state-icon" aria-hidden>▶</span>
+            <div className="empty-poster" aria-hidden>
+              <img src="/brand/coffee-poster.svg" alt="" />
+            </div>
             <h3>{t("dashboard.emptyTitle")}</h3>
             <p>{t("dashboard.emptyBody")}</p>
             <button type="button" className="primary" disabled={!canCreate} onClick={onNewVideo}>
@@ -300,27 +311,28 @@ export function Dashboard({
           </div>
         ) : null}
         {!loading && !loadError && runs.length > 0 && visible.length > 0 ? (
-          <ul className="run-cards">
-            {visible.map((r) => (
-              <li key={r.id} className="run-card-row">
-                <button type="button" className="run-card" onClick={() => openRun(r.id)}>
-                  <span className="run-card-thumb" aria-hidden>
-                    <span>▶</span>
-                  </span>
-                  <span className="run-card-content">
-                    <span className="run-card-title-row">
-                      <strong>{r.title}</strong>
-                      <span className={`status-pill status-${r.status.toLowerCase()}`}>
-                        {t(`dashboard.statuses.${r.status}`, { defaultValue: r.status })}
-                      </span>
+          <ul className="project-cards">
+            {visible.map((r) => {
+              const poster = brandPosterFor(r.id);
+              const ready = r.status === "COMPLETED";
+              return (
+              <li key={r.id} className="project-card-wrap">
+                <button type="button" className="project-card" onClick={() => openRun(r.id)}>
+                  <span className="project-cover">
+                    <img src={poster.src} alt="" />
+                    <span className={`badge ${ready ? "" : "wait"}`}>
+                      {t(`dashboard.statuses.${r.status}`, { defaultValue: r.status })}
                     </span>
+                    <span className="play" aria-hidden>{ready ? "▶" : "✎"}</span>
+                  </span>
+                  <span className="project-info">
+                    <strong>{r.title}</strong>
                     <small>
                       {t("dashboard.updated", { date: formatDate(r.updatedAt) })}
                       {r.currentStage ? ` · ${t("dashboard.stage", { stage: r.currentStage })}` : ""}
                       {` · ${cardAction(r.status)}`}
                     </small>
                   </span>
-                  <span className="run-card-arrow" aria-hidden>{i18n.dir() === "rtl" ? "←" : "→"}</span>
                 </button>
                 <div className="run-card-actions">
                   <button
@@ -362,7 +374,8 @@ export function Dashboard({
                   ) : null}
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         ) : null}
       </section>

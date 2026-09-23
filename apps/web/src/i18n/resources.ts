@@ -88,6 +88,15 @@ export const resources = {
         brandingAndCaptions: "קרדיטים ברורים, בלי מסלול חינם שמסתיר עלויות",
         previewLabel: "תצוגה מקדימה של המערכת",
         platforms: { web: "לאתר ולמצגת" },
+        posters: {
+          label: "שפה חזותית",
+          coffee: "חם / אנושי",
+          product: "ברור / מוחשי",
+          travel: "רגוע / פתוח",
+          coffeeLine: "הבוקר מתחיל כאן.",
+          productLine: "פחות רעש. יותר טבע.",
+          travelLine: "יוצאים קצת מהשגרה."
+        },
         showcase: {
           newProductVideo: "סרטון מוצר חדש",
           creating: "בתהליך יצירה",
@@ -192,7 +201,9 @@ export const resources = {
       },
       dashboard: {
         studio: "הסטודיו שלי",
-        hello: "שלום",
+        welcomeTitle: "ממשיכים עם המותג שלכם",
+        whatToday: "מה ניצור היום?",
+        viewBrand: "לערכת המותג",
         description: "כל הסרטונים, הטיוטות ותהליכי היצירה שלכם במקום אחד.",
         availableBalance: "יתרה זמינה",
         freeVideos_one: "סרטון חינם אחד",
@@ -462,6 +473,15 @@ export const resources = {
         brandingAndCaptions: "Clear credits — no free plan that hides production cost",
         previewLabel: "Product preview",
         platforms: { web: "Web & presentations" },
+        posters: {
+          label: "Visual language",
+          coffee: "Warm / human",
+          product: "Clear / tactile",
+          travel: "Calm / open",
+          coffeeLine: "A good day starts here.",
+          productLine: "Less noise. More nature.",
+          travelLine: "A little escape."
+        },
         showcase: {
           newProductVideo: "New product video",
           creating: "Creating",
@@ -566,7 +586,9 @@ export const resources = {
       },
       dashboard: {
         studio: "My studio",
-        hello: "Hello",
+        welcomeTitle: "Your brand is ready",
+        whatToday: "What will you create today?",
+        viewBrand: "View brand kit",
         description: "All your videos, drafts, and creation workflows in one place.",
         availableBalance: "Available balance",
         freeVideos_one: "One free video",

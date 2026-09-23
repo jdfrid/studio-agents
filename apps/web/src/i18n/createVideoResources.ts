@@ -14,6 +14,12 @@ export const en = {
     remixFrom: "Based on “{{title}}”",
     remixCredit: "A new version uses {{count}} credits, or a remaining free video."
   },
+  inspire: {
+    eyebrow: "A little inspiration",
+    caption: "A good day starts here.",
+    title: "Easy to start. Yours to refine.",
+    body: "Review your script and scenes before rendering. Adjust anything you need."
+  },
   progress: {
     aria: "Video setup steps",
     idea: "Idea & style",
@@ -525,6 +531,12 @@ export const he = {
     remixEyebrow: "גרסה חדשה", remixTitle: "יצירת גרסה נוספת",
     remixSubtitle: "כל ההגדרות מהסרטון הקודם כאן. שנו רק מה שצריך — למשל יום ללילה. זו הפקה חדשה ותחויב כסרטון חדש.",
     remixFrom: "על בסיס «{{title}}»", remixCredit: "גרסה חדשה משתמשת ב־{{count}} קרדיטים, או בסרטון חינם אם נותר."
+  },
+  inspire: {
+    eyebrow: "קצת השראה",
+    caption: "הבוקר מתחיל כאן.",
+    title: "פשוט להתחיל. קל לדייק.",
+    body: "נציג לכם תסריט וסצנות לפני ההפקה. תוכלו לשנות כל דבר שצריך."
   },
   progress: { aria: "שלבי הגדרת הסרטון", idea: "רעיון וסגנון", script: "תסריט וסצנות", audio: "קול ומוזיקה", review: "סקירה ויצירה" },
   common: { required: "חובה", optional: "לא חובה", remove: "הסר", automatic: "אוטומטי — לפי הבריף והאווירה", secondsShort: "{{count}} שנ׳", recommended: "מומלץ", custom: "מותאם" },

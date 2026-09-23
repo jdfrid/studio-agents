@@ -301,6 +301,7 @@ function AppShell() {
               if (user.canCreateVideo) navigate({ view: "create", runId: null, fromRunId: id });
             }}
             onContact={() => navigate({ view: "contact", runId: null })}
+            onBrand={() => navigate({ view: "brand", runId: null })}
           />
         )}
         {appView === "create" && (

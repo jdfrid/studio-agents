@@ -2,6 +2,8 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext.js";
 import { PricingCards } from "./PricingCards.js";
 import { PublicChrome } from "./PublicChrome.js";
+import { CampaignPreview } from "./brand/CampaignPreview.js";
+import { BRAND_POSTERS } from "./brand/posters.js";
 
 export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   const { t, i18n } = useTranslation();
@@ -16,7 +18,8 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
             <p className="eyebrow">{t("common.brandTagline")}</p>
             <h1>
               {t("landing.heroTitle")}
-              <em> {t("landing.heroTitleAccent")}</em>
+              <br />
+              <em>{t("landing.heroTitleAccent")}</em>
             </h1>
             <p className="landing-tagline">{t("landing.tagline")}</p>
             <div className="landing-hero-actions">
@@ -32,11 +35,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
           </div>
 
           <div className="hero-art" aria-label={t("landing.previewLabel")}>
-            <div className="mini-preview">
-              <img src="/brand/coffee-poster.svg" alt={t("landing.showcase.conceptArt")} />
-              <span className="preview-label">{t("landing.showcase.conceptArt")}</span>
-              <p className="preview-copy">{t("landing.showcase.previewLine")}</p>
-            </div>
+            <CampaignPreview kind="coffee" caption={t("landing.posters.coffeeLine")} />
             <div className="hero-float">
               <strong>✓ {t("landing.showcase.ready")}</strong>
               <span>{t("landing.showcase.watchAndDownload")}</span>
@@ -79,6 +78,15 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
               </div>
             </li>
           </ol>
+        </section>
+
+        <section className="poster-grid" aria-label={t("landing.posters.label")}>
+          {BRAND_POSTERS.map((poster) => (
+            <figure key={poster.id}>
+              <CampaignPreview kind={poster.id} caption={t(`landing.posters.${poster.labelKey}Line`)} />
+              <figcaption>{t(`landing.posters.${poster.labelKey}`)}</figcaption>
+            </figure>
+          ))}
         </section>
 
         <section className="landing-audience" aria-label={t("landing.audience.label")}>

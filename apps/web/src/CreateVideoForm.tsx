@@ -10,6 +10,7 @@ import { BrandTemplatePanel } from "./BrandTemplatePanel.js";
 import { storageGet, storageRemove, storageSet } from "./brand/storage.js";
 import { CameraCaptureButton, useIsMobileDevice } from "./CameraCaptureButton.js";
 import { VoicePicker } from "./VoicePreview.js";
+import { CampaignPreview } from "./brand/CampaignPreview.js";
 import {
   readStoredContentLanguage,
   storeContentLanguage,
@@ -898,6 +899,8 @@ export function CreateVideoForm({
         <span><i>3</i><span className="progress-label">{t("progress.audio")}</span></span>
         <span><i>4</i><span className="progress-label">{t("progress.review")}</span></span>
       </nav>
+      <div className="create-layout">
+      <div className="create-main">
       {isRemix ? (
         <section className="billing-banner remix-banner">
           <span className="banner-icon" aria-hidden>↻</span>
@@ -1868,6 +1871,16 @@ export function CreateVideoForm({
           {!busy ? <span aria-hidden>{i18n.dir() === "rtl" ? "←" : "→"}</span> : null}
         </button>
         </div>
+      </div>
+      </div>
+      <aside className="create-inspire">
+        <p className="eyebrow">{t("inspire.eyebrow")}</p>
+        <CampaignPreview kind="coffee" caption={t("inspire.caption")} />
+        <div className="suggestion">
+          <strong>{t("inspire.title")}</strong>
+          <p>{t("inspire.body")}</p>
+        </div>
+      </aside>
       </div>
     </div>
   );
