@@ -3,13 +3,39 @@ import {
   buildRenderProfileSnapshot,
   defaultRenderProfileId,
   getRenderProfile,
+  heygenVideoPerSecondUsd,
   predictRenderProfileId,
   profileVideoPerSecondUsd,
-  resolveRenderProfile
+  resolveRenderProfile,
+  setPlatformDefaultRenderProfile,
+  usesLipSyncVideoProvider
 } from "../renderProfiles.js";
 
 describe("resolveRenderProfile", () => {
-  it("registers Omni as the ordinary default profile", () => {
+  it("registers HeyGen Video as the ordinary default profile", () => {
+    const prevProfile = process.env.RENDER_PROFILE;
+    const prevVeo = process.env.GEMINI_VEO_MODE;
+    delete process.env.RENDER_PROFILE;
+    delete process.env.GEMINI_VEO_MODE;
+    setPlatformDefaultRenderProfile(null);
+    try {
+      const profile = getRenderProfile("heygen-video");
+      expect(profile.provider).toBe("heygen");
+      expect(profile.capabilities.nativeAudio).toBe(true);
+      expect(profile.capabilities.maxClipSeconds).toBe(15);
+      expect(profileVideoPerSecondUsd(profile)).toBe(heygenVideoPerSecondUsd());
+      expect(defaultRenderProfileId()).toBe("heygen-video");
+      expect(usesLipSyncVideoProvider(profile)).toBe(false);
+    } finally {
+      if (prevProfile === undefined) delete process.env.RENDER_PROFILE;
+      else process.env.RENDER_PROFILE = prevProfile;
+      if (prevVeo === undefined) delete process.env.GEMINI_VEO_MODE;
+      else process.env.GEMINI_VEO_MODE = prevVeo;
+      setPlatformDefaultRenderProfile(null);
+    }
+  });
+
+  it("keeps Omni as an explicit historical profile", () => {
     const profile = getRenderProfile("omni-multiclip");
     expect(profile.provider).toBe("omni");
     expect(profile.capabilities.referenceImage).toBe(true);
@@ -52,6 +78,12 @@ describe("resolveRenderProfile", () => {
     expect(profile.provider).toBe("heygen");
     expect(profile.capabilities.referenceImage).toBe(true);
     expect(profile.capabilities.nativeAudio).toBe(true);
+    expect(usesLipSyncVideoProvider(profile)).toBe(true);
+  });
+
+  it("prices HeyGen Video at the October launch rate then the list rate", () => {
+    expect(heygenVideoPerSecondUsd(new Date("2026-10-15T00:00:00.000Z"))).toBe(0.01);
+    expect(heygenVideoPerSecondUsd(new Date("2026-11-01T00:00:00.000Z"))).toBe(0.02);
   });
 
   it("includes kling-avatar-i2v cheap lip-sync profile", () => {

@@ -22,7 +22,7 @@ function envDefaultRenderProfile(): RenderProfileId {
   if (fromEnv && isRenderProfileId(fromEnv)) return fromEnv;
   const veoMode = process.env.GEMINI_VEO_MODE?.trim().toLowerCase();
   if (veoMode === "extend") return "veo-extend";
-  return "omni-multiclip";
+  return "heygen-video";
 }
 
 function rowToView(row: {

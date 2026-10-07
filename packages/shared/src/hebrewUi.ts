@@ -130,6 +130,7 @@ export function videoPromptLabelHe(profile: RenderProfileId): string {
 export function videoProviderShortLabelHe(profile: RenderProfileId): string {
   const p = getRenderProfile(profile);
   if (p.provider === "kling") return "קלינג";
+  if (p.id === "heygen-video") return "הייג׳ן וידאו";
   if (p.provider === "heygen") return "הייג׳ן";
   if (p.provider === "fal") {
     if (p.id === "kling-avatar-i2v") return "קלינג אווטאר";
@@ -149,6 +150,7 @@ export function videoProviderShortLocalizedLabel(profile: RenderProfileId, local
   if (locale === "he") return videoProviderShortLabelHe(profile);
   const p = getRenderProfile(profile);
   if (p.provider === "kling") return "Kling";
+  if (p.id === "heygen-video") return "HeyGen Video";
   if (p.provider === "heygen") return "HeyGen";
   if (p.id === "kling-avatar-i2v") return "Kling Avatar";
   if (p.id === "wan-i2v") return "Wan";

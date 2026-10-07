@@ -14,7 +14,7 @@ import {
 
 describe("planSceneLayout", () => {
   it("aligns 30s budget brief with 4s Veo bucket (popcorn ad fix)", () => {
-    const layout = planSceneLayout(30, true, { forcedVeoBucket: "4" });
+    const layout = planSceneLayout(30, true, { forcedVeoBucket: "4", renderProfileId: "omni-multiclip" });
     expect(layout.sceneCount).toBe(8);
     expect(layout.clipSeconds).toBe(4);
     expect(layout.totalVideoSeconds).toBe(32);
@@ -35,6 +35,13 @@ describe("planSceneLayout", () => {
     const layout = planSceneLayout(30, true, { renderProfileId: "kling-i2v" });
     expect(layout.sceneCount).toBe(3);
     expect(layout.clipSeconds).toBe(10);
+    expect(layout.totalVideoSeconds).toBe(30);
+  });
+
+  it("plans HeyGen Video at 6s beats so a 30s brief is 5 clips", () => {
+    const layout = planSceneLayout(30, true, { renderProfileId: "heygen-video" });
+    expect(layout.sceneCount).toBe(5);
+    expect(layout.clipSeconds).toBe(6);
     expect(layout.totalVideoSeconds).toBe(30);
   });
 

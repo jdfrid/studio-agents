@@ -21,6 +21,8 @@ import {
   resolvePresenterSex,
   resolveRenderProfile,
   sanitizeVeoPromptForExternalAudio,
+  usesBeatLayoutProvider,
+  usesLipSyncVideoProvider,
   userFacingLanguageInstruction,
   visualPlateCount,
   voiceAgeFromCreative,
@@ -49,8 +51,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const costConfig = profileToProductionCostConfig(renderProfile);
     const extendMode = renderProfile.strategy === "extend";
     const klingMode = renderProfile.provider === "kling";
-    const lipSyncMode = renderProfile.capabilities.nativeAudio === true;
-    const beatI2vMode = klingMode || lipSyncMode || renderProfile.provider === "fal";
+    const lipSyncMode = usesLipSyncVideoProvider(renderProfile);
+    const beatI2vMode = klingMode || lipSyncMode || usesBeatLayoutProvider(renderProfile);
     const plateCount = visualPlateCount(brief.visualAnchors);
     const castPhotoCount = (brief.visualAnchors ?? []).filter((anchor) => !anchor.role || anchor.role === "anchor").length;
     const hasCastPhotos = plateCount === 0 && castPhotoCount > 0;

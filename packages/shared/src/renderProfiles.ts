@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Locale } from "./localization.js";
 export const RenderProfileIdSchema = z.enum([
+  "heygen-video",
   "omni-multiclip",
   "veo-multiclip",
   "veo-extend",
@@ -19,8 +20,14 @@ export type VideoProviderName = "omni" | "veo" | "kling" | "fal" | "heygen" | "r
 export type RenderStrategy = "multiclip" | "extend";
 /** Target beat length for script/narration in extend / kling profiles. */
 export const VEO_EXTEND_BEAT_SECONDS = 10;
+/** HeyGen Video general model — clips are 5–15s; 6s keeps 30s briefs at 5 beats. */
+export const HEYGEN_VIDEO_BEAT_SECONDS = 6;
 /** HeyGen / Kling Avatar image→talking-head beat length (driven by narration audio). */
 export const HEYGEN_BEAT_SECONDS = 8;
+/** 50% launch discount on HeyGen Video text/image @ 480p through October 2026. */
+export const HEYGEN_VIDEO_PROMO_ENDS_AT = "2026-11-01T00:00:00.000Z";
+export const HEYGEN_VIDEO_PROMO_PER_SECOND_USD = 0.01;
+export const HEYGEN_VIDEO_STANDARD_PER_SECOND_USD = 0.02;
 /** Kling AI Avatar v2 Standard — audio-driven lip-sync on fal. */
 export const KLING_AVATAR_BEAT_SECONDS = 8;
 /** Luma Ray 3.2 single-image i2v is capped at 5s (10s needs multi-keyframe). */
@@ -47,10 +54,25 @@ export type RenderProfile = {
   capabilities: RenderProfileCapabilities;
 };
 export const RENDER_PROFILES: Record<RenderProfileId, RenderProfile> = {
+  "heygen-video": {
+    id: "heygen-video",
+    label: "HeyGen Video — default",
+    labelHe: "HeyGen Video — ברירת מחדל",
+    provider: "heygen",
+    strategy: "multiclip",
+    costTier: "cheap",
+    capabilities: {
+      referenceImage: true,
+      extend: false,
+      nativeAudio: true,
+      maxClipSeconds: 15,
+      beatSeconds: HEYGEN_VIDEO_BEAT_SECONDS
+    }
+  },
   "omni-multiclip": {
     id: "omni-multiclip",
-    label: "Gemini Omni 1.1 Flash — default",
-    labelHe: "Gemini Omni 1.1 Flash — ברירת מחדל",
+    label: "Gemini Omni 1.1 Flash",
+    labelHe: "Gemini Omni 1.1 Flash",
     provider: "omni",
     strategy: "multiclip",
     costTier: "cheap",
@@ -295,7 +317,7 @@ export function defaultRenderProfileId(): RenderProfileId {
   if (fromEnv && isRenderProfileId(fromEnv)) return fromEnv;
   const veoMode = process.env.GEMINI_VEO_MODE?.trim().toLowerCase();
   if (veoMode === "extend") return "veo-extend";
-  return "omni-multiclip";
+  return "heygen-video";
 }
 export function resolveRenderProfile(
   brief?: { renderProfile?: RenderProfileId | string | null } | null
@@ -342,8 +364,16 @@ export function buildRenderProfileSnapshot(
     envDefault: defaultRenderProfileId()
   };
 }
+/** HeyGen Video 480p text/image rate — launch promo through October 2026, then list. */
+export function heygenVideoPerSecondUsd(now = new Date()): number {
+  return now < new Date(HEYGEN_VIDEO_PROMO_ENDS_AT)
+    ? HEYGEN_VIDEO_PROMO_PER_SECOND_USD
+    : HEYGEN_VIDEO_STANDARD_PER_SECOND_USD;
+}
+
 /** Rough USD per generated video second for cost estimates (720p-class, fal list prices). */
 export function profileVideoPerSecondUsd(profile: RenderProfile, veoModelPerSecond = 0.08): number {
+  if (profile.id === "heygen-video") return heygenVideoPerSecondUsd();
   if (profile.provider === "omni") return 0.1;
   if (profile.provider === "heygen") return 0.12;
   if (profile.id === "kling-avatar-i2v") return 0.0562;
@@ -363,7 +393,8 @@ export function profileVideoPerSecondUsd(profile: RenderProfile, veoModelPerSeco
   return veoModelPerSecond;
 }
 const KLING_VIDEO_MODEL = "fal-ai/kling-video/v2.1/standard/image-to-video";
-const HEYGEN_VIDEO_MODEL = "heygen/v3/videos/image";
+const HEYGEN_LIPSYNC_MODEL = "heygen/v3/videos/image";
+const HEYGEN_GENERAL_MODEL = "heygen-video-1";
 export function resolveRenderProfileId(id?: RenderProfileId | string | null): RenderProfileId {
   if (typeof id === "string" && isRenderProfileId(id)) return id;
   return defaultRenderProfileId();
@@ -380,6 +411,7 @@ export function videoProviderShortLabel(profile: RenderProfile | RenderProfileId
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   if (p.provider === "omni") return "Gemini Omni";
   if (p.provider === "kling") return "Kling";
+  if (p.id === "heygen-video") return "HeyGen Video";
   if (p.provider === "heygen") return "HeyGen";
   if (p.provider === "fal") {
     if (p.id === "kling-avatar-i2v") return "Kling Avatar";
@@ -402,7 +434,8 @@ export function videoModelDisplay(
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   if (p.falModel) return p.falModel;
   if (p.provider === "kling") return KLING_VIDEO_MODEL;
-  if (p.provider === "heygen") return HEYGEN_VIDEO_MODEL;
+  if (p.id === "heygen-video") return HEYGEN_GENERAL_MODEL;
+  if (p.provider === "heygen") return HEYGEN_LIPSYNC_MODEL;
   if (p.provider === "omni") {
     const configured = geminiVideoModel ?? process.env.GEMINI_VIDEO_MODEL;
     return configured?.toLowerCase().includes("omni") ? configured : "gemini-omni-1.1-flash-preview";
@@ -444,6 +477,7 @@ export function videoProviderShortLabelForLocale(
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   if (p.provider === "omni") return "ג׳מיני אומני";
   if (p.provider === "kling") return "קלינג";
+  if (p.id === "heygen-video") return "הייג׳ן וידאו";
   if (p.provider === "heygen") return "הייג׳ן";
   if (p.id === "kling-avatar-i2v") return "קלינג אווטאר";
   if (p.id === "wan-i2v") return "ואן";
@@ -462,10 +496,16 @@ export function usesHeygenVideoProvider(profile: RenderProfile | RenderProfileId
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   return p.provider === "heygen";
 }
-/** True lip-sync / talking-head (image + TTS audio) — HeyGen or fal Kling Avatar. */
+/** True lip-sync / talking-head (image + TTS audio) — HeyGen photo avatar or fal Kling Avatar. */
 export function usesLipSyncVideoProvider(profile: RenderProfile | RenderProfileId): boolean {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
-  return p.capabilities.nativeAudio === true;
+  return p.id === "heygen-i2v" || p.id === "kling-avatar-i2v";
+}
+
+/** HeyGen Video general model (T2V / I2V / Ref2V), not the photo-avatar lip-sync path. */
+export function usesHeygenGeneralVideo(profile: RenderProfile | RenderProfileId): boolean {
+  const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  return p.id === "heygen-video";
 }
 /** Independent I2V-style profiles that plan scenes by beatSeconds (not Veo buckets). */
 export function usesBeatLayoutProvider(profile: RenderProfile | RenderProfileId): boolean {

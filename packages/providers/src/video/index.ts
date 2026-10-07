@@ -1,7 +1,7 @@
 import type { ProviderCredentialView, RenderProfile } from "@studio/shared";
-import { ProviderError, usesFalVideoProvider, usesHeygenVideoProvider } from "@studio/shared";
+import { ProviderError, usesFalVideoProvider, usesHeygenGeneralVideo, usesHeygenVideoProvider } from "@studio/shared";
 import { createFalI2vBeatGenerator } from "./falI2v.js";
-import { createHeygenBeatGenerator } from "./heygen.js";
+import { createHeygenBeatGenerator, createHeygenVideoBeatGenerator } from "./heygen.js";
 import { createKlingBeatGenerator } from "./kling.js";
 import { createOmniBeatGenerator } from "./omni.js";
 import type { VideoBeatGenerator } from "./types.js";
@@ -11,7 +11,7 @@ export * from "./types.js";
 export { createVeoBeatGenerator, resolveExtendHandle } from "./veo.js";
 export { createKlingBeatGenerator } from "./kling.js";
 export { createFalI2vBeatGenerator } from "./falI2v.js";
-export { createHeygenBeatGenerator } from "./heygen.js";
+export { createHeygenBeatGenerator, createHeygenVideoBeatGenerator } from "./heygen.js";
 export { createOmniBeatGenerator } from "./omni.js";
 export { ensureMinImageForFal, probeImageDimensions, FAL_MIN_STILL_PX } from "./minStill.js";
 
@@ -25,7 +25,9 @@ export function getVideoBeatGenerator(
       : createFalI2vBeatGenerator(profile, credential);
   }
   if (usesHeygenVideoProvider(profile)) {
-    return createHeygenBeatGenerator(profile, credential);
+    return usesHeygenGeneralVideo(profile)
+      ? createHeygenVideoBeatGenerator(profile, credential)
+      : createHeygenBeatGenerator(profile, credential);
   }
   if (profile.provider === "omni") {
     return createOmniBeatGenerator(profile, credential);

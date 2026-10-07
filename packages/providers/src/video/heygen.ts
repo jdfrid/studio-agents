@@ -6,6 +6,7 @@ import type { VideoBeatGenerator, VideoBeatHooks, VideoBeatRequest, VideoBeatRes
 
 const DEFAULT_BASE = "https://api.heygen.com";
 const MODEL_ID = "heygen/v3/videos/image";
+const GENERAL_MODEL_ID = "heygen-video-1";
 
 function resolveHeygenBaseUrl(credential: ProviderCredentialView): string {
   const raw = String(credential.config.baseUrl ?? process.env.HEYGEN_API_BASE ?? "").trim();
@@ -254,6 +255,203 @@ export function createHeygenBeatGenerator(
       }
 
       throw new ProviderError(`HeyGen timed out after ${timeoutMs}ms (last status: ${lastStatus})`, {
+        provider: "heygen",
+        metadata: { videoId, lastStatus }
+      });
+    }
+  };
+}
+
+type HeygenVideoCreateResponse = {
+  data?: { video_id?: string; status?: string };
+  error?: { message?: string; code?: string; param?: string };
+};
+
+type HeygenVideoStatusResponse = {
+  data?: {
+    video_id?: string;
+    status?: string;
+    video_url?: string | null;
+    duration?: number | null;
+    failure_code?: string | null;
+    failure_message?: string | null;
+  };
+  error?: { message?: string; code?: string };
+};
+
+export function clampHeygenVideoDuration(seconds: number): number {
+  return Math.min(15, Math.max(5, Math.round(Number.isFinite(seconds) ? seconds : 5) || 5));
+}
+
+export function resolveHeygenVideoResolution(): "480p" | "768p" | "2k" {
+  const raw = String(process.env.HEYGEN_VIDEO_RESOLUTION ?? "480p").trim().toLowerCase();
+  if (raw === "768p" || raw === "2k") return raw;
+  return "480p";
+}
+
+export function buildHeygenVideoPrompt(req: VideoBeatRequest): string {
+  const motion = req.prompt?.trim() || "A clear, natural scene with one subject and a locked or barely moving camera.";
+  const narration = req.narrationText?.trim();
+  const audio = narration
+    ? `Audio: the speaker says exactly: "${narration}". Matching room tone and sound effects. No music.`
+    : "Audio: natural room tone and matching sound effects. No dialogue. No music.";
+  return `${motion}\n\n${audio}`.slice(0, 32_000);
+}
+
+export function buildHeygenVideoCreateBody(
+  req: VideoBeatRequest,
+  imageAssetId?: string | null
+): Record<string, unknown> {
+  const prompt = buildHeygenVideoPrompt(req);
+  const duration = clampHeygenVideoDuration(req.durationSeconds);
+  const resolution = resolveHeygenVideoResolution();
+  const aspectRatio = req.aspectRatio === "16:9" ? "16:9" : "9:16";
+  if (imageAssetId) {
+    return {
+      model: GENERAL_MODEL_ID,
+      mode: "image_to_video",
+      prompt,
+      duration,
+      resolution,
+      image: { type: "asset_id", asset_id: imageAssetId }
+    };
+  }
+  return {
+    model: GENERAL_MODEL_ID,
+    mode: "text_to_video",
+    prompt,
+    duration,
+    resolution,
+    aspect_ratio: aspectRatio
+  };
+}
+
+export function createHeygenVideoBeatGenerator(
+  profile: RenderProfile,
+  credential: ProviderCredentialView
+): VideoBeatGenerator {
+  return {
+    profile,
+    async generateBeat(req: VideoBeatRequest, hooks?: VideoBeatHooks): Promise<VideoBeatResult> {
+      const wallStarted = Date.now();
+      const operationName = `heygen-video/${req.sceneId}/${Date.now()}`;
+
+      if (credential.config.mock === true || process.env.HEYGEN_MOCK === "1") {
+        await hooks?.onUsage?.({
+          activityType: "veo_video",
+          sceneId: req.sceneId,
+          model: GENERAL_MODEL_ID,
+          durationMs: 0,
+          billedUnits: clampHeygenVideoDuration(req.durationSeconds),
+          unit: "veo_seconds",
+          charged: "yes",
+          metadata: { provider: "heygen", mock: true, mode: req.referenceImage ? "image_to_video" : "text_to_video" }
+        });
+        return {
+          provider: "heygen",
+          model: GENERAL_MODEL_ID,
+          operationName,
+          status: "completed",
+          videoBytes: Buffer.from(`mock heygen video 1.0 for ${req.sceneId}`),
+          mimeType: "video/mp4"
+        };
+      }
+
+      const apiKey = credential.secret ?? process.env.HEYGEN_API_KEY;
+      if (!apiKey) {
+        throw new ProviderError("HeyGen missing API key (HEYGEN_API_KEY)", { provider: "heygen" });
+      }
+
+      const baseUrl = resolveHeygenBaseUrl(credential);
+      await hooks?.onPoll?.({ operationName, model: GENERAL_MODEL_ID, status: "queued" });
+
+      let imageAssetId: string | null = null;
+      if (req.referenceImage?.body?.length) {
+        imageAssetId = await uploadAsset(
+          baseUrl,
+          apiKey,
+          req.referenceImage.body,
+          req.referenceImage.mimeType,
+          `scene-${req.sceneId}.${extForMime(req.referenceImage.mimeType, "jpg")}`
+        );
+      }
+
+      const created = await httpJson<HeygenVideoCreateResponse>(`${baseUrl}/v3/models/videos`, {
+        method: "POST",
+        headers: heygenHeaders(apiKey),
+        body: buildHeygenVideoCreateBody(req, imageAssetId),
+        timeoutMs: 120_000
+      });
+
+      const videoId = created.data?.video_id;
+      if (!videoId) {
+        throw new ProviderError(`HeyGen Video create failed: ${created.error?.message ?? "no video_id"}`, {
+          provider: "heygen",
+          metadata: { created }
+        });
+      }
+
+      await hooks?.onPoll?.({ operationName: videoId, model: GENERAL_MODEL_ID, status: "polling" });
+
+      const timeoutMs = Number(credential.config.videoTimeoutSeconds ?? process.env.HEYGEN_TIMEOUT_SECONDS ?? 900) * 1000;
+      const pollMs = Number(credential.config.videoPollIntervalMs ?? process.env.HEYGEN_POLL_MS ?? 4000);
+      const startedAt = Date.now();
+      let lastStatus = created.data?.status ?? "pending";
+
+      while (Date.now() - startedAt < timeoutMs) {
+        await new Promise((resolve) => setTimeout(resolve, pollMs));
+        const statusPayload = await httpJson<HeygenVideoStatusResponse>(`${baseUrl}/v3/models/videos/${videoId}`, {
+          headers: heygenHeaders(apiKey),
+          timeoutMs: 30_000
+        });
+        const data = statusPayload.data;
+        lastStatus = data?.status ?? lastStatus;
+        await hooks?.onPoll?.({
+          operationName: videoId,
+          model: GENERAL_MODEL_ID,
+          status: lastStatus.toLowerCase(),
+          error: data?.failure_message ?? statusPayload.error?.message ?? null
+        });
+
+        if (lastStatus === "failed" || lastStatus === "cancelled") {
+          throw new ProviderError(
+            `HeyGen Video generation ${lastStatus}: ${data?.failure_message ?? data?.failure_code ?? "unknown"}`,
+            { provider: "heygen", metadata: { videoId, failure: data } }
+          );
+        }
+
+        if (lastStatus === "completed") {
+          const videoUrl = data?.video_url;
+          if (!videoUrl) {
+            throw new ProviderError("HeyGen Video completed without video_url", {
+              provider: "heygen",
+              metadata: { videoId }
+            });
+          }
+          const downloaded = await httpBytes(videoUrl, { timeoutMs: 240_000 });
+          const billed = Math.max(1, Math.round(data?.duration ?? clampHeygenVideoDuration(req.durationSeconds)));
+          await hooks?.onUsage?.({
+            activityType: "veo_video",
+            sceneId: req.sceneId,
+            model: GENERAL_MODEL_ID,
+            durationMs: Date.now() - wallStarted,
+            billedUnits: billed,
+            unit: "veo_seconds",
+            charged: "yes",
+            metadata: { provider: "heygen", videoId, mode: imageAssetId ? "image_to_video" : "text_to_video" }
+          });
+          return {
+            provider: "heygen",
+            model: GENERAL_MODEL_ID,
+            operationName: videoId,
+            status: "completed",
+            videoBytes: downloaded.body,
+            mimeType: downloaded.mimeType.includes("mp4") ? "video/mp4" : downloaded.mimeType
+          };
+        }
+      }
+
+      throw new ProviderError(`HeyGen Video timed out after ${timeoutMs}ms (last status: ${lastStatus})`, {
         provider: "heygen",
         metadata: { videoId, lastStatus }
       });

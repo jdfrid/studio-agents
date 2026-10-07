@@ -200,7 +200,7 @@ export function AdminSettingsPanel() {
           />
           <small className="muted">
             מזהה וידאו של Google: Gemini Omni 1.1 Flash (Preview) או Veo. ספקי Wan/Kling/Hailuo נבחרים ב«מודל
-            רינדור ללקוחות» למעלה (דורש FAL_API_KEY).
+            רינדור ללקוחות» למעלה (דורש FAL_API_KEY). HeyGen Video דורש HEYGEN_API_KEY.
           </small>
         </label>
       </fieldset>
@@ -248,6 +248,7 @@ export function AdminSettingsPanel() {
 
 type PlatformSettingsView = {
   defaultRenderProfile:
+    | "heygen-video"
     | "omni-multiclip"
     | "veo-multiclip"
     | "veo-extend"
@@ -272,7 +273,8 @@ type PlatformSettingsView = {
 
 function listRenderProfiles() {
   return [
-    { id: "omni-multiclip" as const, label: "Gemini Omni 1.1 Flash — ברירת מחדל (~$0.10/ש׳)" },
+    { id: "heygen-video" as const, label: "HeyGen Video — ברירת מחדל (~$0.01/ש׳ עד סוף אוק׳ 2026, אחר כך $0.02)" },
+    { id: "omni-multiclip" as const, label: "Gemini Omni 1.1 Flash (~$0.10/ש׳)" },
     { id: "veo-multiclip" as const, label: "Veo Fast — multiclip (היסטורי)" },
     { id: "wan-i2v" as const, label: "Wan 2.7 — זול (מתמונה, ~$0.10/ש׳ @720p)" },
     { id: "kling-avatar-i2v" as const, label: "Kling Avatar — סנכרון שפתיים (~$0.056/ש׳)" },

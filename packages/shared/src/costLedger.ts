@@ -118,6 +118,9 @@ export function videoPerSecondUsd(model: string, generateAudio = veoGenerateAudi
   if (m.includes("luma") || m.includes("ray/v3")) {
     return profileVideoPerSecondUsd(getRenderProfile("luma-ray-i2v"));
   }
+  if (m.includes("heygen-video")) {
+    return profileVideoPerSecondUsd(getRenderProfile("heygen-video"));
+  }
   if (m.includes("heygen")) {
     return profileVideoPerSecondUsd(getRenderProfile("heygen-i2v"));
   }
