@@ -1,7 +1,7 @@
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { formatDate } from "./i18n/format.js";
 import type { WhatsNewEntry } from "./whatsNew.js";
+import { useModalFocus } from "./useModalFocus.js";
 
 export function WhatsNewDialog({
   open,
@@ -15,21 +15,14 @@ export function WhatsNewDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-
-  useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  const dialogRef = useModalFocus<HTMLDivElement>(open, onClose);
 
   if (!open) return null;
 
   return (
-    <div className="whats-new-overlay" onClick={onClose}>
+    <div className="whats-new-overlay" data-modal-root onClick={onClose}>
       <div
+        ref={dialogRef}
         className="whats-new-dialog"
         role="dialog"
         aria-modal="true"

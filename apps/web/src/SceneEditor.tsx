@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { apiPatch } from "./api.js";
 import { correctionCreditCost } from "@studio/shared";
 import type { ProjectRunView } from "./types.js";
+import { useModalFocus } from "./useModalFocus.js";
 
 type SceneDraft = {
   id: string;
@@ -51,6 +52,7 @@ export function SceneEditor({
 }) {
   const { t } = useTranslation("run");
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const dialogRef = useModalFocus<HTMLDivElement>(true, onClose);
   const [index, setIndex] = useState(0);
   const [scenes, setScenes] = useState(() => scenesFromOutput(scriptOutput));
   const [applyAll, setApplyAll] = useState(false);
@@ -115,8 +117,14 @@ export function SceneEditor({
   if (!scene) return null;
 
   return (
-    <div className="scene-editor-overlay" role="dialog" aria-modal="true" aria-labelledby="scene-editor-title">
-      <div className="scene-editor">
+    <div className="scene-editor-overlay" data-modal-root>
+      <div
+        ref={dialogRef}
+        className="scene-editor"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="scene-editor-title"
+      >
         <header className="scene-editor-header">
           <h2 id="scene-editor-title" tabIndex={-1} ref={titleRef}>
             {t("sceneEditor.title", { number: index + 1, total: scenes.length })}

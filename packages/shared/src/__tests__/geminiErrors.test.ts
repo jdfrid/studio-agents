@@ -12,22 +12,22 @@ describe("classifyGeminiError", () => {
   it("429 with prepayment credits depleted is billing (not rate limit)", () => {
     const raw = `429 { "error": { "code": 429, "message": "Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing.", "status": "RESOURCE_EXHAUSTED" } }`;
     expect(classifyGeminiError(raw, 429)).toBe("billing_quota");
-    expect(userFacingGeminiError(raw, 429)).toContain("Prepay");
-    expect(userFacingGeminiError(raw, 429)).toContain("נגמרו קרדיטי");
-    expect(userFacingGeminiError(raw, 429)).toContain("זו לא מגבלת קצב");
+    expect(userFacingGeminiError(raw, 429, "en")).toContain("not a charge on your Reelmino account");
+    expect(userFacingGeminiError(raw, 429)).toContain("אין צורך לטפל בחשבון חיוב");
   });
 
   it("treats generic 429 quota as rate limit (not billing)", () => {
     const raw = `429 { "error": { "code": 429, "message": "You exceeded your current quota", "status": "RESOURCE_EXHAUSTED" } }`;
     expect(classifyGeminiError(raw, 429)).toBe("rate_limit");
-    expect(userFacingGeminiError(raw, 429)).toContain("מגבלת קצב");
+    expect(userFacingGeminiError(raw, 429)).toContain("עמוס");
     expect(userFacingGeminiError(raw, 429)).not.toContain("Prepay");
     expect(userFacingGeminiError(raw, 429)).not.toContain("Veo");
   });
 
-  it("mentions Veo only for video API rate limits", () => {
+  it("keeps video API rate limits distinct from generic busy errors", () => {
     const raw = `429 RESOURCE_EXHAUSTED predictLongRunning veo generateVideos`;
-    expect(userFacingGeminiError(raw, 429)).toContain("Veo");
+    expect(userFacingGeminiError(raw, 429)).toContain("הרינדור");
+    expect(userFacingGeminiError(raw, 429, "en")).toContain("Video rendering");
   });
 
   it("detects billing when payment keywords present", () => {
@@ -38,7 +38,7 @@ describe("classifyGeminiError", () => {
   it("429 with billing details in Google boilerplate is rate limit", () => {
     const raw = `429 { "error": { "code": 429, "message": "You exceeded your current quota, please check your plan and billing details.", "status": "RESOURCE_EXHAUSTED" } }`;
     expect(classifyGeminiError(raw, 429)).toBe("rate_limit");
-    expect(userFacingGeminiError(raw, 429)).toContain("מגבלת קצב");
+    expect(userFacingGeminiError(raw, 429)).toContain("עמוס");
     expect(userFacingGeminiError(raw, 429)).not.toContain("Prepay");
   });
 });
@@ -52,7 +52,7 @@ describe("buildStageErrorRecord", () => {
     const parsed = parseStageError(record);
     expect(parsed.raw).toContain("RESOURCE_EXHAUSTED");
     expect(parsed.kind).toBe("rate_limit");
-    expect(parsed.friendly).toContain("מגבלת קצב");
+    expect(parsed.friendly).toContain("עמוס");
   });
 
   it("preserves a raw provider response through an aggregate TTS error", () => {
@@ -102,7 +102,7 @@ describe("buildStageErrorRecord", () => {
     });
     const parsed = parseStageError(record);
     expect(parsed.kind).toBe("rate_limit");
-    expect(parsed.friendly).toContain("מגבלת קצב");
+    expect(parsed.friendly).toContain("עמוס");
     expect(parsed.friendly).not.toContain("Prepay");
     expect(parsed.raw).toContain("RESOURCE_EXHAUSTED");
   });
@@ -131,7 +131,7 @@ describe("formatApiErrorMessage", () => {
     const msg = formatApiErrorMessage(
       '429 {"error":"HTTP 429 for https://generativelanguage.googleapis.com?key=AIzaSySecret123: quota exceeded"}'
     );
-    expect(msg).toContain("מגבלת קצב");
+    expect(msg).toContain("עמוס");
     expect(msg).not.toContain("AIzaSySecret");
   });
 
@@ -143,5 +143,22 @@ describe("formatApiErrorMessage", () => {
     expect(msg).toContain("HeyGen");
     expect(msg).not.toContain("Prepay AI Studio");
     expect(userFacingGeminiError(raw, 402)).toContain("HeyGen");
+  });
+
+  it("maps provider exhausted-balance text to a user-facing service message", () => {
+    const raw = '402 {"error":{"message":"User is locked / Exhausted balance. Please visit the billing dashboard."}}';
+    expect(classifyGeminiError(raw, 402)).toBe("billing_quota");
+    const msg = formatApiErrorMessage(raw, "en");
+    expect(msg).toContain("not a charge on your Reelmino account");
+    expect(msg).not.toContain("Exhausted balance");
+    expect(msg).not.toContain("billing dashboard");
+  });
+
+  it("does not leak unknown provider JSON to users", () => {
+    const raw = '500 {"error":{"message":"internal boom GCS_CREDENTIALS_FILE missing"}}';
+    const msg = formatApiErrorMessage(raw, "en");
+    expect(msg).toContain("temporary problem");
+    expect(msg).not.toContain("GCS_CREDENTIALS_FILE");
+    expect(msg).not.toContain("internal boom");
   });
 });

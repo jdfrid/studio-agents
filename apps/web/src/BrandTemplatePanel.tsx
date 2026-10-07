@@ -12,6 +12,7 @@ import {
 } from "@studio/shared";
 import { apiDelete, apiGet, apiPost, apiPut } from "./api.js";
 import { useAuth } from "./AuthContext.js";
+import { VoicePicker } from "./VoicePreview.js";
 
 type Props = {
   locale: Locale;
@@ -30,6 +31,14 @@ type Props = {
   onApply: (template: BrandTemplateView, creative: CreativeOptions) => void;
   onClear: () => void;
   onHydrateLogo?: (template: BrandTemplateView) => void;
+  onBrandingChange?: (patch: {
+    businessName?: string;
+    slogan?: string;
+    websiteUrl?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+  }) => void;
+  onCreativeChange?: (creative: CreativeOptions) => void;
   lockedCreativeKeys?: string[];
 };
 
@@ -93,6 +102,8 @@ export function BrandTemplatePanel({
   onApply,
   onClear,
   onHydrateLogo,
+  onBrandingChange,
+  onCreativeChange,
   lockedCreativeKeys = []
 }: Props) {
   const { t } = useTranslation("createVideo");
@@ -302,6 +313,48 @@ export function BrandTemplatePanel({
             {t("branding.templates.name")}
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
           </label>
+          <div className="common-fields-grid">
+            <label>
+              {t("branding.primaryColor")}
+              <span className="brand-color-input">
+                <input
+                  type="color"
+                  value={normalizeHexColor(branding.primaryColor) ?? "#173D35"}
+                  onChange={(e) => onBrandingChange?.({ primaryColor: e.target.value.toUpperCase() })}
+                />
+                <input
+                  value={branding.primaryColor}
+                  onChange={(e) => onBrandingChange?.({ primaryColor: e.target.value })}
+                  placeholder="#173D35"
+                  maxLength={7}
+                />
+              </span>
+            </label>
+            <label>
+              {t("branding.secondaryColor")}
+              <span className="brand-color-input">
+                <input
+                  type="color"
+                  value={normalizeHexColor(branding.secondaryColor) ?? "#F6F7F2"}
+                  onChange={(e) => onBrandingChange?.({ secondaryColor: e.target.value.toUpperCase() })}
+                />
+                <input
+                  value={branding.secondaryColor}
+                  onChange={(e) => onBrandingChange?.({ secondaryColor: e.target.value })}
+                  placeholder="#F6F7F2"
+                  maxLength={7}
+                />
+              </span>
+            </label>
+          </div>
+          <div className="field-block">
+            <span>{t("branding.preferredVoice")}</span>
+            <VoicePicker
+              value={String(creative.voiceCharacter ?? "")}
+              language={String(creative.language ?? (locale === "he" ? "he" : "en"))}
+              onChange={(id) => onCreativeChange?.({ ...creative, voiceCharacter: id })}
+            />
+          </div>
           <label>
             {t("branding.templates.messages")}
             <textarea value={messages} onChange={(e) => setMessages(e.target.value)} rows={4} maxLength={1600} />

@@ -704,14 +704,26 @@ export async function registerRoutes(app: FastifyInstance) {
 
     userRoutes.get("/artifacts/:id/signed-url", async (request, reply) => {
       const { id } = z.object({ id: z.string() }).parse(request.params);
+      const query = z
+        .object({
+          download: z.enum(["1", "true"]).optional(),
+          filename: z.string().max(180).optional()
+        })
+        .parse(request.query);
       const artifact = await prisma.artifact.findUnique({ where: { id }, include: { run: true } });
       const isAdmin = request.user!.role === "ADMIN";
       if (!artifact || (!isAdmin && (!artifact.run.userId || artifact.run.userId !== request.user!.sub))) {
         reply.code(404);
         return { error: "not_found" };
       }
-      const repo = createArtifactsRepo();
-      const url = await repo.signedUrl(id);
+      const filename = String(query.filename ?? "video.mp4")
+        .replace(/[\u0000-\u001f<>:"/\\|?*]+/g, "_")
+        .slice(0, 180) || "video.mp4";
+      const url = await gcsClient().signedUrl(
+        artifact.gcsPath,
+        3600,
+        query.download ? { downloadFilename: filename || "video.mp4" } : undefined
+      );
       return { url };
     });
   });

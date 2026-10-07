@@ -6,6 +6,7 @@ import {
   creativeOptionLabel,
   formatCreativeConstraints,
   getCreativeFieldSections,
+  languageCodeFromCreative,
   normalizeCreativeOptionValue,
   pricingSourceLabel,
   renderProfileLabel,
@@ -65,7 +66,18 @@ describe("shared localization helpers", () => {
 
   it("returns localized friendly provider errors", () => {
     const raw = '402 {"error":{"message":"Payment required — insufficient credit balance"}}';
-    expect(userFacingGeminiError(raw, 402, "en")).toContain("Prepay credits");
-    expect(userFacingGeminiError(raw, 402)).toContain("נגמרו");
+    expect(userFacingGeminiError(raw, 402, "en")).toContain("not a charge on your Reelmino account");
+    expect(userFacingGeminiError(raw, 402)).toContain("אין צורך לטפל בחשבון חיוב");
+  });
+
+  it("maps ISO content-language codes used by the create form", () => {
+    expect(languageCodeFromCreative({ language: "he" })).toBe("he");
+    expect(languageCodeFromCreative({ language: "Hebrew" })).toBe("he");
+    expect(languageCodeFromCreative({ language: "עברית" })).toBe("he");
+    expect(languageCodeFromCreative({ language: "en" })).toBe("en");
+    expect(languageCodeFromCreative({ language: "fr" })).toBe("fr");
+    expect(normalizeCreativeOptionValue("language", "he")).toBe("עברית");
+    expect(creativeOptionLabel("language", "he", "en")).toBe("Hebrew");
+    expect(formatCreativeConstraints({ language: "he" }, "en")[0]).toBe("Language: Hebrew");
   });
 });

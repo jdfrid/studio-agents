@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { authLoginUrl } from "./api.js";
+import { useModalFocus } from "./useModalFocus.js";
 
 export function LoginDialog({
   open,
@@ -25,25 +26,23 @@ export function LoginDialog({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const dialogRef = useModalFocus<HTMLDivElement>(open, onClose);
 
   useEffect(() => {
     if (!open) {
       setPassword("");
       setCode("");
-      return;
     }
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open]);
 
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   return (
-    <div className="whats-new-overlay" onClick={onClose}>
+    <div className="whats-new-overlay" data-modal-root onClick={onClose}>
       <div
+        ref={dialogRef}
         className="whats-new-dialog login-dialog"
         role="dialog"
         aria-modal="true"

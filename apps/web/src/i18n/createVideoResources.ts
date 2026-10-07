@@ -40,6 +40,8 @@ export const en = {
     free_one: "One free video available",
     free_other: "{{count}} free videos available",
     noCharge: "This video will not use any credits.",
+    proposalUsesFree: "Preparing a proposal uses one free video. {{remaining}} will remain. Producing the video after approval does not take another free slot.",
+    proposalUsesCredits: "Preparing a proposal uses {{count}} credits. Producing the video after approval does not take another charge.",
     freeVideo: "Free video",
     oneCredit: "One credit",
     amount: "{{count}} credits",
@@ -261,6 +263,7 @@ export const en = {
     primaryColor: "Primary color",
     secondaryColor: "Background color",
     colorsHelp: "Used on the end card and as the brand palette in the video.",
+    preferredVoice: "Preferred voice",
     templates: {
       heading: "Brand templates",
       help: "Start from a kit or a saved template. Then fill only today's product title, photo, and copy.",
@@ -540,7 +543,7 @@ export const he = {
   },
   progress: { aria: "שלבי הגדרת הסרטון", idea: "רעיון וסגנון", script: "תסריט וסצנות", audio: "קול ומוזיקה", review: "סקירה ויצירה" },
   common: { required: "חובה", optional: "לא חובה", remove: "הסר", automatic: "אוטומטי — לפי הבריף והאווירה", secondsShort: "{{count}} שנ׳", recommended: "מומלץ", custom: "מותאם" },
-  credits: { free_one: "סרטון חינם אחד זמין", free_other: "{{count}} סרטונים חינם זמינים", noCharge: "הסרטון הנוכחי לא יפחית מהקרדיטים.", freeVideo: "סרטון חינם", oneCredit: "קרדיט אחד", amount: "{{count}} קרדיטים", lipSyncSurcharge: "סנכרון שפתיים מוסיף {{extra}} קרדיטים (סה״כ {{total}})." },
+  credits: { free_one: "סרטון חינם אחד זמין", free_other: "{{count}} סרטונים חינם זמינים", noCharge: "הסרטון הנוכחי לא יפחית מהקרדיטים.", proposalUsesFree: "הכנת ההצעה משתמשת בסרטון חינם אחד. יישארו {{remaining}}. הפקת הווידאו אחרי האישור לא תגרע מכסה נוספת.", proposalUsesCredits: "הכנת ההצעה משתמשת ב־{{count}} קרדיטים. הפקת הווידאו אחרי האישור אינה חיוב נוסף.", freeVideo: "סרטון חינם", oneCredit: "קרדיט אחד", amount: "{{count}} קרדיטים", lipSyncSurcharge: "סנכרון שפתיים מוסיף {{extra}} קרדיטים (סה״כ {{total}})." },
   details: {
     heading: "הרעיון", help: "תיאור אחד מספיק כדי להתחיל. כותרת ומטרה נשארות בהתאמות.",
     promptLabel: "מה תרצו שהסרטון יציג או ישיג?",
@@ -631,7 +634,7 @@ export const he = {
     slogan: "סלוגן", sloganPlaceholder: "משפט קצר שמלווה את המותג", website: "קישור לאתר / דף נחיתה", logo: "לוגו",
     logoHelp: "תמונה שקופה או רקע כהה עובדת הכי טוב בכרטיס הסיום. תבנית שמורה משתמשת בלוגו הזה שוב.",
     previewAria: "תצוגה מקדימה של כרטיס סיום ממותג", logoAlt: "תצוגה מקדימה של לוגו {{name}}",
-    primaryColor: "צבע ראשי", secondaryColor: "צבע רקע", colorsHelp: "משמשים בכרטיס הסיום ובפלטת המותג בסרטון.",
+    primaryColor: "צבע ראשי", secondaryColor: "צבע רקע", colorsHelp: "משמשים בכרטיס הסיום ובפלטת המותג בסרטון.", preferredVoice: "קול מועדף",
     templates: {
       heading: "תבניות מותג",
       help: "מתחילים מערכת או מתבנית שמורה. אחר כך ממלאים רק כותרת, תמונה וטקסט של מוצר היום.",

@@ -63,12 +63,18 @@ export function gcsClient(): GcsClient {
         mimeType: meta.contentType ?? "application/octet-stream"
       };
     },
-    async signedUrl(gcsPath, ttlSeconds) {
+    async signedUrl(gcsPath: string, ttlSeconds?: number, options?: { downloadFilename?: string }) {
       const ttl = ttlSeconds ?? Number(process.env.GCS_SIGNED_URL_TTL_SECONDS ?? 3600);
+      const rawName = String(options?.downloadFilename ?? "").replace(/[\u0000-\u001f<>:"/\\|?*]+/g, "_").slice(0, 180);
+      const asciiName = rawName.replace(/[^\w.\-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 180) || "video.mp4";
+      const utfName = encodeURIComponent(rawName || asciiName);
       const [url] = await client().bucket(bucketName()).file(gcsPath).getSignedUrl({
         version: "v4",
         action: "read",
-        expires: Date.now() + ttl * 1000
+        expires: Date.now() + ttl * 1000,
+        ...(rawName || options?.downloadFilename
+          ? { responseDisposition: `attachment; filename="${asciiName}"; filename*=UTF-8''${utfName}` }
+          : {})
       });
       return url;
     }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Locale } from "./localization.js";
+import { normalizeContentLanguage } from "./contentLanguage.js";
 import {
   geminiVoicesForSex,
   isMaleGeminiVoice,
@@ -1163,16 +1164,32 @@ export function creativeFieldLabel(key: keyof CreativeOptions, locale: Locale = 
   return locale === "en" ? (FIELD_LABEL_EN[key] ?? String(key)) : (LABEL_BY_KEY[key] ?? String(key));
 }
 
+const LANGUAGE_ISO_TO_VALUE: Record<string, string> = {
+  he: "עברית",
+  en: "אנגלית",
+  fr: "צרפתית",
+  ar: "ערבית",
+  ru: "רוסית",
+  es: "ספרדית",
+  yi: "יידיש"
+};
+
 export function normalizeCreativeOptionValue(key: keyof CreativeOptions, value: string): string {
+  let probe = value;
+  if (key === "language") {
+    const mapped = LANGUAGE_ISO_TO_VALUE[normalizeContentLanguage(value)];
+    if (mapped) probe = mapped;
+  }
   const field = CREATIVE_FIELD_DEFS.find((candidate) => candidate.key === key);
   const option = field?.options?.find(
     (candidate) =>
+      candidate.value === probe ||
       candidate.value === value ||
       candidate.code === value ||
       candidate.labelHe === value ||
       candidate.labelEn?.toLowerCase() === value.toLowerCase()
   );
-  return option?.value ?? value;
+  return option?.value ?? probe;
 }
 
 export function creativeOptionLabel(
@@ -1598,17 +1615,13 @@ export function aspectRatioFromCreative(creative?: CreativeOptions | null): "9:1
   return undefined;
 }
 
+const KNOWN_CONTENT_LANGUAGES = new Set(["he", "en", "fr", "ar", "ru", "es", "yi"]);
+
 function mapCreativeLanguageLabel(label?: string | null): string | undefined {
   const lang = String(label ?? "").trim();
   if (!lang) return undefined;
-  // Yiddish first (אידיש / יידיש) — before Hebrew substring checks.
-  if (/ייד|איד|אידיש|yiddish/i.test(lang)) return "yi";
-  if (lang.includes("עבר")) return "he";
-  if (lang.includes("אנגל")) return "en";
-  if (lang.includes("צרפ")) return "fr";
-  if (lang.includes("ערב")) return "ar";
-  if (lang.includes("רוס")) return "ru";
-  if (lang.includes("ספרד")) return "es";
+  const normalized = normalizeContentLanguage(lang);
+  if (KNOWN_CONTENT_LANGUAGES.has(normalized)) return normalized;
   return undefined;
 }
 

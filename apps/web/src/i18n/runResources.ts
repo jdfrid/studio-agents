@@ -50,6 +50,7 @@ export const runResources = {
       canLeave: "You can leave and come back — work continues on the server.",
       assemblyFailed: "Assembling the video failed",
       assemblyFailedHelp: "Completed scenes were kept. Retry the failed stage, or create another version.",
+      retryFailedStage: "Retry the failed stage",
       productionDetails: "Production details",
       fixHeading: "Want to refine something?",
       fixHelp: "Script, voice, a scene, or captions. Correction cost is shown before you confirm. Creating another version is a new production.",
@@ -246,6 +247,8 @@ export const runResources = {
       type: "Type",
       httpCode: "HTTP code {{code}}",
       technicalDetails: "Technical provider details",
+      generic: "Production stopped on this stage. Retry in a few minutes, or contact support.",
+      supportHint: "This is a service issue, not a charge on your Reelmino account.",
       missingDetails: "Full technical details were not saved for this run — rerun the stage after updating the server to capture complete details.",
       kinds: {
         rate_limit: "Temporary rate limit / quota",
@@ -372,6 +375,7 @@ export const runResources = {
       canLeave: "אפשר לצאת ולחזור — העבודה ממשיכה בשרת.",
       assemblyFailed: "הרכבת הסרטון נכשלה",
       assemblyFailedHelp: "סצנות תקינות נשמרו. אפשר לנסות שוב את השלב שנכשל, או ליצור גרסה נוספת.",
+      retryFailedStage: "ניסיון חוזר לשלב שנכשל",
       productionDetails: "פרטי הפקה",
       fixHeading: "רוצים לדייק משהו?",
       fixHelp: "תסריט, קול, סצנה או כתוביות. מחיר התיקון יוצג לפני אישור. יצירת גרסה נוספת היא הפקה חדשה.",
@@ -423,7 +427,7 @@ export const runResources = {
       errors: { voiceClone: "שיבוט קול לא מוגדר בשרת — יש להגדיר ELEVENLABS_API_KEY.", locked: "המשימה נעולה בתור העיבוד. המתן מעט או הרץ מחדש את השלב.", modelMissing: "שירות הרינדור לא מצא את המודל המבוקש. בדוק את הגדרות המודל באדמין והרץ מחדש." }
     },
     editor: { editStage: "ערוך שלב", manualEdit: "עריכה ידנית — {{stage}}", uploading: "מעלה: {{name}}…", uploaded: "✓ הועלה: {{name}}", uploadError: "שגיאה: {{message}}", uploadingShort: "מעלה…", chooseFile: "בחר קובץ", baseImages: "תמונות בסיס (cast / look)", baseImagesHint: "תמונת עוגן אחת לכל הסרטון — לא חייבת להיות משויכת לסצנה.", baseCharacters: "תמונת בסיס / דמויות", manualUpload: "העלאה ידנית", voiceScene: "קול · סצנה {{scene}}", music: "מוזיקה", addVisual: "הוספת ויזואל ידנית", wholeVideoBase: "תמונת בסיס לכל הסרטון", optionalScene: "סצנה {{scene}} (אופציונלי)", replaceClip: "החלפת clip ידנית", finalVideo: "סרטון סופי", quickSaveError: "שמירת הבריף נכשלה", summary: "סיכום", visualDirection: "כיוון ויזואלי", musicDirection: "כיוון מוזיקה", tone: "טון", saveContinue: "שמור והמשך" },
-    stageError: { type: "סוג", httpCode: "קוד HTTP {{code}}", technicalDetails: "פירוט טכני מהספק", missingDetails: "פירוט טכני מלא לא נשמר בריצה זו — הרץ מחדש את השלב אחרי עדכון השרת לקבלת פרטים מלאים.", kinds: { rate_limit: "מגבלת קצב / מכסה זמנית", billing_quota: "יתרה / תשלום", auth: "הרשאות", unknown: "שגיאה" } },
+    stageError: { type: "סוג", httpCode: "קוד HTTP {{code}}", technicalDetails: "פירוט טכני מהספק", generic: "ההפקה נעצרה בשלב הזה. נסו שוב בעוד כמה דקות, או פנו לתמיכה.", supportHint: "זו תקלת שירות, לא חיוב בחשבון Reelmino.", missingDetails: "פירוט טכני מלא לא נשמר בריצה זו — הרץ מחדש את השלב אחרי עדכון השרת לקבלת פרטים מלאים.", kinds: { rate_limit: "מגבלת קצב / מכסה זמנית", billing_quota: "יתרה / תשלום", auth: "הרשאות", unknown: "שגיאה" } },
     corrections: { title: "תיקונים ויזואליים", collapsed: "שנו מראה ואז ייצרו מחדש. המחיר מוצג לפני אישור. הקובץ הקודם נשאר עד שקובץ חדש מחליף אותו.", characterDescription: "תיאור דמויות", corrections: "תיקונים", placeholder: "בלי שער מצח, עם כובע…", byScene: "תיקון לפי סצנה", completedHint: "אחרי סרטון מוכן: ויזואל מחדש = {{assetCredits}} קרדיט (תמונות), רינדור מחדש = {{renderCredits}} קרדיט (וידאו בלבד). סרטון חינמי — תיקונים ללא עלות. שמור רק שומר הערות בלי להריץ מחדש.", forkHint: "תיקון משמעותי יוצר גרסה חדשה ({{assetCredits}} קרדיט לוויזואל, {{renderCredits}} לסרטון). הסרטון הנוכחי נשאר זמין.", regenerateVisuals: "ויזואל מחדש", rerender: "רינדור מחדש", withCredits: "{{action}} ({{credits}} קרדיט)", confirmation: "{{label}}. להמשיך?", creditNotice: "{{action}} יעלה {{credits}} קרדיט (יתרת חשבון נדרשת). סרטונים מתוך מכסת החינם — ללא חיוב." },
     costs: {
       title: "לוג עלויות", empty: "אין עדיין רשומות עלות לריצה זו. אירועים יופיעו כששלבי ה-pipeline רצים.", detailedTitle: "לוג עלויות (לפי usageMetadata / תעריפון Google)", total: "סה״כ", measuredRows: "{{count}} שורות מדודות (tokens מ-Gemini)", estimatedRows: "{{count}} שורות משוערות (fallback)", requestParams: "{{unit}} לפי פרמטרי בקשה (שניות × מודל).", freeRows: "שורות charged=no מוצגות כ-₪0.", columns: { date: "תאריך/שעה", stage: "שלב", attempt: "attempt", activity: "פעילות", model: "מודל", source: "מקור", tokens: "tokens", renderTime: "זמן רינדור", renderTimeTitle: "משך קריאת וידאו בלבד", units: "יחידות" }, notCharged: "לא חויב", units: { videoSeconds: "{{count}}s {{unit}}", tokens: "{{count}} tokens", image: "1 תמונה", text: "1 קריאת text", characters: "{{count}} תווים", music: "{{count}}s מוזיקה" }, actual: "עלות בפועל (Cost Ledger)", estimated: "משוער לפני ריצה (תעריפון)", retryWarning: "יותר מניסיון אחד בריצה — ייתכן חיוב כפול על Kling/Veo (למשל כשל concat או retry). Rerun על render משתמש מחדש בקליפים קיימים.", preRunEstimate: "הערכה לפני ריצה (ריצה אחת): {{amount}}", attempts: "{{count}} attempts בריצה זו", actualLength: "אורך וידאו בפועל:", actualLengthDetails: "{{seconds}}s ({{scenes}} סצנות × {{bucket}}s · {{unit}})", briefLength: "brief: {{seconds}}s", actualBreakdown: "פירוט בפועל (Cost Ledger):", estimateBreakdown: "הערכה לריצה אחת (לפני ריצה):", rows: "{{count}} שורות", model: "מודל", images: "תמונות", calls: "{{count}} קריאות", mode: "מצב", expensive: "ריצה אחת עלולה לעלות כ-{{amount}}. ודא שיש מספיק יתרה ב-Google Cloud לפני שממשיכים.", confirmExpensive: "אני מבין/ה שריצה זו עלולה לעלות {{amount}} ומאשר/ת להמשיך", activities: { veo_video: "{{provider}} וידאו", gemini_tts: "Gemini TTS", gemini_image: "Gemini תמונה", gemini_text: "Gemini text", gemini_music: "Gemini מוזיקה", gcs_upload: "GCS העלאה", gcs_storage: "GCS אחסון (יומי)" }

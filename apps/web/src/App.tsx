@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AuthProvider, useAuth } from "./AuthContext.js";
 import { LandingPage } from "./LandingPage.js";
@@ -104,6 +104,8 @@ function AppShell() {
   const [whatsNewSinceVisit, setWhatsNewSinceVisit] = useState(false);
   const [whatsNewEntries, setWhatsNewEntries] = useState<WhatsNewEntry[]>([]);
   const [showWhatsNewReopen, setShowWhatsNewReopen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
 
   const navigate = useCallback((next: AppLocation, mode: "push" | "replace" = "push") => {
     setView(next.view);
@@ -160,6 +162,14 @@ function AppShell() {
       navigate({ view: "dashboard", runId: null }, "replace");
     }
   }, [navigate, user, view]);
+
+  useEffect(() => {
+    function onDocClick(event: MouseEvent) {
+      if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false);
+    }
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -277,17 +287,55 @@ function AppShell() {
             </button>
           ) : null}
           <LanguageSwitcher compact />
-          {user.avatarUrl ? (
-            <img src={user.avatarUrl} alt="" className="avatar" />
-          ) : (
-            <span className="avatar avatar-fallback" aria-hidden>
-              {(user.name || user.email || "P").slice(0, 1).toUpperCase()}
-            </span>
-          )}
           <span className="header-user-email">{user.email}</span>
           <button type="button" className="link-btn" onClick={() => void logout()}>
             {t("shell.logout")}
           </button>
+          <div className="header-account" ref={accountRef}>
+            <button
+              type="button"
+              className="header-account-trigger"
+              aria-haspopup="menu"
+              aria-expanded={accountOpen}
+              aria-label={t("shell.accountMenu")}
+              onClick={() => setAccountOpen((open) => !open)}
+            >
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" className="avatar" />
+              ) : (
+                <span className="avatar avatar-fallback" aria-hidden>
+                  {(user.name || user.email || "P").slice(0, 1).toUpperCase()}
+                </span>
+              )}
+            </button>
+            {accountOpen ? (
+              <div className="header-account-menu" role="menu">
+                <span className="header-user-email">{user.email}</span>
+                {showWhatsNewReopen ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setAccountOpen(false);
+                      openWhatsNew();
+                    }}
+                  >
+                    {t("whatsNew.reopen")}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAccountOpen(false);
+                    void logout();
+                  }}
+                >
+                  {t("shell.logout")}
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
       <main>

@@ -393,12 +393,36 @@ async function loadDestinationsForTenant(tenantId: string, destinationIds: strin
   return rows;
 }
 
+async function mediaFromCompletedRun(tenantId: string, runId: string): Promise<PackageMediaItem[]> {
+  const artifact = await prisma.artifact.findFirst({
+    where: { runId, kind: { in: ["series_final_video", "final_video"] }, run: { tenantId } },
+    orderBy: { createdAt: "desc" }
+  });
+  if (!artifact) return [];
+  return [
+    {
+      kind: "video",
+      gcsPath: artifact.gcsPath,
+      mimeType: artifact.mimeType,
+      sizeBytes: artifact.sizeBytes,
+      filename: "final.mp4"
+    }
+  ];
+}
+
 export async function previewPackageForUser(userId: string, body: PreviewPackageRequest) {
   const tenantId = await tenantIdForUser(userId);
   const destinations = await loadDestinationsForTenant(tenantId, body.destinationIds);
+  let media = body.media ?? [];
+  if (!media.length && body.artifactId) {
+    media = [await resolveIngestMedia(tenantId, userId, "preview", { artifactId: body.artifactId }, 0)];
+  }
+  if (!media.length && body.runId) {
+    media = await mediaFromCompletedRun(tenantId, body.runId);
+  }
   return destinations.map((destination) => {
     const adapter = getNetworkAdapter(fromPrismaNetwork(destination.connection.network));
-    const preview = adapter.preview(body.media, body.copy, parseDestConfig(destination.config));
+    const preview = adapter.preview(media, body.copy, parseDestConfig(destination.config));
     return { destination: destinationView(destination), preview };
   });
 }
@@ -432,19 +456,7 @@ export async function createDistributionPackage(userId: string, request: CreateC
     media.push(await resolveIngestMedia(tenantId, userId, created.id, item, index + 1));
   }
   if (!media.length && request.runId) {
-    const artifact = await prisma.artifact.findFirst({
-      where: { runId: request.runId, kind: { in: ["series_final_video", "final_video"] }, run: { tenantId } },
-      orderBy: { createdAt: "desc" }
-    });
-    if (artifact) {
-      media.push({
-        kind: "video",
-        gcsPath: artifact.gcsPath,
-        mimeType: artifact.mimeType,
-        sizeBytes: artifact.sizeBytes,
-        filename: "final.mp4"
-      });
-    }
+    media.push(...(await mediaFromCompletedRun(tenantId, request.runId)));
   }
   if (!media.length && request.source !== "api") {
     /* text-only allowed */

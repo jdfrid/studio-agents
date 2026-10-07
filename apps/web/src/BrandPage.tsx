@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { localeFor } from "./i18n/index.js";
 import { BrandTemplatePanel } from "./BrandTemplatePanel.js";
-import type { BrandTemplateView, CreativeOptions } from "@studio/shared";
+import { VoicePicker } from "./VoicePreview.js";
+import { normalizeHexColor, type BrandTemplateView, type CreativeOptions } from "@studio/shared";
 
 export function BrandPage() {
   const { t, i18n } = useTranslation();
@@ -49,6 +50,8 @@ export function BrandPage() {
           logoFile={logoFile}
           onApply={applyTemplate}
           onClear={() => setSelectedId(null)}
+          onBrandingChange={(patch) => setBranding((current) => ({ ...current, ...patch }))}
+          onCreativeChange={setCreative}
         />
         <label className="field-block">
           {createT("branding.businessName")}
@@ -79,6 +82,49 @@ export function BrandPage() {
           {createT("branding.logo")}
           <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} />
         </label>
+        <div className="common-fields-grid">
+          <label className="field-block">
+            {createT("branding.primaryColor")}
+            <span className="brand-color-input">
+              <input
+                type="color"
+                value={normalizeHexColor(branding.primaryColor) ?? "#173D35"}
+                onChange={(e) => setBranding((current) => ({ ...current, primaryColor: e.target.value.toUpperCase() }))}
+              />
+              <input
+                value={branding.primaryColor}
+                onChange={(e) => setBranding((current) => ({ ...current, primaryColor: e.target.value }))}
+                placeholder="#173D35"
+                maxLength={7}
+              />
+            </span>
+          </label>
+          <label className="field-block">
+            {createT("branding.secondaryColor")}
+            <span className="brand-color-input">
+              <input
+                type="color"
+                value={normalizeHexColor(branding.secondaryColor) ?? "#F6F7F2"}
+                onChange={(e) => setBranding((current) => ({ ...current, secondaryColor: e.target.value.toUpperCase() }))}
+              />
+              <input
+                value={branding.secondaryColor}
+                onChange={(e) => setBranding((current) => ({ ...current, secondaryColor: e.target.value }))}
+                placeholder="#F6F7F2"
+                maxLength={7}
+              />
+            </span>
+          </label>
+        </div>
+        <small className="field-help">{createT("branding.colorsHelp")}</small>
+        <div className="field-block">
+          <span>{createT("branding.preferredVoice")}</span>
+          <VoicePicker
+            value={String(creative.voiceCharacter ?? "")}
+            language={String(creative.language ?? (uiLocale === "he" ? "he" : "en"))}
+            onChange={(id) => setCreative((current) => ({ ...current, voiceCharacter: id }))}
+          />
+        </div>
       </section>
     </div>
   );

@@ -153,7 +153,9 @@ export type CreateContentPackageRequest = z.infer<typeof CreateContentPackageReq
 export const PreviewPackageRequestSchema = z.object({
   media: z.array(PackageMediaItemSchema).max(10).default([]),
   copy: PackageCopySchema.default({}),
-  destinationIds: z.array(z.string().min(1)).min(1).max(50)
+  destinationIds: z.array(z.string().min(1)).min(1).max(50),
+  runId: z.string().min(1).optional(),
+  artifactId: z.string().min(1).optional()
 });
 export type PreviewPackageRequest = z.infer<typeof PreviewPackageRequestSchema>;
 

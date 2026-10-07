@@ -42,7 +42,9 @@ const BILLING_QUOTA_PATTERNS = [
   "credits are depleted",
   "credits depleted",
   "depleted. please go to ai studio",
-  "manage your project and billing"
+  "manage your project and billing",
+  "exhausted balance",
+  "user is locked"
 ];
 
 const RATE_LIMIT_PATTERNS = [
@@ -82,72 +84,45 @@ export function userFacingGeminiError(
   if (locale === "en") {
     if (kind === "billing_quota") {
       if (provider === "heygen") {
-        return "Your HeyGen account is out of credits. Buy credits in HeyGen Billing, then retry the render stage, or create a video with lip sync turned off.";
+        return "Lip-sync (HeyGen) is temporarily unavailable. Retry the stage in a few minutes, or create a video without lip-sync. Contact support if it continues — this is not a charge on your Reelmino account.";
       }
       if (provider === "fal") {
-        return "Your fal.ai account is out of credits. Add funds in the fal dashboard, then retry the render stage.";
+        return "Video rendering is temporarily unavailable. Retry the stage in a few minutes. Contact support if it continues — this is not a charge on your Reelmino account.";
       }
-      return "Google AI Studio Prepay credits are depleted. Buy credits under the project’s Billing / Prepay settings, then retry the stage.";
+      return "Video production is paused because a rendering provider ran out of capacity. Retry the stage in a few minutes. Contact support if it continues — this is not a charge on your Reelmino account.";
     }
     if (kind === "rate_limit") {
       if (provider === "heygen")
-        return "HeyGen is temporarily rate-limiting requests. Wait a few minutes, then retry the render stage.";
+        return "Lip-sync is busy right now. Wait a few minutes, then retry the render stage.";
       if (/\bveo\b|predictlongrunning|generatevideos|video.*generation/i.test(raw)) {
-        return "Gemini Veo is temporarily rate-limited (HTTP 429). Automatic retries are attempted; if they all fail, wait a few minutes and retry the stage.";
+        return "Video rendering is busy right now. Wait a few minutes, then retry the stage. Completed scenes are kept.";
       }
-      return "Gemini is temporarily rate-limiting requests (HTTP 429). Wait a minute or two, then retry the stage.";
+      return "The production service is busy right now. Wait a minute or two, then retry the stage.";
     }
     if (kind === "auth") {
-      return provider === "heygen"
-        ? "The HeyGen API key is missing or invalid. Verify HEYGEN_API_KEY on the server."
-        : "Gemini API authorization failed. Verify the API key and that billing is connected to the project.";
+      return "The production service could not authorize this request. Retry later or contact support.";
     }
     return null;
   }
   switch (kind) {
     case "billing_quota":
       if (provider === "heygen") {
-        return [
-          "נגמרו הקרדיטים בחשבון HeyGen — זה לא התשלום ל-Reelmino.",
-          "תשלום ₪ ב-Reelmino מכסה יצירת סרטונים במערכת; סנכרון שפתיים (HeyGen) הוא שירות נפרד שדורש קרדיטים ב-HeyGen.",
-          "אפשרויות: (1) HeyGen → Billing / Credits → רכוש קרדיטים, ואז «הפעל מחדש את השלב»;",
-          "או (2) צור סרטון חדש עם «תנועות שפתיים» כבוי — ואז הרינדור רץ על Veo/Wan בלי HeyGen."
-        ].join(" ");
+        return "סנכרון שפתיים (HeyGen) אינו זמין כרגע. נסו שוב בעוד כמה דקות, או צרו סרטון בלי סנכרון שפתיים. אם זה נמשך פנו לתמיכה — אין צורך לטפל בחשבון חיוב חיצוני.";
       }
       if (provider === "fal") {
-        return [
-          "נגמרו הקרדיטים ב-fal.ai (Kling / Seedance וכו׳) — לא Google.",
-          "טען יתרה ב-fal Dashboard ואז הפעל מחדש את שלב הרינדור."
-        ].join(" ");
+        return "הפקת הווידאו נעצרה זמנית אצל ספק הרינדור. נסו שוב בעוד כמה דקות. אם זה נמשך פנו לתמיכה — זה לא חיוב בחשבון Reelmino.";
       }
-      return [
-        "נגמרו קרדיטי Prepay ב-Google AI Studio — זו לא מגבלת קצב זמנית.",
-        "פתח https://aistudio.google.com/ → הפרויקט → Billing / Prepay → Buy credits.",
-        "אחרי טעינת יתרה לחץ «הפעל מחדש את השלב» (או מחק את הריצה והתחל מחדש)."
-      ].join(" ");
+      return "הפקת הווידאו נעצרה כי ספק הרינדור אינו זמין כרגע. נסו שוב בעוד כמה דקות. אם זה נמשך פנו לתמיכה — אין צורך לטפל בחשבון חיוב של ספק חיצוני.";
     case "rate_limit":
       if (provider === "heygen") {
-        return "מגבלת קצב זמנית ב-HeyGen. המתן כמה דקות והפעל מחדש את שלב הרינדור.";
+        return "סנכרון שפתיים עמוס כרגע. המתינו כמה דקות והפעילו מחדש את שלב הרינדור.";
       }
-      // Veo-specific copy only when the failure is actually from video APIs — not brief/script/TTS text.
       if (/\bveo\b|predictlongrunning|generatevideos|video.*generation/i.test(raw)) {
-        return [
-          "מגבלת קצב או מכסה זמנית של Gemini Veo (429) — לא בהכרח 'נגמר כסף'.",
-          "המערכת מנסה שוב אוטומטית עם המתנה בין ניסיונות.",
-          "אם עדיין נכשל אחרי כל הניסיונות: המתן כמה דקות ולחץ «הפעל מחדש את השלב» — סצנות שכבר הצליחו לא יחויבו שוב.",
-          "לייצור לקוחות ודא מכסת Veo מספקת בחשבון Google (Paid)."
-        ].join(" ");
+        return "הרינדור עמוס כרגע. המתינו כמה דקות והפעילו מחדש את השלב. סצנות שכבר הושלמו נשמרות.";
       }
-      return [
-        "מגבלת קצב זמנית של Gemini (HTTP 429) — לא בהכרח נגמרו קרדיטים.",
-        "המערכת מנסה שוב אוטומטית עם המתנה בין ניסיונות.",
-        "אם עדיין נכשל: המתן דקה–שתיים ולחץ «הפעל מחדש את השלב»."
-      ].join(" ");
+      return "שירות ההפקה עמוס כרגע. המתינו דקה–שתיים והפעילו מחדש את השלב.";
     case "auth":
-      if (provider === "heygen") {
-        return "מפתח HeyGen לא תקין או חסר — ודא ש-HEYGEN_API_KEY מוגדר בשרת.";
-      }
-      return "בעיית הרשאה ל-Gemini API — בדוק שה-API key תקין וש-billing מחובר לפרויקט.";
+      return "שירות ההפקה לא הצליח לאשר את הבקשה. נסו שוב מאוחר יותר או פנו לתמיכה.";
     default:
       return null;
   }
@@ -291,13 +266,13 @@ export function formatApiErrorMessage(raw: string, locale: Locale = "he"): strin
   }
   if (lower.includes("image_too_small") || lower.includes("minimum dimensions are 300")) {
     return locale === "en"
-      ? "A reference image is smaller than 300×300 pixels, which Hailuo cannot animate. Upload a larger photo or retry render — small stills are now upscaled automatically."
-      : "תמונת הייחוס קטנה מ־300×300 פיקסלים, ו-Hailuo לא יכול להנפיש אותה. העלו תמונה גדולה יותר או הרץ מחדש את הרינדור — תמונות קטנות מוגדלות עכשיו אוטומטית.";
+      ? "A reference image is smaller than 300×300 pixels and cannot be animated. Upload a larger photo or retry render — small stills are now upscaled automatically."
+      : "תמונת הייחוס קטנה מ־300×300 פיקסלים ולא ניתן להנפיש אותה. העלו תמונה גדולה יותר או הרץ מחדש את הרינדור — תמונות קטנות מוגדלות עכשיו אוטומטית.";
   }
   if (lower.includes("input token count exceeds") || lower.includes("maximum number of tokens allowed")) {
     return locale === "en"
-      ? "The Gemini request is too large (token limit exceeded), usually because audio or video was attached to the prompt by mistake. Update the server and retry the brief stage."
-      : "הבקשה ל-Gemini גדולה מדי (חריגת מגבלת טוקנים). בדרך כלל בגלל קובץ קול/וידאו שצורף בטעות לפרומפט — עדכן את השרת לגרסה האחרונה והפעל מחדש את שלב הביריף.";
+      ? "The production request is too large. Retry the brief stage, and contact support if it continues."
+      : "בקשת ההפקה גדולה מדי. הפעילו מחדש את שלב הביריף, ואם זה נמשך פנו לתמיכה.";
   }
   if (
     (lower.includes("wan") ||
@@ -307,33 +282,28 @@ export function formatApiErrorMessage(raw: string, locale: Locale = "he"): strin
     (lower.includes("not found") || lower.includes("predictlongrunning") || lower.includes("not supported"))
   ) {
     return locale === "en"
-      ? "A Wan/Kling/Hailuo/HeyGen model was configured as a Gemini Veo model. Clear the Video (Veo) model setting or use veo-3.1-fast-generate-preview, then select the correct render profile."
-      : "מודל Wan/Kling/Hailuo/HeyGen הוגדר בטעות כמודל Veo של Gemini. באדמין → הגדרות: נקה את שדה «וידאו (Veo)» (או שים veo-3.1-fast-generate-preview), ובחר את הפרופיל הנכון למעלה. ל-HeyGen ודא ש-HEYGEN_API_KEY מוגדר; ל-fal ודא ש-FAL_API_KEY מוגדר.";
+      ? "Video production is misconfigured on the service. Retry later or contact support — this is not something to fix in your Reelmino account."
+      : "הפקת הווידאו לא הוגדרה כראוי בשרת. נסו שוב מאוחר יותר או פנו לתמיכה — אין צורך לשנות הגדרות בחשבון שלכם.";
   }
   if (lower.includes("no audio inline data") || lower.includes("finishreason=other")) {
     if (lower.includes("yiddish") || lower.includes("yi")) {
       return locale === "en"
-        ? "Gemini TTS could not generate Yiddish audio (finishReason=OTHER). Try shorter dubbing lines or Hebrew with a Yiddish accent, then retry the audio stage."
-        : "Gemini TTS לא הצליח להפיק אודיו ליידיש (finishReason=OTHER). נסה משפטי דיבוב קצרים יותר, או בחר שפה עברית עם מבטא יידיש — ואז הפעל מחדש את שלב האודיו.";
+        ? "Yiddish audio could not be generated. Try shorter dubbing lines or Hebrew with a Yiddish accent, then retry the audio stage."
+        : "לא הצלחנו להפיק אודיו ליידיש. נסו משפטי דיבוב קצרים יותר, או בחרו עברית עם מבטא יידיש — ואז הפעילו מחדש את שלב האודיו.";
     }
     return locale === "en"
-      ? "Gemini TTS returned no audio (finishReason=OTHER), usually because the text, language, or voice is unsupported. Change the voice style or shorten the narration, then retry the audio stage."
-      : "Gemini TTS לא החזיר אודיו (finishReason=OTHER). לרוב בגלל טקסט/שפה/קול לא נתמכים. נסה לשנות סגנון קול או לקצר את הדיבוב, והפעל מחדש את שלב האודיו.";
+      ? "Voice audio could not be generated, usually because the text, language, or voice is unsupported. Change the voice or shorten the narration, then retry the audio stage."
+      : "לא הצלחנו להפיק את קובץ הקול. לרוב בגלל טקסט, שפה או קול שאינם נתמכים. שנו סגנון קול או קצרו את הדיבוב, והפעילו מחדש את שלב האודיו.";
   }
   if (lower.includes("failed to download")) {
-    if (lower.includes("403") || lower.includes("expired")) {
-      return locale === "en"
-        ? "A file could not be downloaded from Google Cloud Storage. Verify GCS_CREDENTIALS_FILE on the server, then retry the render stage."
-        : "לא ניתן להוריד קובץ מ-Google Cloud Storage. ודא ש-GCS_CREDENTIALS_FILE תקין בשרת, ואז הרץ מחדש את שלב הרינדור.";
-    }
     return locale === "en"
-      ? `Storage download failed: ${sanitized.slice(0, 220)}`
-      : `שגיאה בהורדת קובץ מהאחסון: ${sanitized.slice(0, 220)}`;
+      ? "A production file could not be loaded from storage. Retry the render stage, and contact support if it continues."
+      : "לא ניתן לטעון קובץ הפקה מהאחסון. הרץ מחדש את שלב הרינדור, ואם זה נמשך פנו לתמיכה.";
   }
   if (lower.includes("issue with the audio") || lower.includes("audio for your prompt")) {
     return locale === "en"
-      ? "Veo failed because the video prompt requested speech or music. Audio is supplied separately by TTS; update the server, ensure GEMINI_VEO_AUDIO=0, and retry rendering."
-      : "Veo נכשל בגלל בקשת דיבור/מוזיקה בפרומפט הווידאו (ענף האודיו של Google). הקול מגיע מ-TTS נפרד — אחרי עדכון השרת הפרומפטים מנוקים אוטומטית; הפעל מחדש את שלב הרינדור (וודא GEMINI_VEO_AUDIO=0).";
+      ? "Video rendering failed because the prompt requested speech or music. Retry the render stage. Contact support if it continues."
+      : "הרינדור נכשל כי הפרומפט ביקש דיבור או מוזיקה. הפעילו מחדש את שלב הרינדור, ואם זה נמשך פנו לתמיכה.";
   }
   if (
     lower.includes("real people") ||
@@ -357,9 +327,9 @@ export function formatApiErrorMessage(raw: string, locale: Locale = "he"): strin
   }
   const friendly = userFacingGeminiError(probe, httpStatus, locale);
   if (friendly) return friendly;
-
-  if (jsonMessage) return jsonMessage.slice(0, 600);
-  return sanitized.slice(0, 600);
+  return locale === "en"
+    ? "Production hit a temporary problem. Retry the stage, and contact support if it continues."
+    : "ההפקה נתקלה בבעיה זמנית. הפעילו מחדש את השלב, ואם זה נמשך פנו לתמיכה.";
 }
 
 function sanitizeApiErrorText(raw: string): string {

@@ -186,6 +186,24 @@ export function RunView({
         <section className="run-failure-banner" role="alert">
           <h2>{t("run.assemblyFailed")}</h2>
           <p>{t("run.assemblyFailedHelp")}</p>
+          <div className="stage-actions">
+            {run.stages.find((stage) => stage.status === "FAILED") ? (
+              <button
+                type="button"
+                className="primary"
+                onClick={() => {
+                  const failed = run.stages.find((stage) => stage.status === "FAILED");
+                  if (!failed) return;
+                  void apiPost(`/runs/${run.id}/stages/${failed.stage}/rerun`).then(() => refresh());
+                }}
+              >
+                {t("run.retryFailedStage")}
+              </button>
+            ) : null}
+            <button type="button" className="button-secondary" disabled={!canRemix} onClick={onRemix}>
+              {t("run.remix")}
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -382,19 +400,29 @@ function CompletedResult({
   }, [candidate.artifactId, candidate.signedUrl]);
 
   async function download() {
-    if (!url) return;
+    const filename = `${(run.brief.title || "video").replace(/[\u0000-\u001f<>:"/\\|?*]+/g, " ").trim().slice(0, 80) || "video"}.mp4`;
     try {
+      if (artifactId) {
+        const res = await apiGet<{ url: string }>(
+          `/artifacts/${artifactId}/signed-url?download=1&filename=${encodeURIComponent(filename)}`
+        );
+        window.location.assign(res.url);
+        return;
+      }
+      if (!url) return;
       const res = await fetch(url);
       if (!res.ok) throw new Error("download failed");
       const blob = await res.blob();
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objectUrl;
-      a.download = `${run.brief.title || "video"}.mp4`;
+      a.download = filename;
+      document.body.appendChild(a);
       a.click();
+      a.remove();
       URL.revokeObjectURL(objectUrl);
     } catch {
-      window.open(url, "_blank");
+      if (url) window.location.assign(url);
     }
   }
 

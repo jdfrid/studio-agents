@@ -65,9 +65,22 @@ function oauthResultMessage(
   if (error === "oauth_retry" || error === "missing_code") return t("distribution.oauthRetry");
   if (error === "access_denied") return t("distribution.oauthDenied");
   if (error && /redirect_uri/i.test(error)) return t("distribution.oauthRedirectMismatch");
-  if (error) return t("distribution.oauthError", { error });
+  if (error) return t("distribution.oauthError");
   if (connected) return t("distribution.oauthOk", { network: connected });
   return "";
+}
+
+function distributionUserMessage(
+  t: (key: string, options?: { defaultValue?: string }) => string,
+  err: unknown
+): string {
+  const e = err as { code?: string; message?: string };
+  const raw = String(e.code || e.message || "").trim();
+  if (!raw) return t("distribution.errors.generic");
+  return raw
+    .split(/,\s*/)
+    .map((code) => t(`distribution.errors.${code}`, { defaultValue: t("distribution.errors.generic") }))
+    .join(" · ");
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -132,7 +145,7 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
   }, [sourceRunId]);
 
   useEffect(() => {
-    void refresh().catch((err) => setMessage((err as Error).message));
+    void refresh().catch((err) => setMessage(distributionUserMessage(t, err)));
     if (oauthHandled.current) return;
     oauthHandled.current = true;
     const params = new URLSearchParams(window.location.search);
@@ -146,7 +159,7 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
           setMessage(t("distribution.oauthOk", { network: pathNetwork }));
           await refresh();
         })
-        .catch((err) => setMessage((err as Error).message));
+        .catch((err) => setMessage(t("distribution.oauthError")));
       return;
     }
     const next = oauthResultMessage(t, params.get("error"), params.get("connected"));
@@ -162,7 +175,7 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
       const { authorizeUrl } = await apiPost<{ authorizeUrl: string }>(`/distribution/connections/${network}/start`);
       window.location.href = authorizeUrl;
     } catch (err) {
-      setMessage((err as Error).message);
+      setMessage(distributionUserMessage(t, err));
     } finally {
       setBusy("");
     }
@@ -175,7 +188,7 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
       setBotToken("");
       await refresh();
     } catch (err) {
-      setMessage((err as Error).message);
+      setMessage(distributionUserMessage(t, err));
     } finally {
       setBusy("");
     }
@@ -189,7 +202,7 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
       setChatId("");
       await refresh();
     } catch (err) {
-      setMessage((err as Error).message);
+      setMessage(distributionUserMessage(t, err));
     } finally {
       setBusy("");
     }
@@ -211,6 +224,7 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
         : [];
       const result = await apiPost<typeof previews>("/distribution/packages/preview", {
         destinationIds: selectedDestinations,
+        runId: runId || undefined,
         copy: {
           title,
           body,
@@ -221,7 +235,7 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
       });
       setPreviews(result);
     } catch (err) {
-      setMessage((err as Error).message);
+      setMessage(distributionUserMessage(t, err));
     } finally {
       setBusy("");
     }
@@ -254,7 +268,7 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
       });
       await refresh();
     } catch (err) {
-      setMessage((err as Error).message);
+      setMessage(distributionUserMessage(t, err));
     } finally {
       setBusy("");
     }
@@ -285,8 +299,10 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
         <div className="distribution-grid">
           {networks.map((network) => (
             <article key={network.network} className="stage-card">
-              <strong>{network.network}</strong>
-              <small className="muted">{network.authKind}</small>
+              <strong>{t(`distribution.networkNames.${network.network}`, { defaultValue: network.network })}</strong>
+              <small className="muted">
+                {network.configured ? t("distribution.available") : t("distribution.unavailable")}
+              </small>
               {network.network === "telegram" ? (
                 <>
                   <input
@@ -307,26 +323,17 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
                     disabled={!network.configured || Boolean(busy)}
                     onClick={() => void connectOAuth(network.network)}
                   >
-                    {network.configured ? t("distribution.connect") : t("distribution.notConfigured")}
+                    {network.configured ? t("distribution.connect") : t("distribution.unavailable")}
                   </button>
-                  {network.configured && network.oauthCallbackUrl ? (
-                    <p className="muted" style={{ marginTop: 8, wordBreak: "break-all" }}>
-                      {network.oauthCallbackUrl.includes("/auth/google/callback")
-                        ? t("distribution.oauthUsesGoogleLogin")
-                        : t("distribution.oauthCallbackHint")}
-                      {network.oauthCallbackUrl.includes("/auth/google/callback") ? null : (
-                        <>
-                          <br />
-                          <code>{network.oauthCallbackUrl}</code>
-                        </>
-                      )}
-                    </p>
-                  ) : null}
-                  {network.network === "youtube" && network.configured ? (
+                  {network.configured ? (
                     <p className="muted" style={{ marginTop: 8 }}>
-                      {t("distribution.oauthYoutubeBrandHint")}
+                      {t("distribution.connectHelp")}
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="muted" style={{ marginTop: 8 }}>
+                      {t("distribution.operatorRequired")}
+                    </p>
+                  )}
                 </>
               )}
             </article>
@@ -469,8 +476,13 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
             {previews.map((item) => (
               <li key={item.destination.id}>
                 <span>
-                  {item.destination.name}: {item.preview.accepted ? "ok" : item.preview.errors.join(", ")}
-                  {item.preview.lossy ? " · lossy" : ""}
+                  {item.destination.name}:{" "}
+                  {item.preview.accepted
+                    ? t("distribution.previewOk")
+                    : item.preview.errors
+                        .map((code) => t(`distribution.errors.${code}`, { defaultValue: t("distribution.errors.generic") }))
+                        .join(", ")}
+                  {item.preview.lossy ? ` · ${t("distribution.lossy")}` : ""}
                   <br />
                   <small>{item.preview.nativeCopy.title || item.preview.nativeCopy.caption}</small>
                 </span>
@@ -519,7 +531,7 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
             <li key={job.id}>
               <span>
                 {job.destinationName || job.id} · {job.network} · {job.status}
-                {job.lastError ? ` · ${job.lastError}` : ""}
+                {job.lastError ? ` · ${distributionUserMessage(t, { message: job.lastError })}` : ""}
                 {job.remoteUrl ? (
                   <>
                     {" "}

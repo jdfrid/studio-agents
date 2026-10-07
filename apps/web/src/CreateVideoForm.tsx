@@ -914,7 +914,7 @@ export function CreateVideoForm({
         <p className="credit-info-line">
           <span aria-hidden>✦</span>
           {t("credits.free", { count: freeLeft })}
-          <small>{t("credits.noCharge")}</small>
+          <small>{t("credits.proposalUsesFree", { remaining: Math.max(0, freeLeft - 1) })}</small>
         </p>
       ) : null}
       <section className="create-topic-card" aria-labelledby="video-details-heading">
@@ -945,6 +945,7 @@ export function CreateVideoForm({
                   key={value}
                   type="button"
                   className={String(creative.language ?? "en") === value ? "is-selected" : ""}
+                  aria-pressed={String(creative.language ?? "en") === value}
                   onClick={() => setCreativeField("language", value as never)}
                 >
                   {t(`languages.${labelKey}`)}
@@ -959,6 +960,7 @@ export function CreateVideoForm({
               <button
                 type="button"
                 className={previewAspect !== "16:9" ? "is-selected" : ""}
+                aria-pressed={previewAspect !== "16:9"}
                 onClick={() => {
                   setPlatform("instagram_reels");
                   setCreativeField("videoOrientation", "portrait");
@@ -969,6 +971,7 @@ export function CreateVideoForm({
               <button
                 type="button"
                 className={previewAspect === "16:9" ? "is-selected" : ""}
+                aria-pressed={previewAspect === "16:9"}
                 onClick={() => {
                   setPlatform("youtube");
                   setCreativeField("videoOrientation", "landscape");
@@ -988,6 +991,7 @@ export function CreateVideoForm({
                 key={seconds}
                 type="button"
                 className={durationSeconds === seconds ? "is-selected" : ""}
+                aria-pressed={durationSeconds === seconds}
                 onClick={() => setDurationSeconds(seconds)}
               >
                 {t("quick.duration", { count: seconds })} {seconds === 30 ? <small>{t("common.recommended")}</small> : null}
@@ -1005,7 +1009,9 @@ export function CreateVideoForm({
           {" · "}
           {t("quick.duration", { count: durationSeconds })}
           {" · "}
-          {t("quick.summaryVoiceMusic")}
+          {t(`narration.${narrationMode}`)}
+          {" · "}
+          {t(`music.${musicMode}`)}
           {lockedCreativeKeys.length ? <span className="origin-tag">{t("quick.customized")}</span> : null}
         </p>
         <button type="button" className="button-secondary adjustments-open-btn" onClick={() => setAdjustmentsOpen(true)}>
@@ -1356,6 +1362,7 @@ export function CreateVideoForm({
                 key={seconds}
                 type="button"
                 className={durationSeconds === seconds ? "is-selected" : ""}
+                aria-pressed={durationSeconds === seconds}
                 onClick={() => setDurationSeconds(seconds)}
               >
                 {t("common.secondsShort", { count: seconds })} {seconds === 30 ? <small>{t("common.recommended")}</small> : null}
@@ -1493,6 +1500,11 @@ export function CreateVideoForm({
           onHydrateLogo={(template) => {
             if (!logoFile) setTemplateLogoUrl(template.logoUrl ?? null);
           }}
+          onBrandingChange={(patch) => {
+            if (patch.primaryColor !== undefined) setPrimaryColor(patch.primaryColor);
+            if (patch.secondaryColor !== undefined) setSecondaryColor(patch.secondaryColor);
+          }}
+          onCreativeChange={setCreative}
           lockedCreativeKeys={lockedCreativeKeys}
         />
         <label>
@@ -1871,6 +1883,9 @@ export function CreateVideoForm({
           {!busy ? <span aria-hidden>{i18n.dir() === "rtl" ? "←" : "→"}</span> : null}
         </button>
         </div>
+        <p className="field-help">
+          {freeLeft > 0 ? t("credits.proposalUsesFree", { remaining: Math.max(0, freeLeft - 1) }) : t("credits.proposalUsesCredits", { count: creditCost || CREDIT_NEW_VIDEO })}
+        </p>
       </div>
       </div>
       <aside className="create-inspire">
