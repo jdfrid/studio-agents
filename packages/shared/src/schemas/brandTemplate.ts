@@ -135,7 +135,7 @@ export const BRAND_TEMPLATE_STARTERS: BrandTemplateStarter[] = [
       nameHe: "שירות",
       nameEn: "Service",
       filmTemplate: "testimonial",
-      durationSeconds: 45,
+      durationSeconds: 30,
       platform: "instagram_reels",
       primaryColor: "#7AF0BF",
       secondaryColor: "#0F1218",

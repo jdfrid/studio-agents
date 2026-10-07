@@ -182,7 +182,7 @@ export const en = {
     heading: "Basic settings",
     help: "Common choices that affect video length, format, and experience.",
     duration: "Video length",
-    durationHelp: "A longer duration increases the number of scenes, production time, and cost.",
+    durationHelp: "Every video is 30 seconds.",
     platform: "Platform",
     contentLanguage: "Video content language",
     contentLanguageHelp: "This controls the language spoken and written in the video, not the interface language.",
@@ -611,7 +611,7 @@ export const he = {
   origin: { brand: "מותג", project: "הסרטון הזה" },
   basic: {
     heading: "הגדרות בסיסיות", help: "הבחירות הנפוצות שמשפיעות על אורך הסרטון, הפורמט והחוויה.",
-    duration: "משך הסרטון", durationHelp: "משך ארוך יותר יגדיל את מספר הסצנות, זמן הייצור והעלות.",
+    duration: "משך הסרטון", durationHelp: "כל סרטון הוא באורך 30 שניות.",
     platform: "פלטפורמה", contentLanguage: "שפת תוכן הסרטון",
     contentLanguageHelp: "בחירה זו קובעת את שפת הדיבור והטקסט בסרטון, ולא את שפת הממשק.",
     filmType: "סוג הסרטון", narration: "דיבור", music: "מוזיקה", captions: "כתוביות"

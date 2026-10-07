@@ -78,9 +78,7 @@ export function CreateVideoForm({
   const { user } = useAuth();
   const isMobile = useIsMobileDevice();
   const freeLeft = user?.freeVideosRemaining ?? 0;
-  const allowDurationOver30 = user?.allowDurationOver30 === true;
-  const durationOptions = durationOptionsFor(allowDurationOver30);
-  const maxDuration = allowDurationOver30 ? 180 : 30;
+  const durationOptions = durationOptionsFor();
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -215,7 +213,7 @@ export function CreateVideoForm({
       setPlatform(draft.platform ?? "instagram_reels");
       setNarrationMode(draft.narrationMode ?? "voiceover");
       setMusicMode(draft.musicMode ?? "auto");
-      if (draft.durationSeconds) setDurationSeconds(draft.durationSeconds);
+      if (draft.durationSeconds) setDurationSeconds(clampVideoDurationSeconds(draft.durationSeconds));
       if (draft.approvalMode) setApprovalMode(draft.approvalMode);
       if (draft.creative) {
         setCreative({
@@ -261,7 +259,7 @@ export function CreateVideoForm({
         setPlatform(form.platform);
         setNarrationMode(form.narrationMode);
         setMusicMode(form.musicMode);
-        setDurationSeconds(form.durationSeconds);
+        setDurationSeconds(clampVideoDurationSeconds(form.durationSeconds));
         setApprovalMode(form.approvalMode);
         setCreative(form.creative);
         setCatalogSelections(form.catalogSelections);
@@ -367,8 +365,8 @@ export function CreateVideoForm({
   }, [creative.language]);
 
   useEffect(() => {
-    setDurationSeconds((current) => clampVideoDurationSeconds(current, allowDurationOver30));
-  }, [allowDurationOver30]);
+    setDurationSeconds((current) => clampVideoDurationSeconds(current));
+  }, []);
 
   const previewAspect = aspectRatioFromCreative(creative) ?? "9:16";
   const previewLogoSrc = logoPreviewUrl || templateLogoUrl;
@@ -387,7 +385,7 @@ export function CreateVideoForm({
     if (template.primaryColor) setPrimaryColor(template.primaryColor);
     if (template.secondaryColor) setSecondaryColor(template.secondaryColor);
     if (template.durationSeconds) {
-      setDurationSeconds(clampVideoDurationSeconds(template.durationSeconds, allowDurationOver30));
+      setDurationSeconds(clampVideoDurationSeconds(template.durationSeconds));
     }
     if (template.platform) setPlatform(template.platform);
     if (template.filmTemplate === "product_demo") setVideoGoal("product");
@@ -740,7 +738,7 @@ export function CreateVideoForm({
             : {}),
           ...(targetAudience.trim() ? { targetAudience: targetAudience.trim() } : {}),
           language: languageCodeFromCreative(creativeWithBasics) ?? "en",
-          durationSeconds: clampVideoDurationSeconds(durationSeconds, allowDurationOver30),
+          durationSeconds: clampVideoDurationSeconds(durationSeconds),
           aspectRatio: aspectRatioFromCreative(creativeWithBasics) ?? "9:16",
           budgetMode: true,
           approvalMode,
@@ -994,7 +992,7 @@ export function CreateVideoForm({
                 aria-pressed={durationSeconds === seconds}
                 onClick={() => setDurationSeconds(seconds)}
               >
-                {t("quick.duration", { count: seconds })} {seconds === 30 ? <small>{t("common.recommended")}</small> : null}
+                {t("quick.duration", { count: seconds })}
               </button>
             ))}
           </div>
@@ -1365,21 +1363,9 @@ export function CreateVideoForm({
                 aria-pressed={durationSeconds === seconds}
                 onClick={() => setDurationSeconds(seconds)}
               >
-                {t("common.secondsShort", { count: seconds })} {seconds === 30 ? <small>{t("common.recommended")}</small> : null}
+                {t("common.secondsShort", { count: seconds })}
               </button>
             ))}
-            {allowDurationOver30 ? (
-            <label className={!durationOptions.includes(durationSeconds) ? "custom-duration is-selected" : "custom-duration"}>
-              {t("common.custom")}
-              <input
-                type="number"
-                min={5}
-                max={maxDuration}
-                value={durationSeconds}
-                onChange={(e) => setDurationSeconds(clampVideoDurationSeconds(Number(e.target.value) || 30, true))}
-              />
-            </label>
-            ) : null}
           </div>
           <small className="field-help">{t("basic.durationHelp")}</small>
         </fieldset>
@@ -1651,7 +1637,7 @@ export function CreateVideoForm({
             <button
               type="button"
               onClick={() => {
-                setDurationSeconds(90);
+                setDurationSeconds(30);
                 setPlatform("youtube");
                 setCreative((previous) => ({
                   ...previous,
