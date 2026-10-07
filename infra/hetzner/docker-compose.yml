@@ -89,7 +89,8 @@ services:
       ADMIN_URL: ${ADMIN_URL:-http://localhost:5174}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174}
       AUTH_DISABLED: ${AUTH_DISABLED:-0}
-      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_FROM: "${MAIL_FROM:-Reelmino <info@reelmino.com>}"
+      MAIL_INBOX: ${MAIL_INBOX:-info@reelmino.com}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}

@@ -39,6 +39,7 @@ export const siteResources = {
       send: "שליחה",
       sending: "שולח…",
       thanks: "ההודעה התקבלה. נחזור אליכם בהקדם.",
+      writeTo: "כתבו אלינו: {{email}}",
       error: "לא ניתן לשלוח כרגע. נסו שוב בעוד כמה דקות."
     },
     legal: {
@@ -173,6 +174,7 @@ export const siteResources = {
       send: "Send",
       sending: "Sending…",
       thanks: "Message received. We will get back to you shortly.",
+      writeTo: "Email us at {{email}}",
       error: "Could not send right now. Please try again in a few minutes."
     },
     legal: {

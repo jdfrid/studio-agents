@@ -4,3 +4,4 @@ export * from "./emailAuth.js";
 export * from "./google.js";
 export * from "./routes.js";
 export * from "./mobileAuth.js";
+export * from "./mailer.js";

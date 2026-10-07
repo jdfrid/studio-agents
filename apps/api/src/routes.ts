@@ -63,7 +63,14 @@ import {
   profileToProductionCostConfig,
   resolveRenderProfile
 } from "@studio/shared";
-import { registerAuthRoutes, requireAuth, requireAdmin, authPlugin } from "@studio/auth";
+import {
+  registerAuthRoutes,
+  requireAuth,
+  requireAdmin,
+  authPlugin,
+  mailConfigured,
+  sendContactInquiryEmail
+} from "@studio/auth";
 import {
   assertCanStartRun,
   creditCostForNewRun,
@@ -249,6 +256,23 @@ export async function registerRoutes(app: FastifyInstance) {
       }
     });
     request.log.info({ subject: body.subject, locale: body.locale ?? "en" }, "contact inquiry received");
+    if (mailConfigured()) {
+      try {
+        await sendContactInquiryEmail({
+          name: body.name,
+          email: body.email,
+          subject: body.subject,
+          message: body.message,
+          locale: body.locale
+        });
+      } catch (err) {
+        request.log.error({ err }, "contact email failed");
+        reply.code(502);
+        return { error: "mail_failed", message: "Could not deliver the message. Try again later." };
+      }
+    } else {
+      request.log.warn("contact inquiry stored without email delivery (mail not configured)");
+    }
     return { ok: true };
   });
 

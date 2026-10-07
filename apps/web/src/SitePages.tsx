@@ -4,8 +4,12 @@ import { apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 import { PricingCards } from "./PricingCards.js";
 import { PublicChrome } from "./PublicChrome.js";
-import type { CheckoutPlanId } from "@studio/shared";
-import { checkoutCurrencyFromLocale, checkoutLocaleFromLanguage } from "@studio/shared";
+import {
+  PRODUCT_EMAIL,
+  checkoutCurrencyFromLocale,
+  checkoutLocaleFromLanguage,
+  type CheckoutPlanId
+} from "@studio/shared";
 import { enabledCheckoutPlansForUser } from "./checkoutPlans.js";
 
 export function AboutPage({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -69,6 +73,9 @@ export function ContactPage({ onNavigate }: { onNavigate: (path: string) => void
         <p className="eyebrow">{t("contact.eyebrow")}</p>
         <h1>{t("contact.title")}</h1>
         <p className="site-lead">{t("contact.lead")}</p>
+        <p className="muted">
+          <a href={`mailto:${PRODUCT_EMAIL}`}>{t("contact.writeTo", { email: PRODUCT_EMAIL })}</a>
+        </p>
         {status === "ok" ? (
           <p className="site-success">{t("contact.thanks")}</p>
         ) : (
