@@ -265,7 +265,11 @@ export const resources = {
       },
       brandPage: {
         title: "המותג שלי",
-        description: "שם, לוגו, צבעים, אתר וקול מועדף נשמרים כאן. ביצירה חדשה בוחרים ערכה במקום למלא אותה שוב."
+        description: "שם, לוגו, צבעים, אתר וקול מועדף נשמרים כאן. ביצירה חדשה בוחרים ערכה במקום למלא אותה שוב.",
+        identity: "זהות המותג",
+        previewTitle: "כרטיס הסיום",
+        chooseLogo: "בחירת לוגו",
+        changeLogo: "החלפת לוגו"
       },
       automationPage: {
         eyebrow: "אוטומציה",
@@ -664,7 +668,11 @@ export const resources = {
       },
       brandPage: {
         title: "My brand",
-        description: "Name, logo, colors, website, and a preferred voice live here. New videos pick a kit instead of filling it in again."
+        description: "Name, logo, colors, website, and a preferred voice live here. New videos pick a kit instead of filling it in again.",
+        identity: "Brand identity",
+        previewTitle: "End card",
+        chooseLogo: "Choose logo",
+        changeLogo: "Replace logo"
       },
       automationPage: {
         eyebrow: "Automation",

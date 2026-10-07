@@ -40,6 +40,7 @@ type Props = {
   }) => void;
   onCreativeChange?: (creative: CreativeOptions) => void;
   lockedCreativeKeys?: string[];
+  hideHead?: boolean;
 };
 
 function lines(value: string): string[] {
@@ -104,7 +105,8 @@ export function BrandTemplatePanel({
   onHydrateLogo,
   onBrandingChange,
   onCreativeChange,
-  lockedCreativeKeys = []
+  lockedCreativeKeys = [],
+  hideHead = false
 }: Props) {
   const { t } = useTranslation("createVideo");
   const { user } = useAuth();
@@ -250,10 +252,12 @@ export function BrandTemplatePanel({
 
   return (
     <div className="brand-template-panel">
-      <div className="brand-template-panel-head">
-        <h3>{t("branding.templates.heading")}</h3>
-        <p className="muted">{t("branding.templates.help")}</p>
-      </div>
+      {hideHead ? null : (
+        <div className="brand-template-panel-head">
+          <h3>{t("branding.templates.heading")}</h3>
+          <p className="muted">{t("branding.templates.help")}</p>
+        </div>
+      )}
 
       <p className="brand-template-label">{t("branding.templates.starters")}</p>
       <div className="brand-template-cards">
@@ -302,19 +306,21 @@ export function BrandTemplatePanel({
       ) : null}
 
       <div className="brand-template-editor-actions">
-        <button type="button" className="button-secondary" onClick={() => setEditorOpen((open) => !open)}>
+        <button type="button" className="primary lime" onClick={() => setEditorOpen((open) => !open)}>
           {editorOpen ? t("branding.templates.edit") : selectedId ? t("branding.templates.edit") : t("branding.templates.new")}
         </button>
       </div>
 
       {editorOpen ? (
         <div className="brand-template-editor">
-          <label>
+          <label className="field-block">
             {t("branding.templates.name")}
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
           </label>
+          {hideHead ? null : (
+          <>
           <div className="common-fields-grid">
-            <label>
+            <label className="field-block">
               {t("branding.primaryColor")}
               <span className="brand-color-input">
                 <input
@@ -330,7 +336,7 @@ export function BrandTemplatePanel({
                 />
               </span>
             </label>
-            <label>
+            <label className="field-block">
               {t("branding.secondaryColor")}
               <span className="brand-color-input">
                 <input
@@ -355,16 +361,18 @@ export function BrandTemplatePanel({
               onChange={(id) => onCreativeChange?.({ ...creative, voiceCharacter: id })}
             />
           </div>
-          <label>
+          </>
+          )}
+          <label className="field-block">
             {t("branding.templates.messages")}
             <textarea value={messages} onChange={(e) => setMessages(e.target.value)} rows={4} maxLength={1600} />
             <small className="muted">{t("branding.templates.messagesHelp")}</small>
           </label>
-          <label>
+          <label className="field-block">
             {t("branding.templates.mustSay")}
             <textarea value={mustSay} onChange={(e) => setMustSay(e.target.value)} rows={3} maxLength={1600} />
           </label>
-          <label>
+          <label className="field-block">
             {t("branding.templates.mustAvoid")}
             <textarea value={mustAvoid} onChange={(e) => setMustAvoid(e.target.value)} rows={3} maxLength={1600} />
           </label>
@@ -376,7 +384,7 @@ export function BrandTemplatePanel({
           </fieldset>
           {error ? <p className="error-inline">{error}</p> : null}
           <div className="brand-template-save-row">
-            <button type="button" className="primary" disabled={busy || !user} onClick={() => void save()}>
+            <button type="button" className="primary lime" disabled={busy || !user} onClick={() => void save()}>
               {busy ? t("branding.templates.saving") : t("branding.templates.save")}
             </button>
             {editingId ? (
