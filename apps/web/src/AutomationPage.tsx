@@ -146,11 +146,11 @@ export function AutomationPage({ onOpenRun }: { onOpenRun: (runId: string) => vo
 
   return (
     <div className="brand-page automation-page">
-      <header className="page-heading">
+      <div className="page-heading">
         <p className="eyebrow">{t("automationPage.eyebrow")}</p>
         <h1>{t("automationPage.title")}</h1>
         <p className="muted">{t("automationPage.description")}</p>
-      </header>
+      </div>
 
       <section className="create-topic-card">
         <label className="field-block">

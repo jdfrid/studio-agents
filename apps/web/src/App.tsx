@@ -105,6 +105,7 @@ function AppShell() {
   const [whatsNewEntries, setWhatsNewEntries] = useState<WhatsNewEntry[]>([]);
   const [showWhatsNewReopen, setShowWhatsNewReopen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
 
   const navigate = useCallback((next: AppLocation, mode: "push" | "replace" = "push") => {
@@ -300,8 +301,8 @@ function AppShell() {
               aria-label={t("shell.accountMenu")}
               onClick={() => setAccountOpen((open) => !open)}
             >
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" className="avatar" />
+              {user.avatarUrl && !avatarFailed ? (
+                <img src={user.avatarUrl} alt="" className="avatar" referrerPolicy="no-referrer" onError={() => setAvatarFailed(true)} />
               ) : (
                 <span className="avatar avatar-fallback" aria-hidden>
                   {(user.name || user.email || "P").slice(0, 1).toUpperCase()}
