@@ -63,14 +63,15 @@ function briefFor(pkg) {
       `Feature in this ad: ${pkg.feature}.`,
       `What it does: ${pkg.description}`,
       `Audience: ${pkg.audience}.`,
-      `Exactly ${scenes.length} scenes of about ${SECONDS_PER_SCENE} seconds. Use this narration and on-screen text, scene by scene:\n${narration}`,
+      `Total video length: ${scenes.length * SECONDS_PER_SCENE + END_CARD_SECONDS} seconds, including the automatic branded end card. ` +
+        `Use this narration and on-screen text, scene by scene:\n${narration}`,
       endLine ? `Closing line on the end card: "${endLine}"` : "",
       `Platform: TikTok, Instagram Reels and YouTube Shorts.`
     ]
       .filter(Boolean)
       .join("\n"),
     instructions: [
-      `Use exactly ${scenes.length} scenes, one attached image per scene, in the order given.`,
+      `Keep durationSeconds at ${scenes.length * SECONDS_PER_SCENE + END_CARD_SECONDS}. Use one attached image per scene, in the order given.`,
       "Images of the app are real Reelmino screenshots: show them inside a modern smartphone held by a person, or as a clean phone mockup, so the interface stays readable.",
       "Images that are not app screens are real videos made with Reelmino: show them full screen, as they are.",
       "Speak each scene's narration exactly as written — one short sentence per scene. Do not invent other app interfaces."
