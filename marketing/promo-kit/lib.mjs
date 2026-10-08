@@ -1,6 +1,7 @@
 /** Shared helpers for produce.mjs and demos.mjs (Reelmino API, files, state). */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 
 export const API = process.env.REELMINO_API ?? "https://reelmino.com/api";
 export const ROOT = new URL("./", import.meta.url);
@@ -48,6 +49,24 @@ export async function saveState(file, state) {
   await writeFile(file, JSON.stringify(state, null, 2));
 }
 
+/**
+ * Fetches a signed storage URL. When storage is unreachable from this network (e.g. a filtering ISP),
+ * set REELMINO_DOWNLOAD_RELAY=user@host to download through that machine over ssh instead.
+ */
+export async function fetchBytes(url) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`download -> ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
+  } catch (err) {
+    const relay = process.env.REELMINO_DOWNLOAD_RELAY;
+    if (!relay) throw err;
+    return execFileSync("ssh", [relay, `curl -sfL --max-time 300 '${url.replace(/'/g, "%27")}'`], {
+      maxBuffer: 1024 * 1024 * 1024
+    });
+  }
+}
+
 /** Downloads the run's final video to `target` (a file URL). Returns false while not ready. */
 export async function downloadFinal(api, runId, target) {
   const artifacts = await api(`/runs/${runId}/artifacts`);
@@ -55,7 +74,7 @@ export async function downloadFinal(api, runId, target) {
   const final = list.filter((a) => a.kind === "final_video").at(-1);
   if (!final) return false;
   const signed = await api(`/artifacts/${final.id}/signed-url`);
-  const buf = Buffer.from(await fetch(signed.url ?? signed.signedUrl).then((r) => r.arrayBuffer()));
+  const buf = await fetchBytes(signed.url ?? signed.signedUrl);
   await mkdir(new URL("./", target), { recursive: true });
   await writeFile(target, buf);
   return true;

@@ -905,7 +905,7 @@ async function mixSceneAudio(
   options?: { keepProviderAudio?: boolean }
 ): Promise<string> {
   if (options?.keepProviderAudio || scene.audioPolicy === "veo_native_audio") {
-    return videoPath;
+    return trimProviderClip(videoPath, scene, dir, storage);
   }
   if (!shouldUseVoice(scene)) {
     return stripAudio(videoPath, dir);
@@ -945,6 +945,51 @@ async function mixSceneAudio(
     out
   ]);
   return out;
+}
+
+/** Same overrun trim for clips whose audio comes from the provider (e.g. HeyGen lip-sync). */
+async function trimProviderClip(
+  videoPath: string,
+  scene: SceneTimelineEntry,
+  dir: string,
+  storage: GcsClient
+): Promise<string> {
+  const videoDur = await probeDuration(videoPath).catch(() => 0);
+  if (!(videoDur > 0) || sceneWindowSeconds(videoDur, Infinity, scene.durationSeconds) === videoDur) {
+    return videoPath;
+  }
+  let voiceDur = 0;
+  const voiceGcsPath = shouldUseVoice(scene) ? resolveGcsPath(storage, scene.voice) : null;
+  if (voiceGcsPath) {
+    const voiceLocal = path.join(dir, `voice-${scene.sceneId}-${nanoid(4)}.audio`);
+    voiceDur = await downloadMediaToFile(storage, voiceGcsPath, voiceLocal)
+      .then(() => probeDuration(voiceLocal))
+      .catch(() => videoDur);
+  }
+  const windowDur = sceneWindowSeconds(videoDur, voiceDur, scene.durationSeconds);
+  if (windowDur >= videoDur - 0.05) return videoPath;
+  const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-trim.mp4`);
+  try {
+    await runFfmpeg([
+      "-i",
+      videoPath,
+      "-t",
+      String(windowDur),
+      "-af",
+      `afade=t=out:st=${Math.max(0, windowDur - 0.12).toFixed(3)}:d=0.12`,
+      "-c:v",
+      "copy",
+      "-c:a",
+      "aac",
+      "-movflags",
+      "+faststart",
+      "-y",
+      out
+    ]);
+    return out;
+  } catch {
+    return videoPath;
+  }
 }
 
 /**
@@ -1239,7 +1284,7 @@ async function downscaleVideo(videoPath: string, width: number, dir: string): Pr
 }
 
 const BRANDING_END_CARD_SECONDS = 2.8;
-const BRANDING_END_CARD_WITH_VOICE_SECONDS = 5.5;
+const BRANDING_END_CARD_WITH_VOICE_SECONDS = 4;
 const BRANDING_END_FADE_SECONDS = 0.85;
 const BRANDING_END_TEXT = "reelmino.com";
 
@@ -1342,7 +1387,7 @@ async function createBusinessEndCardClip(
         8,
         Math.max(
           BRANDING_END_CARD_WITH_VOICE_SECONDS,
-          Number.isFinite(voiceDur) && voiceDur > 0 ? voiceDur + 0.4 : BRANDING_END_CARD_WITH_VOICE_SECONDS
+          Number.isFinite(voiceDur) && voiceDur > 0 ? voiceDur + 1.2 : BRANDING_END_CARD_WITH_VOICE_SECONDS
         )
       )
     : BRANDING_END_CARD_SECONDS;

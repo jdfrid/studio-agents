@@ -18,6 +18,7 @@ import {
   checkBalance,
   createApi,
   downloadFinal,
+  fetchBytes,
   loadState,
   requireSession,
   saveState
@@ -187,7 +188,7 @@ async function downloadSceneClips(api, entry, id) {
     const target = new URL(`video/${id}-scene-${order}.mp4`, DEMO_DIR);
     if (existsSync(target) || !byOrder.has(order)) continue;
     const signed = await api(`/artifacts/${byOrder.get(order).id}/signed-url`);
-    const buf = Buffer.from(await fetch(signed.url ?? signed.signedUrl).then((r) => r.arrayBuffer()));
+    const buf = await fetchBytes(signed.url ?? signed.signedUrl);
     await writeFile(target, buf);
   }
 }
