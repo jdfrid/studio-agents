@@ -24,4 +24,5 @@ studio-agents/
 # Promo kit: large media + scratch (session token lives in .tmp-frames)
 .tmp-frames/
 marketing/promo-kit/broll/*.mp4
-marketing/promo-kit/output/*.mp4
+marketing/promo-kit/output/**/*.mp4
+marketing/promo-kit/demo/video/

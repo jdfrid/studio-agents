@@ -17,13 +17,11 @@ export const PACKAGES = [
     description:
       "Reelmino turns a one-sentence idea into a finished 30-second video. It writes the script, plans the scenes and shows a proposal before production. Your brand kit (logo, colors, website, voice) is applied to every video, and the result arrives with narration, music and captions, ready for Reels, TikTok and YouTube Shorts.",
     shots: [
-      ["0–3s", "screens/01-landing-hero.png", "Slow push-in on the headline", "Need a video for your business — but no crew, no editor, no time?", "NO CREW. NO EDITOR."],
-      ["3–7s", "screens/21-create-prompt-filled.png", "Typing animation inside the text box", "Meet Reelmino. Describe your idea in one sentence.", "1 · DESCRIBE YOUR IDEA"],
-      ["7–12s", "screens/54-run-coffee-proposal-top.png", "Scroll down through the scenes", "It writes the script and shows you every scene first.", "2 · REVIEW THE SCRIPT"],
-      ["12–17s", "screens/31-brand-identity.png → screens/33-brand-end-card.png", "Quick cut on the beat", "Save your logo, colors and voice once — every video stays on brand.", "3 · YOUR BRAND, EVERY TIME"],
-      ["17–24s", "broll/pizza-bravo.mp4", "Play 0:02–0:09 inside a phone frame", "Then get a finished thirty-second video with narration, music and captions.", "NARRATION · MUSIC · CAPTIONS"],
-      ["24–27s", "screens/62-actions-menu.png", "Tap highlight on the menu", "Ready for Reels, TikTok and Shorts.", "REELS · TIKTOK · SHORTS"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. Your story, now in motion.", "reelmino.com"]
+      ["0–6s", "screens/21-create-prompt-filled.png", "Typing animation inside the text box", "Describe your business video in one sentence.", "1 · DESCRIBE IT"],
+      ["6–12s", "screens/81-visual-style.png", "Tap through the style picker", "Pick a look: Pixar, LEGO, claymation, anime or cinematic.", "2 · PICK A STYLE"],
+      ["12–18s", "demo/pixar-a.png", "Real Reelmino video, full screen", "Reelmino writes, casts and shoots every scene for you.", "3 · IT'S MADE FOR YOU"],
+      ["18–24s", "demo/cinematic-a.png", "Real Reelmino video, full screen", "Your brand, voice, music and captions. Ready to post.", "REELS · TIKTOK · SHORTS"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Your story, now in motion.", "reelmino.com"]
     ],
     copy: {
       youtubeTitle: "One sentence → a finished 30-second business video #Shorts",
@@ -47,13 +45,11 @@ export const PACKAGES = [
     description:
       "The create screen asks one question: what should the video show or achieve? You type a sentence, pick a language and a format, and tap Prepare a proposal. Title, goal and every other setting are optional and live under More adjustments.",
     shots: [
-      ["0–3s", "screens/20-create-empty.png", "Blinking cursor in the empty box", "What if one sentence was enough to make a video?", "ONE SENTENCE → ONE VIDEO"],
-      ["3–9s", "screens/21-create-prompt-filled.png", "Type the Pizza Bravo prompt word by word", "Type what it should show — a cheesy slice, a kid's first bite.", "JUST DESCRIBE IT"],
-      ["9–13s", "screens/22-create-language-format.png", "Tap English, then Vertical", "Pick a language and a format. Every video is a tight thirty seconds.", "7 LANGUAGES · 30 SEC"],
-      ["13–17s", "screens/24-create-summary-bar.png", "Pulse on Prepare a proposal", "Tap Prepare a proposal.", "TAP “PREPARE A PROPOSAL”"],
-      ["17–22s", "screens/54-run-coffee-proposal-top.png", "Scroll the generated scenes", "Reelmino writes the script and plans the scenes for you.", "SCRIPT + SCENES, DONE"],
-      ["22–27s", "broll/pizza-bravo.mp4", "Play 0:00–0:05 full screen", "Approve it, and the video is made — voice, music, captions included.", "A FINISHED MP4"],
-      ["27–30s", "END CARD", "Logo + URL", "Start with one sentence at reelmino.com.", "reelmino.com"]
+      ["0–6s", "screens/20-create-empty.png", "Blinking cursor in the empty box", "What if one sentence was enough to make a video?", "ONE SENTENCE → ONE VIDEO"],
+      ["6–12s", "screens/21-create-prompt-filled.png", "Type the prompt word by word", "Type what it should show: a cheesy slice, a kid's first bite.", "JUST DESCRIBE IT"],
+      ["12–18s", "screens/54-run-coffee-proposal-top.png", "Scroll the generated scenes", "Reelmino writes the script and plans every scene.", "SCRIPT + SCENES, DONE"],
+      ["18–24s", "demo/ugc-a.png", "Real Reelmino video, full screen", "Approve it, and get the video with voice, music and captions.", "A FINISHED MP4"],
+      ["24–30s", "END CARD", "Logo + URL", "Start with one sentence at reelmino.com.", "reelmino.com"]
     ],
     copy: {
       youtubeTitle: "I typed ONE sentence and got a 30-sec ad #Shorts",
@@ -77,13 +73,11 @@ export const PACKAGES = [
     description:
       "In the recommended mode Reelmino prepares a proposal — 'This is how the video will look' — with the narration and visuals of every scene. You can edit any scene, then approve. Preparing the proposal uses 40 credits; producing the video after approval does not take another charge.",
     shots: [
-      ["0–3s", "screens/54-run-coffee-proposal-top.png", "Hold on the headline", "Ever paid for a video and hated the script?", "SEE IT BEFORE IT'S MADE"],
-      ["3–8s", "screens/54-run-coffee-proposal-top.png", "Slow scroll through scenes 1–2", "With Reelmino you see the script and every scene before production starts.", "“THIS IS HOW THE VIDEO WILL LOOK”"],
-      ["8–13s", "screens/60-scene-editor.png", "Slide-up of the editor sheet", "Change a line, a visual, the character, or a scene's length.", "EDIT ANY SCENE"],
-      ["13–18s", "screens/27-create-approval-mode.png", "Highlight the three cards in turn", "Choose your control: automatic, script first, or approve every stage.", "YOU CHOOSE THE CONTROL"],
-      ["18–23s", "screens/55-run-coffee-approve.png", "Tap Approve and produce the video", "Happy with it? Approve, and production continues from your script.", "APPROVE → PRODUCE"],
-      ["23–27s", "screens/24-create-summary-bar.png", "Zoom on the cost line", "The proposal uses forty credits. Producing after approval adds nothing.", "NO SECOND CHARGE"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. Approve it before you make it.", "reelmino.com"]
+      ["0–6s", "screens/54-run-coffee-proposal-top.png", "Hold on the headline", "Ever paid for a video and hated the script?", "SEE IT BEFORE IT'S MADE"],
+      ["6–12s", "screens/60-scene-editor.png", "Highlight the narration field", "See every scene first, and change any line or visual.", "EDIT ANY SCENE"],
+      ["12–18s", "screens/27-create-approval-mode.png", "Tap each mode", "Choose your control: automatic, script first, or every stage.", "YOU CHOOSE THE CONTROL"],
+      ["18–24s", "screens/55-run-coffee-approve.png", "Tap Approve", "Approve it, and production follows your script. No second charge.", "APPROVE → PRODUCE"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Approve it before you make it.", "reelmino.com"]
     ],
     copy: {
       youtubeTitle: "Approve the script BEFORE the video is made #Shorts",
@@ -107,13 +101,11 @@ export const PACKAGES = [
     description:
       "The Brand kit stores your business name, tagline, website, logo, primary and background colors, and a preferred voice. Start from a ready kit (Daily deals shop, Local business, Service / expert) or save your own templates. Every video ends on your branded end card.",
     shots: [
-      ["0–3s", "screens/33-brand-end-card.png", "Hard cut, slight shake", "Does every video you post look like a different company?", "ON BRAND. EVERY VIDEO."],
-      ["3–8s", "screens/30-brand-top.png", "Highlight the three starter kits", "Start from a ready kit — a shop, a local business, or an expert.", "START FROM A KIT"],
-      ["8–14s", "screens/31-brand-identity.png", "Fields fill one by one", "Add your name, tagline, website and logo — once.", "NAME · TAGLINE · LOGO"],
-      ["14–18s", "screens/32-brand-colors.png", "Swatch pops", "Set your brand colors.", "YOUR COLORS"],
-      ["18–23s", "screens/33-brand-end-card.png", "Card scales up to full frame", "Every video ends on your own branded end card.", "YOUR END CARD"],
-      ["23–27s", "screens/35-voices-selected.png", "Tap the selected voice", "Even pick the voice your brand always speaks in.", "YOUR BRAND VOICE"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. Set it once. Look like you, always.", "reelmino.com"]
+      ["0–6s", "screens/30-brand-top.png", "Slow push-in", "Does every video you post look like a different company?", "ON BRAND. EVERY VIDEO."],
+      ["6–12s", "screens/31-brand-identity.png", "Fields fill in one by one", "Add your name, tagline, website and logo, once.", "NAME · TAGLINE · LOGO"],
+      ["12–18s", "screens/32-brand-colors.png", "Color swatches pop", "Set your brand colors and your brand voice.", "YOUR COLORS · YOUR VOICE"],
+      ["18–24s", "screens/33-brand-end-card.png", "End card reveal", "Every video ends on your own branded end card.", "YOUR END CARD"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Set it once. Look like you, always.", "reelmino.com"]
     ],
     copy: {
       youtubeTitle: "Make every video look like YOUR brand #Shorts",
@@ -137,15 +129,13 @@ export const PACKAGES = [
     description:
       "Reelmino includes 23 narration voices: six men's voices, six women's voices, character voices (boy, girl, cartoon, robotic, formal, silly) and special voices like an airport PA announcer, a hotel PA announcer, a beach lifeguard and a retro radio host. Every voice has a Play sample button. You can also clone a voice from a clean 30–120 second recording you have the right to use.",
     shots: [
-      ["0–3s", "screens/34-voices.png", "Sound wave overlay", "Your video's voice matters more than you think.", "23 VOICES. ONE TAP."],
-      ["3–8s", "screens/34-voices.png", "Slow scroll through the grid", "Pick from clear, deep, warm, young or news-style voices.", "MEN · WOMEN · CHARACTERS"],
-      ["8–13s", "screens/36-voices-characters.png", "Each card pops as it's named", "Or go playful: a cartoon, a robot, an airport announcer, a lifeguard, a retro radio host.", "CHARACTER VOICES"],
-      ["13–17s", "screens/35-voices-selected.png", "Tap Play sample, play a real sample under it", "Tap Play sample to hear it before you choose.", "HEAR IT FIRST"],
-      ["17–23s", "screens/65-voice-clone.png", "Highlight Voice cloning", "Or clone your own voice from a clean thirty-second to two-minute recording.", "CLONE YOUR VOICE"],
-      ["23–27s", "broll/dealsluxy-brand-film.mp4", "Play 0:04–0:08 with the narration audible", "Your words, in the voice that fits your brand.", "YOUR SOUND"],
-      ["27–30s", "END CARD", "Logo + URL", "Find your voice at reelmino.com.", "reelmino.com"]
+      ["0–6s", "screens/34-voices.png", "Scroll the voice list", "Pick from 23 voices: clear, deep, warm, young or news-style.", "23 VOICES. ONE TAP."],
+      ["6–12s", "screens/36-voices-characters.png", "Tap the character voices", "Or go playful: a cartoon, a robot, a retro radio host.", "CHARACTER VOICES"],
+      ["12–18s", "screens/35-voices-selected.png", "Pulse on Play sample", "Tap Play sample to hear it before you choose.", "HEAR IT FIRST"],
+      ["18–24s", "screens/65-voice-clone.png", "Highlight the upload box", "Or clone your own voice from a short, clean recording.", "CLONE YOUR VOICE"],
+      ["24–30s", "END CARD", "Logo + URL", "Find your voice at reelmino.com.", "reelmino.com"]
     ],
-    notes: "Only clone voices you have the right to use — the app asks for that consent. In the edit, play two or three real voice samples under shots 2–4.",
+    notes: "Only clone voices you have the right to use — the app asks for that consent. In a manual edit, play two or three real voice samples under scenes 1–3.",
     copy: {
       youtubeTitle: "23 AI voices for your ads — or clone your own #Shorts",
       youtubeDescription:
@@ -168,13 +158,11 @@ export const PACKAGES = [
     description:
       "On mobile, the Source materials card opens the camera directly: Photograph a product (rear camera) or Photograph yourself (front camera). You can also choose files from the gallery. Reelmino places them automatically, or you can assign roles: character photos, product and location stills, logo. You can upload a reference video so Reelmino studies its style, colors and pacing (without copying it), or insert your own short clip.",
     shots: [
-      ["0–3s", "screens/23-create-materials-camera.png", "Phone-in-hand overlay", "Your phone is already a video studio.", "SHOOT ON YOUR PHONE"],
-      ["3–8s", "screens/23-create-materials-camera.png", "Tap Photograph a product, camera flash", "Tap Photograph a product — or Photograph yourself for a selfie.", "PRODUCT · SELFIE"],
-      ["8–12s", "screens/23-create-materials-camera.png", "Highlight the gallery drop zone", "Or pick from your gallery.", "OR FROM YOUR GALLERY"],
-      ["12–17s", "screens/64-materials-roles.png", "Scroll through the role cards", "Reelmino places them — or you assign roles: character, product, logo.", "AUTO-PLACED"],
-      ["17–22s", "screens/66-reference-video.png", "Highlight Reference video", "Love a video's style? Upload it as a reference — Reelmino matches the look without copying it.", "MATCH A STYLE"],
-      ["22–27s", "broll/premium-deals-app.mp4", "Play 0:03–0:08", "Your real product, polished in thirty seconds.", "YOUR PRODUCT, POLISHED"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. Shot on your phone.", "reelmino.com"]
+      ["0–6s", "screens/23-create-materials-camera.png", "Tap Photograph a product", "Your phone is a video studio: snap a product or a selfie.", "SHOOT ON YOUR PHONE"],
+      ["6–12s", "screens/64-materials-roles.png", "Roles appear on each photo", "Reelmino places your photos, or you give each one a role.", "CHARACTER · PRODUCT · LOGO"],
+      ["12–18s", "screens/66-reference-video.png", "Highlight the reference box", "Love a video's style? Upload it as a reference to match the look.", "MATCH A STYLE"],
+      ["18–24s", "demo/cinematic-b.png", "Real Reelmino video, full screen", "Your real business, polished into a thirty-second video.", "YOUR PRODUCT, POLISHED"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Shot on your phone.", "reelmino.com"]
     ],
     copy: {
       youtubeTitle: "Snap a product photo → get a 30-sec ad #Shorts",
@@ -198,15 +186,13 @@ export const PACKAGES = [
     description:
       "Set Speech to 'Talking character with lip-sync', add at least one character image, and Reelmino matches the character's mouth movement to the narration. Lip-sync adds 20 credits (60 credits in total for a 30-second video).",
     shots: [
-      ["0–3s", "broll/watch-claymation.mp4", "Close-up on the character's face", "What if your mascot could talk?", "MAKE YOUR CHARACTER TALK"],
-      ["3–8s", "screens/64-materials-roles.png", "Highlight Character photos", "Upload a photo of your character — a person, a mascot, even a clay figure.", "1 · ADD A CHARACTER"],
-      ["8–13s", "screens/71-lipsync-summary.png", "Highlight 'Talking character with lip-sync'", "Set Speech to Talking character with lip-sync.", "2 · TURN ON LIP-SYNC"],
-      ["13–18s", "screens/34-voices.png", "Tap a voice card", "Pick the voice.", "3 · PICK A VOICE"],
-      ["18–24s", "broll/watch-claymation.mp4", "Play a speaking section", "Reelmino matches the mouth to every word of your script.", "THE MOUTH MATCHES THE WORDS"],
-      ["24–27s", "screens/71-lipsync-summary.png", "Zoom on '60 credits'", "Lip-sync adds twenty credits.", "+20 CREDITS"],
-      ["27–30s", "END CARD", "Logo + URL", "Give your brand a face at reelmino.com.", "reelmino.com"]
+      ["0–6s", "screens/64-materials-roles.png", "Drop in a character photo", "What if your mascot could talk? Upload its photo.", "1 · ADD A CHARACTER"],
+      ["6–12s", "screens/71-lipsync-summary.png", "Toggle lip-sync on", "Turn on Talking character with lip-sync.", "2 · TURN ON LIP-SYNC"],
+      ["12–18s", "screens/34-voices.png", "Pick a voice", "Pick a voice, and the mouth matches every word.", "3 · IT TALKS"],
+      ["18–24s", "screens/52-run-watch-clay-top.png", "Play the clay result", "Even a clay figure can present your product.", "PEOPLE · MASCOTS · CLAY"],
+      ["24–30s", "END CARD", "Logo + URL", "Give your brand a face at reelmino.com.", "reelmino.com"]
     ],
-    notes: "The claymation clip is a placeholder. For the final ad, render one short lip-sync video (for example, a mascot saying the hook line) and use it in shots 1 and 5 so the lip movement is real.",
+    notes: "Scene 4 shows the real claymation watch project. For a stronger ad, render one short lip-sync video (a mascot saying the hook line) and splice it in like package 17 does.",
     copy: {
       youtubeTitle: "Make your mascot TALK (lip-sync in 3 steps) #Shorts",
       youtubeDescription:
@@ -229,13 +215,11 @@ export const PACKAGES = [
     description:
       "Every video can be made in Hebrew, English, Arabic, Russian, French, Spanish or Yiddish. The content language controls what's spoken and written in the video, independent of the app's interface language. Captions are on by default, so the message works with the sound off. Create another version to make the same video in a second language.",
     shots: [
-      ["0–3s", "screens/22-create-language-format.png", "Language chips flash one after another", "Selling in more than one language?", "1 IDEA · 7 LANGUAGES"],
-      ["3–9s", "screens/22-create-language-format.png", "Tap each chip as it's named", "Reelmino speaks Hebrew, English, Arabic, Russian, French, Spanish and Yiddish.", "HE · EN · AR · RU · FR · ES · YI"],
-      ["9–13s", "screens/28-create-basic-settings.png", "Highlight Video content language", "The language you pick is spoken and written in the video — not just in the menus.", "SPOKEN + WRITTEN"],
-      ["13–18s", "screens/63-remix-top.png", "Tap Create another version", "Need it in another language? Create another version.", "ANOTHER LANGUAGE, ANOTHER VERSION"],
-      ["18–24s", "broll/watch-claymation.mp4", "Play with burned-in captions visible", "Captions are on by default…", "CAPTIONS ON BY DEFAULT"],
-      ["24–27s", "screens/52-run-watch-clay-top.png", "Mute icon animation", "…so your message lands even on mute.", "WORKS ON MUTE"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. Speak to everyone.", "reelmino.com"]
+      ["0–6s", "screens/22-create-language-format.png", "Tap through the languages", "Reelmino speaks seven languages, from Hebrew to Spanish.", "HE · EN · AR · RU · FR · ES · YI"],
+      ["6–12s", "screens/28-create-basic-settings.png", "Highlight the language field", "The language is spoken and written in the video itself.", "SPOKEN + WRITTEN"],
+      ["12–18s", "screens/63-remix-top.png", "Tap Create another version", "New market? Create another version in a new language.", "ANOTHER LANGUAGE, ANOTHER VERSION"],
+      ["18–24s", "demo/anime-a.png", "Real Reelmino video with captions", "Captions are on by default, so it lands even on mute.", "WORKS ON MUTE"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Speak to everyone.", "reelmino.com"]
     ],
     copy: {
       youtubeTitle: "Same ad, 7 languages, captions included #Shorts",
@@ -259,13 +243,11 @@ export const PACKAGES = [
     description:
       "Choose Vertical for Reels, TikTok and YouTube Shorts, or Horizontal for YouTube and presentations. Under Basic settings you pick the platform — Instagram Reels, TikTok, YouTube Shorts, LinkedIn, YouTube landscape or Website / presentation. Every video is 30 seconds, the sweet spot for short-form.",
     shots: [
-      ["0–3s", "screens/28-create-basic-settings.png", "Platform logos fly in around the phone", "Reels, TikTok, Shorts, LinkedIn, YouTube — one tool.", "MADE FOR EVERY FEED"],
-      ["3–8s", "screens/22-create-language-format.png", "Tap Vertical", "Choose vertical for Reels, TikTok and Shorts…", "VERTICAL 9:16"],
-      ["8–13s", "screens/22-create-language-format.png", "Tap Horizontal; the frame rotates", "…or horizontal for YouTube and presentations.", "HORIZONTAL 16:9"],
-      ["13–18s", "screens/28-create-basic-settings.png", "Open the Platform dropdown", "Tell Reelmino where you're posting.", "PICK THE PLATFORM"],
-      ["18–24s", "broll/premium-deals-app.mp4", "Play 0:00–0:06", "Every video is thirty seconds — the sweet spot for short-form.", "ALWAYS 30 SECONDS"],
-      ["24–27s", "screens/62-actions-menu.png", "Highlight the menu", "Download the MP4 and post it anywhere.", "DOWNLOAD · POST"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. One video, every feed.", "reelmino.com"]
+      ["0–6s", "screens/22-create-language-format.png", "Tap Vertical, then Horizontal", "Vertical for Reels, TikTok and Shorts, or horizontal for YouTube.", "9:16 · 16:9"],
+      ["6–12s", "screens/28-create-basic-settings.png", "Open the platform list", "Tell Reelmino where you're posting, and it fits the feed.", "PICK THE PLATFORM"],
+      ["12–18s", "demo/lego-a.png", "Real Reelmino video, full screen", "Every video is a tight thirty seconds.", "ALWAYS 30 SECONDS"],
+      ["18–24s", "screens/62-actions-menu.png", "Tap Download", "Download the MP4 and post it anywhere.", "DOWNLOAD · POST"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. One video, every feed.", "reelmino.com"]
     ],
     copy: {
       youtubeTitle: "One tool for Reels, TikTok, Shorts & LinkedIn #Shorts",
@@ -289,13 +271,11 @@ export const PACKAGES = [
     description:
       "Choose up to two moods — Professional & trustworthy, Premium, Emotional, Young & energetic, Clean & modern, Dramatic, Calm. Reelmino applies the mood to color, music, pacing, narration and cinematography. More adjustments opens the full flow (Idea & style, Script & scenes, Voice & music, Review & create), and Creation mode sets how much you approve: automatic, script first, or every stage.",
     shots: [
-      ["0–3s", "screens/26-create-mood.png", "Split screen: calm vs. energetic", "Calm café or high-energy launch?", "SET THE MOOD"],
-      ["3–9s", "screens/26-create-mood.png", "Tap Premium, then Calm", "Choose up to two moods — premium, emotional, energetic, dramatic, calm.", "UP TO 2 MOODS"],
-      ["9–13s", "screens/26-create-mood.png", "Zoom on the helper line", "Reelmino applies it to color, music, pacing, narration and camera work.", "COLOR · MUSIC · PACE"],
-      ["13–18s", "screens/25-create-adjustments-top.png", "Highlight the 4 steps", "Want more? The full studio: idea, script, voice and music.", "THE FULL STUDIO"],
-      ["18–24s", "screens/27-create-approval-mode.png", "Tap each mode", "And choose how hands-on you are — automatic, script first, or approve every stage.", "YOUR LEVEL OF CONTROL"],
-      ["24–27s", "broll/watch-claymation.mp4", "Play a stylized moment", "Same tool. Your style.", "YOUR STYLE"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. Your mood, your rules.", "reelmino.com"]
+      ["0–6s", "screens/26-create-mood.png", "Tap two mood chips", "Calm café or high-energy launch? Pick up to two moods.", "SET THE MOOD"],
+      ["6–12s", "screens/80-style-presets.png", "Tap a preset card", "Or tap a preset: product ad, B2B, personal story, news or social.", "ONE-TAP PRESETS"],
+      ["12–18s", "screens/87-camera-editing.png", "Scroll the camera settings", "Fine-tune camera, effects, transitions and caption style.", "THE FULL STUDIO"],
+      ["18–24s", "demo/clay-a.png", "Real Reelmino video, full screen", "Same tool. Your style.", "YOUR STYLE"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Your mood, your rules.", "reelmino.com"]
     ],
     copy: {
       youtubeTitle: "Pick a mood → the whole video changes #Shorts",
@@ -319,13 +299,11 @@ export const PACKAGES = [
     description:
       "Automation (beta) locks a brand kit and your website. Reelmino scans the site into a product catalog, and each day picks a different product page and produces a new video. Nothing is published automatically — each video waits in your library, ready for you to review and distribute.",
     shots: [
-      ["0–3s", "screens/40-automation-top.png", "Calendar-flip transition", "Got a website full of products? Get a new video every day.", "A DAILY VIDEO FROM YOUR SITE"],
-      ["3–8s", "screens/40-automation-top.png", "Fields highlight", "Lock your brand kit and add your website.", "1 · BRAND + WEBSITE"],
-      ["8–14s", "screens/41-automation-catalog.png", "Products scroll in fast", "Reelmino scans the site and builds a product catalog.", "2 · AUTO CATALOG"],
-      ["14–19s", "screens/42-automation-log.png", "Continue scrolling the list", "Each day it picks a different product and produces a new video.", "3 · A NEW VIDEO DAILY"],
-      ["19–24s", "broll/dealsluxy-brand-film.mp4", "Play 0:00–0:05", "Every video waits in your library — nothing is posted without you.", "YOU STAY IN CONTROL"],
-      ["24–27s", "screens/41-automation-catalog.png", "BETA badge stamps on", "Now in beta.", "NOW IN BETA"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. Your catalog, on video, daily.", "reelmino.com"]
+      ["0–6s", "screens/40-automation-top.png", "Slow push-in", "Got a website full of products? Get a new video every day.", "A DAILY VIDEO FROM YOUR SITE"],
+      ["6–12s", "screens/41-automation-catalog.png", "Catalog rows appear", "Reelmino scans your site and builds a product catalog.", "AUTO CATALOG"],
+      ["12–18s", "screens/42-automation-log.png", "New entry slides in", "Each day it picks a product and produces a new video.", "A NEW VIDEO DAILY"],
+      ["18–24s", "screens/10-dashboard-library.png", "Library scroll", "Every video waits in your library. Nothing posts without you.", "YOU STAY IN CONTROL · BETA"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Your catalog, on video, daily.", "reelmino.com"]
     ],
     notes: "Automation is labelled an experiment in the app; keep the BETA wording and don't promise auto-publishing.",
     copy: {
@@ -350,13 +328,11 @@ export const PACKAGES = [
     description:
       "On a finished project, 'Want to refine something?' leads to the scene editor, where you change narration, visual description, character, location, action and length per scene. Visual corrections lets you change the look and regenerate — the cost is shown before you confirm and the previous file stays until the new one replaces it. Create another version starts a new production based on the original.",
     shots: [
-      ["0–3s", "screens/61-refine.png", "Zoom on the heading", "Almost perfect? Don't start over.", "DON'T START OVER"],
-      ["3–8s", "screens/61-refine.png", "Tap Edit scenes", "Open Edit scenes to change a line or a visual.", "EDIT SCENES"],
-      ["8–13s", "screens/60-scene-editor.png", "Retype the narration line", "Rewrite the narration, the visual, the character, or the scene length.", "LINE BY LINE"],
-      ["13–18s", "screens/56-run-coffee-below.png", "Tap Open on Visual corrections", "Change the look and regenerate — you see the cost before you confirm.", "COST SHOWN FIRST"],
-      ["18–24s", "screens/62-actions-menu.png → screens/63-remix-top.png", "Tap Create another version", "Or create another version: a new angle, language or audience.", "CREATE ANOTHER VERSION"],
-      ["24–27s", "screens/10-dashboard-library.png", "Both projects in the library", "Your original stays in your library.", "ORIGINAL KEPT"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. Refine, don't redo.", "reelmino.com"]
+      ["0–6s", "screens/61-refine.png", "Tap Edit scenes", "Almost perfect? Don't start over. Open Edit scenes.", "DON'T START OVER"],
+      ["6–12s", "screens/60-scene-editor.png", "Edit the narration line", "Rewrite a line, the visual, the character or the timing.", "LINE BY LINE"],
+      ["12–18s", "screens/56-run-coffee-below.png", "Highlight the cost", "Regenerate just that scene. You see the cost first.", "COST SHOWN FIRST"],
+      ["18–24s", "screens/63-remix-top.png", "Tap Create another version", "Or create another version: a new angle, language or audience.", "CREATE ANOTHER VERSION"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Refine, don't redo.", "reelmino.com"]
     ],
     copy: {
       youtubeTitle: "Fix one scene instead of remaking the whole video #Shorts",
@@ -380,15 +356,13 @@ export const PACKAGES = [
     description:
       "A 30-second video costs 40 credits; lip-sync adds 20. Single video: $15 one-time for 49 credits. Starter: $49 per month for 200 credits (about 5 videos). Business: $119 per month for 600 credits (about 15 videos). The cost is shown before you create, and your balance is always on the dashboard. Prices are in USD; local tax may be added at checkout.",
     shots: [
-      ["0–3s", "screens/02-pricing-top.png", "Price tag swing-in", "How much does a video cost? Exactly what it says.", "CREDITS, NOT SURPRISES"],
-      ["3–8s", "screens/02-pricing-top.png", "Highlight the lead line", "A thirty-second video is forty credits.", "1 VIDEO = 40 CREDITS"],
-      ["8–13s", "screens/02-pricing-top.png", "Zoom on $15", "Start with a single video for fifteen dollars — no commitment.", "$15 · NO COMMITMENT"],
-      ["13–19s", "screens/02-pricing-plans.png", "Pan down to Starter and Business", "Or go monthly: Starter is about five videos, Business about fifteen.", "STARTER $49 · BUSINESS $119"],
-      ["19–24s", "screens/24-create-summary-bar.png", "Zoom on the cost line", "The cost is shown before you create.", "COST SHOWN UP FRONT"],
-      ["24–27s", "screens/10-dashboard-top.png", "Highlight the balance", "And your balance is always on your dashboard.", "ALWAYS VISIBLE"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. Clear pricing at reelmino.com.", "reelmino.com"]
+      ["0–6s", "screens/02-pricing-top.png", "Price tag swing-in", "A thirty-second video is forty credits. No surprises.", "1 VIDEO = 40 CREDITS"],
+      ["6–12s", "screens/02-pricing-top.png", "Zoom on $15", "Start with a single video for fifteen dollars, no commitment.", "$15 · NO COMMITMENT"],
+      ["12–18s", "screens/02-pricing-plans.png", "Pan over Starter and Business", "Or go monthly: Starter is five videos, Business about fifteen.", "STARTER $49 · BUSINESS $119"],
+      ["18–24s", "screens/24-create-summary-bar.png", "Zoom on the cost line", "The cost is shown before you create, every time.", "COST SHOWN UP FRONT"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Clear pricing at reelmino.com.", "reelmino.com"]
     ],
-    notes: "Re-check prices on the live Pricing page before publishing. Shot 4 uses 02-pricing-plans.png (Starter and Business cards cropped from 02-pricing-full.png).",
+    notes: "Re-check prices on the live Pricing page before publishing. Scene 3 uses 02-pricing-plans.png (Starter and Business cards cropped from 02-pricing-full.png).",
     copy: {
       youtubeTitle: "A 30-second business video for $15. No subscription. #Shorts",
       youtubeDescription:
@@ -411,13 +385,11 @@ export const PACKAGES = [
     description:
       "My studio lists every project with its status: drafts, in production, ready, needs action. Search and filter, open a project to watch the final video, then download the MP4, share it, or create another version from the Actions menu.",
     shots: [
-      ["0–3s", "screens/10-dashboard-top.png", "Fast zoom-in", "Where did that video go?", "ONE LIBRARY"],
-      ["3–9s", "screens/10-dashboard-library.png", "Tap the filters in turn", "Every project in one place — drafts, in production, ready, or needing you.", "DRAFTS · READY · NEEDS ACTION"],
-      ["9–14s", "screens/50-run-pizza-top.png", "Open the project card", "Open any project to watch the final video.", "WATCH"],
-      ["14–20s", "broll/pizza-bravo.mp4", "Play 0:05–0:11 inside the player frame", "Thirty seconds, with your brand on it.", "YOUR FINAL VIDEO"],
-      ["20–25s", "screens/62-actions-menu.png", "Tap Actions", "Download the MP4, share it, or create another version.", "DOWNLOAD · SHARE · REMIX"],
-      ["25–27s", "screens/24-create-summary-bar.png", "Tap New video", "Then make the next one.", "NEXT VIDEO"],
-      ["27–30s", "END CARD", "Logo + URL", "Reelmino. Your video studio, in your pocket.", "reelmino.com"]
+      ["0–6s", "screens/10-dashboard-library.png", "Library scroll", "Every project in one place: drafts, ready, or needing you.", "ONE LIBRARY"],
+      ["6–12s", "screens/50-run-pizza-top.png", "Tap play", "Open any project to watch the final video.", "WATCH"],
+      ["12–18s", "demo/pixar-b.png", "Real Reelmino video, full screen", "Thirty seconds, with your brand on it.", "YOUR FINAL VIDEO"],
+      ["18–24s", "screens/62-actions-menu.png", "Tap Download", "Download it, share it, or create another version.", "DOWNLOAD · SHARE · REMIX"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Your video studio, in your pocket.", "reelmino.com"]
     ],
     copy: {
       youtubeTitle: "My whole video studio fits in my pocket #Shorts",
@@ -428,6 +400,123 @@ export const PACKAGES = [
       telegram:
         "All your videos, one place.\n\nMy studio shows every project with its status. Watch the final video, download the MP4, share it, or create another version from the Actions menu.\n\n→ https://reelmino.com",
       x: "Your video studio, in your pocket.\n\nEvery Reelmino project in one library → filter by draft / ready / needs action → download the MP4, share, or spin off another version.\n\nhttps://reelmino.com"
+    }
+  },
+  {
+    id: "14",
+    slug: "one-idea-many-styles",
+    name: "One idea, any style",
+    feature: "Design / animation style: Pixar-style 3D, LEGO, claymation, anime, cinematic, UGC and more",
+    audience: "Brands that want their videos to stand out in the feed",
+    hook: "Same idea. Which look stops the scroll?",
+    message: "Pick a visual style and the whole video follows it, from cast to lighting.",
+    description:
+      "Under More adjustments → Visual style you choose the design or animation style: Pixar-style 3D, LEGO characters, claymation, anime, 2D, cinematic film, documentary, phone-style UGC, retro, paper cutout and more, plus color palette, realism and lighting. All footage in this ad is from real Reelmino videos of the same bakery idea.",
+    shots: [
+      ["0–6s", "screens/82-style-options.png", "Scroll the style list", "One bakery idea. Now pick the look.", "ONE IDEA · DOZENS OF LOOKS"],
+      ["6–12s", "demo/pixar-a.png", "Real Reelmino video, full screen", "Pixar-style 3D, in warm sunrise light.", "PIXAR-STYLE 3D"],
+      ["12–18s", "demo/lego-a.png", "Real Reelmino video, full screen", "LEGO characters, brick by brick.", "LEGO CHARACTERS"],
+      ["18–24s", "demo/clay-a.png", "Real Reelmino video, full screen", "Handmade claymation, or anime, cinematic, even phone-style.", "CLAYMATION · ANIME · CINEMATIC"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. One idea, any style.", "reelmino.com"]
+    ],
+    notes: "All footage comes from demo/ — real Reelmino videos made from one bakery idea with different Visual style settings (see demos.mjs).",
+    copy: {
+      youtubeTitle: "Same bakery ad in Pixar, LEGO and claymation style #Shorts",
+      youtubeDescription:
+        "One idea, produced by Reelmino in different visual styles: Pixar-style 3D, LEGO characters, claymation, anime, cinematic and phone-style UGC. Pick the look under Visual style and the whole video follows it.\n\nhttps://reelmino.com",
+      tiktokCaption: "Same bakery ad. Pixar, LEGO or claymation? Pick your fighter 👇",
+      hashtags: ["#aivideo", "#pixarstyle", "#lego", "#claymation", "#animation", "#smallbusiness"],
+      telegram:
+        "One idea, any style.\n\nWe made the same bakery ad with Reelmino in Pixar-style 3D, LEGO characters, claymation, anime and cinematic film. Choose the visual style, color palette, realism and lighting — the whole video follows.\n\n→ https://reelmino.com",
+      x: "Same bakery ad, made with Reelmino in:\n\n· Pixar-style 3D\n· LEGO characters\n· Claymation\n· Anime\n· Cinematic film\n\nPick the look, the whole video follows.\n\nhttps://reelmino.com"
+    }
+  },
+  {
+    id: "15",
+    slug: "cast-and-wardrobe",
+    name: "Cast it, dress it",
+    feature: "Character type, age, wardrobe and expression",
+    audience: "Businesses that want a presenter who looks like their customers",
+    hook: "Who should be in your video — and what are they wearing?",
+    message: "Choose the character, the age, the outfit and the expression.",
+    description:
+      "Under More adjustments → Script & scenes you pick the character type (business owner, customer, expert, presenter, doctor, DJ, mascot, LEGO figure and more), the age group, the wardrobe (casual, business, formal, smart casual, sporty, workwear, medical uniform, futuristic…), the expression and the action. The same character stays consistent across every scene.",
+    shots: [
+      ["0–6s", "screens/85-character-options.png", "Scroll the character list", "Choose who's on screen: an owner, an expert, a DJ or a mascot.", "PICK YOUR CAST"],
+      ["6–12s", "screens/84-wardrobe-options.png", "Tap through the wardrobe list", "Then dress them: workwear, smart casual, formal or sporty.", "PICK THE WARDROBE"],
+      ["12–18s", "demo/formal-a.png", "Real Reelmino video, full screen", "The same baker in a formal suit…", "FORMAL"],
+      ["18–24s", "demo/sporty-a.png", "Real Reelmino video, full screen", "…or sporty at sunrise. Same face in every scene.", "SPORTY · SAME FACE EVERY SCENE"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. Cast it your way.", "reelmino.com"]
+    ],
+    notes: "Scenes 3–4 are real Reelmino videos of the bakery idea with Wardrobe set to Formal and Sporty (demos.mjs).",
+    copy: {
+      youtubeTitle: "I changed my presenter's outfit with one tap #Shorts",
+      youtubeDescription:
+        "Reelmino lets you pick the character type, age group, wardrobe and expression for your video — formal, sporty, workwear, smart casual and more — and keeps the same person in every scene.\n\nhttps://reelmino.com",
+      tiktokCaption: "Formal or sporty? Same baker, one tap.",
+      hashtags: ["#aivideo", "#wardrobe", "#videomarketing", "#smallbusiness", "#contentcreator"],
+      telegram:
+        "Cast it, dress it.\n\nIn Reelmino you choose who appears in your video — owner, customer, expert, presenter, mascot — plus age, wardrobe and expression. The same character stays consistent in every scene.\n\n→ https://reelmino.com",
+      x: "Who's in your video, and what are they wearing?\n\nReelmino: pick the character, age, wardrobe (formal, sporty, workwear…) and expression. Same face in every scene.\n\nhttps://reelmino.com"
+    }
+  },
+  {
+    id: "16",
+    slug: "set-the-scene",
+    name: "You're the director",
+    feature: "Location, time of day, weather, lighting, camera, effects and transitions",
+    audience: "Marketers who want cinematic control without a crew",
+    hook: "Sunrise or neon night? You call the shot.",
+    message: "Set the location, the light, the camera and the effects, without a crew.",
+    description:
+      "Script & scenes sets the location (store, street, office, home, nature, studio), time of day and weather. Cinematography & editing sets the shot type, camera angle and movement, effects (bokeh, slow motion, light rays, film grain, split screen…), scene transitions and caption style.",
+    shots: [
+      ["0–6s", "screens/86-scene-setting.png", "Highlight location and time", "Set the scene: store, street, office, studio or nature.", "LOCATION · TIME · WEATHER"],
+      ["6–12s", "screens/88-effects-options.png", "Scroll the effects list", "Add camera moves and effects: bokeh, slow motion, light rays.", "CAMERA · EFFECTS"],
+      ["12–18s", "demo/anime-a.png", "Real Reelmino video, full screen", "An anime street at sunset, with light rays.", "SUNSET · LIGHT RAYS"],
+      ["18–24s", "demo/cinematic-a.png", "Real Reelmino video, full screen", "Or a cinematic close-up in slow motion.", "CLOSE-UP · SLOW MOTION"],
+      ["24–30s", "END CARD", "Logo + URL", "Reelmino. You're the director.", "reelmino.com"]
+    ],
+    notes: "Scenes 3–4 are real Reelmino videos (demos.mjs: anime at sunset with light rays; cinematic close-up with slow motion).",
+    copy: {
+      youtubeTitle: "Directing a commercial from my phone #Shorts",
+      youtubeDescription:
+        "Pick the location, time of day, weather, lighting, camera movement, effects and transitions — Reelmino shoots it. Bokeh, slow motion, light rays, film grain and more.\n\nhttps://reelmino.com",
+      tiktokCaption: "Sunrise, slow motion, light rays. Directed from my phone.",
+      hashtags: ["#filmmaking", "#aivideo", "#cinematic", "#videomarketing", "#director"],
+      telegram:
+        "You're the director.\n\nChoose the location, time of day and weather, then the shot type, camera movement, effects and transitions. Reelmino shoots every scene the way you set it.\n\n→ https://reelmino.com",
+      x: "You're the director:\n\n· Location, time of day, weather\n· Lighting and camera moves\n· Bokeh, slow motion, light rays\n· Transitions and caption style\n\nNo crew. https://reelmino.com"
+    }
+  },
+  {
+    id: "17",
+    slug: "making-of",
+    name: "Watch me make one",
+    feature: "Live walkthrough: one line + chosen settings → the real finished video",
+    audience: "People who want to see it actually work",
+    hook: "Watch me make an ad in three taps.",
+    message: "One line, a few settings, and this is the real result.",
+    description:
+      "A making-of: type one line about a bakery, choose Pixar-style 3D with warm colors and cinematic light, a baker in workwear in the store at sunrise, then create. The last part of the ad is the actual video Reelmino produced from exactly those settings, spliced in as-is.",
+    shots: [
+      ["0–6s", "screens/90-making-of-prompt.png", "Typing animation", "Watch me make one. One line: a bakery at sunrise.", "1 · ONE LINE"],
+      ["6–12s", "screens/81-visual-style.png", "Tap Pixar-style, warm colors, cinematic", "Pixar-style 3D, warm colors, cinematic light.", "2 · PICK THE STYLE"],
+      ["12–18s", "screens/83-cast-wardrobe.png", "Tap the cast settings", "A baker in workwear, in the store, at sunrise. Create.", "3 · CAST · WARDROBE · PLACE"],
+      ["18–24s", "demo/clip-pixar.mp4", "The real result, spliced in with its own sound", "", "THE RESULT · MADE WITH REELMINO"],
+      ["24–30s", "END CARD", "Logo + URL", "Your turn at reelmino.com.", "reelmino.com"]
+    ],
+    insert: { file: "demo/clip-pixar.mp4", at: 18, audio: "clip" },
+    notes: "Scene 4 is not generated: it is 6 seconds of the real Pixar-style demo video (demo/clip-pixar.mp4), spliced in with its original audio.",
+    copy: {
+      youtubeTitle: "I made this bakery ad in 3 taps (real result) #Shorts",
+      youtubeDescription:
+        "One line, then Pixar-style 3D, warm colors, cinematic light, a baker in workwear at sunrise. The end of this video is the real result Reelmino produced from exactly those settings.\n\nhttps://reelmino.com",
+      tiktokCaption: "3 taps → this. The ending is the real result 🥐",
+      hashtags: ["#aivideo", "#makingof", "#pixarstyle", "#smallbusiness", "#bakery", "#behindthescenes"],
+      telegram:
+        "Watch me make one.\n\nOne line about a bakery → Pixar-style 3D, warm colors, cinematic light → a baker in workwear at sunrise → Create. The ending is the actual video Reelmino produced.\n\n→ https://reelmino.com",
+      x: "Watch me make an ad in 3 taps:\n\n1. One line: a bakery at sunrise\n2. Pixar-style, warm, cinematic\n3. Baker in workwear → Create\n\nThe ending is the real result.\n\nhttps://reelmino.com"
     }
   }
 ];

@@ -14,26 +14,24 @@ Set Speech to 'Talking character with lip-sync', add at least one character imag
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `broll/watch-claymation.mp4` | Close-up on the character's face | What if your mascot could talk? | **MAKE YOUR CHARACTER TALK** |
-| 3–8s | `screens/64-materials-roles.png` | Highlight Character photos | Upload a photo of your character — a person, a mascot, even a clay figure. | **1 · ADD A CHARACTER** |
-| 8–13s | `screens/71-lipsync-summary.png` | Highlight 'Talking character with lip-sync' | Set Speech to Talking character with lip-sync. | **2 · TURN ON LIP-SYNC** |
-| 13–18s | `screens/34-voices.png` | Tap a voice card | Pick the voice. | **3 · PICK A VOICE** |
-| 18–24s | `broll/watch-claymation.mp4` | Play a speaking section | Reelmino matches the mouth to every word of your script. | **THE MOUTH MATCHES THE WORDS** |
-| 24–27s | `screens/71-lipsync-summary.png` | Zoom on '60 credits' | Lip-sync adds twenty credits. | **+20 CREDITS** |
-| 27–30s | `END CARD` | Logo + URL | Give your brand a face at reelmino.com. | **reelmino.com** |
+| 0–6s | `screens/64-materials-roles.png` | Drop in a character photo | What if your mascot could talk? Upload its photo. | **1 · ADD A CHARACTER** |
+| 6–12s | `screens/71-lipsync-summary.png` | Toggle lip-sync on | Turn on Talking character with lip-sync. | **2 · TURN ON LIP-SYNC** |
+| 12–18s | `screens/34-voices.png` | Pick a voice | Pick a voice, and the mouth matches every word. | **3 · IT TALKS** |
+| 18–24s | `screens/52-run-watch-clay-top.png` | Play the clay result | Even a clay figure can present your product. | **PEOPLE · MASCOTS · CLAY** |
+| 24–30s | `END CARD` | Logo + URL | Give your brand a face at reelmino.com. | **reelmino.com** |
 
-**Full voice-over** (52 words, about 21 seconds at a natural pace):
+**Full voice-over** (39 words, about 16 seconds at a natural pace):
 
-> What if your mascot could talk? Upload a photo of your character — a person, a mascot, even a clay figure. Set Speech to Talking character with lip-sync. Pick the voice. Reelmino matches the mouth to every word of your script. Lip-sync adds twenty credits. Give your brand a face at reelmino.com.
+> What if your mascot could talk? Upload its photo. Turn on Talking character with lip-sync. Pick a voice, and the mouth matches every word. Even a clay figure can present your product. Give your brand a face at reelmino.com.
 
-**Production note:** The claymation clip is a placeholder. For the final ad, render one short lip-sync video (for example, a mascot saying the hook line) and use it in shots 1 and 5 so the lip movement is real.
+**Production note:** Scene 4 shows the real claymation watch project. For a stronger ad, render one short lip-sync video (a mascot saying the hook line) and splice it in like package 17 does.
 
 ## Assets used
 
-- `broll/watch-claymation.mp4`
 - `screens/64-materials-roles.png`
 - `screens/71-lipsync-summary.png`
 - `screens/34-voices.png`
+- `screens/52-run-watch-clay-top.png`
 
 ## Platform copy
 

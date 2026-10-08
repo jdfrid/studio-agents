@@ -14,17 +14,15 @@ In the recommended mode Reelmino prepares a proposal — 'This is how the video 
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/54-run-coffee-proposal-top.png` | Hold on the headline | Ever paid for a video and hated the script? | **SEE IT BEFORE IT'S MADE** |
-| 3–8s | `screens/54-run-coffee-proposal-top.png` | Slow scroll through scenes 1–2 | With Reelmino you see the script and every scene before production starts. | **“THIS IS HOW THE VIDEO WILL LOOK”** |
-| 8–13s | `screens/60-scene-editor.png` | Slide-up of the editor sheet | Change a line, a visual, the character, or a scene's length. | **EDIT ANY SCENE** |
-| 13–18s | `screens/27-create-approval-mode.png` | Highlight the three cards in turn | Choose your control: automatic, script first, or approve every stage. | **YOU CHOOSE THE CONTROL** |
-| 18–23s | `screens/55-run-coffee-approve.png` | Tap Approve and produce the video | Happy with it? Approve, and production continues from your script. | **APPROVE → PRODUCE** |
-| 23–27s | `screens/24-create-summary-bar.png` | Zoom on the cost line | The proposal uses forty credits. Producing after approval adds nothing. | **NO SECOND CHARGE** |
-| 27–30s | `END CARD` | Logo + URL | Reelmino. Approve it before you make it. | **reelmino.com** |
+| 0–6s | `screens/54-run-coffee-proposal-top.png` | Hold on the headline | Ever paid for a video and hated the script? | **SEE IT BEFORE IT'S MADE** |
+| 6–12s | `screens/60-scene-editor.png` | Highlight the narration field | See every scene first, and change any line or visual. | **EDIT ANY SCENE** |
+| 12–18s | `screens/27-create-approval-mode.png` | Tap each mode | Choose your control: automatic, script first, or every stage. | **YOU CHOOSE THE CONTROL** |
+| 18–24s | `screens/55-run-coffee-approve.png` | Tap Approve | Approve it, and production follows your script. No second charge. | **APPROVE → PRODUCE** |
+| 24–30s | `END CARD` | Logo + URL | Reelmino. Approve it before you make it. | **reelmino.com** |
 
-**Full voice-over** (69 words, about 28 seconds at a natural pace):
+**Full voice-over** (45 words, about 18 seconds at a natural pace):
 
-> Ever paid for a video and hated the script? With Reelmino you see the script and every scene before production starts. Change a line, a visual, the character, or a scene's length. Choose your control: automatic, script first, or approve every stage. Happy with it? Approve, and production continues from your script. The proposal uses forty credits. Producing after approval adds nothing. Reelmino. Approve it before you make it.
+> Ever paid for a video and hated the script? See every scene first, and change any line or visual. Choose your control: automatic, script first, or every stage. Approve it, and production follows your script. No second charge. Reelmino. Approve it before you make it.
 
 ## Assets used
 
@@ -32,7 +30,6 @@ In the recommended mode Reelmino prepares a proposal — 'This is how the video 
 - `screens/60-scene-editor.png`
 - `screens/27-create-approval-mode.png`
 - `screens/55-run-coffee-approve.png`
-- `screens/24-create-summary-bar.png`
 
 ## Platform copy
 

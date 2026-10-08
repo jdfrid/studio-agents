@@ -14,17 +14,15 @@ Automation (beta) locks a brand kit and your website. Reelmino scans the site in
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/40-automation-top.png` | Calendar-flip transition | Got a website full of products? Get a new video every day. | **A DAILY VIDEO FROM YOUR SITE** |
-| 3–8s | `screens/40-automation-top.png` | Fields highlight | Lock your brand kit and add your website. | **1 · BRAND + WEBSITE** |
-| 8–14s | `screens/41-automation-catalog.png` | Products scroll in fast | Reelmino scans the site and builds a product catalog. | **2 · AUTO CATALOG** |
-| 14–19s | `screens/42-automation-log.png` | Continue scrolling the list | Each day it picks a different product and produces a new video. | **3 · A NEW VIDEO DAILY** |
-| 19–24s | `broll/dealsluxy-brand-film.mp4` | Play 0:00–0:05 | Every video waits in your library — nothing is posted without you. | **YOU STAY IN CONTROL** |
-| 24–27s | `screens/41-automation-catalog.png` | BETA badge stamps on | Now in beta. | **NOW IN BETA** |
-| 27–30s | `END CARD` | Logo + URL | Reelmino. Your catalog, on video, daily. | **reelmino.com** |
+| 0–6s | `screens/40-automation-top.png` | Slow push-in | Got a website full of products? Get a new video every day. | **A DAILY VIDEO FROM YOUR SITE** |
+| 6–12s | `screens/41-automation-catalog.png` | Catalog rows appear | Reelmino scans your site and builds a product catalog. | **AUTO CATALOG** |
+| 12–18s | `screens/42-automation-log.png` | New entry slides in | Each day it picks a product and produces a new video. | **A NEW VIDEO DAILY** |
+| 18–24s | `screens/10-dashboard-library.png` | Library scroll | Every video waits in your library. Nothing posts without you. | **YOU STAY IN CONTROL · BETA** |
+| 24–30s | `END CARD` | Logo + URL | Reelmino. Your catalog, on video, daily. | **reelmino.com** |
 
-**Full voice-over** (62 words, about 25 seconds at a natural pace):
+**Full voice-over** (48 words, about 19 seconds at a natural pace):
 
-> Got a website full of products? Get a new video every day. Lock your brand kit and add your website. Reelmino scans the site and builds a product catalog. Each day it picks a different product and produces a new video. Every video waits in your library — nothing is posted without you. Now in beta. Reelmino. Your catalog, on video, daily.
+> Got a website full of products? Get a new video every day. Reelmino scans your site and builds a product catalog. Each day it picks a product and produces a new video. Every video waits in your library. Nothing posts without you. Reelmino. Your catalog, on video, daily.
 
 **Production note:** Automation is labelled an experiment in the app; keep the BETA wording and don't promise auto-publishing.
 
@@ -33,7 +31,7 @@ Automation (beta) locks a brand kit and your website. Reelmino scans the site in
 - `screens/40-automation-top.png`
 - `screens/41-automation-catalog.png`
 - `screens/42-automation-log.png`
-- `broll/dealsluxy-brand-film.mp4`
+- `screens/10-dashboard-library.png`
 
 ## Platform copy
 

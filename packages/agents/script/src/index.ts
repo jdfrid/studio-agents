@@ -21,6 +21,7 @@ import {
   resolvePresenterSex,
   resolveRenderProfile,
   sanitizeVeoPromptForExternalAudio,
+  storySecondsForBrief,
   usesBeatLayoutProvider,
   usesLipSyncVideoProvider,
   userFacingLanguageInstruction,
@@ -57,7 +58,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const castPhotoCount = (brief.visualAnchors ?? []).filter((anchor) => !anchor.role || anchor.role === "anchor").length;
     const hasCastPhotos = plateCount === 0 && castPhotoCount > 0;
     const layout = applyVisualPlateSceneCount(
-      planSceneLayout(brief.durationSeconds, budget, costConfig),
+      planSceneLayout(storySecondsForBrief(brief.durationSeconds), budget, costConfig),
       plateCount,
       { beatI2v: beatI2vMode, extend: extendMode }
     );
@@ -129,8 +130,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       lipSyncMode
         ? "Pace gestures to the line: open with attention, hold product/gesture mid-line, end with a clear hold — avoid frantic action that fights the voiceover."
         : "Pace gestures to the silent beat: face camera / look at product, natural blinks, hold product mid-beat — avoid frantic action.",
-      "Optionally include 0–1 title_card scenes (sceneKind=title_card): short on-screen CTA/headline, empty narration, audioPolicy muted, durationSeconds 3–5, visualPrompt describes full-frame kinetic text background.",
-      "Spoken beat scenes use sceneKind=beat (default). Keep dubbing lines short, conversational, and timed to the beat.",
+      "Do not add title_card scenes: a branded end card with the call to action is appended automatically after the last scene. Put the call to action in the last beat's narration instead.",
+      "Every scene uses sceneKind=beat. Keep dubbing lines short, conversational, and timed to the beat.",
       "DIALOGUE DUBBING (mandatory when cast has 2+ speaking characters): alternate speakers across consecutive beat scenes.",
       "Set speaker to \"a\" or \"b\" and speakerName to the character's short name from characterBible.",
       "narration must be ONLY the spoken words for that character — clear natural dialogue, no 'Name:' prefixes, no stage directions.",
@@ -228,7 +229,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         : "gemini_tts_plus_music | gemini_tts_only | veo_native_audio | muted",
       durationSeconds: clipSeconds,
       requiredAssets: ["voice", "music", "video"],
-      sceneKind: "beat | title_card",
+      sceneKind: "beat",
       speaker: "a | b | narrator — alternate a/b for dialogue",
       speakerName: "short character name for this spoken line"
     };
@@ -287,7 +288,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       plateCount >= 2
         ? ` Place each uploaded still on its own beat (round-robin if ${sceneCount} > ${plateCount}); vary location/product per still.`
         : "";
-    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}${creativeBlock}${toneHint ? `\n\n${toneHint}` : ""}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Total video length will be ~${totalVideoSeconds}s (brief asks for ${brief.durationSeconds}s). User-facing text (titles, narration, characterBible, backgroundVisualPrompt, musicPrompt) MUST be in ${langEn}. Narration must sound like it belongs to this specific event/style (not generic ads). For every scene, align narration wording with the motion described in veoPrompt.${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}${plateHint}`;
+    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}${creativeBlock}${toneHint ? `\n\n${toneHint}` : ""}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Scenes total ~${totalVideoSeconds}s; with the automatic end card the video is ~${brief.durationSeconds}s. User-facing text (titles, narration, characterBible, backgroundVisualPrompt, musicPrompt) MUST be in ${langEn}. Narration must sound like it belongs to this specific event/style (not generic ads). For every scene, align narration wording with the motion described in veoPrompt.${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}${plateHint}`;
 
     const completeJson = provider.type === "GEMINI" ? geminiCompleteJson : llmCompleteJson;
     const { parsed, model } = await completeJson<{

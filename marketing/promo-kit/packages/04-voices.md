@@ -14,19 +14,17 @@ Reelmino includes 23 narration voices: six men's voices, six women's voices, cha
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/34-voices.png` | Sound wave overlay | Your video's voice matters more than you think. | **23 VOICES. ONE TAP.** |
-| 3–8s | `screens/34-voices.png` | Slow scroll through the grid | Pick from clear, deep, warm, young or news-style voices. | **MEN · WOMEN · CHARACTERS** |
-| 8–13s | `screens/36-voices-characters.png` | Each card pops as it's named | Or go playful: a cartoon, a robot, an airport announcer, a lifeguard, a retro radio host. | **CHARACTER VOICES** |
-| 13–17s | `screens/35-voices-selected.png` | Tap Play sample, play a real sample under it | Tap Play sample to hear it before you choose. | **HEAR IT FIRST** |
-| 17–23s | `screens/65-voice-clone.png` | Highlight Voice cloning | Or clone your own voice from a clean thirty-second to two-minute recording. | **CLONE YOUR VOICE** |
-| 23–27s | `broll/dealsluxy-brand-film.mp4` | Play 0:04–0:08 with the narration audible | Your words, in the voice that fits your brand. | **YOUR SOUND** |
-| 27–30s | `END CARD` | Logo + URL | Find your voice at reelmino.com. | **reelmino.com** |
+| 0–6s | `screens/34-voices.png` | Scroll the voice list | Pick from 23 voices: clear, deep, warm, young or news-style. | **23 VOICES. ONE TAP.** |
+| 6–12s | `screens/36-voices-characters.png` | Tap the character voices | Or go playful: a cartoon, a robot, a retro radio host. | **CHARACTER VOICES** |
+| 12–18s | `screens/35-voices-selected.png` | Pulse on Play sample | Tap Play sample to hear it before you choose. | **HEAR IT FIRST** |
+| 18–24s | `screens/65-voice-clone.png` | Highlight the upload box | Or clone your own voice from a short, clean recording. | **CLONE YOUR VOICE** |
+| 24–30s | `END CARD` | Logo + URL | Find your voice at reelmino.com. | **reelmino.com** |
 
-**Full voice-over** (68 words, about 27 seconds at a natural pace):
+**Full voice-over** (45 words, about 18 seconds at a natural pace):
 
-> Your video's voice matters more than you think. Pick from clear, deep, warm, young or news-style voices. Or go playful: a cartoon, a robot, an airport announcer, a lifeguard, a retro radio host. Tap Play sample to hear it before you choose. Or clone your own voice from a clean thirty-second to two-minute recording. Your words, in the voice that fits your brand. Find your voice at reelmino.com.
+> Pick from 23 voices: clear, deep, warm, young or news-style. Or go playful: a cartoon, a robot, a retro radio host. Tap Play sample to hear it before you choose. Or clone your own voice from a short, clean recording. Find your voice at reelmino.com.
 
-**Production note:** Only clone voices you have the right to use — the app asks for that consent. In the edit, play two or three real voice samples under shots 2–4.
+**Production note:** Only clone voices you have the right to use — the app asks for that consent. In a manual edit, play two or three real voice samples under scenes 1–3.
 
 ## Assets used
 
@@ -34,7 +32,6 @@ Reelmino includes 23 narration voices: six men's voices, six women's voices, cha
 - `screens/36-voices-characters.png`
 - `screens/35-voices-selected.png`
 - `screens/65-voice-clone.png`
-- `broll/dealsluxy-brand-film.mp4`
 
 ## Platform copy
 

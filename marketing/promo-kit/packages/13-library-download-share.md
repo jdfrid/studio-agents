@@ -14,26 +14,22 @@ My studio lists every project with its status: drafts, in production, ready, nee
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/10-dashboard-top.png` | Fast zoom-in | Where did that video go? | **ONE LIBRARY** |
-| 3–9s | `screens/10-dashboard-library.png` | Tap the filters in turn | Every project in one place — drafts, in production, ready, or needing you. | **DRAFTS · READY · NEEDS ACTION** |
-| 9–14s | `screens/50-run-pizza-top.png` | Open the project card | Open any project to watch the final video. | **WATCH** |
-| 14–20s | `broll/pizza-bravo.mp4` | Play 0:05–0:11 inside the player frame | Thirty seconds, with your brand on it. | **YOUR FINAL VIDEO** |
-| 20–25s | `screens/62-actions-menu.png` | Tap Actions | Download the MP4, share it, or create another version. | **DOWNLOAD · SHARE · REMIX** |
-| 25–27s | `screens/24-create-summary-bar.png` | Tap New video | Then make the next one. | **NEXT VIDEO** |
-| 27–30s | `END CARD` | Logo + URL | Reelmino. Your video studio, in your pocket. | **reelmino.com** |
+| 0–6s | `screens/10-dashboard-library.png` | Library scroll | Every project in one place: drafts, ready, or needing you. | **ONE LIBRARY** |
+| 6–12s | `screens/50-run-pizza-top.png` | Tap play | Open any project to watch the final video. | **WATCH** |
+| 12–18s | `demo/pixar-b.png` | Real Reelmino video, full screen | Thirty seconds, with your brand on it. | **YOUR FINAL VIDEO** |
+| 18–24s | `screens/62-actions-menu.png` | Tap Download | Download it, share it, or create another version. | **DOWNLOAD · SHARE · REMIX** |
+| 24–30s | `END CARD` | Logo + URL | Reelmino. Your video studio, in your pocket. | **reelmino.com** |
 
-**Full voice-over** (54 words, about 22 seconds at a natural pace):
+**Full voice-over** (40 words, about 16 seconds at a natural pace):
 
-> Where did that video go? Every project in one place — drafts, in production, ready, or needing you. Open any project to watch the final video. Thirty seconds, with your brand on it. Download the MP4, share it, or create another version. Then make the next one. Reelmino. Your video studio, in your pocket.
+> Every project in one place: drafts, ready, or needing you. Open any project to watch the final video. Thirty seconds, with your brand on it. Download it, share it, or create another version. Reelmino. Your video studio, in your pocket.
 
 ## Assets used
 
-- `screens/10-dashboard-top.png`
 - `screens/10-dashboard-library.png`
 - `screens/50-run-pizza-top.png`
-- `broll/pizza-bravo.mp4`
+- `demo/pixar-b.png`
 - `screens/62-actions-menu.png`
-- `screens/24-create-summary-bar.png`
 
 ## Platform copy
 

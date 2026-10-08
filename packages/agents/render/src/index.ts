@@ -918,9 +918,10 @@ async function mixSceneAudio(
   const voiceLocal = path.join(dir, `voice-${scene.sceneId}-${nanoid(4)}.audio`);
   await downloadMediaToFile(storage, voiceGcsPath, voiceLocal);
   const voiceDur = await probeDuration(voiceLocal).catch(() => 0);
+  const windowDur = sceneWindowSeconds(videoDur, voiceDur, scene.durationSeconds);
   const out = path.join(dir, `${path.basename(videoPath, ".mp4")}-voice.mp4`);
-  // Fit narration into the clip window: mild atempo when slightly long, then pad/trim — never spill past videoDur.
-  const audioFilter = fitVoiceToVideoFilter(voiceDur, videoDur);
+  // Fit narration into the clip window: mild atempo when slightly long, then pad/trim — never spill past the window.
+  const audioFilter = fitVoiceToVideoFilter(voiceDur, windowDur);
   await runFfmpeg([
     "-i",
     videoPath,
@@ -937,13 +938,23 @@ async function mixSceneAudio(
     "-c:a",
     "aac",
     "-t",
-    String(videoDur),
+    String(windowDur),
     "-movflags",
     "+faststart",
     "-y",
     out
   ]);
   return out;
+}
+
+/**
+ * Providers often return clips longer than the planned beat (e.g. 6.67s for 6s), which pushes a
+ * 30s film past 30s with silent tails. Trim back to the plan, but never before the narration ends.
+ */
+export function sceneWindowSeconds(videoDur: number, voiceDur: number, plannedSeconds: number): number {
+  if (!(plannedSeconds > 0) || videoDur <= plannedSeconds + 0.25) return videoDur;
+  const voiceEnd = voiceDur > 0 && Number.isFinite(voiceDur) ? voiceDur + 0.35 : 0;
+  return Math.min(videoDur, Math.max(plannedSeconds, voiceEnd));
 }
 
 /** Build ffmpeg audio filter that keeps voice inside [0, videoDur] without hard mid-word cuts when possible. */

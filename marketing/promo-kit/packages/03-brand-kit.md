@@ -14,25 +14,22 @@ The Brand kit stores your business name, tagline, website, logo, primary and bac
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/33-brand-end-card.png` | Hard cut, slight shake | Does every video you post look like a different company? | **ON BRAND. EVERY VIDEO.** |
-| 3–8s | `screens/30-brand-top.png` | Highlight the three starter kits | Start from a ready kit — a shop, a local business, or an expert. | **START FROM A KIT** |
-| 8–14s | `screens/31-brand-identity.png` | Fields fill one by one | Add your name, tagline, website and logo — once. | **NAME · TAGLINE · LOGO** |
-| 14–18s | `screens/32-brand-colors.png` | Swatch pops | Set your brand colors. | **YOUR COLORS** |
-| 18–23s | `screens/33-brand-end-card.png` | Card scales up to full frame | Every video ends on your own branded end card. | **YOUR END CARD** |
-| 23–27s | `screens/35-voices-selected.png` | Tap the selected voice | Even pick the voice your brand always speaks in. | **YOUR BRAND VOICE** |
-| 27–30s | `END CARD` | Logo + URL | Reelmino. Set it once. Look like you, always. | **reelmino.com** |
+| 0–6s | `screens/30-brand-top.png` | Slow push-in | Does every video you post look like a different company? | **ON BRAND. EVERY VIDEO.** |
+| 6–12s | `screens/31-brand-identity.png` | Fields fill in one by one | Add your name, tagline, website and logo, once. | **NAME · TAGLINE · LOGO** |
+| 12–18s | `screens/32-brand-colors.png` | Color swatches pop | Set your brand colors and your brand voice. | **YOUR COLORS · YOUR VOICE** |
+| 18–24s | `screens/33-brand-end-card.png` | End card reveal | Every video ends on your own branded end card. | **YOUR END CARD** |
+| 24–30s | `END CARD` | Logo + URL | Reelmino. Set it once. Look like you, always. | **reelmino.com** |
 
-**Full voice-over** (63 words, about 25 seconds at a natural pace):
+**Full voice-over** (43 words, about 17 seconds at a natural pace):
 
-> Does every video you post look like a different company? Start from a ready kit — a shop, a local business, or an expert. Add your name, tagline, website and logo — once. Set your brand colors. Every video ends on your own branded end card. Even pick the voice your brand always speaks in. Reelmino. Set it once. Look like you, always.
+> Does every video you post look like a different company? Add your name, tagline, website and logo, once. Set your brand colors and your brand voice. Every video ends on your own branded end card. Reelmino. Set it once. Look like you, always.
 
 ## Assets used
 
-- `screens/33-brand-end-card.png`
 - `screens/30-brand-top.png`
 - `screens/31-brand-identity.png`
 - `screens/32-brand-colors.png`
-- `screens/35-voices-selected.png`
+- `screens/33-brand-end-card.png`
 
 ## Platform copy
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  END_CARD_RESERVE_SECONDS,
   estimateRunCost,
+  storySecondsForBrief,
   geminiVeoMode,
   isCorporateProductFilm,
   isProductAdBrief,
@@ -49,6 +51,19 @@ describe("planSceneLayout", () => {
     const layout = planSceneLayout(25, true, { renderProfileId: "wan-i2v" });
     expect(layout.sceneCount).toBe(5);
     expect(layout.totalVideoSeconds).toBe(25);
+  });
+});
+
+describe("storySecondsForBrief", () => {
+  it("leaves room for the end card so a 30s HeyGen brief is 4 beats + card (~30s, not ~39s)", () => {
+    expect(storySecondsForBrief(30)).toBe(30 - END_CARD_RESERVE_SECONDS);
+    const layout = planSceneLayout(storySecondsForBrief(30), true, { renderProfileId: "heygen-video" });
+    expect(layout.sceneCount).toBe(4);
+    expect(layout.totalVideoSeconds).toBe(24);
+  });
+
+  it("keeps short briefs whole", () => {
+    expect(storySecondsForBrief(15)).toBe(15);
   });
 });
 

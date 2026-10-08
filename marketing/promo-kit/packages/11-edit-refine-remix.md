@@ -14,26 +14,22 @@ On a finished project, 'Want to refine something?' leads to the scene editor, wh
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/61-refine.png` | Zoom on the heading | Almost perfect? Don't start over. | **DON'T START OVER** |
-| 3–8s | `screens/61-refine.png` | Tap Edit scenes | Open Edit scenes to change a line or a visual. | **EDIT SCENES** |
-| 8–13s | `screens/60-scene-editor.png` | Retype the narration line | Rewrite the narration, the visual, the character, or the scene length. | **LINE BY LINE** |
-| 13–18s | `screens/56-run-coffee-below.png` | Tap Open on Visual corrections | Change the look and regenerate — you see the cost before you confirm. | **COST SHOWN FIRST** |
-| 18–24s | `screens/62-actions-menu.png → screens/63-remix-top.png` | Tap Create another version | Or create another version: a new angle, language or audience. | **CREATE ANOTHER VERSION** |
-| 24–27s | `screens/10-dashboard-library.png` | Both projects in the library | Your original stays in your library. | **ORIGINAL KEPT** |
-| 27–30s | `END CARD` | Logo + URL | Reelmino. Refine, don't redo. | **reelmino.com** |
+| 0–6s | `screens/61-refine.png` | Tap Edit scenes | Almost perfect? Don't start over. Open Edit scenes. | **DON'T START OVER** |
+| 6–12s | `screens/60-scene-editor.png` | Edit the narration line | Rewrite a line, the visual, the character or the timing. | **LINE BY LINE** |
+| 12–18s | `screens/56-run-coffee-below.png` | Highlight the cost | Regenerate just that scene. You see the cost first. | **COST SHOWN FIRST** |
+| 18–24s | `screens/63-remix-top.png` | Tap Create another version | Or create another version: a new angle, language or audience. | **CREATE ANOTHER VERSION** |
+| 24–30s | `END CARD` | Logo + URL | Reelmino. Refine, don't redo. | **reelmino.com** |
 
-**Full voice-over** (59 words, about 24 seconds at a natural pace):
+**Full voice-over** (41 words, about 16 seconds at a natural pace):
 
-> Almost perfect? Don't start over. Open Edit scenes to change a line or a visual. Rewrite the narration, the visual, the character, or the scene length. Change the look and regenerate — you see the cost before you confirm. Or create another version: a new angle, language or audience. Your original stays in your library. Reelmino. Refine, don't redo.
+> Almost perfect? Don't start over. Open Edit scenes. Rewrite a line, the visual, the character or the timing. Regenerate just that scene. You see the cost first. Or create another version: a new angle, language or audience. Reelmino. Refine, don't redo.
 
 ## Assets used
 
 - `screens/61-refine.png`
 - `screens/60-scene-editor.png`
 - `screens/56-run-coffee-below.png`
-- `screens/62-actions-menu.png`
 - `screens/63-remix-top.png`
-- `screens/10-dashboard-library.png`
 
 ## Platform copy
 

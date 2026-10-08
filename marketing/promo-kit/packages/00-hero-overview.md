@@ -14,27 +14,22 @@ Reelmino turns a one-sentence idea into a finished 30-second video. It writes th
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/01-landing-hero.png` | Slow push-in on the headline | Need a video for your business — but no crew, no editor, no time? | **NO CREW. NO EDITOR.** |
-| 3–7s | `screens/21-create-prompt-filled.png` | Typing animation inside the text box | Meet Reelmino. Describe your idea in one sentence. | **1 · DESCRIBE YOUR IDEA** |
-| 7–12s | `screens/54-run-coffee-proposal-top.png` | Scroll down through the scenes | It writes the script and shows you every scene first. | **2 · REVIEW THE SCRIPT** |
-| 12–17s | `screens/31-brand-identity.png → screens/33-brand-end-card.png` | Quick cut on the beat | Save your logo, colors and voice once — every video stays on brand. | **3 · YOUR BRAND, EVERY TIME** |
-| 17–24s | `broll/pizza-bravo.mp4` | Play 0:02–0:09 inside a phone frame | Then get a finished thirty-second video with narration, music and captions. | **NARRATION · MUSIC · CAPTIONS** |
-| 24–27s | `screens/62-actions-menu.png` | Tap highlight on the menu | Ready for Reels, TikTok and Shorts. | **REELS · TIKTOK · SHORTS** |
-| 27–30s | `END CARD` | Logo + URL | Reelmino. Your story, now in motion. | **reelmino.com** |
+| 0–6s | `screens/21-create-prompt-filled.png` | Typing animation inside the text box | Describe your business video in one sentence. | **1 · DESCRIBE IT** |
+| 6–12s | `screens/81-visual-style.png` | Tap through the style picker | Pick a look: Pixar, LEGO, claymation, anime or cinematic. | **2 · PICK A STYLE** |
+| 12–18s | `demo/pixar-a.png` | Real Reelmino video, full screen | Reelmino writes, casts and shoots every scene for you. | **3 · IT'S MADE FOR YOU** |
+| 18–24s | `demo/cinematic-a.png` | Real Reelmino video, full screen | Your brand, voice, music and captions. Ready to post. | **REELS · TIKTOK · SHORTS** |
+| 24–30s | `END CARD` | Logo + URL | Reelmino. Your story, now in motion. | **reelmino.com** |
 
-**Full voice-over** (68 words, about 27 seconds at a natural pace):
+**Full voice-over** (40 words, about 16 seconds at a natural pace):
 
-> Need a video for your business — but no crew, no editor, no time? Meet Reelmino. Describe your idea in one sentence. It writes the script and shows you every scene first. Save your logo, colors and voice once — every video stays on brand. Then get a finished thirty-second video with narration, music and captions. Ready for Reels, TikTok and Shorts. Reelmino. Your story, now in motion.
+> Describe your business video in one sentence. Pick a look: Pixar, LEGO, claymation, anime or cinematic. Reelmino writes, casts and shoots every scene for you. Your brand, voice, music and captions. Ready to post. Reelmino. Your story, now in motion.
 
 ## Assets used
 
-- `screens/01-landing-hero.png`
 - `screens/21-create-prompt-filled.png`
-- `screens/54-run-coffee-proposal-top.png`
-- `screens/31-brand-identity.png`
-- `screens/33-brand-end-card.png`
-- `broll/pizza-bravo.mp4`
-- `screens/62-actions-menu.png`
+- `screens/81-visual-style.png`
+- `demo/pixar-a.png`
+- `demo/cinematic-a.png`
 
 ## Platform copy
 

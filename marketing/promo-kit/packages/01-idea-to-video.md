@@ -14,26 +14,22 @@ The create screen asks one question: what should the video show or achieve? You 
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/20-create-empty.png` | Blinking cursor in the empty box | What if one sentence was enough to make a video? | **ONE SENTENCE → ONE VIDEO** |
-| 3–9s | `screens/21-create-prompt-filled.png` | Type the Pizza Bravo prompt word by word | Type what it should show — a cheesy slice, a kid's first bite. | **JUST DESCRIBE IT** |
-| 9–13s | `screens/22-create-language-format.png` | Tap English, then Vertical | Pick a language and a format. Every video is a tight thirty seconds. | **7 LANGUAGES · 30 SEC** |
-| 13–17s | `screens/24-create-summary-bar.png` | Pulse on Prepare a proposal | Tap Prepare a proposal. | **TAP “PREPARE A PROPOSAL”** |
-| 17–22s | `screens/54-run-coffee-proposal-top.png` | Scroll the generated scenes | Reelmino writes the script and plans the scenes for you. | **SCRIPT + SCENES, DONE** |
-| 22–27s | `broll/pizza-bravo.mp4` | Play 0:00–0:05 full screen | Approve it, and the video is made — voice, music, captions included. | **A FINISHED MP4** |
-| 27–30s | `END CARD` | Logo + URL | Start with one sentence at reelmino.com. | **reelmino.com** |
+| 0–6s | `screens/20-create-empty.png` | Blinking cursor in the empty box | What if one sentence was enough to make a video? | **ONE SENTENCE → ONE VIDEO** |
+| 6–12s | `screens/21-create-prompt-filled.png` | Type the prompt word by word | Type what it should show: a cheesy slice, a kid's first bite. | **JUST DESCRIBE IT** |
+| 12–18s | `screens/54-run-coffee-proposal-top.png` | Scroll the generated scenes | Reelmino writes the script and plans every scene. | **SCRIPT + SCENES, DONE** |
+| 18–24s | `demo/ugc-a.png` | Real Reelmino video, full screen | Approve it, and get the video with voice, music and captions. | **A FINISHED MP4** |
+| 24–30s | `END CARD` | Logo + URL | Start with one sentence at reelmino.com. | **reelmino.com** |
 
-**Full voice-over** (68 words, about 27 seconds at a natural pace):
+**Full voice-over** (47 words, about 19 seconds at a natural pace):
 
-> What if one sentence was enough to make a video? Type what it should show — a cheesy slice, a kid's first bite. Pick a language and a format. Every video is a tight thirty seconds. Tap Prepare a proposal. Reelmino writes the script and plans the scenes for you. Approve it, and the video is made — voice, music, captions included. Start with one sentence at reelmino.com.
+> What if one sentence was enough to make a video? Type what it should show: a cheesy slice, a kid's first bite. Reelmino writes the script and plans every scene. Approve it, and get the video with voice, music and captions. Start with one sentence at reelmino.com.
 
 ## Assets used
 
 - `screens/20-create-empty.png`
 - `screens/21-create-prompt-filled.png`
-- `screens/22-create-language-format.png`
-- `screens/24-create-summary-bar.png`
 - `screens/54-run-coffee-proposal-top.png`
-- `broll/pizza-bravo.mp4`
+- `demo/ugc-a.png`
 
 ## Platform copy
 

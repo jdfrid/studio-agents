@@ -1,8 +1,20 @@
 # Reelmino promo kit — 30-second feature ads
 
-Fourteen ready-to-edit packages for YouTube Shorts, TikTok, Telegram and X. Each package is one 30-second vertical ad about one feature, with a timecoded script, on-screen text, a shot list pointing at real mobile screens, and post copy for every platform.
+Eighteen packages for YouTube Shorts, TikTok, Telegram and X. Each package is one 30-second vertical ad about one feature: 4 scenes of 6 seconds plus a 5–6 second branded end card, with on-screen text, one image per scene (real mobile screens or stills from real Reelmino videos), and post copy for every platform.
 
 Open `index.html` in a browser for the visual storyboards. The full scripts are in `packages/`.
+
+## Produce them with Reelmino (no editing)
+
+```powershell
+$env:REELMINO_SESSION = "<studio_session cookie>"
+node marketing/promo-kit/demos.mjs            # 8 sample videos of one bakery idea, each with different settings
+node marketing/promo-kit/demos.mjs --status   # repeat until all are downloaded; extracts stills + a 6s clip into demo/
+node marketing/promo-kit/produce.mjs          # one Reelmino run per package (one free video or 40 credits each)
+node marketing/promo-kit/produce.mjs --status # repeat until all are in output/
+```
+
+Packages 14–17 use the sample-video stills, and 17 splices in 6 real seconds of the Pixar-style sample. `produce.mjs` skips a package until its footage exists. Keep each scene's narration under ~80 characters: longer lines get trimmed to fit a 6-second scene.
 
 ## Folder
 
@@ -12,6 +24,8 @@ Open `index.html` in a browser for the visual storyboards. The full scripts are 
 | `packages/NN-*.md` | Script, shot list, feature description and platform copy for each package |
 | `screens/` | Mobile screenshots (iPhone, 1170×2532). Files ending in `-full` are full-page captures for panning or cropping |
 | `broll/` | Four finished Reelmino videos from the library, for "this is the result" shots |
+| `demo/` | Stills (`<id>-a.png`, `<id>-b.png`) and 6-second clips from the sample videos made by `demos.mjs`: Pixar-style, LEGO, claymation, anime, cinematic, UGC, and formal / sporty wardrobe |
+| `produce.mjs` / `demos.mjs` | Send the packages / sample videos to Reelmino and download the results |
 | `brand/` | Reelmino logo and symbol (SVG) for the end card |
 | `packages.mjs` / `build.mjs` | Source data for the packages. Edit `packages.mjs`, then run `node marketing/promo-kit/build.mjs` to regenerate the Markdown and the storyboard |
 
@@ -33,11 +47,15 @@ Open `index.html` in a browser for the visual storyboards. The full scripts are 
 | 11 | Almost perfect? Don't start over | Edit scenes, visual corrections, new version |
 | 12 | Credits, not surprises | Pricing |
 | 13 | All your videos, one place | Library, download and share |
+| 14 | One idea, any style | Design / animation styles (Pixar, LEGO, claymation, anime…) |
+| 15 | Cast it, dress it | Character type, age, wardrobe, expression |
+| 16 | You're the director | Location, time, weather, lighting, camera, effects |
+| 17 | Watch me make one | Making-of: settings → the real result spliced in |
 
 ## How to cut one ad (CapCut, Premiere or similar)
 
 1. Make a 1080×1920 project at 30 fps.
-2. Record the voice-over from the package. Good options are Reelmino's own "Woman — warm" or "Man — clear" voice, or your own voice. Each script runs 20–28 seconds.
+2. Record the voice-over from the package. Good options are Reelmino's own "Woman — warm" or "Man — clear" voice, or your own voice. Each script runs 12–20 seconds, leaving room for pauses and the end card.
 3. Put each screen inside a phone mockup (or full-bleed, cropped from the top) and follow the "Motion / edit" column: slow push-ins, scrolls and tap highlights. The screens are 3× resolution, so zooming up to about 2× stays sharp.
 4. Add the on-screen text in bold, large type. Brand colors: forest `#173D35`, lime `#D9F27A`, paper `#F6F7F2`.
 5. Add light upbeat music under the voice, about −18 dB below the voice.

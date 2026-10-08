@@ -14,24 +14,22 @@ Choose up to two moods — Professional & trustworthy, Premium, Emotional, Young
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/26-create-mood.png` | Split screen: calm vs. energetic | Calm café or high-energy launch? | **SET THE MOOD** |
-| 3–9s | `screens/26-create-mood.png` | Tap Premium, then Calm | Choose up to two moods — premium, emotional, energetic, dramatic, calm. | **UP TO 2 MOODS** |
-| 9–13s | `screens/26-create-mood.png` | Zoom on the helper line | Reelmino applies it to color, music, pacing, narration and camera work. | **COLOR · MUSIC · PACE** |
-| 13–18s | `screens/25-create-adjustments-top.png` | Highlight the 4 steps | Want more? The full studio: idea, script, voice and music. | **THE FULL STUDIO** |
-| 18–24s | `screens/27-create-approval-mode.png` | Tap each mode | And choose how hands-on you are — automatic, script first, or approve every stage. | **YOUR LEVEL OF CONTROL** |
-| 24–27s | `broll/watch-claymation.mp4` | Play a stylized moment | Same tool. Your style. | **YOUR STYLE** |
-| 27–30s | `END CARD` | Logo + URL | Reelmino. Your mood, your rules. | **reelmino.com** |
+| 0–6s | `screens/26-create-mood.png` | Tap two mood chips | Calm café or high-energy launch? Pick up to two moods. | **SET THE MOOD** |
+| 6–12s | `screens/80-style-presets.png` | Tap a preset card | Or tap a preset: product ad, B2B, personal story, news or social. | **ONE-TAP PRESETS** |
+| 12–18s | `screens/87-camera-editing.png` | Scroll the camera settings | Fine-tune camera, effects, transitions and caption style. | **THE FULL STUDIO** |
+| 18–24s | `demo/clay-a.png` | Real Reelmino video, full screen | Same tool. Your style. | **YOUR STYLE** |
+| 24–30s | `END CARD` | Logo + URL | Reelmino. Your mood, your rules. | **reelmino.com** |
 
-**Full voice-over** (60 words, about 24 seconds at a natural pace):
+**Full voice-over** (38 words, about 15 seconds at a natural pace):
 
-> Calm café or high-energy launch? Choose up to two moods — premium, emotional, energetic, dramatic, calm. Reelmino applies it to color, music, pacing, narration and camera work. Want more? The full studio: idea, script, voice and music. And choose how hands-on you are — automatic, script first, or approve every stage. Same tool. Your style. Reelmino. Your mood, your rules.
+> Calm café or high-energy launch? Pick up to two moods. Or tap a preset: product ad, B2B, personal story, news or social. Fine-tune camera, effects, transitions and caption style. Same tool. Your style. Reelmino. Your mood, your rules.
 
 ## Assets used
 
 - `screens/26-create-mood.png`
-- `screens/25-create-adjustments-top.png`
-- `screens/27-create-approval-mode.png`
-- `broll/watch-claymation.mp4`
+- `screens/80-style-presets.png`
+- `screens/87-camera-editing.png`
+- `demo/clay-a.png`
 
 ## Platform copy
 

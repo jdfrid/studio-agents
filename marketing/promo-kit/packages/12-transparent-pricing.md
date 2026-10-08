@@ -14,26 +14,23 @@ A 30-second video costs 40 credits; lip-sync adds 20. Single video: $15 one-time
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/02-pricing-top.png` | Price tag swing-in | How much does a video cost? Exactly what it says. | **CREDITS, NOT SURPRISES** |
-| 3–8s | `screens/02-pricing-top.png` | Highlight the lead line | A thirty-second video is forty credits. | **1 VIDEO = 40 CREDITS** |
-| 8–13s | `screens/02-pricing-top.png` | Zoom on $15 | Start with a single video for fifteen dollars — no commitment. | **$15 · NO COMMITMENT** |
-| 13–19s | `screens/02-pricing-plans.png` | Pan down to Starter and Business | Or go monthly: Starter is about five videos, Business about fifteen. | **STARTER $49 · BUSINESS $119** |
-| 19–24s | `screens/24-create-summary-bar.png` | Zoom on the cost line | The cost is shown before you create. | **COST SHOWN UP FRONT** |
-| 24–27s | `screens/10-dashboard-top.png` | Highlight the balance | And your balance is always on your dashboard. | **ALWAYS VISIBLE** |
-| 27–30s | `END CARD` | Logo + URL | Reelmino. Clear pricing at reelmino.com. | **reelmino.com** |
+| 0–6s | `screens/02-pricing-top.png` | Price tag swing-in | A thirty-second video is forty credits. No surprises. | **1 VIDEO = 40 CREDITS** |
+| 6–12s | `screens/02-pricing-top.png` | Zoom on $15 | Start with a single video for fifteen dollars, no commitment. | **$15 · NO COMMITMENT** |
+| 12–18s | `screens/02-pricing-plans.png` | Pan over Starter and Business | Or go monthly: Starter is five videos, Business about fifteen. | **STARTER $49 · BUSINESS $119** |
+| 18–24s | `screens/24-create-summary-bar.png` | Zoom on the cost line | The cost is shown before you create, every time. | **COST SHOWN UP FRONT** |
+| 24–30s | `END CARD` | Logo + URL | Reelmino. Clear pricing at reelmino.com. | **reelmino.com** |
 
-**Full voice-over** (58 words, about 23 seconds at a natural pace):
+**Full voice-over** (42 words, about 17 seconds at a natural pace):
 
-> How much does a video cost? Exactly what it says. A thirty-second video is forty credits. Start with a single video for fifteen dollars — no commitment. Or go monthly: Starter is about five videos, Business about fifteen. The cost is shown before you create. And your balance is always on your dashboard. Reelmino. Clear pricing at reelmino.com.
+> A thirty-second video is forty credits. No surprises. Start with a single video for fifteen dollars, no commitment. Or go monthly: Starter is five videos, Business about fifteen. The cost is shown before you create, every time. Reelmino. Clear pricing at reelmino.com.
 
-**Production note:** Re-check prices on the live Pricing page before publishing. Shot 4 uses 02-pricing-plans.png (Starter and Business cards cropped from 02-pricing-full.png).
+**Production note:** Re-check prices on the live Pricing page before publishing. Scene 3 uses 02-pricing-plans.png (Starter and Business cards cropped from 02-pricing-full.png).
 
 ## Assets used
 
 - `screens/02-pricing-top.png`
 - `screens/02-pricing-plans.png`
 - `screens/24-create-summary-bar.png`
-- `screens/10-dashboard-top.png`
 
 ## Platform copy
 

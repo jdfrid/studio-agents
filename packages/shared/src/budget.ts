@@ -52,6 +52,17 @@ export function veoClipSeconds(budget: boolean, forcedBucket?: VeoDurationBucket
   return budget ? 4 : 6;
 }
 
+/** Seconds of the requested length taken by the branded end card the renderer always appends. */
+export const END_CARD_RESERVE_SECONDS = 6;
+
+/**
+ * Story seconds to plan scenes for: the requested length minus the end card, so a 30s brief
+ * renders ~30s in total instead of 30s of scenes plus the card. Short briefs keep their full length.
+ */
+export function storySecondsForBrief(durationSeconds: number): number {
+  return durationSeconds >= 20 ? durationSeconds - END_CARD_RESERVE_SECONDS : durationSeconds;
+}
+
 /** Scene count aligned with Veo bucket so total video length matches the brief. */
 export function planSceneLayout(
   durationSeconds: number,

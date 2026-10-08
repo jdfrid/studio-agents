@@ -14,23 +14,21 @@ Choose Vertical for Reels, TikTok and YouTube Shorts, or Horizontal for YouTube 
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/28-create-basic-settings.png` | Platform logos fly in around the phone | Reels, TikTok, Shorts, LinkedIn, YouTube — one tool. | **MADE FOR EVERY FEED** |
-| 3–8s | `screens/22-create-language-format.png` | Tap Vertical | Choose vertical for Reels, TikTok and Shorts… | **VERTICAL 9:16** |
-| 8–13s | `screens/22-create-language-format.png` | Tap Horizontal; the frame rotates | …or horizontal for YouTube and presentations. | **HORIZONTAL 16:9** |
-| 13–18s | `screens/28-create-basic-settings.png` | Open the Platform dropdown | Tell Reelmino where you're posting. | **PICK THE PLATFORM** |
-| 18–24s | `broll/premium-deals-app.mp4` | Play 0:00–0:06 | Every video is thirty seconds — the sweet spot for short-form. | **ALWAYS 30 SECONDS** |
-| 24–27s | `screens/62-actions-menu.png` | Highlight the menu | Download the MP4 and post it anywhere. | **DOWNLOAD · POST** |
-| 27–30s | `END CARD` | Logo + URL | Reelmino. One video, every feed. | **reelmino.com** |
+| 0–6s | `screens/22-create-language-format.png` | Tap Vertical, then Horizontal | Vertical for Reels, TikTok and Shorts, or horizontal for YouTube. | **9:16 · 16:9** |
+| 6–12s | `screens/28-create-basic-settings.png` | Open the platform list | Tell Reelmino where you're posting, and it fits the feed. | **PICK THE PLATFORM** |
+| 12–18s | `demo/lego-a.png` | Real Reelmino video, full screen | Every video is a tight thirty seconds. | **ALWAYS 30 SECONDS** |
+| 18–24s | `screens/62-actions-menu.png` | Tap Download | Download the MP4 and post it anywhere. | **DOWNLOAD · POST** |
+| 24–30s | `END CARD` | Logo + URL | Reelmino. One video, every feed. | **reelmino.com** |
 
-**Full voice-over** (49 words, about 20 seconds at a natural pace):
+**Full voice-over** (39 words, about 16 seconds at a natural pace):
 
-> Reels, TikTok, Shorts, LinkedIn, YouTube — one tool. Choose vertical for Reels, TikTok and Shorts… …or horizontal for YouTube and presentations. Tell Reelmino where you're posting. Every video is thirty seconds — the sweet spot for short-form. Download the MP4 and post it anywhere. Reelmino. One video, every feed.
+> Vertical for Reels, TikTok and Shorts, or horizontal for YouTube. Tell Reelmino where you're posting, and it fits the feed. Every video is a tight thirty seconds. Download the MP4 and post it anywhere. Reelmino. One video, every feed.
 
 ## Assets used
 
-- `screens/28-create-basic-settings.png`
 - `screens/22-create-language-format.png`
-- `broll/premium-deals-app.mp4`
+- `screens/28-create-basic-settings.png`
+- `demo/lego-a.png`
 - `screens/62-actions-menu.png`
 
 ## Platform copy

@@ -14,24 +14,22 @@ On mobile, the Source materials card opens the camera directly: Photograph a pro
 
 | Time | Screen / footage | Motion / edit | Voice-over | On-screen text |
 |---|---|---|---|---|
-| 0–3s | `screens/23-create-materials-camera.png` | Phone-in-hand overlay | Your phone is already a video studio. | **SHOOT ON YOUR PHONE** |
-| 3–8s | `screens/23-create-materials-camera.png` | Tap Photograph a product, camera flash | Tap Photograph a product — or Photograph yourself for a selfie. | **PRODUCT · SELFIE** |
-| 8–12s | `screens/23-create-materials-camera.png` | Highlight the gallery drop zone | Or pick from your gallery. | **OR FROM YOUR GALLERY** |
-| 12–17s | `screens/64-materials-roles.png` | Scroll through the role cards | Reelmino places them — or you assign roles: character, product, logo. | **AUTO-PLACED** |
-| 17–22s | `screens/66-reference-video.png` | Highlight Reference video | Love a video's style? Upload it as a reference — Reelmino matches the look without copying it. | **MATCH A STYLE** |
-| 22–27s | `broll/premium-deals-app.mp4` | Play 0:03–0:08 | Your real product, polished in thirty seconds. | **YOUR PRODUCT, POLISHED** |
-| 27–30s | `END CARD` | Logo + URL | Reelmino. Shot on your phone. | **reelmino.com** |
+| 0–6s | `screens/23-create-materials-camera.png` | Tap Photograph a product | Your phone is a video studio: snap a product or a selfie. | **SHOOT ON YOUR PHONE** |
+| 6–12s | `screens/64-materials-roles.png` | Roles appear on each photo | Reelmino places your photos, or you give each one a role. | **CHARACTER · PRODUCT · LOGO** |
+| 12–18s | `screens/66-reference-video.png` | Highlight the reference box | Love a video's style? Upload it as a reference to match the look. | **MATCH A STYLE** |
+| 18–24s | `demo/cinematic-b.png` | Real Reelmino video, full screen | Your real business, polished into a thirty-second video. | **YOUR PRODUCT, POLISHED** |
+| 24–30s | `END CARD` | Logo + URL | Reelmino. Shot on your phone. | **reelmino.com** |
 
-**Full voice-over** (63 words, about 25 seconds at a natural pace):
+**Full voice-over** (49 words, about 20 seconds at a natural pace):
 
-> Your phone is already a video studio. Tap Photograph a product — or Photograph yourself for a selfie. Or pick from your gallery. Reelmino places them — or you assign roles: character, product, logo. Love a video's style? Upload it as a reference — Reelmino matches the look without copying it. Your real product, polished in thirty seconds. Reelmino. Shot on your phone.
+> Your phone is a video studio: snap a product or a selfie. Reelmino places your photos, or you give each one a role. Love a video's style? Upload it as a reference to match the look. Your real business, polished into a thirty-second video. Reelmino. Shot on your phone.
 
 ## Assets used
 
 - `screens/23-create-materials-camera.png`
 - `screens/64-materials-roles.png`
 - `screens/66-reference-video.png`
-- `broll/premium-deals-app.mp4`
+- `demo/cinematic-b.png`
 
 ## Platform copy
 

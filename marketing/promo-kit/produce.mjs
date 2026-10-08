@@ -8,17 +8,27 @@
  *
  * Auth: REELMINO_SESSION env var (the studio_session cookie value).
  * Progress is kept in output/produced.json, so re-running never creates a package twice.
+ * Packages that use demo/ footage need `node demos.mjs --status` to have finished first.
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { PACKAGES } from "./packages.mjs";
+import {
+  BRANDING,
+  ROOT,
+  checkBalance,
+  createApi,
+  dataUrl,
+  downloadFinal,
+  loadState,
+  requireSession,
+  saveState
+} from "./lib.mjs";
 
-const API = process.env.REELMINO_API ?? "https://reelmino.com/api";
-const ROOT = new URL("./", import.meta.url);
 const OUTPUT = new URL("output/", ROOT);
 const STATE_FILE = new URL("produced.json", OUTPUT);
-const CREDITS_PER_VIDEO = 40;
-const MAX_SCREENS = 6;
+/** Each scene is one ~6s HeyGen beat. Briefs of 20s+ reserve END_CARD_SECONDS for the branded end card. */
+const SECONDS_PER_SCENE = 6;
+const END_CARD_SECONDS = 6;
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -26,58 +36,48 @@ const statusOnly = args.includes("--status");
 const onlyArg = args.find((a) => a.startsWith("--only="));
 const only = onlyArg ? new Set(onlyArg.slice(7).split(",")) : null;
 
-const session = process.env.REELMINO_SESSION?.trim();
-if (!session && !dryRun) {
-  console.error("Set REELMINO_SESSION to your studio_session cookie first.");
-  process.exit(1);
-}
-const headers = { cookie: `studio_session=${session}`, "content-type": "application/json" };
+/** Generated scenes only: the end card is added by the renderer and .mp4 rows are spliced via pkg.insert. */
+const scenesOf = (pkg) => pkg.shots.filter((s) => s[1] !== "END CARD" && !s[1].endsWith(".mp4"));
 
-async function api(path, init = {}) {
-  const res = await fetch(`${API}${path}`, { ...init, headers: { ...headers, ...(init.headers ?? {}) } });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`${init.method ?? "GET"} ${path} -> ${res.status}: ${text.slice(0, 300)}`);
-  return text ? JSON.parse(text) : {};
-}
-
-async function dataUrl(relPath, mimeType) {
-  const buf = await readFile(new URL(relPath, ROOT));
-  return `data:${mimeType};base64,${buf.toString("base64")}`;
-}
-
-function screensOf(pkg) {
-  const files = pkg.shots
-    .flatMap((s) => s[1].split("→").map((a) => a.trim()))
-    // Full-page captures (e.g. 1170x7296) make HeyGen fail with generation_failed.
-    .filter((a) => a.startsWith("screens/") && a.endsWith(".png") && !a.includes("-full"));
-  return [...new Set(files)].slice(0, MAX_SCREENS);
+/** One still per scene, in scene order (full-page captures make HeyGen fail with generation_failed). */
+function imagesOf(pkg) {
+  return scenesOf(pkg).map((s) => {
+    const file = s[1].split("→")[0].trim();
+    if (!/^(screens|demo)\/.+\.png$/.test(file) || file.includes("-full")) {
+      throw new Error(`${pkg.id}: scene asset must be a screens/ or demo/ PNG, got "${s[1]}"`);
+    }
+    return file;
+  });
 }
 
 function briefFor(pkg) {
-  const narration = pkg.shots
-    .filter((s) => s[3])
-    .map((s, i) => `Scene ${i + 1} (${s[0]}): "${s[3]}" — on-screen text: ${s[4]}`)
+  const scenes = scenesOf(pkg);
+  const endLine = pkg.shots.find((s) => s[1] === "END CARD")?.[3];
+  const narration = scenes
+    .map((s, i) => `Scene ${i + 1}: narration "${s[3]}" — on-screen text: ${s[4]} — visual: attached image ${i + 1} (${s[2]})`)
     .join("\n");
   return {
     title: `Reelmino promo ${pkg.id} — ${pkg.name}`,
     sourceText: [
-      `A 30-second vertical social ad for Reelmino, an app that turns a one-sentence idea into a finished branded 30-second business video.`,
+      `A short vertical social ad for Reelmino, an app that turns a one-sentence idea into a finished branded business video.`,
       `Feature in this ad: ${pkg.feature}.`,
       `What it does: ${pkg.description}`,
       `Audience: ${pkg.audience}.`,
-      `Hook: ${pkg.hook}`,
-      `Key message: ${pkg.message}`,
-      `Use this narration and on-screen text, scene by scene:\n${narration}`,
+      `Exactly ${scenes.length} scenes of about ${SECONDS_PER_SCENE} seconds. Use this narration and on-screen text, scene by scene:\n${narration}`,
+      endLine ? `Closing line on the end card: "${endLine}"` : "",
       `Platform: TikTok, Instagram Reels and YouTube Shorts.`
-    ].join("\n"),
+    ]
+      .filter(Boolean)
+      .join("\n"),
     instructions: [
-      "The attached images are real screenshots of the Reelmino mobile app. Show them inside a modern smartphone held by a person, or as a clean phone mockup, so the interface stays readable.",
-      "Do not invent other app interfaces. Keep the narration exactly as written.",
-      "End on the Reelmino end card with reelmino.com."
+      `Use exactly ${scenes.length} scenes, one attached image per scene, in the order given.`,
+      "Images of the app are real Reelmino screenshots: show them inside a modern smartphone held by a person, or as a clean phone mockup, so the interface stays readable.",
+      "Images that are not app screens are real videos made with Reelmino: show them full screen, as they are.",
+      "Speak each scene's narration exactly as written — one short sentence per scene. Do not invent other app interfaces."
     ].join("\n"),
     targetAudience: pkg.audience,
     language: "en",
-    durationSeconds: 30,
+    durationSeconds: scenes.length * SECONDS_PER_SCENE + END_CARD_SECONDS,
     aspectRatio: "9:16",
     budgetMode: true,
     approvalMode: "auto",
@@ -86,40 +86,66 @@ function briefFor(pkg) {
       videoOrientation: "portrait",
       voiceCharacter: "female_warm",
       karaokeCaptions: "on",
-      preferHeygenDub: "off"
+      preferHeygenDub: "off",
+      ...(pkg.creative ?? {})
     },
-    branding: {
-      businessName: "Reelmino",
-      slogan: "Your story. Now in motion.",
-      websiteUrl: "https://reelmino.com",
-      primaryColor: "#173D35",
-      secondaryColor: "#F6F7F2"
-    }
+    branding: BRANDING
   };
 }
 
-async function loadState() {
-  if (!existsSync(STATE_FILE)) return {};
-  return JSON.parse(await readFile(STATE_FILE, "utf8"));
+async function attachmentsFor(pkg, logo) {
+  const list = [
+    { name: "reelmino-logo.png", mimeType: "image/png", kind: "image", role: "logo", dataUrl: logo },
+    ...(await Promise.all(
+      imagesOf(pkg).map(async (file) => ({
+        name: file.split("/").pop(),
+        mimeType: "image/png",
+        kind: "image",
+        role: "product",
+        dataUrl: await dataUrl(file, "image/png")
+      }))
+    ))
+  ];
+  if (pkg.insert) {
+    list.push({
+      name: pkg.insert.file.split("/").pop(),
+      mimeType: "video/mp4",
+      kind: "video",
+      role: "insert_clip",
+      insertAtSeconds: pkg.insert.at,
+      audioSource: pkg.insert.audio ?? "clip",
+      dataUrl: await dataUrl(pkg.insert.file, "video/mp4")
+    });
+  }
+  return list;
 }
 
-async function saveState(state) {
-  await mkdir(OUTPUT, { recursive: true });
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2));
+function missingFootage(pkg) {
+  const files = [...imagesOf(pkg), ...(pkg.insert ? [pkg.insert.file] : [])];
+  return files.filter((f) => !existsSync(new URL(f, ROOT)));
 }
 
-async function downloadFinal(runId, file) {
-  const artifacts = await api(`/runs/${runId}/artifacts`);
-  const list = Array.isArray(artifacts) ? artifacts : (artifacts.artifacts ?? []);
-  const final = list.filter((a) => a.kind === "final_video").at(-1);
-  if (!final) return false;
-  const signed = await api(`/artifacts/${final.id}/signed-url`);
-  const buf = Buffer.from(await fetch(signed.url ?? signed.signedUrl).then((r) => r.arrayBuffer()));
-  await writeFile(new URL(file, OUTPUT), buf);
-  return true;
+const state = await loadState(STATE_FILE);
+const todo = PACKAGES.filter((p) => (!only || only.has(p.id)) && !state[p.id]);
+
+if (dryRun) {
+  for (const pkg of todo) {
+    const brief = briefFor(pkg);
+    const missing = missingFootage(pkg);
+    console.log(
+      `\n=== ${pkg.id} ${pkg.name} (${brief.durationSeconds}s incl. end card${pkg.insert ? ` + ${pkg.insert.file} @${pkg.insert.at}s` : ""})` +
+        `\nimages: ${imagesOf(pkg).join(", ")}` +
+        (missing.length ? `\nMISSING: ${missing.join(", ")}` : "") +
+        `\n${brief.sourceText}`
+    );
+  }
+  console.log(`\n${todo.length} videos · one free video or 40 credits each`);
+  process.exit(0);
 }
 
-async function status(state) {
+const api = createApi(requireSession(false));
+
+if (statusOnly) {
   for (const pkg of PACKAGES) {
     const entry = state[pkg.id];
     if (!entry || (only && !only.has(pkg.id))) continue;
@@ -131,61 +157,32 @@ async function status(state) {
     try {
       const run = await api(`/runs/${entry.runId}`);
       entry.status = run.status;
-      if (run.status === "COMPLETED" && (await downloadFinal(entry.runId, file))) entry.file = `output/${file}`;
+      if (run.status === "COMPLETED" && (await downloadFinal(api, entry.runId, new URL(file, OUTPUT)))) {
+        entry.file = `output/${file}`;
+      }
     } catch (err) {
       console.warn(`${pkg.id} check failed, will retry next time: ${err.message.slice(0, 80)}`);
       continue;
     }
     console.log(`${pkg.id} ${pkg.slug.padEnd(30)} ${entry.status.padEnd(18)} ${entry.file ?? ""}`);
   }
-  await saveState(state);
-}
-
-const state = await loadState();
-const todo = PACKAGES.filter((p) => (!only || only.has(p.id)) && !state[p.id]);
-
-if (statusOnly) {
-  await status(state);
+  await saveState(STATE_FILE, state);
   process.exit(0);
 }
 
-if (dryRun) {
-  for (const pkg of todo) {
-    const brief = briefFor(pkg);
-    console.log(`\n=== ${pkg.id} ${pkg.name}\nscreens: ${screensOf(pkg).join(", ")}\n${brief.sourceText}`);
-  }
-  console.log(`\n${todo.length} videos · one free video or ${CREDITS_PER_VIDEO} credits each`);
-  process.exit(0);
-}
-
-const me = await api("/auth/me");
-const free = me.freeVideosRemaining ?? 0;
-const paidVideos = Math.max(0, todo.length - free);
-const needed = paidVideos * CREDITS_PER_VIDEO;
-console.log(`Balance: ${free} free videos + ${me.credits} credits · ${todo.length} videos need ${needed} credits after free videos`);
-if (me.credits < needed) {
-  console.error("Not enough credits. Add credits, or use --only= for fewer packages.");
-  process.exit(1);
-}
-
+const ready = todo.filter((pkg) => {
+  const missing = missingFootage(pkg);
+  if (missing.length) console.warn(`${pkg.id} skipped — missing ${missing.join(", ")} (run demos.mjs --status first)`);
+  return !missing.length;
+});
+await checkBalance(api, ready.length);
 const logo = await dataUrl("brand/logo-primary.png", "image/png");
-for (const pkg of todo) {
+for (const pkg of ready) {
   const brief = briefFor(pkg);
-  brief.attachments = [
-    { name: "reelmino-logo.png", mimeType: "image/png", kind: "image", role: "logo", dataUrl: logo },
-    ...(await Promise.all(
-      screensOf(pkg).map(async (file) => ({
-        name: file.split("/").pop(),
-        mimeType: "image/png",
-        kind: "image",
-        role: "product",
-        dataUrl: await dataUrl(file, "image/png")
-      }))
-    ))
-  ];
+  brief.attachments = await attachmentsFor(pkg, logo);
   const run = await api("/runs", { method: "POST", body: JSON.stringify({ brief }) });
   state[pkg.id] = { runId: run.id, createdAt: new Date().toISOString(), status: run.status };
-  await saveState(state);
+  await saveState(STATE_FILE, state);
   console.log(`${pkg.id} ${pkg.slug.padEnd(30)} started  https://reelmino.com/runs/${run.id}`);
 }
 console.log("\nVideos take a few minutes each. Run with --status to check progress and download them.");
