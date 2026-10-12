@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { apiGet } from "./api.js";
+import { apiGet, mediaUrl } from "./api.js";
 import type { ArtifactRow, StageName } from "./types.js";
 import { formatApiErrorMessage, type RenderProfileId } from "@studio/shared";
 
@@ -430,7 +430,7 @@ export function SignedMedia({
     return (
       <figure className="media-preview media-preview-hero">
         <figcaption>{label}</figcaption>
-        <video controls playsInline src={url} onError={handleError} />
+        <video controls playsInline src={mediaUrl(url)} onError={handleError} />
       </figure>
     );
   }
@@ -438,14 +438,14 @@ export function SignedMedia({
     return (
       <figure className="media-preview">
         <figcaption>{label}</figcaption>
-        <audio controls src={url} onError={handleError} />
+        <audio controls src={mediaUrl(url)} onError={handleError} />
       </figure>
     );
   }
   return (
     <figure className="media-preview">
       <figcaption>{label}</figcaption>
-      <img src={url} alt={label} loading="lazy" onError={handleError} />
+      <img src={mediaUrl(url)} alt={label} loading="lazy" onError={handleError} />
     </figure>
   );
 }
@@ -453,7 +453,7 @@ export function SignedMedia({
 function MediaLink({ label, url }: { label: string; url: string }) {
   return (
     <p>
-      <a href={url} target="_blank" rel="noreferrer">
+      <a href={mediaUrl(url)} target="_blank" rel="noreferrer">
         {label}
       </a>
     </p>

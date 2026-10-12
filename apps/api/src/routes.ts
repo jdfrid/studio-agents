@@ -101,6 +101,7 @@ import {
 } from "@studio/providers";
 import { predictRenderProfileId } from "@studio/shared";
 import { getAdminServicesOverview } from "./servicesOverview.js";
+import { registerMediaProxy } from "./mediaProxy.js";
 import { registerDistributionRoutes } from "./distributionRoutes.js";
 import { registerAutomationRoutes } from "./automationRoutes.js";
 import { consumeRateLimit } from "./rateLimit.js";
@@ -214,6 +215,7 @@ export async function registerRoutes(app: FastifyInstance) {
   await registerAutomationRoutes(app);
 
   app.get("/health", async () => ({ ok: true }));
+  registerMediaProxy(app);
   app.get("/config/creative-catalog", async (request) => {
     const { locale } = z.object({ locale: z.enum(["he", "en"]).default("en") }).parse(request.query);
     return { locale, fields: await getCreativeCatalog(locale) };

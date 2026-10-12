@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { apiDelete, apiGet, apiPost } from "./api.js";
+import { apiDelete, apiGet, apiPost, mediaUrl } from "./api.js";
 import { StageOutputView, SignedMedia } from "./StageOutputs.js";
 import { StageProgressClock } from "./StageProgressClock.js";
 import { VisualCorrectionsPanel } from "./VisualCorrectionsPanel.js";
@@ -406,11 +406,11 @@ function CompletedResult({
         const res = await apiGet<{ url: string }>(
           `/artifacts/${artifactId}/signed-url?download=1&filename=${encodeURIComponent(filename)}`
         );
-        window.location.assign(res.url);
+        window.location.assign(mediaUrl(res.url));
         return;
       }
       if (!url) return;
-      const res = await fetch(url);
+      const res = await fetch(mediaUrl(url));
       if (!res.ok) throw new Error("download failed");
       const blob = await res.blob();
       const objectUrl = URL.createObjectURL(blob);
@@ -422,7 +422,7 @@ function CompletedResult({
       a.remove();
       URL.revokeObjectURL(objectUrl);
     } catch {
-      if (url) window.location.assign(url);
+      if (url) window.location.assign(mediaUrl(url));
     }
   }
 
@@ -602,7 +602,7 @@ function UserStageCard({
 
   async function openArtifact(id: string) {
     const { url } = await apiGet<{ url: string }>(`/artifacts/${id}/signed-url`);
-    window.open(url, "_blank");
+    window.open(mediaUrl(url), "_blank");
   }
 
   const showOutput = s?.output && status !== "PENDING";
@@ -807,7 +807,7 @@ function RunLogoThumb({ artifactId }: { artifactId: string }) {
     };
   }, [artifactId]);
   if (!url) return <div className="run-branding-logo-placeholder" aria-hidden />;
-  return <img src={url} alt="" className="run-branding-logo" />;
+  return <img src={mediaUrl(url)} alt="" className="run-branding-logo" />;
 }
 
 function runEndedAt(run: ProjectRunView): string | null {

@@ -5,6 +5,14 @@ function apiUrl(path: string): string {
   return `${apiBase}${path}`;
 }
 
+/** Route storage.googleapis.com links through our domain; some filtered networks block GCS media. */
+export function mediaUrl(url: string): string;
+export function mediaUrl(url: string | null): string | null;
+export function mediaUrl(url: string | null): string | null {
+  if (!url || !/^https:\/\/storage\.googleapis\.com\//.test(url)) return url;
+  return apiUrl(`/media?u=${encodeURIComponent(url)}`);
+}
+
 async function throwApiError(res: Response): Promise<never> {
   const text = await res.text();
   let message = text;
