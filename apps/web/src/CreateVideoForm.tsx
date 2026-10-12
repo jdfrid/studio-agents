@@ -134,8 +134,6 @@ export function CreateVideoForm({
     [freeLeft, lipSyncRequested]
   );
   const enoughCredits = freeLeft > 0 || (user?.credits ?? 0) >= (creditCost || CREDIT_NEW_VIDEO);
-  const keptAnchorCount = keptAttachments.filter((item) => item.role === "anchor" || item.role === "scene").length;
-  const heygenNeedsAnchor = lipSyncRequested && visualFiles.length === 0 && keptAnchorCount === 0;
   const contentLocale = languageCodeFromCreative(creative) === "en" ? "en" : "he";
   const contentT = i18n.getFixedT(contentLocale, "createVideo");
 
@@ -531,10 +529,6 @@ export function CreateVideoForm({
       setError(t("validation.logoSize"));
       return;
     }
-    if (lipSyncRequested && visualFiles.length === 0 && keptAnchorCount === 0) {
-      setError(t("validation.anchorRequired"));
-      return;
-    }
     if (visualFiles.length > MAX_VISUAL_FILES) {
       setError(t("validation.characterLimit", { count: MAX_VISUAL_FILES }));
       return;
@@ -855,7 +849,6 @@ export function CreateVideoForm({
   ];
   const requiredMissing = [
     !prompt.trim() ? t("summary.descriptionField") : "",
-    heygenNeedsAnchor ? t("summary.anchorField") : "",
     voiceFile && !voiceConsent ? t("summary.voiceConsentField") : "",
     !enoughCredits ? t("summary.creditsField") : ""
   ].filter(Boolean);
@@ -1776,7 +1769,7 @@ export function CreateVideoForm({
                   })
                 )}
                 {group.id === "voice" && (narrationMode === "lip_sync" || visualFiles.length > 0) ? (
-                  <p className={heygenNeedsAnchor ? "error-inline accordion-note" : "muted accordion-note"}>
+                  <p className="muted accordion-note">
                     {t("voice.lipSyncLabel")} · {t("credits.lipSyncSurcharge", { extra: CREDIT_LIP_SYNC_SURCHARGE, total: CREDIT_NEW_VIDEO + CREDIT_LIP_SYNC_SURCHARGE })}
                   </p>
                 ) : null}

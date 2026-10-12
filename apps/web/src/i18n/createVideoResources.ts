@@ -307,7 +307,7 @@ export const en = {
     presetsHeading: "Quick style presets",
     presetsHelp: "One choice updates several professional settings together.",
     auto: "Automatic — based on the brief and mood",
-    lipSyncHelp: "Lip-sync requires a character image and adds {{extra}} credits ({{total}} total). The default is automatic.",
+    lipSyncHelp: "Lip-sync adds {{extra}} credits ({{total}} total). Upload a character photo to keep the same face, or we create the characters for you. The default is automatic.",
     groups: {
       format: { title: "Format & audience", description: "Pacing, communication style, and format extensions" },
       visualStyle: { title: "Visual style", description: "Design, color, realism, logo, and lighting" },
@@ -666,7 +666,7 @@ export const he = {
   advanced: {
     heading: "הגדרות מתקדמות", summaryHelp: "שליטה מקצועית בסגנון, תסריט, קול, צילום ועריכה",
     presetsHeading: "תבניות סגנון מהירות", presetsHelp: "בחירה אחת תעדכן מספר הגדרות מקצועיות יחד.",
-    auto: "אוטומטי — לפי הבריף והאווירה", lipSyncHelp: "סנכרון שפתיים דורש תמונת דמות ומוסיף {{extra}} קרדיטים (סה״כ {{total}}). ברירת המחדל היא אוטומטית.",
+    auto: "אוטומטי — לפי הבריף והאווירה", lipSyncHelp: "סנכרון שפתיים מוסיף {{extra}} קרדיטים (סה״כ {{total}}). אפשר להעלות תמונת דמות כדי לשמור על אותו פרצוף, או שהמערכת תיצור את הדמויות בעצמה. ברירת המחדל היא אוטומטית.",
     groups: {
       format: { title: "פורמט וקהל", description: "קצב, סגנון תקשורת והרחבות לפורמט" },
       visualStyle: { title: "סגנון חזותי", description: "עיצוב, צבעוניות, מציאותיות, לוגו ותאורה" },
