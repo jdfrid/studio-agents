@@ -4,9 +4,11 @@ import {
   calculateRunwayHours,
   officialBillingUrl,
   parseHeygenBilling,
+  parseRunwayOrganization,
   providerNameHe,
   severityForReading
 } from "./index.js";
+import { capacityRequirementsForRun, evaluateReadingCapacity, videoProviderForProfile } from "./capacity.js";
 
 describe("provider monitoring", () => {
   it("calculates runway from remaining units and burn rate", () => {
@@ -77,5 +79,64 @@ describe("provider monitoring", () => {
       expectedFromRecentUsage: true
     });
     expect(inventory.some((entry) => entry.provider === "lemonsqueezy")).toBe(false);
+  });
+
+  it("attributes Runway Grok Imagine usage to Runway, not xAI", () => {
+    const inventory = buildProviderInventory(
+      [],
+      [{ activityType: "veo_video", model: "grok_imagine_1_5_lite", metadata: { provider: "runway" } }],
+      {}
+    );
+    expect(inventory.map((entry) => entry.provider)).toEqual(["runway"]);
+  });
+
+  it("converts the Runway credit balance to dollars and keeps daily limits", () => {
+    const parsed = parseRunwayOrganization({
+      creditBalance: 1250,
+      tier: { maxMonthlyCreditSpend: 100000, models: { grok_imagine_1_5_lite: { maxDailyGenerations: 500, maxConcurrentGenerations: 3 } } },
+      usage: { models: { grok_imagine_1_5_lite: { dailyGenerations: 12 }, gen4_turbo: { dailyGenerations: 3 } } }
+    });
+    expect(parsed.value).toBe(12.5);
+    expect(parsed.details).toMatchObject({
+      creditBalance: 1250,
+      dailyGenerations: 15,
+      grokDailyGenerations: 12,
+      grokMaxDailyGenerations: 500,
+      grokMaxConcurrentGenerations: 3
+    });
+    expect(parseRunwayOrganization({}).value).toBeNull();
+  });
+});
+
+describe("run capacity pre-flight", () => {
+  const base = { operationalStatus: "HEALTHY" as const, source: "official_api", metricType: "BALANCE" as const, unit: "USD" };
+
+  it("blocks when a USD balance cannot cover the video", () => {
+    expect(evaluateReadingCapacity({ ...base, value: 0.5 }, 0.9)).toBe("no_funds");
+    expect(evaluateReadingCapacity({ ...base, value: 5 }, 0.9)).toBeNull();
+  });
+
+  it("blocks empty credit quotas, missing keys and rejected keys", () => {
+    expect(evaluateReadingCapacity({ ...base, metricType: "QUOTA", unit: "credits", value: 0 })).toBe("no_funds");
+    expect(evaluateReadingCapacity({ ...base, metricType: "QUOTA", unit: "credits", value: 3 })).toBeNull();
+    expect(evaluateReadingCapacity({ ...base, value: null, operationalStatus: "DISABLED", source: "optional_not_configured" })).toBe(
+      "not_configured"
+    );
+    expect(evaluateReadingCapacity({ ...base, value: null, errorCode: "http_401" })).toBe("auth");
+    expect(evaluateReadingCapacity({ ...base, value: null, errorCode: "http_402" })).toBe("no_funds");
+  });
+
+  it("does not block on health-only providers or transient outages", () => {
+    expect(evaluateReadingCapacity({ ...base, metricType: "SERVICE_HEALTH", value: null })).toBeNull();
+    expect(evaluateReadingCapacity({ ...base, value: null, errorCode: "http_503" })).toBeNull();
+  });
+
+  it("requires the profile's video provider plus Gemini", () => {
+    expect(videoProviderForProfile("runway-grok-lite")).toBe("runway");
+    expect(videoProviderForProfile("kling-avatar-i2v")).toBe("fal");
+    expect(videoProviderForProfile("omni-multiclip")).toBe("gemini");
+    const reqs = capacityRequirementsForRun("runway-grok-lite", 30);
+    expect(reqs.map((r) => r.provider)).toEqual(["runway", "gemini"]);
+    expect(reqs[0]?.requiredUsd).toBeCloseTo(0.9);
   });
 });

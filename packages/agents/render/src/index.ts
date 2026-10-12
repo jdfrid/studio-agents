@@ -25,6 +25,7 @@ import {
   usesFalVideoProvider,
   usesHeygenVideoProvider,
   usesLipSyncVideoProvider,
+  usesRunwayVideoProvider,
   type Agent,
   type AgentContext,
   type ArtifactRecord,
@@ -62,14 +63,18 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
 
     const provider = usesHeygenVideoProvider(renderProfile)
       ? resolveHeygenCredential()
-      : await ctx.providers.primary(usesFalVideoProvider(renderProfile) ? "VIDEO" : "GEMINI");
+      : usesRunwayVideoProvider(renderProfile)
+        ? resolveRunwayCredential()
+        : await ctx.providers.primary(usesFalVideoProvider(renderProfile) ? "VIDEO" : "GEMINI");
     if (!provider) {
       throw new NoProviderConfiguredError(
         usesHeygenVideoProvider(renderProfile)
           ? "HEYGEN"
-          : usesFalVideoProvider(renderProfile)
-            ? "VIDEO"
-            : "GEMINI"
+          : usesRunwayVideoProvider(renderProfile)
+            ? "RUNWAY"
+            : usesFalVideoProvider(renderProfile)
+              ? "VIDEO"
+              : "GEMINI"
       );
     }
     const beatGenerator = getVideoBeatGenerator(renderProfile, provider);
@@ -101,7 +106,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
       }
 
       const beatConcurrency =
-        usesFalVideoProvider(renderProfile) || usesHeygenVideoProvider(renderProfile)
+        usesFalVideoProvider(renderProfile) || usesHeygenVideoProvider(renderProfile) || usesRunwayVideoProvider(renderProfile)
           ? Math.min(3, Math.max(1, Number(process.env.RENDER_BEAT_CONCURRENCY ?? 2) || 2))
           : 1;
       await ctx.log.log("render_beat_concurrency", "Multiclip beat concurrency", {
@@ -673,6 +678,23 @@ function resolveHeygenCredential(): ProviderCredentialView | null {
     config: {
       ...(process.env.HEYGEN_VOICE_ID ? { voiceId: process.env.HEYGEN_VOICE_ID } : {}),
       ...(process.env.HEYGEN_API_BASE ? { baseUrl: process.env.HEYGEN_API_BASE } : {})
+    },
+    secret
+  };
+}
+
+/** Env-only Runway credential (RUNWAYML_API_SECRET, the name the Runway SDKs read). */
+function resolveRunwayCredential(): ProviderCredentialView | null {
+  const secret = process.env.RUNWAYML_API_SECRET?.trim() || process.env.RUNWAY_API_KEY?.trim();
+  if (!secret) return null;
+  return {
+    id: "env-runway",
+    type: "VIDEO",
+    provider: "runway",
+    priority: 0,
+    config: {
+      ...(process.env.RUNWAY_API_BASE ? { baseUrl: process.env.RUNWAY_API_BASE } : {}),
+      ...(process.env.RUNWAY_VIDEO_MODEL ? { model: process.env.RUNWAY_VIDEO_MODEL } : {})
     },
     secret
   };

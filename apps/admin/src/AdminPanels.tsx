@@ -200,7 +200,7 @@ export function AdminSettingsPanel() {
           />
           <small className="muted">
             מזהה וידאו של Google: Gemini Omni 1.1 Flash (Preview) או Veo. ספקי Wan/Kling/Hailuo נבחרים ב«מודל
-            רינדור ללקוחות» למעלה (דורש FAL_API_KEY). HeyGen Video דורש HEYGEN_API_KEY.
+            רינדור ללקוחות» למעלה (דורש FAL_API_KEY). HeyGen Video דורש HEYGEN_API_KEY. Runway דורש RUNWAYML_API_SECRET.
           </small>
         </label>
       </fieldset>
@@ -250,7 +250,8 @@ type PlatformSettingsView = {
     | "seedance-mini-i2v"
     | "seedance-fast-i2v"
     | "seedance-i2v"
-    | "luma-ray-i2v";
+    | "luma-ray-i2v"
+    | "runway-grok-lite";
   geminiTextModel: string | null;
   geminiTtsModel: string | null;
   geminiImageModel: string | null;
@@ -264,6 +265,7 @@ type PlatformSettingsView = {
 function listRenderProfiles() {
   return [
     { id: "heygen-video" as const, label: "HeyGen Video — ברירת מחדל (~$0.01/ש׳ עד סוף אוק׳ 2026, אחר כך $0.02)" },
+    { id: "runway-grok-lite" as const, label: "Runway — Grok Imagine 1.5 Lite (זול ומהיר, ~$0.03/ש׳ @720p)" },
     { id: "omni-multiclip" as const, label: "Gemini Omni 1.1 Flash (~$0.10/ש׳)" },
     { id: "veo-multiclip" as const, label: "Veo Fast — multiclip (היסטורי)" },
     { id: "wan-i2v" as const, label: "Wan 2.7 — זול (מתמונה, ~$0.10/ש׳ @720p)" },

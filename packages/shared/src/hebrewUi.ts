@@ -113,7 +113,7 @@ export function frameTypeLabel(
 export function videoPromptLocalizedLabel(profile: RenderProfileId, locale: Locale = "he"): string {
   if (locale === "he") return videoPromptLabelHe(profile);
   const p = getRenderProfile(profile);
-  if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen") {
+  if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen" || p.provider === "runway") {
     return `Motion prompt (${videoProviderShortLocalizedLabel(profile, "en")})`;
   }
   return "Video prompt";
@@ -121,7 +121,7 @@ export function videoPromptLocalizedLabel(profile: RenderProfileId, locale: Loca
 
 export function videoPromptLabelHe(profile: RenderProfileId): string {
   const p = getRenderProfile(profile);
-  if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen") {
+  if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen" || p.provider === "runway") {
     return `פרומפט תנועה (${videoProviderShortLabelHe(profile)})`;
   }
   return "פרומפט וידאו";
@@ -130,6 +130,7 @@ export function videoPromptLabelHe(profile: RenderProfileId): string {
 export function videoProviderShortLabelHe(profile: RenderProfileId): string {
   const p = getRenderProfile(profile);
   if (p.provider === "kling") return "קלינג";
+  if (p.provider === "runway") return "ראנוויי גרוק";
   if (p.id === "heygen-video") return "הייג׳ן וידאו";
   if (p.provider === "heygen") return "הייג׳ן";
   if (p.provider === "fal") {
@@ -150,6 +151,7 @@ export function videoProviderShortLocalizedLabel(profile: RenderProfileId, local
   if (locale === "he") return videoProviderShortLabelHe(profile);
   const p = getRenderProfile(profile);
   if (p.provider === "kling") return "Kling";
+  if (p.provider === "runway") return "Runway Grok";
   if (p.id === "heygen-video") return "HeyGen Video";
   if (p.provider === "heygen") return "HeyGen";
   if (p.id === "kling-avatar-i2v") return "Kling Avatar";

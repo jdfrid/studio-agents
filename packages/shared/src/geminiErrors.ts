@@ -86,7 +86,7 @@ export function userFacingGeminiError(
       if (provider === "heygen") {
         return "Lip-sync (HeyGen) is temporarily unavailable. Retry the stage in a few minutes, or create a video without lip-sync. Contact support if it continues — this is not a charge on your Reelmino account.";
       }
-      if (provider === "fal") {
+      if (provider === "fal" || provider === "runway") {
         return "Video rendering is temporarily unavailable. Retry the stage in a few minutes. Contact support if it continues — this is not a charge on your Reelmino account.";
       }
       return "Video production is paused because a rendering provider ran out of capacity. Retry the stage in a few minutes. Contact support if it continues — this is not a charge on your Reelmino account.";
@@ -109,7 +109,7 @@ export function userFacingGeminiError(
       if (provider === "heygen") {
         return "סנכרון שפתיים (HeyGen) אינו זמין כרגע. נסו שוב בעוד כמה דקות, או צרו סרטון בלי סנכרון שפתיים. אם זה נמשך פנו לתמיכה — אין צורך לטפל בחשבון חיוב חיצוני.";
       }
-      if (provider === "fal") {
+      if (provider === "fal" || provider === "runway") {
         return "הפקת הווידאו נעצרה זמנית אצל ספק הרינדור. נסו שוב בעוד כמה דקות. אם זה נמשך פנו לתמיכה — זה לא חיוב בחשבון Reelmino.";
       }
       return "הפקת הווידאו נעצרה כי ספק הרינדור אינו זמין כרגע. נסו שוב בעוד כמה דקות. אם זה נמשך פנו לתמיכה — אין צורך לטפל בחשבון חיוב של ספק חיצוני.";
@@ -128,9 +128,10 @@ export function userFacingGeminiError(
   }
 }
 
-function detectExternalProvider(raw: string): "heygen" | "fal" | "gemini" | null {
+function detectExternalProvider(raw: string): "heygen" | "fal" | "runway" | "gemini" | null {
   const lower = raw.toLowerCase();
   if (lower.includes("heygen") || lower.includes("api.heygen.com")) return "heygen";
+  if (lower.includes("runwayml.com") || lower.includes("runway")) return "runway";
   // HeyGen-specific error code (Google does not use this exact code string).
   if (lower.includes("insufficient_credit") || lower.includes("purchase credit packs")) return "heygen";
   if (lower.includes("fal.ai") || lower.includes("fal.media") || lower.includes("fal-ai")) return "fal";
@@ -152,6 +153,7 @@ function looksLikeApiRaw(text: string): boolean {
   if (/generativelanguage\.googleapis\.com/i.test(t)) return true;
   if (/api\.heygen\.com/i.test(t)) return true;
   if (/fal\.ai|fal\.media/i.test(t)) return true;
+  if (/api\.dev\.runwayml\.com/i.test(t)) return true;
   if (/RESOURCE_EXHAUSTED|PERMISSION_DENIED|INVALID_ARGUMENT|insufficient_credit/i.test(t)) return true;
   if (/ffmpeg (exited|probe)/i.test(t)) return true;
   return false;

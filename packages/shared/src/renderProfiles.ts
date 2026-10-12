@@ -13,7 +13,8 @@ export const RenderProfileIdSchema = z.enum([
   "seedance-mini-i2v",
   "seedance-fast-i2v",
   "seedance-i2v",
-  "luma-ray-i2v"
+  "luma-ray-i2v",
+  "runway-grok-lite"
 ]);
 export type RenderProfileId = z.infer<typeof RenderProfileIdSchema>;
 export type VideoProviderName = "omni" | "veo" | "kling" | "fal" | "heygen" | "runway" | "shotstack";
@@ -34,6 +35,11 @@ export const KLING_AVATAR_BEAT_SECONDS = 8;
 export const LUMA_RAY_BEAT_SECONDS = 5;
 /** Seedance 2 beat length — short clips for volume / cost control. */
 export const SEEDANCE_BEAT_SECONDS = 5;
+/** Runway Grok Imagine 1.5 Lite — clips are 1–15s; 6s beats match the HeyGen layout. */
+export const RUNWAY_GROK_BEAT_SECONDS = 6;
+export const RUNWAY_GROK_MODEL = "grok_imagine_1_5_lite";
+/** Runway credits are $0.01; Grok Imagine Lite is 3 credits/s at 720p (2 at 480p), +1 credit per start frame. */
+export const RUNWAY_GROK_PER_SECOND_USD = 0.03;
 export type RenderProfileCapabilities = {
   referenceImage: boolean;
   extend: boolean;
@@ -256,6 +262,21 @@ export const RENDER_PROFILES: Record<RenderProfileId, RenderProfile> = {
       maxClipSeconds: 5,
       beatSeconds: LUMA_RAY_BEAT_SECONDS
     }
+  },
+  "runway-grok-lite": {
+    id: "runway-grok-lite",
+    label: "Runway — Grok Imagine 1.5 Lite",
+    labelHe: "Runway — Grok Imagine 1.5 Lite (זול ומהיר)",
+    provider: "runway",
+    strategy: "multiclip",
+    costTier: "cheap",
+    capabilities: {
+      referenceImage: true,
+      extend: false,
+      nativeAudio: false,
+      maxClipSeconds: 15,
+      beatSeconds: RUNWAY_GROK_BEAT_SECONDS
+    }
   }
 };
 export function listRenderProfiles(): RenderProfile[] {
@@ -374,6 +395,7 @@ export function heygenVideoPerSecondUsd(now = new Date()): number {
 /** Rough USD per generated video second for cost estimates (720p-class, fal list prices). */
 export function profileVideoPerSecondUsd(profile: RenderProfile, veoModelPerSecond = 0.08): number {
   if (profile.id === "heygen-video") return heygenVideoPerSecondUsd();
+  if (profile.provider === "runway") return RUNWAY_GROK_PER_SECOND_USD;
   if (profile.provider === "omni") return 0.1;
   if (profile.provider === "heygen") return 0.12;
   if (profile.id === "kling-avatar-i2v") return 0.0562;
@@ -402,7 +424,7 @@ export function resolveRenderProfileId(id?: RenderProfileId | string | null): Re
 /** UI label for the veoPrompt field (reused for Kling motion prompts). */
 export function videoPromptLabel(profile: RenderProfile | RenderProfileId): string {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
-  if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen") return "Motion";
+  if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen" || p.provider === "runway") return "Motion";
   if (p.provider === "omni") return "Gemini Omni";
   return "Veo";
 }
@@ -411,6 +433,7 @@ export function videoProviderShortLabel(profile: RenderProfile | RenderProfileId
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   if (p.provider === "omni") return "Gemini Omni";
   if (p.provider === "kling") return "Kling";
+  if (p.provider === "runway") return "Runway Grok";
   if (p.id === "heygen-video") return "HeyGen Video";
   if (p.provider === "heygen") return "HeyGen";
   if (p.provider === "fal") {
@@ -433,6 +456,7 @@ export function videoModelDisplay(
 ): string {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   if (p.falModel) return p.falModel;
+  if (p.provider === "runway") return RUNWAY_GROK_MODEL;
   if (p.provider === "kling") return KLING_VIDEO_MODEL;
   if (p.id === "heygen-video") return HEYGEN_GENERAL_MODEL;
   if (p.provider === "heygen") return HEYGEN_LIPSYNC_MODEL;
@@ -454,7 +478,7 @@ export function budgetModeCheckboxLabel(
       ? `Budget mode (fewer scenes, Gemini Omni ${clip}s, optional reference image)`
       : `מצב חסכון (פחות סצנות, Gemini Omni ${clip}s, תמונת reference אופציונלית)`;
   }
-  if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen") {
+  if (p.provider === "kling" || p.provider === "fal" || p.provider === "heygen" || p.provider === "runway") {
     return locale === "en"
       ? `Budget mode (fewer scenes, ${clip}s per scene, reference frame)`
       : `מצב חסכון (פחות סצנות, ${clip}s לסצנה, reference frame)`;
@@ -477,6 +501,7 @@ export function videoProviderShortLabelForLocale(
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   if (p.provider === "omni") return "ג׳מיני אומני";
   if (p.provider === "kling") return "קלינג";
+  if (p.provider === "runway") return "ראנוויי גרוק";
   if (p.id === "heygen-video") return "הייג׳ן וידאו";
   if (p.provider === "heygen") return "הייג׳ן";
   if (p.id === "kling-avatar-i2v") return "קלינג אווטאר";
@@ -491,6 +516,10 @@ export function videoProviderShortLabelForLocale(
 export function usesFalVideoProvider(profile: RenderProfile | RenderProfileId): boolean {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
   return p.provider === "kling" || p.provider === "fal";
+}
+export function usesRunwayVideoProvider(profile: RenderProfile | RenderProfileId): boolean {
+  const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
+  return p.provider === "runway";
 }
 export function usesHeygenVideoProvider(profile: RenderProfile | RenderProfileId): boolean {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
@@ -510,5 +539,5 @@ export function usesHeygenGeneralVideo(profile: RenderProfile | RenderProfileId)
 /** Independent I2V-style profiles that plan scenes by beatSeconds (not Veo buckets). */
 export function usesBeatLayoutProvider(profile: RenderProfile | RenderProfileId): boolean {
   const p = typeof profile === "string" ? getRenderProfile(profile) : profile;
-  return p.provider === "kling" || p.provider === "fal" || p.provider === "heygen";
+  return p.provider === "kling" || p.provider === "fal" || p.provider === "heygen" || p.provider === "runway";
 }

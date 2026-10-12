@@ -94,6 +94,9 @@ export function priceVeoScene(
 /** USD per second for ledger estimates (Veo or Kling/fal). */
 export function videoPerSecondUsd(model: string, generateAudio = veoGenerateAudio()): number {
   const m = model.toLowerCase();
+  if (m.includes("grok_imagine")) {
+    return profileVideoPerSecondUsd(getRenderProfile("runway-grok-lite"));
+  }
   if (m.includes("ai-avatar") || m.includes("kling-avatar")) {
     return profileVideoPerSecondUsd(getRenderProfile("kling-avatar-i2v"));
   }
@@ -236,7 +239,7 @@ export function activityTypeLabel(
           if (profile.provider === "omni") return "Gemini Omni וידאו";
           if (profile.provider === "kling") return "Kling וידאו";
           if (profile.provider === "heygen") return "HeyGen וידאו";
-          if (profile.provider === "fal") return `${videoProviderShortLabel(profile)} וידאו`;
+          if (profile.provider === "fal" || profile.provider === "runway") return `${videoProviderShortLabel(profile)} וידאו`;
         } catch {
           /* ignore invalid profile id */
         }

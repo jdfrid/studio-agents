@@ -172,7 +172,11 @@ export const en = {
     previewError: "Could not play a sample for this voice.",
     lipSyncLabel: "Match mouth movement to speech",
     noneHides: "No speech hides voice settings but keeps them if you turn speech back on.",
-    pickHelp: "Choose a voice, then play a sample. Accent and speed appear after you pick a voice."
+    pickHelp: "Choose a voice, then play a sample. Accent and speed appear after you pick a voice.",
+    playSample: "Play a sample of {{name}}",
+    groupMale: "Men",
+    groupFemale: "Women",
+    groupCharacter: "Characters & effects"
   },
   origin: {
     brand: "Brand",
@@ -485,6 +489,9 @@ export const en = {
     titleField: "title",
     goalField: "goal",
     descriptionField: "description",
+    anchorField: "a character image for lip-sync",
+    voiceConsentField: "voice-clone consent",
+    creditsField: "credits",
     saveDraft: "Save",
     preview: "Summary preview",
     untitled: "Untitled",
@@ -512,7 +519,8 @@ export const en = {
     productLimit: "You can upload up to {{count}} stills in one request. The engine places them across the film.",
     characterAnyTooLarge: "One of the character images is too large (maximum 5 MB per file).",
     productAnyTooLarge: "One of the stills is too large (maximum 5 MB per file).",
-    server: "Some settings could not be submitted: {{detail}}"
+    server: "Some settings could not be submitted: {{detail}}",
+    serviceBusy: "Due to high demand, the service is temporarily limited. Please try again in a few minutes — we apologize for the inconvenience."
   },
   brief: {
     goal: "Video goal: {{value}}",
@@ -606,7 +614,11 @@ export const he = {
     preview: "השמעת דוגמה", previewing: "משמיע…", previewError: "לא ניתן להשמיע דוגמה לקול הזה.",
     lipSyncLabel: "התאמת תנועות הפה לדיבור",
     noneHides: "ללא דיבור מסתיר הגדרות קול אך שומר אותן אם תחזרו לדיבור.",
-    pickHelp: "בחרו קול והשמיעו דוגמה. מבטא ומהירות מופיעים אחרי בחירת הקול."
+    pickHelp: "בחרו קול והשמיעו דוגמה. מבטא ומהירות מופיעים אחרי בחירת הקול.",
+    playSample: "השמעת דוגמה של {{name}}",
+    groupMale: "גברים",
+    groupFemale: "נשים",
+    groupCharacter: "דמויות ואפקטים"
   },
   origin: { brand: "מותג", project: "הסרטון הזה" },
   basic: {
@@ -714,7 +726,7 @@ export const he = {
   },
   summary: {
     cost: "עלות", time: "זמן משוער", minutes: "{{min}}–{{max}} דקות", status: "סטטוס מילוי",     ready: "מוכן להצעה",
-    missing: "חסר: {{fields}}", titleField: "כותרת", goalField: "מטרה", descriptionField: "תיאור", saveDraft: "שמירה",
+    missing: "חסר: {{fields}}", titleField: "כותרת", goalField: "מטרה", descriptionField: "תיאור", anchorField: "תמונת דמות לסנכרון שפתיים", voiceConsentField: "אישור לשיבוט קול", creditsField: "קרדיטים", saveDraft: "שמירה",
     preview: "תצוגת סיכום", untitled: "ללא כותרת", noGoal: "לא נבחרה מטרה", autoAudience: "קהל יעד אוטומטי",
     autoMood: "אווירה אוטומטית", create: "הכינו לי הצעה", creating: "מכין הצעה…",
     createRemix: "יצירת גרסה נוספת", creatingRemix: "מכין את הגרסה החדשה…", createAuto: "הפקת הסרטון"
@@ -729,7 +741,8 @@ export const he = {
     productLimit: "ניתן להעלות עד {{count}} תמונות בבקשה אחת. המנוע ישבץ אותן לאורך הסרטון.",
     characterAnyTooLarge: "אחת מתמונות הדמויות גדולה מדי (מקסימום 5MB לקובץ).",
     productAnyTooLarge: "אחת מהתמונות גדולה מדי (מקסימום 5MB לקובץ).",
-    server: "לא ניתן לשלוח חלק מההגדרות: {{detail}}"
+    server: "לא ניתן לשלוח חלק מההגדרות: {{detail}}",
+    serviceBusy: "עקב עומס על המערכת השירות מוגבל - תנסו בעוד כמה דקות שוב, אתכם הסליחה"
   },
   brief: {
     goal: "מטרת הסרטון: {{value}}", action: "הפעולה הרצויה מהצופה: {{value}}", mood: "אווירה נדרשת: {{value}}",

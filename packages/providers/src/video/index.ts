@@ -4,6 +4,7 @@ import { createFalI2vBeatGenerator } from "./falI2v.js";
 import { createHeygenBeatGenerator, createHeygenVideoBeatGenerator } from "./heygen.js";
 import { createKlingBeatGenerator } from "./kling.js";
 import { createOmniBeatGenerator } from "./omni.js";
+import { createRunwayBeatGenerator } from "./runway.js";
 import type { VideoBeatGenerator } from "./types.js";
 import { createVeoBeatGenerator } from "./veo.js";
 
@@ -13,6 +14,15 @@ export { createKlingBeatGenerator } from "./kling.js";
 export { createFalI2vBeatGenerator } from "./falI2v.js";
 export { createHeygenBeatGenerator, createHeygenVideoBeatGenerator } from "./heygen.js";
 export { createOmniBeatGenerator } from "./omni.js";
+export {
+  createRunwayBeatGenerator,
+  buildRunwayCreateBody,
+  clampRunwayDuration,
+  resolveRunwayBaseUrl,
+  runwayApiKey,
+  runwayHeaders,
+  RUNWAY_API_VERSION
+} from "./runway.js";
 export { ensureMinImageForFal, probeImageDimensions, FAL_MIN_STILL_PX } from "./minStill.js";
 
 export function getVideoBeatGenerator(
@@ -28,6 +38,9 @@ export function getVideoBeatGenerator(
     return usesHeygenGeneralVideo(profile)
       ? createHeygenVideoBeatGenerator(profile, credential)
       : createHeygenBeatGenerator(profile, credential);
+  }
+  if (profile.provider === "runway") {
+    return createRunwayBeatGenerator(profile, credential);
   }
   if (profile.provider === "omni") {
     return createOmniBeatGenerator(profile, credential);

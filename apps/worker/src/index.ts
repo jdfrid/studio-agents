@@ -37,12 +37,13 @@ function classifyProviderFailure(error: Error): { provider: string; code: string
   const provider =
     message.includes("eleven") ? "elevenlabs" :
     message.includes("heygen") ? "heygen" :
+    message.includes("runway") ? "runway" :
     message.includes("fal") ? "fal" :
     message.includes("redis") ? "redis" :
     message.includes("gcs") || message.includes("storage") ? "gcs" :
     "gemini";
   const code =
-    /billing|payment/.test(message) ? "billing_failure" :
+    /billing|payment|insufficient.?credit|not enough credit|402/.test(message) ? "billing_failure" :
     /quota|limit|resource_exhausted|429/.test(message) ? "billing_quota" :
     /unauthori|forbidden|credential|401|403/.test(message) ? "authorization_failure" :
     "provider_failure";

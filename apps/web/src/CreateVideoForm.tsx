@@ -754,9 +754,11 @@ export function CreateVideoForm({
     } catch (err) {
       const e = err as Error & { code?: string };
       setError(
-        e.code === "validation_error"
-          ? t("validation.server", { detail: e.message.replace(/^Invalid request:\s*/i, "") })
-          : e.message
+        e.code === "service_busy"
+          ? t("validation.serviceBusy")
+          : e.code === "validation_error"
+            ? t("validation.server", { detail: e.message.replace(/^Invalid request:\s*/i, "") })
+            : e.message
       );
     } finally {
       setBusy(false);
@@ -851,7 +853,12 @@ export function CreateVideoForm({
       ]
     }
   ];
-  const requiredMissing = [!prompt.trim() ? t("summary.descriptionField") : ""].filter(Boolean);
+  const requiredMissing = [
+    !prompt.trim() ? t("summary.descriptionField") : "",
+    heygenNeedsAnchor ? t("summary.anchorField") : "",
+    voiceFile && !voiceConsent ? t("summary.voiceConsentField") : "",
+    !enoughCredits ? t("summary.creditsField") : ""
+  ].filter(Boolean);
   const requiredComplete = requiredMissing.length ? 0 : 1;
   const estimatedMinutesMin = Math.max(4, Math.ceil(durationSeconds / 15) * 2);
   const estimatedMinutesMax = estimatedMinutesMin + 4;
@@ -1826,8 +1833,8 @@ export function CreateVideoForm({
         </div>
       </details>
 
-      {error ? <p className="error-inline">{error}</p> : null}
       <div className="stage-actions create-actions">
+        {error ? <p className="error-inline create-actions-error" role="alert">{error}</p> : null}
         <div className="creation-summary-metrics">
           <span><small>{t("summary.time")}</small><strong>{t("summary.minutes", { min: estimatedMinutesMin, max: estimatedMinutesMax })}</strong></span>
           <span className={requiredComplete === 1 ? "is-ready" : ""}>
@@ -1850,13 +1857,8 @@ export function CreateVideoForm({
         <button
           type="button"
           className="primary"
-          disabled={
-            busy ||
-            !enoughCredits ||
-            !prompt.trim() ||
-            (!!voiceFile && !voiceConsent) ||
-            heygenNeedsAnchor
-          }
+          disabled={busy}
+          aria-disabled={requiredComplete !== 1}
           onClick={() => void submit()}
         >
           {busy

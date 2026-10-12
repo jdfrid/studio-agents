@@ -40,6 +40,7 @@ const OFFICIAL_BILLING_URLS: Record<string, string> = {
   gcs: "https://console.cloud.google.com/billing",
   fal: "https://fal.ai/dashboard/billing",
   heygen: "https://app.heygen.com/settings/billing",
+  runway: "https://dev.runwayml.com/",
   elevenlabs: "https://elevenlabs.io/app/subscription",
   lemonsqueezy: "https://app.lemonsqueezy.com/settings/stores",
   openai: "https://platform.openai.com/settings/organization/billing/overview",
@@ -93,6 +94,7 @@ const PROVIDER_NAMES_HE: Record<string, string> = {
   gcs: "Google Cloud Storage",
   fal: "fal.ai — מודלי רינדור",
   heygen: "HeyGen — וידאו וסנכרון שפתיים",
+  runway: "Runway — Grok Imagine וידאו",
   elevenlabs: "ElevenLabs — קול וקריינות",
   lemonsqueezy: "Lemon Squeezy — חיוב לקוחות",
   openai: "OpenAI — טקסט וקול",
@@ -149,6 +151,13 @@ const PAID_PROVIDER_DEFINITIONS = [
     credentialPattern: /heygen/i
   },
   {
+    provider: "runway",
+    company: "Runway",
+    capability: "רינדור וידאו במודל Grok Imagine 1.5 Lite דרך Runway API",
+    envKeys: ["RUNWAYML_API_SECRET", "RUNWAY_API_KEY"],
+    credentialPattern: /runway/i
+  },
+  {
     provider: "elevenlabs",
     company: "ElevenLabs",
     capability: "שכפול קול וקריינות",
@@ -181,7 +190,7 @@ const PAID_PROVIDER_DEFINITIONS = [
     company: "xAI",
     capability: "יצירת טקסט ווידאו באמצעות Grok",
     envKeys: ["XAI_API_KEY"],
-    credentialPattern: /(^|[^a-z])xai|grok/i
+    credentialPattern: /(^|[^a-z])xai|grok(?!_imagine)/i
   },
   {
     provider: "shotstack",
@@ -785,6 +794,35 @@ export function parseHeygenBilling(body: any): {
   };
 }
 
+/** Runway credits are prepaid at $0.01 each; GET /v1/organization returns the live balance. */
+export const RUNWAY_CREDIT_USD = 0.01;
+
+export function parseRunwayOrganization(body: any): {
+  value: number | null;
+  details: Record<string, unknown>;
+} {
+  const credits = typeof body?.creditBalance === "number" ? body.creditBalance : null;
+  const models = (body?.tier?.models ?? {}) as Record<string, { maxDailyGenerations?: number; maxConcurrentGenerations?: number }>;
+  const usage = (body?.usage?.models ?? {}) as Record<string, { dailyGenerations?: number }>;
+  const grok = models.grok_imagine_1_5_lite ?? null;
+  const dailyGenerations = Object.values(usage).reduce(
+    (sum, entry) => sum + (typeof entry?.dailyGenerations === "number" ? entry.dailyGenerations : 0),
+    0
+  );
+  return {
+    value: credits === null ? null : Math.round(credits * RUNWAY_CREDIT_USD * 100) / 100,
+    details: {
+      creditBalance: credits,
+      maxMonthlyCreditSpend:
+        typeof body?.tier?.maxMonthlyCreditSpend === "number" ? body.tier.maxMonthlyCreditSpend : null,
+      dailyGenerations,
+      grokDailyGenerations: usage.grok_imagine_1_5_lite?.dailyGenerations ?? 0,
+      grokMaxDailyGenerations: grok?.maxDailyGenerations ?? null,
+      grokMaxConcurrentGenerations: grok?.maxConcurrentGenerations ?? null
+    }
+  };
+}
+
 export async function createDefaultMonitorAdapters(
   runtime: "api" | "worker" = "worker"
 ): Promise<ProviderMonitorAdapter[]> {
@@ -792,6 +830,7 @@ export async function createDefaultMonitorAdapters(
   const inventoryByProvider = new Map(inventory.map((entry) => [entry.provider, entry]));
   const geminiKey = () =>
     process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
+  const runwaySecret = () => process.env.RUNWAYML_API_SECRET?.trim() || process.env.RUNWAY_API_KEY?.trim() || "";
   const paidAdapter = (config: Parameters<typeof envHealthAdapter>[0]) => {
     const entry = inventoryByProvider.get(config.provider);
     return envHealthAdapter({
@@ -886,6 +925,18 @@ export async function createDefaultMonitorAdapters(
       parseDetails: (body) => parseHeygenBilling(body).details,
       optional: true,
       balanceUnavailableReason: "סוג החיוב בחשבון קובע אם HeyGen מספק כסף, קרדיטים או תקרת הוצאה."
+    }),
+    paidAdapter({
+      provider: "runway",
+      displayName: "Runway",
+      envKey: process.env.RUNWAYML_API_SECRET ? "RUNWAYML_API_SECRET" : "RUNWAY_API_KEY",
+      url: runwaySecret() ? `${(process.env.RUNWAY_API_BASE ?? "https://api.dev.runwayml.com").replace(/\/$/, "")}/v1/organization` : undefined,
+      headers: () => ({ Authorization: `Bearer ${runwaySecret()}`, "X-Runway-Version": "2024-11-06" }),
+      parseValue: (body) => parseRunwayOrganization(body).value,
+      parseDetails: (body) => parseRunwayOrganization(body).details,
+      metricType: "BALANCE",
+      unit: "USD",
+      optional: true
     }),
     paidAdapter({
       provider: "elevenlabs",

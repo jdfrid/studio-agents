@@ -10,4 +10,5 @@ export * from "./video/index.js";
 export * from "./http.js";
 export * from "./audio/pcm.js";
 export * from "./monitoring/index.js";
+export * from "./monitoring/capacity.js";
 export * from "./social/index.js";

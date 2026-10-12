@@ -91,7 +91,16 @@ import {
   updatePlatformSettings
 } from "@studio/billing";
 import { PlatformSettingsPatchSchema, AdminUserUpdateSchema, clampVideoDurationSeconds } from "@studio/shared";
-import { getProviderInventory, officialBillingUrl, pollProviderMonitors } from "@studio/providers";
+import {
+  capacityRequirementsForRun,
+  checkServiceCapacity,
+  clearServiceCapacityCache,
+  getProviderInventory,
+  officialBillingUrl,
+  pollProviderMonitors
+} from "@studio/providers";
+import { predictRenderProfileId } from "@studio/shared";
+import { getAdminServicesOverview } from "./servicesOverview.js";
 import { registerDistributionRoutes } from "./distributionRoutes.js";
 import { registerAutomationRoutes } from "./automationRoutes.js";
 import { consumeRateLimit } from "./rateLimit.js";
@@ -439,9 +448,8 @@ export async function registerRoutes(app: FastifyInstance) {
     userRoutes.post("/runs", async (request, reply) => {
       const body = CreateRunRequestSchema.parse(request.body);
       const userId = request.user!.sub;
-      const cost = await creditCostForNewRun(userId, {
-        preferLipSync: briefRequestsLipSync(body.brief)
-      });
+      const preferLipSync = briefRequestsLipSync(body.brief);
+      const cost = await creditCostForNewRun(userId, { preferLipSync });
       try {
         await assertCanStartRun(userId, cost);
       } catch (err) {
@@ -457,6 +465,19 @@ export async function registerRoutes(app: FastifyInstance) {
         ...incomingBrief,
         durationSeconds: clampVideoDurationSeconds(incomingBrief.durationSeconds, settings.allowDurationOver30)
       };
+      const predictedProfile = predictRenderProfileId({
+        preferLipSync,
+        briefRenderProfile: resolveRenderProfile().id,
+        falAvailable: Boolean(process.env.FAL_API_KEY?.trim())
+      });
+      const capacity = await checkServiceCapacity(
+        capacityRequirementsForRun(predictedProfile, incomingBrief.durationSeconds ?? 30)
+      ).catch(() => ({ ok: true, blocked: [] }));
+      if (!capacity.ok) {
+        request.log.warn({ blocked: capacity.blocked, profile: predictedProfile }, "run blocked: provider capacity");
+        reply.code(503);
+        return { error: "service_busy", code: "service_busy" };
+      }
       if (body.parentRunId) {
         const allowedPaths = await reusableGcsPathsForRun(body.parentRunId, userId);
         if (!allowedPaths) {
@@ -965,8 +986,11 @@ export async function registerRoutes(app: FastifyInstance) {
       adminRoutes.post("/providers/refresh", async (request) => {
         await auditAdmin(request.user!.sub, "PROVIDER_MONITOR_REFRESH", "provider_monitor");
         await pollProviderMonitors(undefined, "api");
+        clearServiceCapacityCache();
         return { ok: true };
       });
+
+      adminRoutes.get("/services", async () => getAdminServicesOverview());
 
       adminRoutes.patch("/providers/:id/thresholds", async (request, reply) => {
         const { id } = z.object({ id: z.string() }).parse(request.params);
