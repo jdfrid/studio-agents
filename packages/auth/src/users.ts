@@ -114,6 +114,49 @@ export async function createEmailUser(email: string, passwordHash: string): Prom
   return toUserView(user);
 }
 
+export class UserEmailTakenError extends Error {
+  constructor() {
+    super("email_taken");
+    this.name = "UserEmailTakenError";
+  }
+}
+
+/** Admin-created account; same tenant layout as self sign-up. Returns the new user id. */
+export async function adminCreateUser(input: {
+  email: string;
+  name?: string | null;
+  role: "USER" | "ADMIN";
+  passwordHash?: string | null;
+  freeVideosLimit?: number | null;
+}): Promise<string> {
+  const email = input.email.trim().toLowerCase();
+  if (await prisma.user.findUnique({ where: { email }, select: { id: true } })) {
+    throw new UserEmailTakenError();
+  }
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: { slug: `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, name: input.name ?? email }
+      });
+      const user = await tx.user.create({
+        data: {
+          email,
+          name: input.name ?? email.split("@")[0],
+          role: input.role,
+          passwordHash: input.passwordHash ?? null,
+          freeVideosLimit: input.freeVideosLimit ?? null,
+          tenantId: tenant.id
+        }
+      });
+      await tx.tenant.update({ where: { id: tenant.id }, data: { slug: `user_${user.id}` } });
+      return user.id;
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code === "P2002") throw new UserEmailTakenError();
+    throw err;
+  }
+}
+
 export async function setUserPasswordHash(userId: string, passwordHash: string): Promise<void> {
   await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
 }

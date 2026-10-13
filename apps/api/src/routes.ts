@@ -69,7 +69,10 @@ import {
   requireAdmin,
   authPlugin,
   mailConfigured,
-  sendContactInquiryEmail
+  sendContactInquiryEmail,
+  adminCreateUser,
+  hashPassword,
+  UserEmailTakenError
 } from "@studio/auth";
 import {
   assertCanStartRun,
@@ -86,11 +89,18 @@ import {
   getAdminUserPnl,
   adminAdjustCredits,
   updateAdminUser,
+  deleteAdminUser,
+  AdminUserEmailTakenError,
   InsufficientCreditsError,
   getPlatformSettings,
   updatePlatformSettings
 } from "@studio/billing";
-import { PlatformSettingsPatchSchema, AdminUserUpdateSchema, clampVideoDurationSeconds } from "@studio/shared";
+import {
+  PlatformSettingsPatchSchema,
+  AdminUserCreateSchema,
+  AdminUserUpdateSchema,
+  clampVideoDurationSeconds
+} from "@studio/shared";
 import {
   capacityRequirementsForRun,
   checkServiceCapacity,
@@ -1152,16 +1162,53 @@ export async function registerRoutes(app: FastifyInstance) {
       adminRoutes.patch("/users/:id", async (request, reply) => {
         const { id } = z.object({ id: z.string() }).parse(request.params);
         const body = AdminUserUpdateSchema.parse(request.body);
+        if (id === request.user!.sub && body.role === "USER") {
+          return reply.code(400).send({ error: "cannot_demote_self" });
+        }
         try {
-          const updated = await updateAdminUser(id, body);
+          const passwordHash = body.password ? await hashPassword(body.password) : undefined;
+          const updated = await updateAdminUser(id, body, { passwordHash });
           await auditAdmin(request.user!.sub, "ADMIN_USER_UPDATE", "user", id, {
             fields: Object.keys(body)
           });
           return updated;
-        } catch {
+        } catch (err) {
+          if (err instanceof AdminUserEmailTakenError) return reply.code(409).send({ error: "email_taken" });
           reply.code(404);
           return { error: "not_found" };
         }
+      });
+
+      adminRoutes.post("/users", async (request, reply) => {
+        const body = AdminUserCreateSchema.parse(request.body);
+        try {
+          const id = await adminCreateUser({
+            email: body.email,
+            name: body.name,
+            role: body.role,
+            freeVideosLimit: body.freeVideosLimit,
+            passwordHash: body.password ? await hashPassword(body.password) : null
+          });
+          if (body.credits > 0) await adminAdjustCredits(id, body.credits, "initial credits (admin created)");
+          await auditAdmin(request.user!.sub, "ADMIN_USER_CREATE", "user", id, {
+            role: body.role,
+            credits: body.credits,
+            withPassword: Boolean(body.password)
+          });
+          return reply.code(201).send({ id });
+        } catch (err) {
+          if (err instanceof UserEmailTakenError) return reply.code(409).send({ error: "email_taken" });
+          throw err;
+        }
+      });
+
+      adminRoutes.delete("/users/:id", async (request, reply) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        if (id === request.user!.sub) return reply.code(400).send({ error: "cannot_delete_self" });
+        const deleted = await deleteAdminUser(id);
+        if (!deleted) return reply.code(404).send({ error: "not_found" });
+        await auditAdmin(request.user!.sub, "ADMIN_USER_DELETE", "user", id);
+        return { ok: true };
       });
 
       adminRoutes.get("/settings", async (request) => {

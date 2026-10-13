@@ -76,7 +76,7 @@ export async function getAdminUsers(query: AdminListQuery = {}) {
   });
   const results = [];
   for (const u of users) {
-    const [credits, payments, runs, costs, freeVideosRemaining, freeVideosAllowance] = await Promise.all([
+    const [credits, payments, runs, costs, freeVideosRemaining, freeVideosAllowance, lastRun] = await Promise.all([
       getCreditBalance(u.id),
       prisma.payment.aggregate({ _sum: { amountNis: true }, where: { userId: u.id, status: "paid" } }),
       prisma.projectRun.groupBy({ by: ["status"], where: { userId: u.id }, _count: true }),
@@ -85,12 +85,20 @@ export async function getAdminUsers(query: AdminListQuery = {}) {
         where: { run: { userId: u.id } }
       }),
       getFreeVideosRemaining(u.id),
-      getFreeVideosAllowanceForUser(u.id)
+      getFreeVideosAllowanceForUser(u.id),
+      prisma.projectRun.findFirst({
+        where: { userId: u.id },
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true }
+      })
     ]);
     const completed = runs.find((r) => r.status === "COMPLETED")?._count ?? 0;
     const failed = runs.find((r) => r.status === "FAILED")?._count ?? 0;
     const paid = payments._sum.amountNis ?? 0;
     const cost = costs._sum.costNis ?? 0;
+    const lastActivity = [u.lastLoginAt, lastRun?.updatedAt]
+      .filter((d): d is Date => d instanceof Date)
+      .sort((a, b) => b.getTime() - a.getTime())[0];
     results.push({
       id: u.id,
       email: u.email,
@@ -109,6 +117,10 @@ export async function getAdminUsers(query: AdminListQuery = {}) {
       marginNis: paid - cost,
       lastLoginIp: u.lastLoginIp,
       lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
+      lastRunAt: lastRun?.updatedAt.toISOString() ?? null,
+      lastActivityAt: lastActivity?.toISOString() ?? null,
+      hasPassword: Boolean(u.passwordHash),
+      hasGoogle: Boolean(u.googleId),
       createdAt: u.createdAt.toISOString()
     });
   }
@@ -245,11 +257,37 @@ export async function adminAdjustCredits(userId: string, delta: number, note: st
   return grantCredits(userId, delta, "ADMIN_ADJUST", { note });
 }
 
-export async function updateAdminUser(userId: string, patch: AdminUserUpdate) {
+export class AdminUserEmailTakenError extends Error {
+  constructor() {
+    super("email_taken");
+    this.name = "AdminUserEmailTakenError";
+  }
+}
+
+/** Deletes the user row; logins, credits, payments and subscription cascade, runs keep their cost history with no owner. */
+export async function deleteAdminUser(userId: string): Promise<boolean> {
+  const result = await prisma.user.deleteMany({ where: { id: userId } });
+  return result.count > 0;
+}
+
+export async function updateAdminUser(
+  userId: string,
+  patch: AdminUserUpdate,
+  opts: { passwordHash?: string } = {}
+) {
   const body = AdminUserUpdateSchema.parse(patch);
+  if (body.email !== undefined) {
+    const clash = await prisma.user.findFirst({
+      where: { email: body.email, NOT: { id: userId } },
+      select: { id: true }
+    });
+    if (clash) throw new AdminUserEmailTakenError();
+  }
   const user = await prisma.user.update({
     where: { id: userId },
     data: {
+      ...(body.email !== undefined ? { email: body.email } : {}),
+      ...(opts.passwordHash ? { passwordHash: opts.passwordHash } : {}),
       ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.role !== undefined ? { role: body.role } : {}),
       ...(body.freeVideosLimit !== undefined ? { freeVideosLimit: body.freeVideosLimit } : {})

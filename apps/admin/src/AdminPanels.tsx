@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiPatch } from "./api.js";
+import { apiGet, apiPost, apiPatch, apiDelete } from "./api.js";
 
 type AdminUser = {
   id: string;
@@ -18,6 +18,10 @@ type AdminUser = {
   marginNis: number;
   lastLoginIp: string | null;
   lastLoginAt: string | null;
+  lastRunAt: string | null;
+  lastActivityAt: string | null;
+  hasPassword: boolean;
+  hasGoogle: boolean;
   createdAt: string;
 };
 
@@ -43,11 +47,71 @@ type UserPnl = {
 };
 
 type UserEditForm = {
+  email: string;
   name: string;
   role: "USER" | "ADMIN";
   /** empty string = platform default; otherwise integer */
   freeVideosLimit: string;
+  /** empty = keep current password */
+  password: string;
 };
+
+type UserCreateForm = UserEditForm & { credits: string };
+
+const emptyUserForm: UserCreateForm = {
+  email: "",
+  name: "",
+  role: "USER",
+  freeVideosLimit: "",
+  password: "",
+  credits: "0"
+};
+
+const userErrorMessages: Record<string, string> = {
+  email_taken: "כתובת האימייל כבר רשומה במערכת.",
+  cannot_delete_self: "אי אפשר למחוק את המשתמש שאיתו אתה מחובר.",
+  cannot_demote_self: "אי אפשר להוריד לעצמך את הרשאת המנהל.",
+  not_found: "המשתמש לא נמצא (אולי כבר נמחק).",
+  validation_error: "חלק מהשדות לא תקינים."
+};
+
+function userErrorText(err: unknown): string {
+  const raw = (err as Error).message ?? "";
+  return userErrorMessages[raw] ?? (raw || "שגיאה לא צפויה.");
+}
+
+/** Client-side check mirroring AdminUserCreateSchema / AdminUserUpdateSchema. */
+function validateUserForm(form: UserEditForm, opts: { passwordOptional: boolean }): string | null {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) || form.email.trim().length > 160) {
+    return "כתובת אימייל לא תקינה.";
+  }
+  if (form.password && (form.password.length < 8 || form.password.length > 200)) {
+    return "סיסמה חייבת להכיל לפחות 8 תווים.";
+  }
+  if (!opts.passwordOptional && !form.password) return "יש להזין סיסמה.";
+  if (parseFreeVideosLimit(form.freeVideosLimit) === "invalid") {
+    return "מכסת סרטונים חינם חייבת להיות מספר שלם ≥ 0, או ריק לברירת מחדל.";
+  }
+  return null;
+}
+
+function parseFreeVideosLimit(raw: string): number | null | "invalid" {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  const n = Math.floor(Number(trimmed));
+  return Number.isFinite(n) && n >= 0 ? n : "invalid";
+}
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return "";
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return "עכשיו";
+  if (minutes < 60) return `לפני ${minutes} דק׳`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `לפני ${hours} שע׳`;
+  const days = Math.round(hours / 24);
+  return `לפני ${days} ימים`;
+}
 
 type Dashboard = {
   users: number;
@@ -285,14 +349,76 @@ export function AdminUsersPanel() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [pnl, setPnl] = useState<UserPnl | null>(null);
-  const [edit, setEdit] = useState<UserEditForm>({ name: "", role: "USER", freeVideosLimit: "" });
+  const [edit, setEdit] = useState<UserEditForm>({ ...emptyUserForm });
   const [adjust, setAdjust] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState<UserCreateForm>({ ...emptyUserForm });
+  const [createMessage, setCreateMessage] = useState("");
+  const [listMessage, setListMessage] = useState("");
+  const [search, setSearch] = useState("");
 
   async function reloadUsers() {
     const response = await apiGet<{ items: AdminUser[] }>("/admin/users?pageSize=100");
     setUsers(response.items);
+  }
+
+  const visibleUsers = search.trim()
+    ? users.filter((u) =>
+        `${u.email} ${u.name ?? ""}`.toLowerCase().includes(search.trim().toLowerCase())
+      )
+    : users;
+
+  async function createUser() {
+    const invalid = validateUserForm(createForm, { passwordOptional: true });
+    const credits = Math.floor(Number(createForm.credits || "0"));
+    if (invalid || !Number.isFinite(credits) || credits < 0) {
+      setCreateMessage(invalid ?? "קרדיטים חייבים להיות מספר שלם ≥ 0.");
+      return;
+    }
+    setBusy(true);
+    setCreateMessage("");
+    try {
+      const created = await apiPost<{ id: string }>("/admin/users", {
+        email: createForm.email.trim(),
+        name: createForm.name.trim() || null,
+        role: createForm.role,
+        freeVideosLimit: parseFreeVideosLimit(createForm.freeVideosLimit),
+        ...(createForm.password ? { password: createForm.password } : {}),
+        credits
+      });
+      await reloadUsers();
+      setCreating(false);
+      setCreateForm({ ...emptyUserForm });
+      setSelected(created.id);
+      setListMessage(`המשתמש ${createForm.email.trim()} נוסף בהצלחה.`);
+    } catch (err) {
+      setCreateMessage(userErrorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteUser(user: AdminUser) {
+    const confirmed = window.confirm(
+      `למחוק לצמיתות את המשתמש ${user.email}?\n\n` +
+        "יימחקו: פרטי המשתמש, קרדיטים, תשלומים, מנוי והיסטוריית התחברות.\n" +
+        "הסרטונים שלו יישארו במערכת ללא בעלים (לטובת דוחות עלויות).\n\nאי אפשר לבטל פעולה זו."
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setListMessage("");
+    try {
+      await apiDelete(`/admin/users/${user.id}`);
+      if (selected === user.id) setSelected(null);
+      await reloadUsers();
+      setListMessage(`המשתמש ${user.email} נמחק.`);
+    } catch (err) {
+      setListMessage(userErrorText(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -308,40 +434,41 @@ export function AdminUsersPanel() {
       .then((data) => {
         setPnl(data);
         setEdit({
+          email: data.user.email,
           name: data.user.name ?? "",
           role: data.user.role as "USER" | "ADMIN",
-          freeVideosLimit: data.user.freeVideosLimit == null ? "" : String(data.user.freeVideosLimit)
+          freeVideosLimit: data.user.freeVideosLimit == null ? "" : String(data.user.freeVideosLimit),
+          password: ""
         });
+        setMessage("");
       })
       .catch(() => setPnl(null));
   }, [selected]);
 
   async function saveUser() {
     if (!selected) return;
+    const invalid = validateUserForm(edit, { passwordOptional: true });
+    if (invalid) {
+      setMessage(invalid);
+      return;
+    }
     setBusy(true);
     setMessage("");
     try {
-      const limitRaw = edit.freeVideosLimit.trim();
-      let freeVideosLimit: number | null = null;
-      if (limitRaw !== "") {
-        const n = Math.floor(Number(limitRaw));
-        if (!Number.isFinite(n) || n < 0) {
-          setMessage("מכסת סרטונים חינם חייבת להיות מספר שלם ≥ 0, או ריק לברירת מחדל.");
-          return;
-        }
-        freeVideosLimit = n;
-      }
       await apiPatch(`/admin/users/${selected}`, {
+        email: edit.email.trim(),
         name: edit.name.trim() || null,
         role: edit.role,
-        freeVideosLimit
+        freeVideosLimit: parseFreeVideosLimit(edit.freeVideosLimit),
+        ...(edit.password ? { password: edit.password } : {})
       });
       await reloadUsers();
       const data = await apiGet<UserPnl>(`/admin/users/${selected}/pnl`);
       setPnl(data);
+      setEdit((current) => ({ ...current, password: "" }));
       setMessage("נשמר בהצלחה.");
     } catch (err) {
-      setMessage((err as Error).message);
+      setMessage(userErrorText(err));
     } finally {
       setBusy(false);
     }
@@ -371,7 +498,96 @@ export function AdminUsersPanel() {
 
   return (
     <section className="admin-users">
-      <h3>משתמשים</h3>
+      <div className="users-toolbar">
+        <h3>משתמשים ({users.length})</h3>
+        <input
+          className="users-search"
+          type="search"
+          placeholder="חיפוש לפי אימייל או שם"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <button
+          type="button"
+          className="primary"
+          onClick={() => {
+            setCreating((v) => !v);
+            setCreateMessage("");
+          }}
+        >
+          {creating ? "ביטול" : "+ הוספת משתמש"}
+        </button>
+      </div>
+      {creating ? (
+        <div className="user-detail user-create">
+          <h4>משתמש חדש</h4>
+          <div className="user-edit-grid">
+            <label>
+              אימייל *
+              <input
+                type="email"
+                dir="ltr"
+                value={createForm.email}
+                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+              />
+            </label>
+            <label>
+              שם תצוגה
+              <input value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
+            </label>
+            <label>
+              תפקיד
+              <select
+                value={createForm.role}
+                onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as "USER" | "ADMIN" })}
+              >
+                <option value="USER">משתמש</option>
+                <option value="ADMIN">מנהל</option>
+              </select>
+            </label>
+            <label>
+              סיסמה (אופציונלי)
+              <input
+                type="password"
+                dir="ltr"
+                autoComplete="new-password"
+                value={createForm.password}
+                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+              />
+              <small className="muted">בלי סיסמה המשתמש נכנס עם Google, או בוחר סיסמה בכניסה הראשונה במייל.</small>
+            </label>
+            <label>
+              קרדיטים התחלתיים
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={createForm.credits}
+                onChange={(e) => setCreateForm({ ...createForm, credits: e.target.value })}
+              />
+            </label>
+            <label>
+              מכסת סרטונים חינם
+              <input
+                type="number"
+                min={0}
+                max={10000}
+                step={1}
+                placeholder="ברירת מחדל מההגדרות"
+                value={createForm.freeVideosLimit}
+                onChange={(e) => setCreateForm({ ...createForm, freeVideosLimit: e.target.value })}
+              />
+            </label>
+          </div>
+          <div className="stage-actions">
+            <button type="button" className="primary" disabled={busy} onClick={() => void createUser()}>
+              {busy ? "יוצר…" : "צור משתמש"}
+            </button>
+          </div>
+          {createMessage ? <p className="error-inline">{createMessage}</p> : null}
+        </div>
+      ) : null}
+      {listMessage ? <p className={listMessage.startsWith("המשתמש") ? "muted" : "error-inline"}>{listMessage}</p> : null}
       <table className="admin-table">
         <thead>
           <tr>
@@ -380,13 +596,17 @@ export function AdminUsersPanel() {
             <th>תפקיד</th>
             <th>קרדיטים</th>
             <th>סרטונים חינם</th>
-            <th>IP אחרון</th>
+            <th>סרטונים</th>
+            <th>שימוש אחרון</th>
             <th>התחברות אחרונה</th>
+            <th>IP אחרון</th>
+            <th>נרשם</th>
             <th>רווח</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          {users.map((u) => (
+          {visibleUsers.map((u) => (
             <tr key={u.id} className={selected === u.id ? "selected" : ""} onClick={() => setSelected(u.id)}>
               <td>{u.email}</td>
               <td>{u.name ?? "—"}</td>
@@ -396,9 +616,39 @@ export function AdminUsersPanel() {
                 {u.freeVideosRemaining}/{u.freeVideosAllowance}
                 {u.freeVideosLimit == null ? <small className="muted"> (ברירת מחדל)</small> : null}
               </td>
-              <td>{u.lastLoginIp ?? "—"}</td>
+              <td title="הושלמו / נכשלו">
+                {u.videosCompleted}
+                {u.videosFailed > 0 ? <small className="muted"> / {u.videosFailed} נכשלו</small> : null}
+              </td>
+              <td title={u.lastRunAt ? `סרטון אחרון: ${formatWhen(u.lastRunAt)}` : undefined}>
+                {u.lastActivityAt ? (
+                  <>
+                    {formatWhen(u.lastActivityAt)}
+                    <br />
+                    <small className="muted">{timeAgo(u.lastActivityAt)}</small>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </td>
               <td>{formatWhen(u.lastLoginAt)}</td>
+              <td>{u.lastLoginIp ?? "—"}</td>
+              <td>{new Date(u.createdAt).toLocaleDateString("he-IL")}</td>
               <td>₪{u.marginNis.toFixed(0)}</td>
+              <td>
+                <button
+                  type="button"
+                  className="danger-link"
+                  disabled={busy}
+                  title="מחיקת משתמש"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void deleteUser(u);
+                  }}
+                >
+                  מחק
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -406,11 +656,40 @@ export function AdminUsersPanel() {
       {selected && pnl ? (
         <div className="user-detail">
           <h4>עריכת משתמש</h4>
-          <p className="muted">אימייל (Google): {pnl.user.email}</p>
+          <p className="muted">
+            כניסה באמצעות:{" "}
+            {[
+              users.find((u) => u.id === selected)?.hasGoogle ? "Google" : null,
+              users.find((u) => u.id === selected)?.hasPassword ? "סיסמה" : null
+            ]
+              .filter(Boolean)
+              .join(" + ") || "קוד במייל / טרם נכנס"}
+            {" · "}נרשם {formatWhen(pnl.user.createdAt)}
+          </p>
           <div className="user-edit-grid">
+            <label>
+              אימייל
+              <input
+                type="email"
+                dir="ltr"
+                value={edit.email}
+                onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+              />
+            </label>
             <label>
               שם תצוגה
               <input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+            </label>
+            <label>
+              סיסמה חדשה
+              <input
+                type="password"
+                dir="ltr"
+                autoComplete="new-password"
+                placeholder="ריק = ללא שינוי"
+                value={edit.password}
+                onChange={(e) => setEdit({ ...edit, password: e.target.value })}
+              />
             </label>
             <label>
               תפקיד

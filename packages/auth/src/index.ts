@@ -5,3 +5,4 @@ export * from "./google.js";
 export * from "./routes.js";
 export * from "./mobileAuth.js";
 export * from "./mailer.js";
+export { hashPassword } from "./password.js";
