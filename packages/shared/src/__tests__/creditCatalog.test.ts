@@ -11,7 +11,10 @@ import {
   PAYG_PRICE_USD,
   STARTER_CREDITS,
   briefRequestsLipSync,
-  creditCostForVideo
+  checkoutCurrencyFromLocale,
+  creditCostForVideo,
+  formatCheckoutPrice,
+  formatEffectivePerVideo
 } from "../index.js";
 
 describe("credit catalog", () => {
@@ -38,11 +41,21 @@ describe("credit catalog", () => {
     expect(CHECKOUT_PLANS.payg.credits).toBe(PAYG_CREDITS);
     expect(CHECKOUT_PLANS.starter.credits).toBe(STARTER_CREDITS);
     expect(CHECKOUT_PLANS.business.credits).toBe(BUSINESS_CREDITS);
-    expect(PAYG_CREDITS).toBe(49);
-    expect(STARTER_CREDITS).toBe(200);
-    expect(BUSINESS_CREDITS).toBe(600);
+    expect(PAYG_CREDITS).toBe(CREDIT_NEW_VIDEO);
+    expect(STARTER_CREDITS).toBe(30 * CREDIT_NEW_VIDEO);
+    expect(BUSINESS_CREDITS).toBe(30 * CREDIT_NEW_VIDEO);
     expect(CHECKOUT_PLANS.payg.priceNis).toBe(PAYG_PRICE_NIS);
     expect(CHECKOUT_PLANS.payg.priceUsd).toBe(PAYG_PRICE_USD);
-    expect(PAYG_PRICE_USD).toBe(15);
+    expect(PAYG_PRICE_USD).toBe(5);
+    expect(CHECKOUT_PLANS.starter).toMatchObject({ priceUsd: 100, interval: "month", equivalentVideos: 30 });
+    expect(CHECKOUT_PLANS.business).toMatchObject({ priceUsd: 1000, interval: "year", equivalentVideos: 30 });
+  });
+
+  it("sells every checkout in USD and prices per video by the full paid period", () => {
+    expect(checkoutCurrencyFromLocale("he")).toBe("usd");
+    expect(checkoutCurrencyFromLocale("en")).toBe("usd");
+    expect(formatCheckoutPrice("payg", "usd")).toBe("$5");
+    expect(formatEffectivePerVideo("starter", "usd")).toBe("$3.33");
+    expect(formatEffectivePerVideo("business", "usd")).toBe("$2.78");
   });
 });

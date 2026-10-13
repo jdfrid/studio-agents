@@ -108,11 +108,11 @@ export const siteResources = {
       commercial: {
         eyebrow: "מסחרי",
         title: "תנאים מסחריים",
-        updated: "עודכן: 15 בספטמבר 2026. תנאים אלה משלימים את תנאי השימוש לגבי מחיר, קרדיטים והחזרים.",
+        updated: "עודכן: 13 באוקטובר 2026. תנאים אלה משלימים את תנאי השימוש לגבי מחיר, קרדיטים והחזרים.",
         sections: [
           {
             title: "מחירון",
-            body: "סרטון בודד: ₪49 עבור 49 קרדיטים. מסלול התחלתי: ₪179 לחודש עבור 200 קרדיטים (כ־5 סרטונים עד 30 שניות). מסלול עסקי: ₪449 לחודש עבור 600 קרדיטים (כ־15 סרטונים). המחירים לצרכן כוללים מע״מ; בחשבונית עסקית עשוי להופיע מחיר לפני מע״מ אם צוין במפורש."
+            body: "סרטון בודד: $5 חד־פעמי עבור 40 קרדיטים (סרטון אחד עד 30 שניות). מנוי חודשי: $100 לחודש עבור 1,200 קרדיטים בכל חודש (30 סרטונים עד 30 שניות). מנוי שנתי: $1,000 בתשלום אחד לשנה, ו־1,200 קרדיטים מתווספים בכל אחד מ־12 החודשים (30 סרטונים בחודש). המחירים בדולר ארה״ב; מס מקומי עשוי להתווסף בעמוד התשלום, לפי המדינה."
           },
           {
             title: "רכישה מקוונת",
@@ -128,7 +128,7 @@ export const siteResources = {
           },
           {
             title: "מנויים",
-            body: "מסלול התחלתי ועסקי מתחדשים לפי תנאי העסקה אצל ספק התשלומים עד ביטול או סיום תקופה. ביטול נעשה מולנו או מול הספק, לפי ההוראות שקיבלתם בקבלה. מנוי ישן במחיר ₪600 ממשיך לפי תנאיו עד ביטול."
+            body: "המנוי החודשי מתחדש כל חודש, והמנוי השנתי מתחדש כל שנה, לפי תנאי העסקה אצל ספק התשלומים עד ביטול. ביטול נעשה מולנו או מול הספק, לפי ההוראות שקיבלתם בקבלה. אחרי ביטול המנוי ממשיך עד סוף התקופה ששולמה, וגם במנוי השנתי הקרדיטים החודשיים ממשיכים להתווסף עד סוף השנה ששולמה."
           }
         ]
       }
@@ -243,11 +243,11 @@ export const siteResources = {
       commercial: {
         eyebrow: "Commercial",
         title: "Commercial terms",
-        updated: "Updated 15 September 2026. These terms complement the terms of use for price, credits, and refunds.",
+        updated: "Updated 13 October 2026. These terms complement the terms of use for price, credits, and refunds.",
         sections: [
           {
             title: "List prices",
-            body: "Single video: $15 for 49 credits. Starter: $49 per month for 200 credits (about 5 videos of up to 30 seconds). Business: $119 per month for 600 credits (about 15 videos). Prices are shown in US dollars; local tax may be added at checkout depending on your country."
+            body: "Single video: $5 one-time for 40 credits (one video of up to 30 seconds). Monthly: $100 per month for 1,200 credits every month (30 videos of up to 30 seconds). Yearly: $1,000 paid once a year, with 1,200 credits added in each of the 12 months (30 videos a month). Prices are in US dollars; local tax may be added at checkout depending on your country."
           },
           {
             title: "Online checkout",
@@ -263,7 +263,7 @@ export const siteResources = {
           },
           {
             title: "Subscriptions",
-            body: "Starter and Business plans renew under the payment provider's transaction until cancelled or the period ends. Cancel with us or the provider, following the receipt you received. A legacy ₪600 monthly plan continues on its original terms until cancelled."
+            body: "The Monthly plan renews every month and the Yearly plan renews every year, under the payment provider's transaction, until cancelled. Cancel with us or the provider, following the receipt you received. After cancelling, the plan runs until the end of the paid period; on the Yearly plan the monthly credits keep arriving until the paid year ends."
           }
         ]
       }

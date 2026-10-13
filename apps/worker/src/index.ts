@@ -1,6 +1,6 @@
 import { Worker, type Job, type WorkerOptions } from "bullmq";
 import { STAGE_ORDER, type StageName } from "@studio/shared";
-import { refreshPlatformSettingsCache } from "@studio/billing";
+import { refreshPlatformSettingsCache, syncAllSubscriptionGrants } from "@studio/billing";
 import { redisConnection, registerAgent, runStage, queueName, DISTRIBUTION_QUEUE_NAME, runDistributionJob, AUTOMATION_QUEUE_NAME, runAutomationJob, ensureAutomationRepeatable } from "@studio/orchestrator";
 import { briefAgent } from "@studio/agent-brief";
 import { scriptAgent } from "@studio/agent-script";
@@ -31,6 +31,7 @@ const stageTimeouts: Record<StageName, number> = {
 
 const workers: Worker[] = [];
 let monitorTimer: NodeJS.Timeout | undefined;
+let grantTimer: NodeJS.Timeout | undefined;
 
 function classifyProviderFailure(error: Error): { provider: string; code: string } {
   const message = error.message.toLowerCase();
@@ -61,6 +62,19 @@ async function main() {
     });
   }, intervalMs);
   monitorTimer.unref();
+  const syncGrants = () =>
+    void syncAllSubscriptionGrants()
+      .then((granted) => {
+        // eslint-disable-next-line no-console
+        if (granted > 0) console.log(`[billing] granted ${granted} monthly subscription credit batch(es)`);
+      })
+      .catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error("Subscription credit sync failed:", error);
+      });
+  syncGrants();
+  grantTimer = setInterval(syncGrants, 60 * 60_000);
+  grantTimer.unref();
   for (const stage of STAGE_ORDER) {
     const w = new Worker(
       queueName(stage),
@@ -156,6 +170,7 @@ async function shutdown() {
   // eslint-disable-next-line no-console
   console.log("Shutting down workers...");
   if (monitorTimer) clearInterval(monitorTimer);
+  if (grantTimer) clearInterval(grantTimer);
   await Promise.all(workers.map((w) => w.close()));
   process.exit(0);
 }

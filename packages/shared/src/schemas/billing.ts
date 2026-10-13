@@ -33,25 +33,36 @@ export const BillingStatusSchema = z.object({
 });
 export type BillingStatus = z.infer<typeof BillingStatusSchema>;
 
-export const PAYG_CREDITS = 49;
-export const PAYG_PRICE_NIS = 49;
-export const PAYG_PRICE_USD = 15;
-export const STARTER_CREDITS = 200;
-export const STARTER_PRICE_NIS = 179;
-export const STARTER_PRICE_USD = 49;
-export const BUSINESS_CREDITS = 600;
-export const BUSINESS_PRICE_NIS = 449;
-export const BUSINESS_PRICE_USD = 119;
-/** Grandfathered ₪600 / 30-video monthly plan, after the 40× credit scale. */
+/** Checkout is sold in USD only (the Lemon store currency). NIS values are for internal P&L. */
+const USD_TO_NIS_FOR_CATALOG = 3.7;
+const nis = (usd: number) => Math.round(usd * USD_TO_NIS_FOR_CATALOG);
+
+/** One video of up to 30 seconds (CREDIT_NEW_VIDEO). */
+export const PAYG_CREDITS = 40;
+export const PAYG_PRICE_USD = 5;
+export const PAYG_PRICE_NIS = nis(PAYG_PRICE_USD);
+/** "starter" = monthly plan: 30 videos per month. */
+export const STARTER_CREDITS = 1200;
+export const STARTER_PRICE_USD = 100;
+export const STARTER_PRICE_NIS = nis(STARTER_PRICE_USD);
+/** "business" = yearly plan, paid once a year; credits are granted per month (BUSINESS_CREDITS each month). */
+export const BUSINESS_CREDITS = 1200;
+export const BUSINESS_PRICE_USD = 1000;
+export const BUSINESS_PRICE_NIS = nis(BUSINESS_PRICE_USD);
+export const BUSINESS_GRANT_MONTHS = 12;
+/** Grandfathered monthly subscription variant: 30 videos per month. */
 export const LEGACY_SUBSCRIPTION_CREDITS = 1200;
 
 export type CheckoutPlanCatalog = {
   id: CheckoutPlanId;
   planType: PlanType;
+  /** Credits per grant: once for PAYG, per month for both subscriptions. */
   credits: number;
   priceNis: number;
   priceUsd: number;
-  interval: "once" | "month";
+  /** Billing interval. The yearly plan still grants `credits` every month. */
+  interval: "once" | "month" | "year";
+  /** Videos per grant (per month for subscriptions). */
   equivalentVideos: number;
 };
 
@@ -72,7 +83,7 @@ export const CHECKOUT_PLANS: Record<CheckoutPlanId, CheckoutPlanCatalog> = {
     priceNis: STARTER_PRICE_NIS,
     priceUsd: STARTER_PRICE_USD,
     interval: "month",
-    equivalentVideos: 5
+    equivalentVideos: 30
   },
   business: {
     id: "business",
@@ -80,8 +91,8 @@ export const CHECKOUT_PLANS: Record<CheckoutPlanId, CheckoutPlanCatalog> = {
     credits: BUSINESS_CREDITS,
     priceNis: BUSINESS_PRICE_NIS,
     priceUsd: BUSINESS_PRICE_USD,
-    interval: "month",
-    equivalentVideos: 15
+    interval: "year",
+    equivalentVideos: 30
   }
 };
 
@@ -89,8 +100,9 @@ export function checkoutLocaleFromLanguage(language?: string | null): CheckoutLo
   return (language ?? "").toLowerCase().startsWith("en") ? "en" : "he";
 }
 
-export function checkoutCurrencyFromLocale(locale?: string | null): CheckoutCurrency {
-  return checkoutLocaleFromLanguage(locale) === "en" ? "usd" : "ils";
+/** All checkouts are in USD, for both the Hebrew and English sites. */
+export function checkoutCurrencyFromLocale(_locale?: string | null): CheckoutCurrency {
+  return "usd";
 }
 
 export function formatCheckoutPrice(plan: CheckoutPlanId, currency: CheckoutCurrency): string {
@@ -101,7 +113,8 @@ export function formatCheckoutPrice(plan: CheckoutPlanId, currency: CheckoutCurr
 export function formatEffectivePerVideo(plan: CheckoutPlanId, currency: CheckoutCurrency): string {
   const catalog = CHECKOUT_PLANS[plan];
   const price = currency === "usd" ? catalog.priceUsd : catalog.priceNis;
-  const per = price / Math.max(1, catalog.equivalentVideos);
+  const videos = catalog.equivalentVideos * (catalog.interval === "year" ? BUSINESS_GRANT_MONTHS : 1);
+  const per = price / Math.max(1, videos);
   const formatted = per.toFixed(2);
   return currency === "usd" ? `$${formatted}` : `₪${formatted}`;
 }
