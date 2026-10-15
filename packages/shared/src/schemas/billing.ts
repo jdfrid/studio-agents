@@ -33,7 +33,7 @@ export const BillingStatusSchema = z.object({
 });
 export type BillingStatus = z.infer<typeof BillingStatusSchema>;
 
-/** Checkout is sold in USD only (the Lemon store currency). NIS values are for internal P&L. */
+/** Checkout is sold in USD only (the Creem product currency). NIS values are for internal P&L. */
 const USD_TO_NIS_FOR_CATALOG = 3.7;
 const nis = (usd: number) => Math.round(usd * USD_TO_NIS_FOR_CATALOG);
 

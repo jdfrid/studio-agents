@@ -42,7 +42,7 @@ const OFFICIAL_BILLING_URLS: Record<string, string> = {
   heygen: "https://app.heygen.com/settings/billing",
   runway: "https://dev.runwayml.com/",
   elevenlabs: "https://elevenlabs.io/app/subscription",
-  lemonsqueezy: "https://app.lemonsqueezy.com/settings/stores",
+  creem: "https://www.creem.io/dashboard",
   openai: "https://platform.openai.com/settings/organization/billing/overview",
   anthropic: "https://console.anthropic.com/settings/billing",
   xai: "https://console.x.ai/team/default/billing",
@@ -96,7 +96,7 @@ const PROVIDER_NAMES_HE: Record<string, string> = {
   heygen: "HeyGen — וידאו וסנכרון שפתיים",
   runway: "Runway — Grok Imagine וידאו",
   elevenlabs: "ElevenLabs — קול וקריינות",
-  lemonsqueezy: "Lemon Squeezy — חיוב לקוחות",
+  creem: "Creem — חיוב לקוחות ובדיקת תוכן",
   openai: "OpenAI — טקסט וקול",
   anthropic: "Anthropic Claude — טקסט",
   xai: "xAI Grok — טקסט ווידאו",
@@ -165,11 +165,11 @@ const PAID_PROVIDER_DEFINITIONS = [
     credentialPattern: /eleven/i
   },
   {
-    provider: "lemonsqueezy",
-    company: "Lemon Squeezy",
-    capability: "גבייה, מנויים ותשלומי לקוחות",
-    envKeys: ["LEMONSQUEEZY_API_KEY"],
-    credentialPattern: /lemon/i
+    provider: "creem",
+    company: "Creem",
+    capability: "גבייה, מנויים ובדיקת תוכן (Moderation) לפני יצירה",
+    envKeys: ["CREEM_API_KEY"],
+    credentialPattern: /creem/i
   },
   {
     provider: "openai",
@@ -964,17 +964,17 @@ export async function createDefaultMonitorAdapters(
       balanceUnavailableReason: "ElevenLabs API מספק שימוש ומכסת תווים, אך לא יתרה כספית."
     }),
     paidAdapter({
-      provider: "lemonsqueezy",
-      displayName: "Lemon Squeezy",
-      envKey: "LEMONSQUEEZY_API_KEY",
-      url: process.env.LEMONSQUEEZY_API_KEY ? "https://api.lemonsqueezy.com/v1/users/me" : undefined,
-      headers: () => ({
-        Authorization: `Bearer ${process.env.LEMONSQUEEZY_API_KEY ?? ""}`,
-        Accept: "application/vnd.api+json"
-      }),
+      provider: "creem",
+      displayName: "Creem",
+      envKey: "CREEM_API_KEY",
+      url:
+        process.env.CREEM_API_KEY && process.env.CREEM_PRODUCT_PAYG
+          ? `${process.env.CREEM_API_KEY.startsWith("creem_test_") ? "https://test-api.creem.io" : "https://api.creem.io"}/v1/products?product_id=${encodeURIComponent(process.env.CREEM_PRODUCT_PAYG)}`
+          : undefined,
+      headers: () => ({ "x-api-key": process.env.CREEM_API_KEY ?? "" }),
       optional: true,
       balanceUnavailableReason:
-        "Lemon Squeezy הוא שירות גבייה; נקודת הקצה הזו מאמתת גישה ואינה מחזירה יתרה זמינה."
+        "Creem הוא שירות גבייה ובדיקת תוכן; הבדיקה מאמתת גישה ואינה מחזירה יתרה. עמלות ה-Moderation יורדות מהתשלומים."
     }),
     {
       provider: "postgresql",

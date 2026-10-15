@@ -1,3 +1,5 @@
+import { i18n } from "./i18n/index.js";
+
 const apiBase = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 function apiUrl(path: string): string {
@@ -27,6 +29,8 @@ async function throwApiError(res: Response): Promise<never> {
   } catch {
     // keep raw
   }
+  if (code === "prompt_rejected") message = i18n.t("createVideo:validation.promptRejected");
+  if (code === "moderation_unavailable") message = i18n.t("createVideo:validation.moderationUnavailable");
   const err = new Error(message) as Error & { code?: string; status?: number; details?: unknown };
   err.code = code;
   err.status = res.status;

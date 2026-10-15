@@ -7,6 +7,7 @@ import {
   upsertDiscoveredProducts
 } from "@studio/infra-prisma";
 import { assertCanStartRun, creditCostForNewRun, InsufficientCreditsError } from "@studio/billing";
+import { briefModerationParts, ContentModerationError, moderateUserText } from "@studio/providers";
 import { createRun } from "../runService.js";
 import { buildAutomationBrief } from "./brief.js";
 import { productImagesAsDataUrls, refreshProductSnapshot } from "./media.js";
@@ -194,6 +195,30 @@ async function finishProduce(
       data: { enabled: false, status: "paused", lastError: message.slice(0, 500) }
     });
     return;
+  }
+
+  try {
+    await moderateUserText(briefModerationParts(brief), `user_${campaign.userId}:automation:${jobId}`);
+  } catch (error) {
+    if (!(error instanceof ContentModerationError)) throw error;
+    await prisma.automationJob.update({
+      where: { id: jobId },
+      data: { status: "failed", error: error.code }
+    });
+    await prisma.auditLog.create({
+      data: {
+        tenantId: campaign.brandTemplate.tenantId,
+        action: error.code === "prompt_rejected" ? "content_moderation_blocked" : "content_moderation_unavailable",
+        entity: "AutomationJob",
+        entityId: jobId,
+        metadata: { source: "automation", decision: error.decision, productId: product.id, detail: error.message }
+      }
+    });
+    if (error.code === "prompt_rejected") {
+      await prisma.automationProduct.update({ where: { id: product.id }, data: { usedAt: new Date() } });
+      return;
+    }
+    throw error;
   }
 
   await prisma.automationJob.update({ where: { id: jobId }, data: { status: "producing" } });

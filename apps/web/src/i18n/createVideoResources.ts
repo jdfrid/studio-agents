@@ -520,7 +520,9 @@ export const en = {
     characterAnyTooLarge: "One of the character images is too large (maximum 5 MB per file).",
     productAnyTooLarge: "One of the stills is too large (maximum 5 MB per file).",
     server: "Some settings could not be submitted: {{detail}}",
-    serviceBusy: "Due to high demand, the service is temporarily limited. Please try again in a few minutes — we apologize for the inconvenience."
+    serviceBusy: "Due to high demand, the service is temporarily limited. Please try again in a few minutes — we apologize for the inconvenience.",
+    promptRejected: "Part of the text can't be used under our content policy. Please rephrase the description or instructions and try again. No credits were charged.",
+    moderationUnavailable: "We couldn't check the text right now. Please try again in a minute. No credits were charged."
   },
   brief: {
     goal: "Video goal: {{value}}",
@@ -742,7 +744,9 @@ export const he = {
     characterAnyTooLarge: "אחת מתמונות הדמויות גדולה מדי (מקסימום 5MB לקובץ).",
     productAnyTooLarge: "אחת מהתמונות גדולה מדי (מקסימום 5MB לקובץ).",
     server: "לא ניתן לשלוח חלק מההגדרות: {{detail}}",
-    serviceBusy: "עקב עומס על המערכת השירות מוגבל - תנסו בעוד כמה דקות שוב, אתכם הסליחה"
+    serviceBusy: "עקב עומס על המערכת השירות מוגבל - תנסו בעוד כמה דקות שוב, אתכם הסליחה",
+    promptRejected: "חלק מהטקסט לא עומד במדיניות התוכן שלנו. נסחו מחדש את התיאור או ההוראות ונסו שוב. לא חויבו קרדיטים.",
+    moderationUnavailable: "לא הצלחנו לבדוק את הטקסט כרגע. נסו שוב בעוד דקה. לא חויבו קרדיטים."
   },
   brief: {
     goal: "מטרת הסרטון: {{value}}", action: "הפעולה הרצויה מהצופה: {{value}}", mood: "אווירה נדרשת: {{value}}",

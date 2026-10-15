@@ -11,7 +11,7 @@ export const siteResources = {
     footer: { legalNav: "קישורים משפטיים" },
     pricing: {
       checkoutLead:
-        "המחירים להלן הם המחירון הנוכחי בקרדיטים. הרכישה מתבצעת באתר דרך Lemon Squeezy, אחרי התחברות. סרטון עד 30 שניות = 40 קרדיטים.",
+        "המחירים להלן הם המחירון הנוכחי בקרדיטים. הרכישה מתבצעת באתר דרך Creem, אחרי התחברות. סרטון עד 30 שניות = 40 קרדיטים.",
       contactCta: "שאלה על מחיר או על מסלול אוטומטי? פנו אלינו"
     },
     about: {
@@ -46,7 +46,7 @@ export const siteResources = {
       terms: {
         eyebrow: "משפטי",
         title: "תנאי שימוש",
-        updated: "עודכן: 9 בספטמבר 2026. השימוש באתר ובשירות Reelmino מהווה הסכמה לתנאים אלה.",
+        updated: "עודכן: 15 באוקטובר 2026. השימוש באתר ובשירות Reelmino מהווה הסכמה לתנאים אלה.",
         sections: [
           {
             title: "השירות",
@@ -67,6 +67,10 @@ export const siteResources = {
           {
             title: "שימוש אסור",
             body: "אין להשתמש בשירות לתוכן בלתי חוקי, מטעה, פוגעני, או להפרת זכויות. אין לנסות לחדור למערכת, לעקוף מכסות, או לעשות שימוש אוטומטי בלתי מורשה ב-API."
+          },
+          {
+            title: "תוכן אסור ובדיקת תוכן",
+            body: "חל איסור מוחלט ליצור, לבקש או להעלות תוכן מיני, תוכן בוטה או למבוגרים (NSFW), עירום, תוכן מיני הקשור לקטינים בכל צורה, דיפפייק או התחזות לאדם אמיתי ללא הסכמתו, אלימות קשה או גרפית, תוכן שנאה, הסתה או הטרדה, ועידוד פגיעה עצמית או טרור. כל טקסט שנשלח ליצירה (תיאור, הוראות, תיקונים ותוכן שנאסף מהאתר שלכם) נבדק אוטומטית לפני היצירה, ובקשה שאינה עומדת במדיניות נחסמת בלי חיוב קרדיטים. הפרה עלולה להוביל להשעיית החשבון או לסגירתו ללא החזר, ולדיווח לרשויות כשהחוק מחייב."
           },
           {
             title: "אחריות",
@@ -116,7 +120,7 @@ export const siteResources = {
           },
           {
             title: "רכישה מקוונת",
-            body: "רכישת קרדיטים ומנויים מתבצעת באתר דרך Lemon Squeezy אחרי התחברות. הקבלה מגיעה מספק התשלומים. לשאלות על חשבונית או מנוי קיים אפשר לפנות דרך עמוד צור קשר."
+            body: "רכישת קרדיטים ומנויים מתבצעת באתר דרך Creem אחרי התחברות. הקבלה מגיעה מספק התשלומים. לשאלות על חשבונית או מנוי קיים אפשר לפנות דרך עמוד צור קשר."
           },
           {
             title: "קרדיטים",
@@ -146,7 +150,7 @@ export const siteResources = {
     footer: { legalNav: "Legal links" },
     pricing: {
       checkoutLead:
-        "These are the current credit-based list prices. Checkout runs on the site through Lemon Squeezy after you sign in. A video of up to 30 seconds uses 40 credits.",
+        "These are the current credit-based list prices. Checkout runs on the site through Creem after you sign in. A video of up to 30 seconds uses 40 credits.",
       contactCta: "Questions about pricing or the automatic plan? Contact us"
     },
     about: {
@@ -181,7 +185,7 @@ export const siteResources = {
       terms: {
         eyebrow: "Legal",
         title: "Terms of use",
-        updated: "Updated 9 September 2026. Using the Reelmino site and service means you agree to these terms.",
+        updated: "Updated 15 October 2026. Using the Reelmino site and service means you agree to these terms.",
         sections: [
           {
             title: "The service",
@@ -202,6 +206,10 @@ export const siteResources = {
           {
             title: "Unacceptable use",
             body: "Do not use the service for illegal, deceptive, or abusive content, or to infringe rights. Do not probe the system, bypass quotas, or make unauthorized automated API use."
+          },
+          {
+            title: "Prohibited content and moderation",
+            body: "You may not generate, request, or upload sexually explicit, pornographic, or adult (NSFW) content, nudity, any sexual content involving minors, deepfakes or impersonation of a real person without their consent, graphic violence, hate speech, harassment, or content promoting self-harm or terrorism. Every text submitted for generation (descriptions, instructions, corrections, and content collected from your website) is screened automatically before generation, and requests that violate this policy are blocked without charging credits. Violations may lead to suspension or termination of the account without refund, and to reports to authorities where the law requires."
           },
           {
             title: "Liability",
@@ -251,7 +259,7 @@ export const siteResources = {
           },
           {
             title: "Online checkout",
-            body: "Credits and subscriptions are purchased on the site through Lemon Squeezy after sign-in. The receipt comes from the payment provider. For invoice or existing-subscription questions, use the contact page."
+            body: "Credits and subscriptions are purchased on the site through Creem after sign-in. The receipt comes from the payment provider. For invoice or existing-subscription questions, use the contact page."
           },
           {
             title: "Credits",

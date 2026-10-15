@@ -78,7 +78,7 @@ describe("provider monitoring", () => {
       configured: false,
       expectedFromRecentUsage: true
     });
-    expect(inventory.some((entry) => entry.provider === "lemonsqueezy")).toBe(false);
+    expect(inventory.some((entry) => entry.provider === "creem")).toBe(false);
   });
 
   it("attributes Runway Grok Imagine usage to Runway, not xAI", () => {

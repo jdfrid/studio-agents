@@ -81,8 +81,8 @@ import {
   getBillingStatus,
   isCheckoutEnabled,
   isCheckoutPlanEnabled,
-  handleLemonWebhook,
-  verifyWebhookSignature,
+  handleCreemWebhook,
+  verifyCreemSignature,
   getAdminDashboard,
   getAdminUsers,
   getAdminOperationalMetrics,
@@ -115,6 +115,7 @@ import { registerMediaProxy } from "./mediaProxy.js";
 import { registerDistributionRoutes } from "./distributionRoutes.js";
 import { registerAutomationRoutes } from "./automationRoutes.js";
 import { consumeRateLimit } from "./rateLimit.js";
+import { brandTemplateModerationParts, briefModerationParts, changedStrings, screenOrReject } from "./moderation.js";
 import { createHash } from "node:crypto";
 
 const mobileRateBuckets = new Map<string, { count: number; resetAt: number }>();
@@ -231,22 +232,22 @@ export async function registerRoutes(app: FastifyInstance) {
     return { locale, fields: await getCreativeCatalog(locale) };
   });
 
-  // Browser / Lemon "ping" uses GET — real webhooks are POST with signature.
-  app.get("/billing/webhooks/lemonsqueezy", async () => ({
+  // Browser ping uses GET — real webhooks are POST with signature.
+  app.get("/billing/webhooks/creem", async () => ({
     ok: true,
-    service: "lemonsqueezy-webhook",
+    service: "creem-webhook",
     method: "POST required for events"
   }));
 
-  app.post("/billing/webhooks/lemonsqueezy", { config: { rawBody: true } }, async (request, reply) => {
+  app.post("/billing/webhooks/creem", { config: { rawBody: true } }, async (request, reply) => {
     const raw = (request as { rawBody?: string }).rawBody ?? JSON.stringify(request.body);
-    const sig = request.headers["x-signature"] as string | undefined;
-    if (!verifyWebhookSignature(raw, sig)) {
+    const sig = request.headers["creem-signature"] as string | undefined;
+    if (!verifyCreemSignature(raw, sig)) {
       reply.code(401);
       return { error: "invalid_signature" };
     }
-    const body = JSON.parse(raw) as { meta?: { event_name?: string }; data?: unknown };
-    await handleLemonWebhook(body.meta?.event_name ?? "", body as Record<string, unknown>);
+    const event = JSON.parse(raw) as { eventType?: string; object?: unknown };
+    await handleCreemWebhook(event);
     return { ok: true };
   });
 
@@ -311,8 +312,7 @@ export async function registerRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
-      const currency = body.locale === "en" ? "usd" : "ils";
-      if (!isCheckoutPlanEnabled(body.plan, currency)) {
+      if (!isCheckoutPlanEnabled(body.plan)) {
         reply.code(503);
         return {
           error: isCheckoutEnabled() ? "plan_unavailable" : "payments_paused",
@@ -322,7 +322,7 @@ export async function registerRoutes(app: FastifyInstance) {
         };
       }
       try {
-        const url = await createCheckout(user.id, user.email, body.plan, body.locale);
+        const url = await createCheckout(user.id, user.email, body.plan);
         return { checkoutUrl: url };
       } catch (err) {
         request.log.error({ err, plan: body.plan, locale: body.locale, userId: user.id }, "checkout failed");
@@ -355,6 +355,12 @@ export async function registerRoutes(app: FastifyInstance) {
         return { error: "not_found" };
       }
       const body = BrandTemplateWriteSchema.parse(request.body);
+      const screened = await screenOrReject(reply, request.log, {
+        userId: request.user!.sub,
+        source: "brand_template",
+        parts: brandTemplateModerationParts(body)
+      });
+      if (screened !== true) return screened;
       const created = await createBrandTemplateRow(tenantId, body);
       let logo = null;
       if (body.logoDataUrl) {
@@ -383,6 +389,13 @@ export async function registerRoutes(app: FastifyInstance) {
       }
       const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
       const body = BrandTemplateWriteSchema.parse(request.body);
+      const screened = await screenOrReject(reply, request.log, {
+        userId: request.user!.sub,
+        source: "brand_template",
+        entityId: id,
+        parts: brandTemplateModerationParts(body)
+      });
+      if (screened !== true) return screened;
       let logo: { gcsPath: string; mimeType: string; name: string } | null | "clear" = body.clearLogo
         ? "clear"
         : null;
@@ -521,6 +534,12 @@ export async function registerRoutes(app: FastifyInstance) {
         budgetMode: true,
         renderProfile: resolveRenderProfile().id
       });
+      const screened = await screenOrReject(reply, request.log, {
+        userId,
+        source: "run_create",
+        parts: briefModerationParts(brief)
+      });
+      if (screened !== true) return screened;
       const view = await createRun({
         brief,
         userId,
@@ -600,6 +619,14 @@ export async function registerRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
+      const current = await getRun(id);
+      const screened = await screenOrReject(reply, request.log, {
+        userId: request.user!.sub,
+        source: "stage_output",
+        entityId: id,
+        parts: changedStrings(current?.stages.find((s) => s.stage === stage)?.output ?? null, request.body)
+      });
+      if (screened !== true) return screened;
       try {
         const view = await updateStageOutput(id, stage, request.body);
         if (!view) {
@@ -665,6 +692,24 @@ export async function registerRoutes(app: FastifyInstance) {
         reply.code(404);
         return { error: "not_found" };
       }
+      const correctionText = request.body as {
+        characterBible?: unknown;
+        corrections?: unknown;
+        sceneOverrides?: Array<{ visualNotes?: unknown }>;
+      } | null;
+      const screened = await screenOrReject(reply, request.log, {
+        userId: request.user!.sub,
+        source: "visual_corrections",
+        entityId: id,
+        parts: [
+          correctionText?.characterBible,
+          correctionText?.corrections,
+          ...(Array.isArray(correctionText?.sceneOverrides)
+            ? correctionText.sceneOverrides.map((o) => o?.visualNotes)
+            : [])
+        ].map((v) => (typeof v === "string" ? v : null))
+      });
+      if (screened !== true) return screened;
       const { chargeCorrectionCredits, correctionCreditCostForRun } = await import("@studio/billing");
       const cost = await correctionCreditCostForRun(id, run.status, body?.rerunFrom);
       // Pre-check balance so we don't start a rerun the user can't pay for.

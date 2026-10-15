@@ -6,7 +6,7 @@ const PROVIDERS: Record<string, string> = {
   fal: "fal.ai — מודלי רינדור",
   heygen: "HeyGen — וידאו וסנכרון שפתיים",
   elevenlabs: "ElevenLabs — קול וקריינות",
-  lemonsqueezy: "Lemon Squeezy — חיוב לקוחות",
+  creem: "Creem — חיוב לקוחות ובדיקת תוכן",
   openai: "OpenAI — טקסט וקול",
   anthropic: "Anthropic Claude — טקסט",
   xai: "xAI Grok — טקסט ווידאו",

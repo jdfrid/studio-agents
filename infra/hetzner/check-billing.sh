@@ -20,54 +20,30 @@ echo "=== API container env ==="
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T api printenv FREE_VIDEOS_PER_USER 2>/dev/null || echo "(api not running)"
 
 echo ""
-echo "=== Lemon Squeezy env (api container) ==="
+echo "=== Creem env (api container; values hidden) ==="
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T api sh -c '
-  echo "STORE=${LEMONSQUEEZY_STORE_ID:-MISSING}"
-  echo "PAYG=${LEMONSQUEEZY_VARIANT_PAYG:-MISSING}"
-  echo "STARTER=${LEMONSQUEEZY_VARIANT_STARTER:-MISSING}"
-  echo "BUSINESS=${LEMONSQUEEZY_VARIANT_BUSINESS:-MISSING}"
-  echo "SUB=${LEMONSQUEEZY_VARIANT_SUBSCRIPTION:-MISSING}"
-  echo "STORE_USD=${LEMONSQUEEZY_STORE_ID_USD:-MISSING}"
-  echo "PAYG_USD=${LEMONSQUEEZY_VARIANT_PAYG_USD:-MISSING}"
-  echo "STARTER_USD=${LEMONSQUEEZY_VARIANT_STARTER_USD:-MISSING}"
-  echo "BUSINESS_USD=${LEMONSQUEEZY_VARIANT_BUSINESS_USD:-MISSING}"
+  for v in CREEM_API_KEY CREEM_WEBHOOK_SECRET CREEM_PRODUCT_PAYG CREEM_PRODUCT_MONTHLY CREEM_PRODUCT_YEARLY; do
+    eval "val=\${$v:-}"
+    test -n "$val" && echo "$v=set" || echo "$v=MISSING"
+  done
+  case "${CREEM_API_KEY:-}" in creem_test_*) echo "MODE=sandbox";; creem_*) echo "MODE=production";; *) echo "MODE=none";; esac
   echo "PAYMENTS_ENABLED=${PAYMENTS_ENABLED:-unset}"
-  test -n "${LEMONSQUEEZY_API_KEY:-}" && echo "API_KEY=set" || echo "API_KEY=MISSING"
 ' 2>/dev/null || echo "(api not running)"
 
 echo ""
-echo "=== Lemon Squeezy API ping (store lookup) ==="
+echo "=== Creem products ==="
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T api node -e "
-const storeId = process.env.LEMONSQUEEZY_STORE_ID;
-const key = process.env.LEMONSQUEEZY_API_KEY;
-if (!storeId || !key) { console.log('skip — missing STORE or API_KEY'); process.exit(0); }
-fetch('https://api.lemonsqueezy.com/v1/stores/' + storeId, {
-  headers: { Authorization: 'Bearer ' + key, Accept: 'application/vnd.api+json' }
-}).then(async (r) => {
-  const text = await r.text();
-  console.log('HTTP', r.status, text.slice(0, 400));
-}).catch((e) => console.error(String(e)));
-" 2>/dev/null || echo "(api not running)"
-
-echo ""
-echo "=== Lemon Squeezy variants (PAYG + subscription) ==="
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T api node -e "
+const key = process.env.CREEM_API_KEY;
+const base = key && key.startsWith('creem_test_') ? 'https://test-api.creem.io' : 'https://api.creem.io';
 async function check(id, label) {
-  const key = process.env.LEMONSQUEEZY_API_KEY;
   if (!id || !key) { console.log(label, 'MISSING'); return; }
-  const r = await fetch('https://api.lemonsqueezy.com/v1/variants/' + id, {
-    headers: { Authorization: 'Bearer ' + key, Accept: 'application/vnd.api+json' }
-  });
-  const text = await r.text();
-  console.log(label, 'HTTP', r.status, text.slice(0, 280));
+  const r = await fetch(base + '/v1/products?product_id=' + encodeURIComponent(id), { headers: { 'x-api-key': key } });
+  const json = await r.json().catch(() => ({}));
+  console.log(label, 'HTTP', r.status, json.name ?? '', json.price ?? '', json.currency ?? '', json.billing_period ?? '');
 }
-await check(process.env.LEMONSQUEEZY_VARIANT_PAYG, 'PAYG');
-await check(process.env.LEMONSQUEEZY_VARIANT_STARTER, 'STARTER');
-await check(process.env.LEMONSQUEEZY_VARIANT_BUSINESS, 'BUSINESS');
-await check(process.env.LEMONSQUEEZY_VARIANT_SUBSCRIPTION, 'SUB');
-await check(process.env.LEMONSQUEEZY_VARIANT_PAYG_USD, 'PAYG_USD');
-await check(process.env.LEMONSQUEEZY_VARIANT_STARTER_USD, 'STARTER_USD');
-await check(process.env.LEMONSQUEEZY_VARIANT_BUSINESS_USD, 'BUSINESS_USD');
+await check(process.env.CREEM_PRODUCT_PAYG, 'PAYG');
+await check(process.env.CREEM_PRODUCT_MONTHLY, 'MONTHLY');
+await check(process.env.CREEM_PRODUCT_YEARLY, 'YEARLY');
 " 2>/dev/null || echo "(api not running)"
 
 echo ""
@@ -79,7 +55,3 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T postgres \
    LEFT JOIN \"ProjectRun\" r ON r.\"userId\" = u.id
    GROUP BY u.id, u.email
    ORDER BY u.\"createdAt\" DESC;"
-
-echo ""
-echo "Expected on latest code: commit message contains 'free first video' or 'Improve billing UX'."
-echo "If FREE_VIDEOS=1 and runs=0, /auth/me should show canCreateVideo=true and freeVideosRemaining=1."

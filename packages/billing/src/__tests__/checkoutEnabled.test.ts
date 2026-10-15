@@ -4,15 +4,10 @@ import { configuredCheckoutPlans, isCheckoutEnabled, isCheckoutPlanEnabled } fro
 describe("isCheckoutEnabled", () => {
   const keys = [
     "PAYMENTS_ENABLED",
-    "LEMONSQUEEZY_API_KEY",
-    "LEMONSQUEEZY_STORE_ID",
-    "LEMONSQUEEZY_STORE_ID_USD",
-    "LEMONSQUEEZY_VARIANT_PAYG",
-    "LEMONSQUEEZY_VARIANT_STARTER",
-    "LEMONSQUEEZY_VARIANT_BUSINESS",
-    "LEMONSQUEEZY_VARIANT_PAYG_USD",
-    "LEMONSQUEEZY_VARIANT_STARTER_USD",
-    "LEMONSQUEEZY_VARIANT_BUSINESS_USD"
+    "CREEM_API_KEY",
+    "CREEM_PRODUCT_PAYG",
+    "CREEM_PRODUCT_MONTHLY",
+    "CREEM_PRODUCT_YEARLY"
   ];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 
@@ -23,80 +18,50 @@ describe("isCheckoutEnabled", () => {
     }
   });
 
-  function setLemonKeys() {
-    process.env.LEMONSQUEEZY_API_KEY = "key";
-    process.env.LEMONSQUEEZY_STORE_ID = "1";
-    process.env.LEMONSQUEEZY_VARIANT_PAYG = "2";
-    process.env.LEMONSQUEEZY_VARIANT_STARTER = "3";
-    process.env.LEMONSQUEEZY_VARIANT_BUSINESS = "4";
+  function setCreemKeys() {
+    process.env.CREEM_API_KEY = "creem_test_key";
+    process.env.CREEM_PRODUCT_PAYG = "prod_payg";
+    process.env.CREEM_PRODUCT_MONTHLY = "prod_month";
+    process.env.CREEM_PRODUCT_YEARLY = "prod_year";
   }
 
-  it("is on when Lemon Squeezy is configured", () => {
-    setLemonKeys();
+  it("is on when Creem is configured", () => {
+    setCreemKeys();
     delete process.env.PAYMENTS_ENABLED;
     expect(isCheckoutEnabled()).toBe(true);
-  });
-
-  it("stays on when PAYMENTS_ENABLED=1", () => {
-    setLemonKeys();
-    process.env.PAYMENTS_ENABLED = "1";
-    expect(isCheckoutEnabled()).toBe(true);
+    expect(configuredCheckoutPlans()).toEqual(["payg", "starter", "business"]);
   });
 
   it("turns off when PAYMENTS_ENABLED=0", () => {
-    setLemonKeys();
+    setCreemKeys();
     process.env.PAYMENTS_ENABLED = "0";
     expect(isCheckoutEnabled()).toBe(false);
+    expect(isCheckoutPlanEnabled("payg")).toBe(false);
   });
 
-  it("is off when Lemon keys are missing", () => {
+  it("is off without an API key even when products are set", () => {
+    setCreemKeys();
+    delete process.env.CREEM_API_KEY;
     delete process.env.PAYMENTS_ENABLED;
-    delete process.env.LEMONSQUEEZY_API_KEY;
-    delete process.env.LEMONSQUEEZY_STORE_ID;
-    delete process.env.LEMONSQUEEZY_VARIANT_PAYG;
-    delete process.env.LEMONSQUEEZY_VARIANT_STARTER;
-    delete process.env.LEMONSQUEEZY_VARIANT_BUSINESS;
     expect(isCheckoutEnabled()).toBe(false);
+    expect(configuredCheckoutPlans()).toEqual([]);
   });
 
-  it("enables checkout when only the PAYG variant is set", () => {
+  it("enables only the plans that have a product", () => {
     delete process.env.PAYMENTS_ENABLED;
-    process.env.LEMONSQUEEZY_API_KEY = "key";
-    process.env.LEMONSQUEEZY_STORE_ID = "1";
-    process.env.LEMONSQUEEZY_VARIANT_PAYG = "2";
-    delete process.env.LEMONSQUEEZY_VARIANT_STARTER;
-    delete process.env.LEMONSQUEEZY_VARIANT_BUSINESS;
-    expect(isCheckoutEnabled()).toBe(true);
+    process.env.CREEM_API_KEY = "creem_test_key";
+    process.env.CREEM_PRODUCT_PAYG = "prod_payg";
+    delete process.env.CREEM_PRODUCT_MONTHLY;
+    delete process.env.CREEM_PRODUCT_YEARLY;
     expect(configuredCheckoutPlans()).toEqual(["payg"]);
     expect(isCheckoutPlanEnabled("payg")).toBe(true);
     expect(isCheckoutPlanEnabled("starter")).toBe(false);
     expect(isCheckoutPlanEnabled("business")).toBe(false);
   });
 
-  it("keeps ILS and USD plans independent", () => {
+  it("offers the same plans for both currencies", () => {
+    setCreemKeys();
     delete process.env.PAYMENTS_ENABLED;
-    process.env.LEMONSQUEEZY_API_KEY = "key";
-    process.env.LEMONSQUEEZY_STORE_ID = "1";
-    process.env.LEMONSQUEEZY_VARIANT_PAYG = "2";
-    delete process.env.LEMONSQUEEZY_VARIANT_STARTER;
-    delete process.env.LEMONSQUEEZY_VARIANT_BUSINESS;
-    process.env.LEMONSQUEEZY_STORE_ID_USD = "9";
-    process.env.LEMONSQUEEZY_VARIANT_PAYG_USD = "15";
-    delete process.env.LEMONSQUEEZY_VARIANT_STARTER_USD;
-    delete process.env.LEMONSQUEEZY_VARIANT_BUSINESS_USD;
-    expect(isCheckoutEnabled()).toBe(true);
-    expect(configuredCheckoutPlans("ils")).toEqual(["payg"]);
-    expect(configuredCheckoutPlans("usd")).toEqual(["payg"]);
-    expect(isCheckoutPlanEnabled("payg", "usd")).toBe(true);
-    expect(isCheckoutPlanEnabled("starter", "usd")).toBe(false);
-  });
-
-  it("does not enable USD checkout when the USD store is missing", () => {
-    setLemonKeys();
-    delete process.env.LEMONSQUEEZY_STORE_ID_USD;
-    process.env.LEMONSQUEEZY_VARIANT_PAYG_USD = "15";
-    expect(configuredCheckoutPlans("usd")).toEqual([]);
-    expect(isCheckoutPlanEnabled("payg", "usd")).toBe(false);
-    expect(isCheckoutPlanEnabled("payg", "ils")).toBe(true);
+    expect(configuredCheckoutPlans("ils")).toEqual(configuredCheckoutPlans("usd"));
   });
 });
