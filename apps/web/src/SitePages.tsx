@@ -3,6 +3,7 @@ import { formatNumber } from "./i18n/format.js";
 import { useTranslation } from "react-i18next";
 import { apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
+import { CheckoutDialog } from "./CheckoutDialog.js";
 import { PricingCards } from "./PricingCards.js";
 import { PublicChrome } from "./PublicChrome.js";
 import {
@@ -150,6 +151,7 @@ export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void
   const { login, user } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState("");
+  const [checkout, setCheckout] = useState<{ url: string; plan: CheckoutPlanId } | null>(null);
   const currency = checkoutCurrencyFromLocale(i18n.resolvedLanguage);
   const billingReady = enabledCheckoutPlansForUser(user, currency).length > 0;
 
@@ -175,7 +177,7 @@ export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void
         plan,
         locale: checkoutLocaleFromLanguage(i18n.resolvedLanguage)
       });
-      window.location.href = checkoutUrl;
+      setCheckout({ url: checkoutUrl, plan });
     } catch (err) {
       setPurchaseError((err as Error).message || t("dashboard.purchaseError"));
     } finally {
@@ -213,6 +215,11 @@ export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void
           </button>
         </div>
       </main>
+      <CheckoutDialog
+        checkoutUrl={checkout?.url ?? null}
+        planName={checkout ? t(`landing.plans.${checkout.plan}.name`) : ""}
+        onClose={() => setCheckout(null)}
+      />
     </PublicChrome>
   );
 }

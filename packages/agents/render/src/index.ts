@@ -364,7 +364,7 @@ export const renderAgent: Agent<RenderInput, RenderOutput> = {
         finalPath = await muxMusicTrack(assembledPath, musicLocal, dir);
       }
 
-      finalPath = await burnKaraokeAndWatermark(finalPath, dir, dimensions, input, ctx.log);
+      finalPath = await burnKaraokeAndWatermark(finalPath, dir, dimensions, input, ctx.log, ctx.storage);
 
       finalPath = await appendBrandingEndCard(
         finalPath,
@@ -605,7 +605,7 @@ async function renderExtendChain(
     finalPath = await muxMusicTrack(finalPath, musicLocal, dir);
   }
 
-  finalPath = await burnKaraokeAndWatermark(finalPath, dir, dimensions, input, ctx.log);
+  finalPath = await burnKaraokeAndWatermark(finalPath, dir, dimensions, input, ctx.log, ctx.storage);
 
   finalPath = await appendBrandingEndCard(
     finalPath,
@@ -1726,17 +1726,49 @@ async function createTitleCardClip(
   }
 }
 
+type ImageOverlay = { path: string; maxW: number; maxH: number; x: string; y: string; alpha: number };
+
+const FREE_TIER_CREDIT = { he: "נוצר באמצעות reelmino.com", en: "Made with reelmino.com" };
+
+function resolveReelminoBadge(): string | null {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.join(here, "..", "assets", "reelmino-badge.png"),
+    path.join(process.cwd(), "packages", "agents", "render", "assets", "reelmino-badge.png"),
+    path.join(process.cwd(), "assets", "reelmino-badge.png")
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
+
+function overlayAxisExpr(axis: "x" | "y", value: string, margin: number): string {
+  const [full, own] = axis === "x" ? ["W", "w"] : ["H", "h"];
+  if (value === "center" || value === "middle") return `(${full}-${own})/2`;
+  if (value === "right" || value === "bottom") return `${full}-${own}-${margin}`;
+  return String(margin);
+}
+
+/** Free-tier badge corner: away from top captions and from a customer logo in the same corner. */
+function freeBadgeCorner(input: RenderInput): { x: "left" | "right"; y: "top" | "bottom" } {
+  const y = input.subtitleStyle?.position === "top" ? "bottom" : "top";
+  const logo = input.logoOverlay && input.branding?.logo?.gcsPath ? input.logoOverlay : null;
+  const x = logo && logo.y === y && logo.x === "left" ? "right" : "left";
+  return { x, y };
+}
+
 async function burnKaraokeAndWatermark(
   videoPath: string,
   dir: string,
   dimensions: VideoDimensions,
   input: RenderInput,
-  log: AgentContext["log"]
+  log: AgentContext["log"],
+  storage: GcsClient
 ): Promise<string> {
   const wantKaraoke = Boolean(input.karaokeCaptions);
   const wantMark = Boolean(input.sideWatermark);
   const wantLower = Boolean(input.lowerThirds);
-  if (!wantKaraoke && !wantMark && !wantLower) return videoPath;
+  const wantLogo = Boolean(input.logoOverlay && input.branding?.logo?.gcsPath);
+  const wantBadge = Boolean(input.freeTierBadge);
+  if (!wantKaraoke && !wantMark && !wantLower && !wantLogo && !wantBadge) return videoPath;
 
   try {
     const filters: string[] = [];
@@ -1836,6 +1868,56 @@ async function burnKaraokeAndWatermark(
       }
     }
 
+    const images: ImageOverlay[] = [];
+    const minDim = Math.min(dimensions.width, dimensions.height);
+    const margin = Math.round(minDim * 0.04);
+    if (wantLogo && input.logoOverlay && input.branding?.logo) {
+      const logo = input.branding.logo;
+      const logoLocal = path.join(dir, `overlay-logo-${nanoid(4)}${path.extname(logo.name) || ".png"}`);
+      try {
+        await downloadMediaToFile(storage, logo.gcsPath, logoLocal);
+        images.push({
+          path: logoLocal,
+          maxW: Math.round(minDim * 0.28),
+          maxH: Math.round(minDim * 0.14),
+          x: overlayAxisExpr("x", input.logoOverlay.x, margin),
+          y: overlayAxisExpr("y", input.logoOverlay.y, margin),
+          alpha: 0.7
+        });
+      } catch (error) {
+        await log.log("render_logo_overlay_skipped", "Logo download failed; continuing without overlay", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+    if (wantBadge) {
+      const corner = freeBadgeCorner(input);
+      const badgePath = resolveReelminoBadge();
+      const badgeSize = Math.max(40, Math.round(minDim * 0.075));
+      const gap = Math.round(badgeSize * 0.22);
+      if (badgePath) {
+        images.push({
+          path: badgePath,
+          maxW: badgeSize,
+          maxH: badgeSize,
+          x: overlayAxisExpr("x", corner.x, margin),
+          y: overlayAxisExpr("y", corner.y, margin),
+          alpha: 0.85
+        });
+      }
+      const textOffset = margin + (badgePath ? badgeSize + gap : 0);
+      generatedLayers.push({
+        text: input.language === "he" || input.language === "yi" ? FREE_TIER_CREDIT.he : FREE_TIER_CREDIT.en,
+        endSecond: 86400,
+        fontSize: Math.max(16, Math.round(minDim * 0.028)),
+        color: "&H26FFFFFF",
+        bold: true,
+        alignment: corner.x === "left" ? 4 : 6,
+        x: corner.x === "left" ? textOffset : dimensions.width - textOffset,
+        y: corner.y === "top" ? margin + Math.round(badgeSize / 2) : dimensions.height - margin - Math.round(badgeSize / 2)
+      });
+    }
+
     if (generatedLayers.length) {
       const ass = buildRenderedTextAss(
         {
@@ -1854,33 +1936,58 @@ async function burnKaraokeAndWatermark(
       filters.push(assFilterExpr(assEsc, fontsEsc));
     }
 
-    if (!filters.length) return videoPath;
+    if (!filters.length && !images.length) return videoPath;
 
+    const encodeArgs = ["-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart", "-y"];
     const out = path.join(dir, `overlay-${nanoid(4)}.mp4`);
-    await runFfmpeg([
-      "-i",
-      videoPath,
-      "-vf",
-      filters.join(","),
-      "-c:v",
-      "libx264",
-      "-preset",
-      "fast",
-      "-crf",
-      "23",
-      "-pix_fmt",
-      "yuv420p",
-      "-c:a",
-      "copy",
-      "-movflags",
-      "+faststart",
-      "-y",
-      out
-    ]);
+    // Customer logos (e.g. SVG without a decoder) may fail; the free-tier badge must still be burned.
+    const attempts = [images];
+    if (images.length > 1) attempts.push(images.slice(1));
+    let burnedImages: ImageOverlay[] | null = null;
+    for (const set of images.length ? attempts : []) {
+      const graph: string[] = [];
+      let current = "[0:v]";
+      set.forEach((image, index) => {
+        graph.push(
+          `[${index + 1}:v]scale=w='min(iw\\,${image.maxW})':h='min(ih\\,${image.maxH})':force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa=${image.alpha}[img${index}]`
+        );
+        graph.push(`${current}[img${index}]overlay=x=${image.x}:y=${image.y}[v${index}]`);
+        current = `[v${index}]`;
+      });
+      graph.push(`${current}${filters.length ? filters.join(",") : "null"}[vout]`);
+      try {
+        await runFfmpeg([
+          "-i",
+          videoPath,
+          ...set.flatMap((image) => ["-i", image.path]),
+          "-filter_complex",
+          graph.join(";"),
+          "-map",
+          "[vout]",
+          "-map",
+          "0:a?",
+          ...encodeArgs,
+          out
+        ]);
+        burnedImages = set;
+        break;
+      } catch (error) {
+        await log.log("render_image_overlay_failed", "Image overlay failed; retrying with fewer layers", {
+          images: set.length,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+    if (!burnedImages) {
+      if (!filters.length) return videoPath;
+      await runFfmpeg(["-i", videoPath, "-vf", filters.join(","), ...encodeArgs, out]);
+    }
     await log.log("render_overlays", "Burned karaoke/watermark/lower-third overlays", {
       karaoke: wantKaraoke && Boolean(assPath),
       sideWatermark: wantMark,
-      lowerThirds: wantLower
+      lowerThirds: wantLower,
+      logoOverlay: wantLogo && Boolean(burnedImages?.some((image) => !image.path.endsWith("reelmino-badge.png"))),
+      freeTierBadge: wantBadge
     });
     return out;
   } catch (error) {

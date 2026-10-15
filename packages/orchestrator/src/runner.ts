@@ -121,6 +121,14 @@ export async function runStage(runId: string, stage: StageName): Promise<void> {
   }
 }
 
+/** A customer run that never debited credits (free allowance) carries the Reelmino credit. */
+async function isFreeTierRun(runId: string): Promise<boolean> {
+  const run = await prisma.projectRun.findUnique({ where: { id: runId }, select: { userId: true } });
+  if (!run?.userId) return false;
+  const { wasRunChargedCredits } = await import("@studio/billing");
+  return !(await wasRunChargedCredits(runId));
+}
+
 async function collectStageInput(runId: string, stage: StageName, brief: unknown): Promise<unknown> {
   const stages = await prisma.stageExecution.findMany({ where: { runId } });
   const byName = new Map<StageName, unknown>();
@@ -310,13 +318,21 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           preferHeygenDub?: string;
           lowerThirds?: string;
           filmTemplate?: string;
+          logoPositionY?: "top" | "middle" | "bottom";
+          logoPositionX?: "right" | "center" | "left";
         } | null;
       };
       const briefInput = brief as { creative?: typeof briefData.creative; language?: string };
       const creative = briefData.creative ?? briefInput.creative ?? null;
       const karaokeCaptions = creativeFlagOn(creative, "karaokeCaptions", true);
-      const sideWatermark =
-        creativeFlagOn(creative, "sideWatermark") || briefData.branding?.logoPlacement === "always";
+      const logoAlways = briefData.branding?.logoPlacement === "always";
+      const hasLogo = Boolean(briefData.branding?.logo?.gcsPath);
+      const sideWatermark = creativeFlagOn(creative, "sideWatermark") || (logoAlways && !hasLogo);
+      const logoOverlay =
+        logoAlways && hasLogo
+          ? { y: creative?.logoPositionY ?? "top", x: creative?.logoPositionX ?? "right" }
+          : null;
+      const freeTierBadge = await isFreeTierRun(runId);
       const lowerThirds =
         creativeFlagOn(creative, "lowerThirds") || creative?.filmTemplate === "corporate_product";
       const renderProfile = resolveRenderProfile(briefOut ?? briefData).id;
@@ -345,6 +361,8 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
           ...(creative?.subtitleEffect ? { effect: creative.subtitleEffect } : {})
         }),
         sideWatermark,
+        logoOverlay,
+        freeTierBadge,
         lowerThirds
       };
     }

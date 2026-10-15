@@ -7,6 +7,12 @@ export const resources = {
         hebrew: "עברית",
         english: "English"
       },
+      checkout: {
+        eyebrow: "תשלום מאובטח",
+        secure: "התשלום מתבצע מאובטח ומוצפן דרך Creem, שותף הסליקה שלנו. לא נשמרים אצלנו פרטי כרטיס.",
+        loading: "טוען את טופס התשלום...",
+        completed: "התשלום התקבל! הקרדיטים יתווספו לחשבון שלך בעוד רגע."
+      },
       auth: {
         eyebrow: "חשבון",
         title: "מכאן מתחיל הסיפור.",
@@ -410,6 +416,12 @@ export const resources = {
         language: "Language",
         hebrew: "עברית",
         english: "English"
+      },
+      checkout: {
+        eyebrow: "Secure payment",
+        secure: "Payment is processed securely and encrypted by Creem, our payment partner. We never store card details.",
+        loading: "Loading the payment form...",
+        completed: "Payment received! Credits will be added to your account in a moment."
       },
       auth: {
         eyebrow: "Account",

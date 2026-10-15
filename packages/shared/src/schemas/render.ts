@@ -38,6 +38,16 @@ export const RenderInputSchema = z.object({
   subtitleStyle: SubtitleStyleSchema.optional(),
   /** Burn a vertical side watermark. */
   sideWatermark: z.boolean().default(false),
+  /** Semi-transparent business logo (branding.logo) over the whole film. */
+  logoOverlay: z
+    .object({
+      y: z.enum(["top", "middle", "bottom"]),
+      x: z.enum(["right", "center", "left"])
+    })
+    .nullable()
+    .optional(),
+  /** Free-tier video: burn the Reelmino badge and "made with reelmino.com" credit. */
+  freeTierBadge: z.boolean().default(false),
   /** Burn per-scene lower-third titles. */
   lowerThirds: z.boolean().default(false)
 });

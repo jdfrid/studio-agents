@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { localeFor } from "./i18n/index.js";
 import { BrandTemplatePanel } from "./BrandTemplatePanel.js";
 import { VoicePicker } from "./VoicePreview.js";
+import { LogoPlacementFields } from "./LogoPlacementFields.js";
 import { contrastTextHex, normalizeHexColor, type BrandTemplateView, type CreativeOptions } from "@studio/shared";
 
 const DEFAULT_PRIMARY = "#173D35";
@@ -140,6 +141,20 @@ export function BrandPage() {
                 onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
               />
             </label>
+            <LogoPlacementFields
+              locale={uiLocale === "en" ? "en" : "he"}
+              creative={creative}
+              autoLabel={createT("branding.logoPlacementDefault")}
+              help={createT("branding.logoPlacementHelp")}
+              onChange={(key, value) =>
+                setCreative((current) => {
+                  const next = { ...current };
+                  if (value) (next as Record<string, unknown>)[key] = value;
+                  else delete next[key];
+                  return next;
+                })
+              }
+            />
             <div className="common-fields-grid">
               <label className="field-block">
                 {createT("branding.primaryColor")}

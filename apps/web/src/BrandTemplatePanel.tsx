@@ -205,7 +205,10 @@ export function BrandTemplatePanel({
           ...(creative.voiceCharacter ? { voiceCharacter: creative.voiceCharacter } : {}),
           ...(creative.voiceGender ? { voiceGender: creative.voiceGender } : {}),
           ...(creative.designStyle ? { designStyle: creative.designStyle } : {}),
-          ...(creative.colorPalette ? { colorPalette: creative.colorPalette } : {})
+          ...(creative.colorPalette ? { colorPalette: creative.colorPalette } : {}),
+          ...(creative.logoPlacement ? { logoPlacement: creative.logoPlacement } : {}),
+          ...(creative.logoPositionY ? { logoPositionY: creative.logoPositionY } : {}),
+          ...(creative.logoPositionX ? { logoPositionX: creative.logoPositionX } : {})
         }
       };
       if (logoFile) {

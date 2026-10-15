@@ -10,6 +10,7 @@ import { BrandTemplatePanel } from "./BrandTemplatePanel.js";
 import { storageGet, storageRemove, storageSet } from "./brand/storage.js";
 import { CameraCaptureButton, useIsMobileDevice } from "./CameraCaptureButton.js";
 import { VoicePicker } from "./VoicePreview.js";
+import { LOGO_FIELD_KEYS, LogoPlacementFields } from "./LogoPlacementFields.js";
 import { CampaignPreview } from "./brand/CampaignPreview.js";
 import {
   readStoredContentLanguage,
@@ -817,7 +818,7 @@ export function CreateVideoForm({
       title: t("advanced.groups.visualStyle.title"),
       description: t("advanced.groups.visualStyle.description"),
       fields: [...fieldsFor("brief"), ...fieldsFor("visual").filter((field) => field.key === "lighting")].filter(
-        (field) => !basicKeys.has(field.key)
+        (field) => !basicKeys.has(field.key) && !LOGO_FIELD_KEYS.has(field.key)
       )
     },
     {
@@ -1575,6 +1576,14 @@ export function CreateVideoForm({
           />
           <small className="muted">{t("branding.logoHelp")}</small>
         </label>
+        <LogoPlacementFields
+          locale={uiLocale === "en" ? "en" : "he"}
+          creative={creative}
+          disabled={busy}
+          autoLabel={t("branding.logoPlacementDefault")}
+          help={t("branding.logoPlacementHelp")}
+          onChange={(key, value) => setCreativeField(key, value as never)}
+        />
         {showBrandingPreview ? (
           <div
             className={`branding-preview branding-preview-${previewAspect === "16:9" ? "landscape" : "portrait"}`}

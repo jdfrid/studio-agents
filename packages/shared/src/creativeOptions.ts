@@ -58,6 +58,9 @@ export const CreativeOptionsSchema = z
     musicVolumePercent: z.number().int().min(5).max(40).optional(),
     musicSync: z.enum(["auto", "manual"]).optional(),
     logoPlacement: z.enum(["none", "always", "end_only", "open_and_end"]).optional(),
+    /** Where the semi-transparent logo sits when logoPlacement is "always". */
+    logoPositionY: z.enum(["top", "middle", "bottom"]).optional(),
+    logoPositionX: z.enum(["right", "center", "left"]).optional(),
     /** Portrait (9:16) or landscape (16:9) final video. */
     videoOrientation: z.enum(["portrait", "landscape"]).optional(),
     /** Burn karaoke-style Hebrew captions (default on when "on"). */
@@ -305,9 +308,31 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
         kind: "select",
         options: [
           { value: "none", labelHe: "ללא" },
-          { value: "always", labelHe: "קבוע" },
+          { value: "always", labelHe: "על כל הסרטון (שקוף) + בסיום", labelEn: "Over the whole video (transparent) + end" },
           { value: "end_only", labelHe: "רק בסיום" },
           { value: "open_and_end", labelHe: "פתיח וסיום" }
+        ]
+      },
+      {
+        key: "logoPositionY",
+        labelHe: "מיקום הלוגו — גובה",
+        labelEn: "Logo position — vertical",
+        kind: "select",
+        options: [
+          { value: "top", labelHe: "למעלה", labelEn: "Top" },
+          { value: "middle", labelHe: "באמצע", labelEn: "Middle" },
+          { value: "bottom", labelHe: "למטה", labelEn: "Bottom" }
+        ]
+      },
+      {
+        key: "logoPositionX",
+        labelHe: "מיקום הלוגו — צד",
+        labelEn: "Logo position — side",
+        kind: "select",
+        options: [
+          { value: "right", labelHe: "ימין", labelEn: "Right" },
+          { value: "center", labelHe: "מרכז", labelEn: "Center" },
+          { value: "left", labelHe: "שמאל", labelEn: "Left" }
         ]
       }
     ]
@@ -821,6 +846,8 @@ const FIELD_LABEL_EN: Record<keyof CreativeOptions, string> = {
   musicVolumePercent: "Music volume (%)",
   musicSync: "Sync to scene pace",
   logoPlacement: "Logo",
+  logoPositionY: "Logo position — vertical",
+  logoPositionX: "Logo position — side",
   videoOrientation: "Video orientation",
   karaokeCaptions: "Captions",
   subtitlePosition: "Caption position",
@@ -1266,6 +1293,7 @@ export function formatCreativeConstraints(
       lines.push(`${label}: ${displayValue}`);
       continue;
     }
+    if (key === "logoPositionY" || key === "logoPositionX") continue;
     if (key === "logoPlacement") {
       const map: Record<string, string> = {
         none: "ללא",

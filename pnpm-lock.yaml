@@ -161,6 +161,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@creem_io/embed':
+        specifier: ^0.3.4
+        version: 0.3.4
       '@fontsource/heebo':
         specifier: ^5.3.0
         version: 5.3.0
@@ -618,6 +621,9 @@ packages:
     resolution: {integrity: sha512-oFXygC4eKYA5l2MdpTR06L2M/4x6e2SLD5yS1T9+UBDKTkzyvhWKEhbYLUaTIBPpLKqlfGudJw1X73S1H9eUzQ==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
+
+  '@creem_io/embed@0.3.4':
+    resolution: {integrity: sha512-+pIEhmc7uxPvo5Q6/j7zWarEdyqPmQD3roK9m4HrYzJy/yrFFooWcT3nYVrVrlDQXJWCVXG5oYDY1Dh36Ggo4A==}
 
   '@derhuerst/http-basic@8.2.4':
     resolution: {integrity: sha512-F9rL9k9Xjf5blCz8HsJRO4diy111cayL2vkY2XE4r4t3n0yPXVYy3KD3nJ1qbrSn9743UWSXH4IwuCa/HWlGFw==}
@@ -3806,6 +3812,8 @@ snapshots:
   '@capacitor/keyboard@8.0.5(@capacitor/core@8.5.1)':
     dependencies:
       '@capacitor/core': 8.5.1
+
+  '@creem_io/embed@0.3.4': {}
 
   '@derhuerst/http-basic@8.2.4':
     dependencies:
