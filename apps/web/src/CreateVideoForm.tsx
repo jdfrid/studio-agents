@@ -66,10 +66,12 @@ const CONTENT_LANGUAGES = [
 export function CreateVideoForm({
   onCreated,
   onCancel,
+  onNeedCredits,
   sourceRunId
 }: {
   onCreated: (run: ProjectRunView) => void;
   onCancel: () => void;
+  onNeedCredits: () => void;
   sourceRunId?: string | null;
 }) {
   const { t, i18n } = useTranslation("createVideo");
@@ -747,6 +749,10 @@ export function CreateVideoForm({
       onCreated(run);
     } catch (err) {
       const e = err as Error & { code?: string };
+      if (e.code === "insufficient_credits") {
+        onNeedCredits();
+        return;
+      }
       setError(
         e.code === "service_busy"
           ? t("validation.serviceBusy")

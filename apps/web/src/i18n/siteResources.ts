@@ -12,7 +12,8 @@ export const siteResources = {
     pricing: {
       checkoutLead:
         "המחירים להלן הם המחירון הנוכחי בקרדיטים. הרכישה מתבצעת באתר דרך Creem, אחרי התחברות. סרטון עד 30 שניות = 40 קרדיטים.",
-      contactCta: "שאלה על מחיר או על מסלול אוטומטי? פנו אלינו"
+      contactCta: "שאלה על מחיר או על מסלול אוטומטי? פנו אלינו",
+      yourBalance: "היתרה שלך: {{count}} קרדיטים. סרטון עד 30 שניות = 40 קרדיטים."
     },
     about: {
       eyebrow: "הסיפור",
@@ -151,7 +152,8 @@ export const siteResources = {
     pricing: {
       checkoutLead:
         "These are the current credit-based list prices. Checkout runs on the site through Creem after you sign in. A video of up to 30 seconds uses 40 credits.",
-      contactCta: "Questions about pricing or the automatic plan? Contact us"
+      contactCta: "Questions about pricing or the automatic plan? Contact us",
+      yourBalance: "Your balance: {{count}} credits. A video of up to 30 seconds uses 40 credits."
     },
     about: {
       eyebrow: "The story",

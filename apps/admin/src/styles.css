@@ -348,6 +348,12 @@ button.danger-link { background: none; border: 1px solid transparent; color: #ff
 button.danger-link:hover:not(:disabled) { border-color: #8a2020; background: #221012; }
 .login-events-table { margin-top: 8px; }
 .login-events-table .ua-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: #9eb0d0; }
+.customers-panel tbody tr { cursor: pointer; }
+.customers-panel tbody tr.selected { background: #1b2433; }
+.customers-panel h4 { margin: 18px 0 8px; }
+.mono-cell { font-family: ui-monospace, Consolas, monospace; font-size: 0.75rem; direction: ltr; }
+.delta-plus { color: #6fdc9a; }
+.delta-minus { color: #ff9a9a; }
 .user-runs-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; font-size: 0.85rem; }
 .settings-models { border: 1px solid #232733; border-radius: 8px; padding: 12px; margin: 16px 0; }
 .settings-models label { margin-bottom: 10px; }

@@ -5,3 +5,4 @@ export * from "./plans.js";
 export * from "./subscriptions.js";
 export * from "./creem.js";
 export * from "./admin.js";
+export * from "./customers.js";

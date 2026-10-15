@@ -249,9 +249,8 @@ function AppShell() {
           <button
             type="button"
             className={appView === "create" ? "nav-active" : ""}
-            disabled={!user.canCreateVideo}
             aria-label={t("shell.newCreation")}
-            onClick={() => navigate({ view: "create", runId: null })}
+            onClick={() => navigate({ view: user.canCreateVideo ? "create" : "pricing", runId: null })}
           >
             <span className="nav-icon" aria-hidden>＋</span>
             <span className="nav-label">{t("shell.newCreation")}</span>
@@ -343,14 +342,16 @@ function AppShell() {
         {appView === "dashboard" && (
           <Dashboard
             onNewVideo={() => {
-              if (user.canCreateVideo) navigate({ view: "create", runId: null });
+              navigate({ view: user.canCreateVideo ? "create" : "pricing", runId: null });
             }}
             onOpenRun={(id) => navigate({ view: "run", runId: id })}
             onRemixRun={(id) => {
               if (user.canCreateVideo) navigate({ view: "create", runId: null, fromRunId: id });
+              else navigate({ view: "pricing", runId: null });
             }}
             onContact={() => navigate({ view: "contact", runId: null })}
             onBrand={() => navigate({ view: "brand", runId: null })}
+            onPricing={() => navigate({ view: "pricing", runId: null })}
           />
         )}
         {appView === "create" && (
@@ -359,6 +360,7 @@ function AppShell() {
             sourceRunId={fromRunId}
             onCreated={(run: ProjectRunView) => navigate({ view: "run", runId: run.id })}
             onCancel={() => navigate({ view: "dashboard", runId: null })}
+            onNeedCredits={() => navigate({ view: "pricing", runId: null })}
           />
         )}
         {appView === "run" && runId ? (
@@ -372,8 +374,9 @@ function AppShell() {
             }
             onRemix={() => {
               if (user.canCreateVideo) navigate({ view: "create", runId: null, fromRunId: runId });
+              else navigate({ view: "pricing", runId: null });
             }}
-            canRemix={user.canCreateVideo}
+            canRemix
             canDistribute={user.role === "ADMIN"}
             onDistribute={() => navigate({ view: "distribution", runId: runId })}
             onOpenRun={(id) => navigate({ view: "run", runId: id, fromAutomation })}

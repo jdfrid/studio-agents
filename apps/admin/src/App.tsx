@@ -9,6 +9,7 @@ import { CostIndicator } from "./CostIndicator.js";
 import { RunsLogMatrix } from "./RunsLogMatrix.js";
 import { CreativeCatalogPanel } from "./CreativeCatalogPanel.js";
 import { ServicesPanel } from "./ServicesPanel.js";
+import { CustomersPanel } from "./CustomersPanel.js";
 import type { ArtifactRow, ProjectRunView, RunSummary, StageName } from "./types.js";
 import {
   STAGE_ORDER,
@@ -21,7 +22,7 @@ import {
   type UserView
 } from "@studio/shared";
 
-type AppView = "runs" | "users" | "log" | "services" | "settings" | "catalog";
+type AppView = "runs" | "users" | "customers" | "log" | "services" | "settings" | "catalog";
 
 const ADMIN_AUTH_ERRORS: Record<string, string> = {
   invalid_email: "כתובת המייל לא תקינה.",
@@ -225,6 +226,9 @@ export function App() {
           <button type="button" className={view === "users" ? "nav-active" : ""} onClick={() => setView("users")}>
             משתמשים
           </button>
+          <button type="button" className={view === "customers" ? "nav-active" : ""} onClick={() => setView("customers")}>
+            לקוחות משלמים
+          </button>
           <button type="button" className={view === "log" ? "nav-active" : ""} onClick={() => setView("log")}>
             לוג עלויות
           </button>
@@ -250,6 +254,8 @@ export function App() {
         <RunsLogMatrix onSelectRun={(id) => { setSelectedId(id); setView("runs"); }} />
       ) : view === "users" ? (
         <AdminUsersPanel />
+      ) : view === "customers" ? (
+        <CustomersPanel />
       ) : (
         <main className="admin-main">
           <section className="panel">

@@ -2647,6 +2647,7 @@ a { color: inherit; }
 }
 .site-page h1 { margin: 8px 0 16px; font-size: clamp(1.8rem, 3vw, 2.6rem); line-height: 1.15; }
 .site-lead { color: var(--text-soft); font-size: 1.05rem; line-height: 1.7; margin: 0 0 28px; }
+.pricing-balance { margin: -12px 0 24px; font-weight: 600; }
 .site-prose { display: grid; gap: 22px; }
 .site-prose h2 { margin: 0; font-size: 1.15rem; }
 .site-prose p { margin: 8px 0 0; color: var(--muted); line-height: 1.75; }

@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { formatNumber } from "./i18n/format.js";
 import { useTranslation } from "react-i18next";
 import { apiPost } from "./api.js";
 import { useAuth } from "./AuthContext.js";
@@ -141,6 +142,8 @@ export function LegalPage({
   );
 }
 
+const PENDING_PLAN_KEY = "reelmino:pending-plan";
+
 export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   const { t, i18n } = useTranslation();
   const { t: st } = useTranslation("site");
@@ -150,8 +153,18 @@ export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void
   const currency = checkoutCurrencyFromLocale(i18n.resolvedLanguage);
   const billingReady = enabledCheckoutPlansForUser(user, currency).length > 0;
 
+  useEffect(() => {
+    if (!user) return;
+    const pending = sessionStorage.getItem(PENDING_PLAN_KEY) as CheckoutPlanId | null;
+    if (!pending) return;
+    sessionStorage.removeItem(PENDING_PLAN_KEY);
+    if (pending === "payg" || pending === "starter" || pending === "business") void buy(pending);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   async function buy(plan: CheckoutPlanId) {
     if (!user) {
+      sessionStorage.setItem(PENDING_PLAN_KEY, plan);
       login();
       return;
     }
@@ -176,6 +189,11 @@ export function PricingPage({ onNavigate }: { onNavigate: (path: string) => void
         <p className="eyebrow">{t("landing.plans.eyebrow")}</p>
         <h1>{t("landing.plans.title")}</h1>
         <p className="site-lead">{st("pricing.checkoutLead")}</p>
+        {user ? (
+          <p className="pricing-balance">
+            {st("pricing.yourBalance", { count: formatNumber(user.credits ?? 0) })}
+          </p>
+        ) : null}
         <div className="site-pricing-cards">
           <PricingCards
             mode="checkout"

@@ -87,6 +87,8 @@ import {
   getAdminUsers,
   getAdminOperationalMetrics,
   getAdminUserPnl,
+  getAdminCustomers,
+  getAdminCustomerDetail,
   adminAdjustCredits,
   updateAdminUser,
   deleteAdminUser,
@@ -1191,6 +1193,23 @@ export async function registerRoutes(app: FastifyInstance) {
           return { error: "not_found" };
         }
         return pnl;
+      });
+
+      adminRoutes.get("/customers", async (request) => {
+        const query = z.object({ search: z.string().trim().max(200).optional() }).parse(request.query);
+        await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "customers");
+        return getAdminCustomers(query.search);
+      });
+
+      adminRoutes.get("/customers/:id", async (request, reply) => {
+        const { id } = z.object({ id: z.string() }).parse(request.params);
+        await auditAdmin(request.user!.sub, "ADMIN_SENSITIVE_VIEW", "customer", id);
+        const detail = await getAdminCustomerDetail(id);
+        if (!detail) {
+          reply.code(404);
+          return { error: "not_found" };
+        }
+        return detail;
       });
 
       adminRoutes.post("/users/:id/credits", async (request) => {
