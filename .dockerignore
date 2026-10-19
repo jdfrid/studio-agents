@@ -16,3 +16,5 @@ tmp
 studio-agents
 *.md
 !infra/hetzner/**/*.md
+!marketing/promo-kit/**/*.md
+apps/growth/data

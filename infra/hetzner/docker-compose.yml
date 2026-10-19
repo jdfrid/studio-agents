@@ -203,6 +203,44 @@ services:
     networks:
       - internal
 
+  growth:
+    build:
+      context: ../..
+      dockerfile: infra/hetzner/Dockerfile.growth
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      GROWTH_HOST: 0.0.0.0
+      GROWTH_PORT: 4180
+      GROWTH_PUBLIC_BASE: ${GROWTH_PUBLIC_BASE:-https://growth.reelmino.com}
+      GROWTH_SITE_ORIGIN: ${GROWTH_SITE_ORIGIN:-https://reelmino.com}
+      GROWTH_OPERATOR_PASSWORD: ${GROWTH_OPERATOR_PASSWORD:-}
+      GROWTH_OPERATOR_NAME: ${GROWTH_OPERATOR_NAME:-מפעיל}
+      GROWTH_SECRETS_KEY: ${GROWTH_SECRETS_KEY:-}
+      GROWTH_SESSION_SECRET: ${GROWTH_SESSION_SECRET:-}
+      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID:-}
+      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET:-}
+      META_APP_ID: ${META_APP_ID:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      TIKTOK_CLIENT_KEY: ${TIKTOK_CLIENT_KEY:-}
+      TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET:-}
+      TIKTOK_DIRECT_POST: ${TIKTOK_DIRECT_POST:-0}
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
+      LINKEDIN_SCOPES: ${LINKEDIN_SCOPES:-openid profile w_member_social}
+      LINKEDIN_VERSION: ${LINKEDIN_VERSION:-202510}
+      GROWTH_RESEND_API_KEY: ${GROWTH_RESEND_API_KEY:-}
+      GROWTH_MAIL_FROM: ${GROWTH_MAIL_FROM:-}
+      GROWTH_MAIL_TO: ${GROWTH_MAIL_TO:-}
+      REELMINO_API: ${REELMINO_API:-https://reelmino.com/api}
+      REELMINO_SESSION: ${REELMINO_SESSION:-}
+    volumes:
+      - growth_data:/app/apps/growth/data
+    ports:
+      - "127.0.0.1:${GROWTH_HTTP_PORT:-8082}:4180"
+    networks:
+      - internal
+
   web:
     build:
       context: ../..
@@ -223,6 +261,7 @@ services:
 volumes:
   studio_pg:
   studio_redis:
+  growth_data:
 
 networks:
   internal:

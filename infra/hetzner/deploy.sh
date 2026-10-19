@@ -52,9 +52,36 @@ if command -v caddy >/dev/null 2>&1 && [ -f /etc/caddy/Caddyfile ]; then
   fi
 fi
 
+if ! grep -q '^GROWTH_HTTP_PORT=' "$ENV_FILE" 2>/dev/null; then
+  echo "GROWTH_HTTP_PORT=8082" >> "$ENV_FILE"
+  echo "Added GROWTH_HTTP_PORT=8082 to $ENV_FILE"
+fi
+
+if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build growth; then
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d growth
+else
+  echo "Growth console image failed. The video stack is already up."
+fi
+
+if command -v caddy >/dev/null 2>&1 && [ -f /etc/caddy/Caddyfile ] && ! grep -q 'localhost:8082' /etc/caddy/Caddyfile; then
+  echo "Adding growth.reelmino.com to Caddy..."
+  cat >> /etc/caddy/Caddyfile <<'EOF'
+
+growth.reelmino.com {
+    reverse_proxy localhost:8082 {
+        header_up Host {host}
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+EOF
+  systemctl reload caddy 2>/dev/null || systemctl restart caddy || true
+fi
+
 echo "Studio Agents is up."
 echo "  Git HEAD: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 echo "  User app:  http://reelmino.com (or http://$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'))"
 echo "  Admin app: http://admin.reelmino.com (docker port ${ADMIN_HTTP_PORT:-8081})"
+echo "  Growth:    https://growth.reelmino.com (docker port ${GROWTH_HTTP_PORT:-8082}, localhost only)"
 echo ""
 echo "If deploy was run elsewhere: on this VPS use: cd ~/studio-agents && git pull && bash infra/hetzner/deploy.sh"

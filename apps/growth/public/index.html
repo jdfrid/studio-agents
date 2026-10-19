@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reelmino — שיווק אורגני</title>
+  <style>
+    :root { color-scheme: light; --ink: #173d35; --lime: #d9f27a; --paper: #f6f7f2; --line: #d5ddd6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", sans-serif; background: var(--paper); color: var(--ink); }
+    header, main { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+    header { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+    h1 { font-size: 1.4rem; margin: 0; }
+    .muted { color: #4d635c; font-size: 0.92rem; }
+    nav { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
+    button, .tab { background: white; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.45rem 0.7rem; cursor: pointer; }
+    button.primary { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+    button.warn { background: #fff; }
+    .card { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 0.9rem; margin: 0.6rem 0; }
+    label { display: block; font-size: 0.85rem; margin-top: 0.55rem; }
+    input, textarea, select { width: 100%; padding: 0.45rem; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+    textarea { min-height: 5rem; direction: ltr; text-align: left; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { border-bottom: 1px solid var(--line); padding: 0.4rem; vertical-align: top; text-align: right; }
+    .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+    .error { color: #8d1d1d; }
+    .ok { color: #1d6b32; }
+    .hidden { display: none; }
+    a { color: var(--ink); }
+    code { direction: ltr; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Reelmino — מערך שיווק אורגני</h1>
+      <p class="muted">פרסום ידני או אוטומטי לערוצי המותג. בלי מודעות בתשלום.</p>
+    </div>
+    <button id="logout" class="hidden" type="button">יציאה</button>
+  </header>
+  <main>
+    <form id="login" class="card">
+      <label>שם<input id="name" autocomplete="username" placeholder="אם יש מפעיל אחד, אפשר להשאיר ריק"></label>
+      <label>סיסמה<input id="password" type="password" autocomplete="current-password"></label>
+      <p class="row"><button class="primary" type="submit">כניסה</button></p>
+      <p id="login-error" class="error"></p>
+    </form>
+    <section id="app" class="hidden">
+      <nav>
+        <button class="tab" type="button" data-tab="content">תוכן</button>
+        <button class="tab" type="button" data-tab="accounts">חשבונות</button>
+        <button class="tab" type="button" data-tab="calendar">לוח</button>
+        <button class="tab" type="button" data-tab="internet">אינטרנט</button>
+        <button class="tab" type="button" data-tab="results">תוצאות</button>
+        <button class="tab" type="button" data-tab="people">מפעילים</button>
+      </nav>
+      <p id="banner" class="muted"></p>
+      <div id="panel"></div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -5,10 +5,11 @@ set -euo pipefail
 
 DOMAIN="${1:-reelmino.com}"
 ADMIN_DOMAIN="admin.${DOMAIN}"
+GROWTH_DOMAIN="growth.${DOMAIN}"
 LEGACY_DOMAIN="prompt2spot.com"
 
 echo "=== Domain setup for ${DOMAIN} ==="
-echo "1. Ensure A records point @, www, and admin to this server IP"
+echo "1. Ensure A records point @, www, admin, and growth to this server IP"
 echo "2. Update infra/hetzner/.env: APP_URL=https://${DOMAIN}, ADMIN_URL=https://${ADMIN_DOMAIN}"
 echo "3. Keep ${LEGACY_DOMAIN} DNS on this server until 301s and OAuth clients are cut over"
 echo ""
@@ -67,6 +68,14 @@ ${ADMIN_DOMAIN} {
     }
 }
 
+${GROWTH_DOMAIN} {
+    reverse_proxy localhost:8082 {
+        header_up Host {host}
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
 ${LEGACY_REDIRECT}
 EOF
 
@@ -79,7 +88,7 @@ systemctl reload caddy 2>/dev/null || systemctl restart caddy
 
 echo ""
 echo "Done. Caddy will obtain Let's Encrypt certificates automatically."
-echo "Verify: https://${DOMAIN} and https://${ADMIN_DOMAIN}"
+echo "Verify: https://${DOMAIN} , https://${ADMIN_DOMAIN} and https://${GROWTH_DOMAIN}"
 if [ -n "${LEGACY_REDIRECT}" ]; then
   echo "Legacy 301: https://${LEGACY_DOMAIN} → https://${DOMAIN}"
 fi

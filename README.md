@@ -181,6 +181,8 @@ bash infra/hetzner/deploy.sh
 
 Open `http://YOUR_SERVER_IP` in the browser.
 
+The growth console is a separate container on the same server. Set `GROWTH_OPERATOR_PASSWORD` in `infra/hetzner/.env`, add a DNS A record for `growth.reelmino.com`, then deploy. Operators open `https://growth.reelmino.com`. Its database is the `growth_data` volume, so it stays up when a development computer is off.
+
 ### Updates
 
 ```bash
