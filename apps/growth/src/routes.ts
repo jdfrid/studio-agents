@@ -6,23 +6,24 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { beginOAuth, connectTelegram, finishOAuth, networkSetup, oauthNetworks, removeConnection, syncConnection } from "./accounts.js";
 import { importCalendar, importPromoKit, slugify } from "./catalog.js";
 import { emptyCopy, EXPORT_NETWORKS, networkText, type ItemCopy } from "./copy.js";
-import { hashPassword, hashToken, nid, verifyPassword } from "./crypto.js";
+import { encryptJson, hashPassword, hashToken, nid, verifyPassword } from "./crypto.js";
 import {
   createSession,
   deleteGroup,
   deleteOperator,
   deleteSession,
   findOperatorByPassword,
-  finishGroupShare,
+  finishGroupPost,
   flag,
-  getGroupShare,
+  getGroup,
+  getGroupPost,
   getJob,
   insertGroup,
   insertOperator,
+  listGroupPosts,
   listGroups,
-  listGroupShares,
   listOperators,
-  queueGroupShares,
+  queueGroupPosts,
   updateGroup,
   getDestination,
   getEmail,
@@ -47,7 +48,19 @@ import {
   upsertPlannedSlot,
   type GrowthDb
 } from "./db.js";
-import { groupShareText, normalizeGroupUrl, sharedTooRecently } from "./groups.js";
+import {
+  facebookShareUrl,
+  GROUP_NETWORKS,
+  groupText,
+  isAutoNetwork,
+  isGroupNetwork,
+  openUrl,
+  parseDiscordWebhook,
+  parseGroupAddress,
+  resolveTelegramGroup,
+  sendGroupPost,
+  sharedTooRecently
+} from "./groups.js";
 import { writeLearnSite } from "./internet.js";
 import { sendGrowthMail } from "./mail.js";
 import { applyLink, trackedLink } from "./utm.js";
@@ -134,25 +147,96 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
     produceConfigured: Boolean(process.env.REELMINO_SESSION),
     operators: listOperators(ctx.db),
     publicBase: ctx.publicBase,
-    groups: listGroups(ctx.db),
-    groupShares: listGroupShares(ctx.db).map((share) => {
-      const item = getItem(ctx.db, share.itemId);
-      return {
-        ...share,
-        text: item ? groupShareText(item.copy, share.pagePostUrl) : "",
-        tooSoon: share.status === "pending" && sharedTooRecently(share.groupLastSharedAt, share.groupMinDays)
-      };
-    })
+    groupNetworks: GROUP_NETWORKS.map((network) => ({ network, auto: isAutoNetwork(network) })),
+    groups: listGroups(ctx.db).map(({ secretEnc: _secret, ...group }) => ({
+      ...group,
+      auto: isAutoNetwork(group.network),
+      tooSoon: sharedTooRecently(group.lastSharedAt, group.minDays)
+    })),
+    groupPosts: groupPostsView()
   }));
 
+  function groupPostsView() {
+    const groups = new Map(listGroups(ctx.db).map((group) => [group.id, group]));
+    const campaign = getSetting(ctx.db, "utm_campaign") ?? undefined;
+    return listGroupPosts(ctx.db).flatMap((post) => {
+      const group = groups.get(post.groupId);
+      const item = getItem(ctx.db, post.itemId);
+      if (!group || !item) return [];
+      const text = groupText(group, item, post, campaign);
+      return [
+        {
+          ...post,
+          network: group.network,
+          groupName: group.name,
+          groupRules: group.rules,
+          groupMinDays: group.minDays,
+          groupLastSharedAt: group.lastSharedAt,
+          auto: isAutoNetwork(group.network),
+          autopilot: group.autopilot,
+          text,
+          openUrl: openUrl(group, item, text),
+          shareUrl: group.network === "facebook" ? facebookShareUrl(post.facebookPostUrl) : null,
+          tooSoon: post.status === "pending" && sharedTooRecently(group.lastSharedAt, group.minDays)
+        }
+      ];
+    });
+  }
+
+  const validTrigger = (value: string | undefined): string | null =>
+    value && ["any", "youtube", "instagram", "facebook", "tiktok", "telegram", "linkedin"].includes(value) ? value : null;
+
+  const groupContext = () => ({
+    db: ctx.db,
+    key: ctx.key,
+    mediaDir: ctx.mediaDir,
+    publicBase: ctx.publicBase,
+    campaign: getSetting(ctx.db, "utm_campaign") ?? undefined
+  });
+
   app.post("/api/groups", async (request, reply) => {
-    const body = request.body as { name?: string; url?: string; rules?: string; minDays?: number };
-    const url = normalizeGroupUrl(body.url ?? "");
-    if (!url) return reply.code(400).send({ error: "כתובת קבוצה בפורמט https://www.facebook.com/groups/..." });
-    const name = body.name?.trim() || url.split("/").pop()!;
-    const minDays = Number.isFinite(body.minDays) ? Math.max(0, Math.round(body.minDays!)) : 7;
+    const body = request.body as {
+      network?: string;
+      address?: string;
+      name?: string;
+      rules?: string;
+      minDays?: number;
+      trigger?: string;
+      autopilot?: boolean;
+    };
+    const network = body.network ?? "";
+    if (!isGroupNetwork(network)) return reply.code(400).send({ error: "רשת לא נתמכת לקבוצות" });
+    let address: { link: string; target: string; name: string } | null;
+    let secretEnc: string | null = null;
+    if (network === "telegram") {
+      try {
+        address = await resolveTelegramGroup(groupContext(), body.address ?? "");
+      } catch (error) {
+        return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+      }
+    } else if (network === "discord") {
+      const hook = parseDiscordWebhook(body.address ?? "");
+      if (!hook) return reply.code(400).send({ error: "כתובת Webhook בפורמט https://discord.com/api/webhooks/..." });
+      address = { link: "", target: hook.target, name: "Discord" };
+      secretEnc = encryptJson({ url: hook.webhook }, ctx.key);
+    } else {
+      address = parseGroupAddress(network, body.address ?? "");
+      if (!address) return reply.code(400).send({ error: "הכתובת לא נראית כמו קבוצה ברשת הזו" });
+    }
+    const trigger = validTrigger(body.trigger) ?? (network === "facebook" ? "facebook" : "any");
     try {
-      return insertGroup(ctx.db, { id: nid(), name, url, rules: body.rules?.trim() ?? "", minDays });
+      return insertGroup(ctx.db, {
+        id: nid(),
+        network,
+        name: body.name?.trim().slice(0, 80) || address.name,
+        link: address.link,
+        target: address.target,
+        secretEnc,
+        rules: body.rules?.trim().slice(0, 500) ?? "",
+        minDays: Number.isFinite(body.minDays) ? Math.max(0, Math.round(body.minDays!)) : 7,
+        trigger,
+        autopilot: isAutoNetwork(network) && body.autopilot === true
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("UNIQUE")) return reply.code(409).send({ error: "הקבוצה כבר ברשימה" });
@@ -161,15 +245,18 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
   });
 
   app.patch("/api/groups/:id", async (request, reply) => {
-    const body = request.body as { name?: string; rules?: string; minDays?: number; enabled?: boolean };
-    const row = updateGroup(ctx.db, (request.params as { id: string }).id, {
-      ...(body.name?.trim() ? { name: body.name.trim() } : {}),
-      ...(body.rules !== undefined ? { rules: body.rules.trim() } : {}),
+    const { id } = request.params as { id: string };
+    const body = request.body as { name?: string; rules?: string; minDays?: number; trigger?: string; autopilot?: boolean; enabled?: boolean };
+    const current = getGroup(ctx.db, id);
+    if (!current) return reply.code(404).send({ error: "not found" });
+    return updateGroup(ctx.db, id, {
+      ...(body.name?.trim() ? { name: body.name.trim().slice(0, 80) } : {}),
+      ...(body.rules !== undefined ? { rules: body.rules.trim().slice(0, 500) } : {}),
       ...(Number.isFinite(body.minDays) ? { minDays: Math.max(0, Math.round(body.minDays!)) } : {}),
+      ...(validTrigger(body.trigger) ? { trigger: validTrigger(body.trigger)! } : {}),
+      ...(body.autopilot !== undefined ? { autopilot: isAutoNetwork(current.network) && body.autopilot } : {}),
       ...(body.enabled !== undefined ? { enabled: body.enabled } : {})
     });
-    if (!row) return reply.code(404).send({ error: "not found" });
-    return row;
   });
 
   app.delete("/api/groups/:id", async (request) => {
@@ -179,20 +266,34 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
 
   app.post("/api/jobs/:id/groups", async (request, reply) => {
     const job = getJob(ctx.db, (request.params as { id: string }).id);
-    if (!job || job.network !== "facebook" || job.status !== "published") {
-      return reply.code(400).send({ error: "רק פוסט שפורסם בעמוד הפייסבוק" });
-    }
-    return { added: queueGroupShares(ctx.db, job, nid) };
+    if (!job || job.status !== "published") return reply.code(400).send({ error: "רק פוסט שפורסם" });
+    return { added: queueGroupPosts(ctx.db, { itemId: job.itemId, jobId: job.id, network: job.network }, nid, { force: true }) };
   });
 
-  app.patch("/api/group-shares/:id", async (request, reply) => {
+  app.post("/api/items/:id/groups", async (request, reply) => {
+    const item = getItem(ctx.db, (request.params as { id: string }).id);
+    if (!item) return reply.code(404).send({ error: "not found" });
+    return { added: queueGroupPosts(ctx.db, { itemId: item.id, jobId: null, network: null }, nid, { force: true }) };
+  });
+
+  app.patch("/api/group-posts/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as { status?: string; postUrl?: string };
     if (body.status !== "done" && body.status !== "skipped") return reply.code(400).send({ error: "status must be done or skipped" });
-    if (!getGroupShare(ctx.db, id)) return reply.code(404).send({ error: "not found" });
+    if (!getGroupPost(ctx.db, id)) return reply.code(404).send({ error: "not found" });
     const postUrl = body.postUrl?.trim() || null;
-    if (postUrl && !/^https:\/\/(www\.|m\.|web\.)?facebook\.com\//.test(postUrl)) return reply.code(400).send({ error: "קישור פייסבוק בלבד" });
-    return finishGroupShare(ctx.db, id, body.status, postUrl);
+    if (postUrl && !/^https:\/\/\S+$/.test(postUrl)) return reply.code(400).send({ error: "קישור https בלבד" });
+    return finishGroupPost(ctx.db, id, { status: body.status, postUrl });
+  });
+
+  app.post("/api/group-posts/:id/send", async (request, reply) => {
+    const post = getGroupPost(ctx.db, (request.params as { id: string }).id);
+    if (!post) return reply.code(404).send({ error: "not found" });
+    const group = getGroup(ctx.db, post.groupId);
+    if (!group || !isAutoNetwork(group.network)) return reply.code(400).send({ error: "ברשת הזו מפרסמים בעצמכם" });
+    const result = await sendGroupPost(groupContext(), post.id);
+    if (result?.status === "failed") return reply.code(502).send({ error: result.error });
+    return result;
   });
 
   app.post("/api/operators", async (request, reply) => {

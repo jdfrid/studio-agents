@@ -2,12 +2,12 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { assetKind, CALENDAR, networksForKind } from "./calendar.js";
 import { importCalendar, importPromoKit } from "./catalog.js";
 import { signPayload, verifyPayload } from "./crypto.js";
-import { insertJob, openDb, updateJob } from "./db.js";
-import { normalizeGroupUrl } from "./groups.js";
+import { insertJob, listGroups, migrate, openDb, queueGroupPosts, updateJob } from "./db.js";
+import { deliverDueGroupPosts, normalizeGroupUrl, parseDiscordWebhook, parseGroupAddress, sharedTooRecently } from "./groups.js";
 import { renderArticle, spliceSitemap, writeLearnSite } from "./internet.js";
 import { linkedinPostBody } from "./linkedin.js";
 import { decideSlot } from "./schedule.js";
@@ -158,12 +158,44 @@ describe("growth console", () => {
     await built.close();
   });
 
-  it("queues a facebook page post for the operator's groups without posting into them", async () => {
-    process.env.GROWTH_OPERATOR_PASSWORD = "secret";
-    process.env.GROWTH_DISABLE_SCHEDULER = "1";
+  it("accepts only real group addresses for each network", () => {
     expect(normalizeGroupUrl("https://m.facebook.com/groups/reelmino.club/?ref=share")).toBe("https://www.facebook.com/groups/reelmino.club");
     expect(normalizeGroupUrl("https://www.facebook.com/reelmino")).toBeNull();
     expect(normalizeGroupUrl("http://facebook.com/groups/x")).toBeNull();
+    expect(parseGroupAddress("linkedin", "https://www.linkedin.com/groups/1234567/")?.link).toBe("https://www.linkedin.com/groups/1234567/");
+    expect(parseGroupAddress("linkedin", "https://www.linkedin.com/company/reelmino")).toBeNull();
+    expect(parseGroupAddress("whatsapp", "https://chat.whatsapp.com/AbCdEf1234567890")?.link).toBe("https://chat.whatsapp.com/AbCdEf1234567890");
+    expect(parseGroupAddress("reddit", "https://old.reddit.com/r/VideoEditing/")?.name).toBe("r/VideoEditing");
+    expect(parseGroupAddress("x", "https://twitter.com/i/communities/1500000000000000000")?.link).toBe("https://x.com/i/communities/1500000000000000000");
+    expect(parseGroupAddress("telegram", "@group")).toBeNull();
+    expect(parseDiscordWebhook("https://discordapp.com/api/webhooks/123/abc-DEF_9")).toEqual({
+      target: "webhook:123",
+      webhook: "https://discord.com/api/webhooks/123/abc-DEF_9"
+    });
+    expect(parseDiscordWebhook("https://example.com/api/webhooks/123/abc")).toBeNull();
+    expect(sharedTooRecently(new Date(Date.now() - 2 * 86400000).toISOString(), 7)).toBe(true);
+    expect(sharedTooRecently(new Date(Date.now() - 8 * 86400000).toISOString(), 7)).toBe(false);
+  });
+
+  it("moves facebook groups from the first version into the shared group list", () => {
+    const db = openDb(path.join(tempDir(), "growth.sqlite"));
+    db.exec(`
+      CREATE TABLE fb_groups (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL UNIQUE, rules TEXT NOT NULL DEFAULT '',
+        min_days INTEGER NOT NULL DEFAULT 7, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL);
+      CREATE TABLE group_shares (id TEXT PRIMARY KEY, group_id TEXT NOT NULL, job_id TEXT NOT NULL, item_id TEXT NOT NULL,
+        status TEXT NOT NULL, post_url TEXT, created_at TEXT NOT NULL, done_at TEXT, UNIQUE(group_id, job_id));
+      INSERT INTO fb_groups VALUES ('g1', 'Creators', 'https://www.facebook.com/groups/creators', 'Fridays', 5, 1, '2026-10-21T00:00:00Z');
+    `);
+    migrate(db);
+    const [group] = listGroups(db);
+    expect(group).toMatchObject({ network: "facebook", name: "Creators", rules: "Fridays", minDays: 5, trigger: "facebook" });
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name = 'fb_groups'").get()).toBeUndefined();
+    db.close();
+  });
+
+  it("queues every published item once per group and auto-sends only through the owner's webhook", async () => {
+    process.env.GROWTH_OPERATOR_PASSWORD = "secret";
+    process.env.GROWTH_DISABLE_SCHEDULER = "1";
     const dir = tempDir();
     const built = await buildApp({ dataDir: dir, webPublic: path.join(dir, "public"), promoKit: path.join(repoRoot, "marketing/promo-kit"), listen: false });
     const login = await built.app.inject({ method: "POST", url: "/api/login", payload: { password: "secret" } });
@@ -173,32 +205,52 @@ describe("growth console", () => {
       built.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
 
     await call("POST", "/api/import/kit", {});
-    expect((await call("POST", "/api/groups", { name: "Bad", url: "https://www.facebook.com/reelmino" })).statusCode).toBe(400);
-    expect((await call("POST", "/api/groups", { name: "Creators", url: "https://www.facebook.com/groups/creators", minDays: 7 })).statusCode).toBe(200);
-    expect((await call("POST", "/api/groups", { url: "https://m.facebook.com/groups/creators/" })).statusCode).toBe(409);
-    const off = (await call("POST", "/api/groups", { name: "Off", url: "https://www.facebook.com/groups/off" })).json() as { id: string };
-    await call("PATCH", `/api/groups/${off.id}`, { enabled: false });
+    expect((await call("POST", "/api/groups", { network: "facebook", address: "https://www.facebook.com/reelmino" })).statusCode).toBe(400);
+    expect((await call("POST", "/api/groups", { network: "facebook", name: "Creators", address: "https://www.facebook.com/groups/creators" })).statusCode).toBe(200);
+    expect((await call("POST", "/api/groups", { network: "facebook", address: "https://m.facebook.com/groups/creators/" })).statusCode).toBe(409);
+    expect((await call("POST", "/api/groups", { network: "reddit", address: "https://www.reddit.com/r/VideoEditing/", trigger: "any" })).statusCode).toBe(200);
+    const hook = await call("POST", "/api/groups", { network: "discord", name: "Agency club", address: "https://discord.com/api/webhooks/42/secret-token", autopilot: true });
+    expect(hook.statusCode).toBe(200);
+    expect(JSON.stringify(hook.json())).not.toContain("secret-token");
+    expect((await call("POST", "/api/groups", { network: "telegram", address: "@nobot" })).statusCode).toBe(400);
 
-    const item = (built.db.prepare("SELECT id FROM items LIMIT 1").get() as { id: string }).id;
-    const job = insertJob(built.db, { id: "job-fb", itemId: item, destinationId: null, slotId: null, network: "facebook", status: "queued" });
-    expect((await call("POST", `/api/jobs/${job.id}/groups`)).statusCode).toBe(400);
-    updateJob(built.db, job.id, { status: "published", remoteUrl: "https://www.facebook.com/reelmino/posts/1" });
-    expect((await call("POST", `/api/jobs/${job.id}/groups`, {})).json()).toEqual({ added: 1 });
-    expect((await call("POST", `/api/jobs/${job.id}/groups`, {})).json()).toEqual({ added: 0 });
+    const [first, second] = built.db.prepare("SELECT id FROM items ORDER BY slug LIMIT 2").all() as Array<{ id: string }>;
+    const youtube = insertJob(built.db, { id: "job-yt", itemId: first!.id, destinationId: null, slotId: null, network: "youtube", status: "queued" });
+    updateJob(built.db, youtube.id, { status: "published", remoteUrl: "https://youtu.be/1" });
+    expect(queueGroupPosts(built.db, { itemId: first!.id, jobId: youtube.id, network: "youtube" }, () => crypto.randomUUID())).toBe(2);
+    const facebook = insertJob(built.db, { id: "job-fb", itemId: first!.id, destinationId: null, slotId: null, network: "facebook", status: "queued" });
+    updateJob(built.db, facebook.id, { status: "published", remoteUrl: "https://www.facebook.com/reelmino/posts/1" });
+    expect((await call("POST", `/api/jobs/${facebook.id}/groups`, {})).json()).toEqual({ added: 1 });
+    expect((await call("POST", `/api/jobs/${facebook.id}/groups`, {})).json()).toEqual({ added: 0 });
 
-    type Share = { id: string; groupName: string; status: string; text: string; tooSoon: boolean };
-    const shares = ((await call("GET", "/api/state")).json() as { groupShares: Share[] }).groupShares;
-    expect(shares).toHaveLength(1);
-    expect(shares[0]!.groupName).toBe("Creators");
-    expect(shares[0]!.text).toContain("https://www.facebook.com/reelmino/posts/1");
-    const done = await call("PATCH", `/api/group-shares/${shares[0]!.id}`, { status: "done", postUrl: "https://www.facebook.com/groups/creators/posts/9" });
-    expect(done.statusCode).toBe(200);
+    type Post = { id: string; network: string; groupName: string; status: string; text: string; openUrl: string; shareUrl: string | null; auto: boolean };
+    const posts = ((await call("GET", "/api/state")).json() as { groupPosts: Post[] }).groupPosts;
+    expect(posts).toHaveLength(3);
+    const fb = posts.find((row) => row.network === "facebook")!;
+    expect(fb.text).toContain("https://www.facebook.com/reelmino/posts/1");
+    expect(fb.text).toContain("utm_medium=community");
+    expect(fb.text).toContain("utm_term=creators");
+    expect(fb.shareUrl).toContain("sharer.php");
+    expect(posts.find((row) => row.network === "reddit")!.openUrl).toContain("/r/VideoEditing/submit?type=TEXT");
+    expect((await call("PATCH", `/api/group-posts/${fb.id}`, { status: "done", postUrl: "https://www.facebook.com/groups/creators/posts/9" })).statusCode).toBe(200);
+    expect((await call("POST", `/api/group-posts/${fb.id}/send`, {})).statusCode).toBe(400);
 
-    const next = insertJob(built.db, { id: "job-fb-2", itemId: item, destinationId: null, slotId: null, network: "facebook", status: "queued" });
-    updateJob(built.db, next.id, { status: "published", remoteUrl: "https://www.facebook.com/reelmino/posts/2" });
-    await call("POST", `/api/jobs/${next.id}/groups`, {});
-    const after = ((await call("GET", "/api/state")).json() as { groupShares: Share[] }).groupShares;
-    expect(after.find((row) => row.status === "pending")!.tooSoon).toBe(true);
+    const sent: Array<{ url: string; body: { content: string } }> = [];
+    vi.stubGlobal("fetch", async (url: string, init: { body: string }) => {
+      sent.push({ url, body: JSON.parse(init.body) });
+      return new Response(JSON.stringify({ id: "m1" }), { status: 200 });
+    });
+    try {
+      const groupCtx = { db: built.db, key: built.ctx.key, mediaDir: path.join(dir, "media"), publicBase: "http://localhost" };
+      expect(await deliverDueGroupPosts(groupCtx)).toBe(1);
+      expect(sent[0]!.url).toBe("https://discord.com/api/webhooks/42/secret-token?wait=true");
+      expect(sent[0]!.body.content).toContain("utm_source=discord");
+      await call("POST", `/api/items/${second!.id}/groups`, {});
+      expect(await deliverDueGroupPosts(groupCtx)).toBe(0);
+      expect(sent).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
     await built.close();
   });
 });

@@ -16,7 +16,7 @@ import {
   getDestination,
   getJob,
   insertJob,
-  queueGroupShares,
+  queueGroupPosts,
   updateConnectionTokens,
   updateJob,
   type Destination,
@@ -56,7 +56,7 @@ export function publishCopy(item: Item, network: string, campaign?: string): Pac
   };
 }
 
-function mediaOf(item: Item, mediaDir: string, publicBase: string): PublishMediaFile[] {
+export function mediaOf(item: Item, mediaDir: string, publicBase: string): PublishMediaFile[] {
   if (!item.mediaPath) return [];
   const filename = item.mediaPath;
   const body = readFileSync(path.join(mediaDir, filename));
@@ -182,7 +182,7 @@ function applyResult(db: GrowthDb, jobId: string, result: PublishHandle): Job {
     lastError: result.status === "draft" ? "Waiting in the network inbox. Finish it in the app." : null,
     attempts: 1
   })!;
-  if (job.network === "facebook" && job.status === "published") queueGroupShares(db, job, nid);
+  if (job.status === "published") queueGroupPosts(db, { itemId: job.itemId, jobId: job.id, network: job.network }, nid);
   return job;
 }
 

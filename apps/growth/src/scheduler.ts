@@ -22,6 +22,7 @@ import { writeLearnSite, type LearnArticle } from "./internet.js";
 import { sendGrowthMail } from "./mail.js";
 import { networkText } from "./copy.js";
 import { applyLink, trackedLink } from "./utm.js";
+import { deliverDueGroupPosts } from "./groups.js";
 import { pollPublish, runPublish } from "./publish.js";
 
 export type DispatchContext = {
@@ -47,7 +48,7 @@ function articlesOf(db: GrowthDb): LearnArticle[] {
 export async function dispatchSlot(ctx: DispatchContext, slot: Slot): Promise<void> {
   const destination = slot.destinationId
     ? getDestination(ctx.db, slot.destinationId)
-    : destinationsForNetwork(ctx.db, slot.network).filter((row) => row.enabled);
+    : destinationsForNetwork(ctx.db, slot.network).filter((row) => row.enabled && row.kind !== "group");
   const chosen = Array.isArray(destination) ? (destination.length === 1 ? destination[0] : null) : destination;
   const decision = decideSlot({
     network: slot.network,
@@ -134,6 +135,11 @@ export async function tick(ctx: DispatchContext): Promise<void> {
     } catch (error) {
       console.error("[growth] poll failed", error);
     }
+  }
+  try {
+    await deliverDueGroupPosts({ ...ctx, campaign: getSetting(ctx.db, "utm_campaign") ?? undefined });
+  } catch (error) {
+    console.error("[growth] group delivery failed", error);
   }
 }
 

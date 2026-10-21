@@ -84,6 +84,11 @@ function renderContent() {
   panel.querySelector("#pull").onclick = () => run(() => api(`/api/items/${item.id}/pull`, { method: "POST", body: "{}" }));
   panel.querySelector("#publish-now").onclick = () => run(() => api("/api/publish", { method: "POST", body: JSON.stringify({ itemId: item.id, destinationId: panel.querySelector("#dest").value }) }));
   panel.querySelector("#schedule").onclick = () => run(() => api("/api/schedule", { method: "POST", body: JSON.stringify({ itemId: item.id, destinationId: panel.querySelector("#dest").value, scheduledFor: new Date(panel.querySelector("#when").value).toISOString() }) }));
+  const toGroups = panel.querySelector("#to-groups");
+  if (toGroups) toGroups.onclick = () => run(async () => {
+    await api(`/api/items/${item.id}/groups`, { method: "POST", body: "{}" });
+    tab = "groups";
+  });
   panel.querySelectorAll("[data-export]").forEach((button) => {
     button.onclick = () => run(async () => {
       const pack = await api(`/api/items/${item.id}/export/${button.dataset.export}`);
@@ -95,7 +100,7 @@ function renderContent() {
 
 function editor(item) {
   const field = (group, key, label) => `<label>${label}<textarea data-field="${group}.${key}">${esc(item.copy[group]?.[key] || "")}</textarea></label>`;
-  const dests = state.destinations.filter((row) => row.enabled).map((row) => `<option value="${row.id}">${esc(row.network)} · ${esc(row.name)}</option>`).join("");
+  const dests = state.destinations.filter((row) => row.enabled && row.kind !== "group").map((row) => `<option value="${row.id}">${esc(row.network)} · ${esc(row.name)}</option>`).join("");
   return `<div class="card">
     <label>כותרת<input id="item-title" value="${esc(item.title)}"></label>
     <label>תקציר<textarea id="item-summary">${esc(item.summary)}</textarea></label>
@@ -124,6 +129,7 @@ function editor(item) {
       <button class="primary" type="button" id="publish-now">פרסום עכשיו</button>
       <input id="when" type="datetime-local">
       <button type="button" id="schedule">תזמון מאושר</button>
+      ${(state.groups || []).some((row) => row.enabled) ? `<button type="button" id="to-groups">משימות לכל הקבוצות</button>` : ""}
     </p>
     <p class="row">
       ${["x", "whatsapp", "pinterest", "threads"].map((network) => `<button type="button" data-export="${network}">ייצוא ${network}</button>`).join("")}
@@ -173,112 +179,155 @@ function renderAccounts() {
   });
 }
 
+const GROUP_NETWORK_INFO = {
+  facebook: { label: "פייסבוק", placeholder: "https://www.facebook.com/groups/...", hint: "קבוצה שאתם חברים בה ומותר בה לפרסם. אתם מדביקים ולוחצים פרסום." },
+  linkedin: { label: "לינקדאין", placeholder: "https://www.linkedin.com/groups/1234567/", hint: "קבוצת לינקדאין שאתם חברים בה. אתם מדביקים ולוחצים פרסום." },
+  whatsapp: { label: "וואטסאפ", placeholder: "https://chat.whatsapp.com/...", hint: "קישור ההזמנה מפרטי הקבוצה. הוא פותח את הקבוצה באפליקציה, ושם מדביקים." },
+  reddit: { label: "Reddit", placeholder: "https://www.reddit.com/r/...", hint: "נפתח טופס פרסום עם כותרת וטקסט כבר מולאו. לפני שליחה קראו את כללי הקהילה." },
+  x: { label: "X קהילות", placeholder: "https://x.com/i/communities/...", hint: "קהילת X שאתם חברים בה. אתם מדביקים ולוחצים פרסום." },
+  telegram: { label: "טלגרם", placeholder: "@groupname או ‎-1001234567890", hint: "שליחה אוטומטית דרך הבוט המחובר. הבוט צריך להיות חבר בקבוצה, ובערוץ גם מנהל עם הרשאת פרסום." },
+  discord: { label: "דיסקורד", placeholder: "https://discord.com/api/webhooks/...", hint: "שליחה אוטומטית דרך Webhook. בערוץ: Edit Channel → Integrations → Webhooks → New Webhook → Copy URL." }
+};
+const TRIGGER_LABELS = { any: "כל פרסום של הפריט", facebook: "פרסום בעמוד פייסבוק", youtube: "פרסום ביוטיוב", instagram: "פרסום באינסטגרם", tiktok: "פרסום בטיקטוק", telegram: "פרסום בערוץ טלגרם", linkedin: "פרסום בלינקדאין" };
+let groupNetwork = "facebook";
+
 function renderGroups() {
   const groups = state.groups || [];
-  const shares = state.groupShares || [];
-  const pending = shares.filter((row) => row.status === "pending");
-  const history = shares.filter((row) => row.status !== "pending").slice(0, 40);
+  const posts = state.groupPosts || [];
+  const open = posts.filter((row) => row.status === "pending" || row.status === "failed" || row.status === "sending");
+  const history = posts.filter((row) => row.status === "done" || row.status === "skipped").slice(0, 60);
+  const info = GROUP_NETWORK_INFO[groupNetwork];
+  const label = (network) => GROUP_NETWORK_INFO[network]?.label || network;
   const days = (iso) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null);
+  const telegramChats = state.destinations.filter((row) => row.network === "telegram" && row.kind !== "channel");
+  const triggerOptions = (selected) => Object.entries(TRIGGER_LABELS).map(([value, text]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${text}</option>`).join("");
   panel.innerHTML = `
     <div class="card">
-      <p>אחרי כל פוסט שעולה לעמוד הפייסבוק, נוצרת כאן משימה לכל קבוצה פעילה ברשימה: הטקסט מוכן, וקישור לפוסט בעמוד.</p>
-      <p class="muted">פייסבוק סגרו את ממשק הקבוצות ב-2024, ולכן שום כלי חיצוני לא יכול לפרסם בקבוצה. הלחיצה על <strong>פרסום</strong> נעשית בתוך פייסבוק, בחשבון שלך. הכלי מכין, פותח את הקבוצה ורושם מה פורסם.</p>
+      <p>כל פריט תוכן שמתפרסם מייצר משימה אחת לכל קבוצה פעילה. אותו פריט לא יישלח לאותה קבוצה פעמיים, ויש מרווח ימים מינימלי בין פרסומים בכל קבוצה.</p>
+      <p class="muted"><strong>טלגרם ודיסקורד</strong>: נשלח אוטומטית דרך הבוט או ה-Webhook שלכם, מיידית או בטייס אוטומטי.<br>
+      <strong>פייסבוק, לינקדאין, וואטסאפ, Reddit ו-X</strong>: לרשתות האלה אין דרך רשמית לפרסם בקבוצה מתוכנה. המערכת מכינה את הטקסט, מעתיקה אותו ופותחת את הקבוצה, ואתם מדביקים ולוחצים פרסום.</p>
     </div>
     <div class="card">
-      <h2>משימות פתוחות</h2>
-      ${pending.map((row) => `<div class="card share">
-        <p><strong>${esc(row.groupName)}</strong> · ${esc(row.itemTitle)}</p>
-        ${row.tooSoon ? `<p class="warn-text">פורסם בקבוצה הזו לפני ${days(row.groupLastSharedAt)} ימים. המרווח שהוגדר הוא ${row.groupMinDays} ימים.</p>` : ""}
+      <h2>משימות פתוחות (${open.length})</h2>
+      ${open.map((row) => `<div class="card share">
+        <p><strong>${esc(label(row.network))} · ${esc(row.groupName)}</strong> · ${esc(row.itemTitle)}
+          ${row.sourceNetwork ? `<span class="muted"> · אחרי ${esc(row.sourceNetwork)}</span>` : ""}</p>
+        ${row.tooSoon ? `<p class="warn-text">בקבוצה הזו פורסם לפני ${days(row.groupLastSharedAt)} ימים, והמרווח שהוגדר הוא ${row.groupMinDays} ימים.${row.autopilot ? " הטייס האוטומטי ימתין." : ""}</p>` : ""}
+        ${row.status === "failed" ? `<p class="error">השליחה נכשלה: ${esc(row.error || "")}</p>` : ""}
         ${row.groupRules ? `<p class="muted">כללי הקבוצה: ${esc(row.groupRules)}</p>` : ""}
-        <label>טקסט לפרסום<textarea readonly data-share-text="${row.id}">${esc(row.text)}</textarea></label>
+        <label>טקסט<textarea readonly data-post-text="${row.id}">${esc(row.text)}</textarea></label>
         <p class="row">
-          <button class="primary" type="button" data-open-share="${row.id}">העתקה ופתיחת הקבוצה</button>
-          ${row.pagePostUrl ? `<a href="${esc(row.pagePostUrl)}" target="_blank" rel="noreferrer">הפוסט בעמוד, לשיתוף לקבוצה</a>` : ""}
+          ${row.auto
+            ? `<button class="primary" type="button" data-send-post="${row.id}" ${row.status === "sending" ? "disabled" : ""}>${row.status === "failed" ? "שליחה חוזרת" : "שליחה עכשיו"}</button>
+               ${row.autopilot ? `<span class="muted">טייס אוטומטי פעיל: יישלח לבד</span>` : ""}`
+            : `<button class="primary" type="button" data-open-post="${row.id}">${row.network === "reddit" ? "פתיחת טופס ממולא" : "העתקה ופתיחת הקבוצה"}</button>
+               ${row.shareUrl ? `<a href="${esc(row.shareUrl)}" target="_blank" rel="noreferrer">או: שיתוף הפוסט מהעמוד לקבוצה</a>` : ""}`}
         </p>
         <p class="row">
-          <input data-share-url="${row.id}" placeholder="קישור לפוסט בקבוצה, לא חובה" style="max-width:24rem">
-          <button type="button" data-done-share="${row.id}">פורסם</button>
-          <button type="button" data-skip-share="${row.id}">דילוג</button>
+          ${row.auto ? "" : `<input data-post-url="${row.id}" placeholder="קישור לפוסט בקבוצה, לא חובה" style="max-width:24rem">
+          <button type="button" data-done-post="${row.id}">פורסם</button>`}
+          <button type="button" data-skip-post="${row.id}">דילוג</button>
         </p>
-      </div>`).join("") || "<p>אין משימות. הן נוצרות אחרי פרסום לעמוד הפייסבוק.</p>"}
+      </div>`).join("") || "<p>אין משימות פתוחות.</p>"}
     </div>
     <div class="card">
-      <h2>הקבוצות שלי</h2>
-      <p class="muted">רק קבוצות שאתה כבר חבר בהן ומותר בהן לפרסם. כתובת בפורמט https://www.facebook.com/groups/...</p>
+      <h2>הוספת קבוצה</h2>
       <div class="row">
-        <input id="group-name" placeholder="שם" style="max-width:12rem">
-        <input id="group-url" placeholder="https://www.facebook.com/groups/..." style="max-width:22rem">
-        <input id="group-days" type="number" min="0" value="7" style="max-width:6rem" title="מינימום ימים בין פרסומים">
+        <select id="group-network" style="max-width:12rem">${Object.entries(GROUP_NETWORK_INFO).map(([value, row]) => `<option value="${value}" ${value === groupNetwork ? "selected" : ""}>${row.label}</option>`).join("")}</select>
+        <input id="group-address" placeholder="${esc(info.placeholder)}" style="max-width:24rem" dir="ltr">
+        ${groupNetwork === "telegram" && telegramChats.length ? `<select id="group-known"><option value="">או בחרו קבוצה שהבוט מכיר</option>${telegramChats.map((row) => `<option value="${esc(row.externalId)}">${esc(row.name)}</option>`).join("")}</select>` : ""}
+      </div>
+      <p class="muted">${esc(info.hint)}</p>
+      <div class="row">
+        <input id="group-name" placeholder="שם לתצוגה, לא חובה" style="max-width:14rem">
+        <label class="row">מרווח בימים <input id="group-days" type="number" min="0" value="7" style="max-width:5rem"></label>
+        <label class="row">מתי ליצור משימה <select id="group-trigger">${triggerOptions(groupNetwork === "facebook" ? "facebook" : "any")}</select></label>
+        ${groupNetwork === "telegram" || groupNetwork === "discord" ? `<label class="row"><input id="group-autopilot" type="checkbox"> טייס אוטומטי</label>` : ""}
       </div>
       <label>כללי הקבוצה, לתזכורת<input id="group-rules" placeholder="למשל: קידום עצמי רק ביום שישי"></label>
-      <p class="row"><button class="primary" type="button" id="add-group">הוספת קבוצה</button></p>
+      <p class="row"><button class="primary" type="button" id="add-group">הוספה</button></p>
+    </div>
+    <div class="card">
+      <h2>הקבוצות שלי (${groups.length})</h2>
       <table>
-        <thead><tr><th>קבוצה</th><th>מרווח בימים</th><th>פרסום אחרון</th><th>פעילה</th><th></th></tr></thead>
+        <thead><tr><th>רשת</th><th>קבוצה</th><th>מתי</th><th>מרווח</th><th>אחרון</th><th>טייס</th><th>פעילה</th><th></th></tr></thead>
         <tbody>
           ${groups.map((row) => `<tr>
-            <td><a href="${esc(row.url)}" target="_blank" rel="noreferrer">${esc(row.name)}</a>${row.rules ? `<br><span class="muted">${esc(row.rules)}</span>` : ""}</td>
-            <td><input type="number" min="0" value="${row.minDays}" data-group-days="${row.id}" style="max-width:5rem"></td>
+            <td>${esc(label(row.network))}<br><span class="muted">${row.auto ? "אוטומטי" : "העתקה ופתיחה"}</span></td>
+            <td>${row.link ? `<a href="${esc(row.link)}" target="_blank" rel="noreferrer">${esc(row.name)}</a>` : esc(row.name)}${row.rules ? `<br><span class="muted">${esc(row.rules)}</span>` : ""}</td>
+            <td><select data-group-trigger="${row.id}">${triggerOptions(row.trigger)}</select></td>
+            <td><input type="number" min="0" value="${row.minDays}" data-group-days="${row.id}" style="max-width:4.5rem"></td>
             <td>${row.lastSharedAt ? esc(row.lastSharedAt.slice(0, 10)) : "—"}</td>
+            <td>${row.auto ? `<input type="checkbox" data-group-autopilot="${row.id}" ${row.autopilot ? "checked" : ""}>` : "—"}</td>
             <td><input type="checkbox" data-group-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
             <td><button type="button" data-group-drop="${row.id}">הסרה</button></td>
-          </tr>`).join("") || "<tr><td colspan='5'>אין קבוצות</td></tr>"}
+          </tr>`).join("") || "<tr><td colspan='8'>אין קבוצות</td></tr>"}
         </tbody>
       </table>
     </div>
     <div class="card">
       <h2>היסטוריה</h2>
       <table>
-        <thead><tr><th>תאריך</th><th>קבוצה</th><th>פריט</th><th>מצב</th><th>קישור</th></tr></thead>
+        <thead><tr><th>תאריך</th><th>רשת</th><th>קבוצה</th><th>פריט</th><th>מצב</th><th>קישור</th></tr></thead>
         <tbody>
           ${history.map((row) => `<tr>
             <td>${esc((row.doneAt || "").slice(0, 10))}</td>
+            <td>${esc(label(row.network))}</td>
             <td>${esc(row.groupName)}</td>
             <td>${esc(row.itemTitle)}</td>
             <td>${row.status === "done" ? "פורסם" : "דולג"}</td>
             <td>${row.postUrl ? `<a href="${esc(row.postUrl)}" target="_blank" rel="noreferrer">פוסט</a>` : "—"}</td>
-          </tr>`).join("") || "<tr><td colspan='5'>עדיין אין</td></tr>"}
+          </tr>`).join("") || "<tr><td colspan='6'>עדיין אין</td></tr>"}
         </tbody>
       </table>
     </div>
   `;
+  panel.querySelector("#group-network").onchange = (event) => { groupNetwork = event.target.value; renderGroups(); };
+  const known = panel.querySelector("#group-known");
+  if (known) known.onchange = () => { panel.querySelector("#group-address").value = known.value; };
   panel.querySelector("#add-group").onclick = () => run(() => api("/api/groups", {
     method: "POST",
     body: JSON.stringify({
+      network: groupNetwork,
+      address: panel.querySelector("#group-address").value,
       name: panel.querySelector("#group-name").value,
-      url: panel.querySelector("#group-url").value,
       rules: panel.querySelector("#group-rules").value,
-      minDays: Number(panel.querySelector("#group-days").value)
+      minDays: Number(panel.querySelector("#group-days").value),
+      trigger: panel.querySelector("#group-trigger").value,
+      autopilot: Boolean(panel.querySelector("#group-autopilot")?.checked)
     })
   }));
-  panel.querySelectorAll("[data-group-enabled]").forEach((box) => {
-    box.onchange = () => run(() => api(`/api/groups/${box.dataset.groupEnabled}`, { method: "PATCH", body: JSON.stringify({ enabled: box.checked }) }));
-  });
-  panel.querySelectorAll("[data-group-days]").forEach((input) => {
-    input.onchange = () => run(() => api(`/api/groups/${input.dataset.groupDays}`, { method: "PATCH", body: JSON.stringify({ minDays: Number(input.value) }) }));
-  });
+  const patchGroup = (id, body) => run(() => api(`/api/groups/${id}`, { method: "PATCH", body: JSON.stringify(body) }));
+  panel.querySelectorAll("[data-group-enabled]").forEach((box) => { box.onchange = () => patchGroup(box.dataset.groupEnabled, { enabled: box.checked }); });
+  panel.querySelectorAll("[data-group-autopilot]").forEach((box) => { box.onchange = () => patchGroup(box.dataset.groupAutopilot, { autopilot: box.checked }); });
+  panel.querySelectorAll("[data-group-days]").forEach((input) => { input.onchange = () => patchGroup(input.dataset.groupDays, { minDays: Number(input.value) }); });
+  panel.querySelectorAll("[data-group-trigger]").forEach((select) => { select.onchange = () => patchGroup(select.dataset.groupTrigger, { trigger: select.value }); });
   panel.querySelectorAll("[data-group-drop]").forEach((button) => {
     button.onclick = () => run(() => api(`/api/groups/${button.dataset.groupDrop}`, { method: "DELETE" }));
   });
-  panel.querySelectorAll("[data-open-share]").forEach((button) => {
+  panel.querySelectorAll("[data-open-post]").forEach((button) => {
     button.onclick = async () => {
-      const row = pending.find((share) => share.id === button.dataset.openShare);
+      const row = open.find((post) => post.id === button.dataset.openPost);
       if (!row) return;
-      window.open(row.groupUrl, "_blank", "noopener");
+      window.open(row.openUrl, "_blank", "noopener");
       try {
         await navigator.clipboard.writeText(row.text);
-        banner.textContent = `הטקסט הועתק. בקבוצה ${row.groupName}: כתבו פוסט, הדביקו, והוסיפו את הסרטון אם צריך.`;
+        banner.textContent = `הטקסט הועתק. ב-${row.groupName}: פותחים פוסט חדש, מדביקים, ומצרפים את הסרטון אם צריך.`;
       } catch {
-        panel.querySelector(`[data-share-text="${row.id}"]`).select();
-        banner.textContent = "ההעתקה האוטומטית נחסמה. הטקסט מסומן: Ctrl+C.";
+        panel.querySelector(`[data-post-text="${row.id}"]`).select();
+        banner.textContent = "ההעתקה האוטומטית נחסמה. הטקסט מסומן, העתיקו עם Ctrl+C.";
       }
     };
   });
-  const finish = (id, status) => run(() => api(`/api/group-shares/${id}`, {
+  panel.querySelectorAll("[data-send-post]").forEach((button) => {
+    button.onclick = () => run(() => api(`/api/group-posts/${button.dataset.sendPost}/send`, { method: "POST", body: "{}" }));
+  });
+  const finish = (id, status) => run(() => api(`/api/group-posts/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ status, postUrl: panel.querySelector(`[data-share-url="${id}"]`)?.value || "" })
+    body: JSON.stringify({ status, postUrl: panel.querySelector(`[data-post-url="${id}"]`)?.value || "" })
   }));
-  panel.querySelectorAll("[data-done-share]").forEach((button) => { button.onclick = () => finish(button.dataset.doneShare, "done"); });
-  panel.querySelectorAll("[data-skip-share]").forEach((button) => { button.onclick = () => finish(button.dataset.skipShare, "skipped"); });
+  panel.querySelectorAll("[data-done-post]").forEach((button) => { button.onclick = () => finish(button.dataset.donePost, "done"); });
+  panel.querySelectorAll("[data-skip-post]").forEach((button) => { button.onclick = () => finish(button.dataset.skipPost, "skipped"); });
 }
 
 function renderCalendar() {
@@ -360,7 +409,7 @@ function renderResults() {
             <td>${esc(row.status)}</td>
             <td>${row.remoteUrl ? `<a href="${esc(row.remoteUrl)}" target="_blank" rel="noreferrer">פוסט</a>` : "—"}</td>
             <td class="error">${esc(row.lastError || row.errorCode || "")}</td>
-            <td>${row.network === "facebook" && row.status === "published" ? `<button type="button" data-to-groups="${row.id}">לקבוצות</button>` : ""}</td>
+            <td>${row.status === "published" ? `<button type="button" data-to-groups="${row.id}">לקבוצות</button>` : ""}</td>
           </tr>`).join("") || "<tr><td colspan='7'>אין פרסומים עדיין</td></tr>"}
         </tbody>
       </table>

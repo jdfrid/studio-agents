@@ -135,25 +135,32 @@ export function migrate(db: GrowthDb): void {
       sent_at TEXT,
       created_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS fb_groups (
+    CREATE TABLE IF NOT EXISTS share_groups (
       id TEXT PRIMARY KEY,
+      network TEXT NOT NULL,
       name TEXT NOT NULL,
-      url TEXT NOT NULL UNIQUE,
+      link TEXT NOT NULL DEFAULT '',
+      target TEXT NOT NULL,
+      secret_enc TEXT,
       rules TEXT NOT NULL DEFAULT '',
       min_days INTEGER NOT NULL DEFAULT 7,
+      trigger TEXT NOT NULL DEFAULT 'any',
+      autopilot INTEGER NOT NULL DEFAULT 0,
       enabled INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      UNIQUE(network, target)
     );
-    CREATE TABLE IF NOT EXISTS group_shares (
+    CREATE TABLE IF NOT EXISTS group_posts (
       id TEXT PRIMARY KEY,
       group_id TEXT NOT NULL,
-      job_id TEXT NOT NULL,
       item_id TEXT NOT NULL,
+      job_id TEXT,
       status TEXT NOT NULL,
       post_url TEXT,
+      error TEXT,
       created_at TEXT NOT NULL,
       done_at TEXT,
-      UNIQUE(group_id, job_id)
+      UNIQUE(group_id, item_id)
     );
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
@@ -166,7 +173,21 @@ export function migrate(db: GrowthDb): void {
   if (!sessionColumns.some((column) => str(column, "name") === "operator_id")) {
     db.exec("ALTER TABLE sessions ADD COLUMN operator_id TEXT");
   }
+  migrateFacebookGroups(db);
   seedDirectories(db);
+}
+
+function migrateFacebookGroups(db: GrowthDb): void {
+  const old = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'fb_groups'").get();
+  if (!old) return;
+  db.exec(`
+    INSERT OR IGNORE INTO share_groups (id, network, name, link, target, rules, min_days, trigger, autopilot, enabled, created_at)
+      SELECT id, 'facebook', name, url, url, rules, min_days, 'facebook', 0, enabled, created_at FROM fb_groups;
+    INSERT OR IGNORE INTO group_posts (id, group_id, item_id, job_id, status, post_url, created_at, done_at)
+      SELECT id, group_id, item_id, job_id, status, post_url, created_at, done_at FROM group_shares;
+    DROP TABLE IF EXISTS group_shares;
+    DROP TABLE fb_groups;
+  `);
 }
 
 export function seedDirectories(db: GrowthDb): void {
@@ -579,141 +600,200 @@ export function updateJob(
   return getJob(db, id);
 }
 
-export type FbGroup = {
+export type ShareGroup = {
   id: string;
+  network: string;
   name: string;
-  url: string;
+  link: string;
+  target: string;
+  secretEnc: string | null;
   rules: string;
   minDays: number;
+  trigger: string;
+  autopilot: boolean;
   enabled: boolean;
   lastSharedAt: string | null;
   createdAt: string;
 };
 
-const GROUP_SELECT = `SELECT fb_groups.*,
-  (SELECT MAX(done_at) FROM group_shares WHERE group_shares.group_id = fb_groups.id AND group_shares.status = 'done') AS last_shared_at
-  FROM fb_groups`;
+const GROUP_SELECT = `SELECT share_groups.*,
+  (SELECT MAX(done_at) FROM group_posts WHERE group_posts.group_id = share_groups.id AND group_posts.status = 'done') AS last_shared_at
+  FROM share_groups`;
 
-function mapGroup(row: Row): FbGroup {
+function mapGroup(row: Row): ShareGroup {
   return {
     id: str(row, "id"),
+    network: str(row, "network"),
     name: str(row, "name"),
-    url: str(row, "url"),
+    link: str(row, "link"),
+    target: str(row, "target"),
+    secretEnc: str(row, "secret_enc") || null,
     rules: str(row, "rules"),
     minDays: num(row, "min_days"),
+    trigger: str(row, "trigger"),
+    autopilot: num(row, "autopilot") === 1,
     enabled: num(row, "enabled") === 1,
     lastSharedAt: str(row, "last_shared_at") || null,
     createdAt: str(row, "created_at")
   };
 }
 
-export function listGroups(db: GrowthDb): FbGroup[] {
-  return rows(db.prepare(`${GROUP_SELECT} ORDER BY fb_groups.created_at`).all()).map(mapGroup);
+export function listGroups(db: GrowthDb): ShareGroup[] {
+  return rows(db.prepare(`${GROUP_SELECT} ORDER BY share_groups.network, share_groups.created_at`).all()).map(mapGroup);
 }
 
-export function getGroup(db: GrowthDb, id: string): FbGroup | null {
-  const row = db.prepare(`${GROUP_SELECT} WHERE fb_groups.id = ?`).get(id) as Row | undefined;
+export function getGroup(db: GrowthDb, id: string): ShareGroup | null {
+  const row = db.prepare(`${GROUP_SELECT} WHERE share_groups.id = ?`).get(id) as Row | undefined;
   return row ? mapGroup(row) : null;
 }
 
-export function insertGroup(db: GrowthDb, input: { id: string; name: string; url: string; rules: string; minDays: number }): FbGroup {
-  db.prepare("INSERT INTO fb_groups (id, name, url, rules, min_days, enabled, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)").run(
+export function insertGroup(
+  db: GrowthDb,
+  input: Pick<ShareGroup, "id" | "network" | "name" | "link" | "target" | "secretEnc" | "rules" | "minDays" | "trigger" | "autopilot">
+): ShareGroup {
+  db.prepare(
+    `INSERT INTO share_groups (id, network, name, link, target, secret_enc, rules, min_days, trigger, autopilot, enabled, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
+  ).run(
     input.id,
+    input.network,
     input.name,
-    input.url,
+    input.link,
+    input.target,
+    input.secretEnc,
     input.rules,
     input.minDays,
+    input.trigger,
+    input.autopilot ? 1 : 0,
     new Date().toISOString()
   );
   return getGroup(db, input.id)!;
 }
 
-export function updateGroup(db: GrowthDb, id: string, patch: Partial<Pick<FbGroup, "name" | "rules" | "minDays" | "enabled">>): FbGroup | null {
+export function updateGroup(
+  db: GrowthDb,
+  id: string,
+  patch: Partial<Pick<ShareGroup, "name" | "rules" | "minDays" | "trigger" | "autopilot" | "enabled">>
+): ShareGroup | null {
   const current = getGroup(db, id);
   if (!current) return null;
   const next = { ...current, ...patch };
-  db.prepare("UPDATE fb_groups SET name = ?, rules = ?, min_days = ?, enabled = ? WHERE id = ?").run(next.name, next.rules, next.minDays, next.enabled ? 1 : 0, id);
+  db.prepare("UPDATE share_groups SET name = ?, rules = ?, min_days = ?, trigger = ?, autopilot = ?, enabled = ? WHERE id = ?").run(
+    next.name,
+    next.rules,
+    next.minDays,
+    next.trigger,
+    next.autopilot ? 1 : 0,
+    next.enabled ? 1 : 0,
+    id
+  );
   return getGroup(db, id);
 }
 
 export function deleteGroup(db: GrowthDb, id: string): void {
-  db.prepare("DELETE FROM group_shares WHERE group_id = ? AND status = 'pending'").run(id);
-  db.prepare("DELETE FROM fb_groups WHERE id = ?").run(id);
+  db.prepare("DELETE FROM group_posts WHERE group_id = ? AND status IN ('pending', 'failed')").run(id);
+  db.prepare("DELETE FROM share_groups WHERE id = ?").run(id);
 }
 
-export type GroupShare = {
+export type GroupPost = {
   id: string;
   groupId: string;
-  groupName: string;
-  groupUrl: string;
-  groupRules: string;
-  groupMinDays: number;
-  groupLastSharedAt: string | null;
-  jobId: string;
   itemId: string;
   itemTitle: string;
-  pagePostUrl: string | null;
+  jobId: string | null;
+  sourceNetwork: string | null;
+  sourcePostUrl: string | null;
+  facebookPostUrl: string | null;
   status: string;
   postUrl: string | null;
+  error: string | null;
   createdAt: string;
   doneAt: string | null;
 };
 
-const SHARE_SELECT = `SELECT group_shares.*, fb_groups.name AS group_name, fb_groups.url AS group_url,
-  fb_groups.rules AS group_rules, fb_groups.min_days AS group_min_days,
-  (SELECT MAX(done_at) FROM group_shares AS done WHERE done.group_id = group_shares.group_id AND done.status = 'done') AS group_last_shared_at,
-  items.title AS item_title, jobs.remote_url AS page_post_url
-  FROM group_shares
-  JOIN fb_groups ON fb_groups.id = group_shares.group_id
-  JOIN items ON items.id = group_shares.item_id
-  JOIN jobs ON jobs.id = group_shares.job_id`;
+const POST_SELECT = `SELECT group_posts.*, items.title AS item_title,
+  jobs.network AS source_network, jobs.remote_url AS source_post_url,
+  (SELECT remote_url FROM jobs AS fb WHERE fb.item_id = group_posts.item_id AND fb.network = 'facebook'
+     AND fb.status = 'published' AND fb.remote_url IS NOT NULL ORDER BY fb.published_at DESC LIMIT 1) AS facebook_post_url
+  FROM group_posts
+  JOIN items ON items.id = group_posts.item_id
+  LEFT JOIN jobs ON jobs.id = group_posts.job_id`;
 
-function mapShare(row: Row): GroupShare {
+function mapPost(row: Row): GroupPost {
   return {
     id: str(row, "id"),
     groupId: str(row, "group_id"),
-    groupName: str(row, "group_name"),
-    groupUrl: str(row, "group_url"),
-    groupRules: str(row, "group_rules"),
-    groupMinDays: num(row, "group_min_days"),
-    groupLastSharedAt: str(row, "group_last_shared_at") || null,
-    jobId: str(row, "job_id"),
     itemId: str(row, "item_id"),
     itemTitle: str(row, "item_title"),
-    pagePostUrl: str(row, "page_post_url") || null,
+    jobId: str(row, "job_id") || null,
+    sourceNetwork: str(row, "source_network") || null,
+    sourcePostUrl: str(row, "source_post_url") || null,
+    facebookPostUrl: str(row, "facebook_post_url") || null,
     status: str(row, "status"),
     postUrl: str(row, "post_url") || null,
+    error: str(row, "error") || null,
     createdAt: str(row, "created_at"),
     doneAt: str(row, "done_at") || null
   };
 }
 
-export function listGroupShares(db: GrowthDb): GroupShare[] {
+export function listGroupPosts(db: GrowthDb): GroupPost[] {
   return rows(
-    db.prepare(`${SHARE_SELECT} ORDER BY CASE group_shares.status WHEN 'pending' THEN 0 ELSE 1 END, group_shares.created_at DESC LIMIT 200`).all()
-  ).map(mapShare);
+    db
+      .prepare(
+        `${POST_SELECT} ORDER BY CASE group_posts.status WHEN 'pending' THEN 0 WHEN 'failed' THEN 1 ELSE 2 END, group_posts.created_at DESC LIMIT 300`
+      )
+      .all()
+  ).map(mapPost);
 }
 
-export function getGroupShare(db: GrowthDb, id: string): GroupShare | null {
-  const row = db.prepare(`${SHARE_SELECT} WHERE group_shares.id = ?`).get(id) as Row | undefined;
-  return row ? mapShare(row) : null;
+export function getGroupPost(db: GrowthDb, id: string): GroupPost | null {
+  const row = db.prepare(`${POST_SELECT} WHERE group_posts.id = ?`).get(id) as Row | undefined;
+  return row ? mapPost(row) : null;
 }
 
-export function queueGroupShares(db: GrowthDb, job: Pick<Job, "id" | "itemId">, newId: () => string): number {
+export function pendingGroupPosts(db: GrowthDb): GroupPost[] {
+  return rows(db.prepare(`${POST_SELECT} WHERE group_posts.status = 'pending' ORDER BY group_posts.created_at`).all()).map(mapPost);
+}
+
+export function queueGroupPosts(
+  db: GrowthDb,
+  source: { itemId: string; jobId: string | null; network: string | null },
+  newId: () => string,
+  options: { force?: boolean } = {}
+): number {
   const insert = db.prepare(
-    "INSERT OR IGNORE INTO group_shares (id, group_id, job_id, item_id, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)"
+    "INSERT OR IGNORE INTO group_posts (id, group_id, item_id, job_id, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)"
   );
   const now = new Date().toISOString();
   let added = 0;
-  for (const group of listGroups(db).filter((row) => row.enabled)) {
-    added += insert.run(newId(), group.id, job.id, job.itemId, now).changes;
+  for (const group of listGroups(db)) {
+    if (!group.enabled) continue;
+    if (!options.force && group.trigger !== "any" && group.trigger !== source.network) continue;
+    added += Number(insert.run(newId(), group.id, source.itemId, source.jobId, now).changes);
   }
   return added;
 }
 
-export function finishGroupShare(db: GrowthDb, id: string, status: "done" | "skipped", postUrl: string | null): GroupShare | null {
-  db.prepare("UPDATE group_shares SET status = ?, post_url = ?, done_at = ? WHERE id = ?").run(status, postUrl, new Date().toISOString(), id);
-  return getGroupShare(db, id);
+export function finishGroupPost(
+  db: GrowthDb,
+  id: string,
+  patch: { status: "done" | "skipped" | "failed" | "pending"; postUrl?: string | null; error?: string | null }
+): GroupPost | null {
+  const doneAt = patch.status === "done" || patch.status === "skipped" ? new Date().toISOString() : null;
+  db.prepare("UPDATE group_posts SET status = ?, post_url = ?, error = ?, done_at = ? WHERE id = ?").run(
+    patch.status,
+    patch.postUrl ?? null,
+    patch.error ?? null,
+    doneAt,
+    id
+  );
+  return getGroupPost(db, id);
+}
+
+export function claimGroupPost(db: GrowthDb, id: string): boolean {
+  const result = db.prepare("UPDATE group_posts SET status = 'sending', error = NULL WHERE id = ? AND status IN ('pending', 'failed')").run(id);
+  return Number(result.changes) === 1;
 }
 
 export type DirectoryRow = {

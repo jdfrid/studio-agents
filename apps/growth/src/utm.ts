@@ -22,14 +22,17 @@ export function trackedLink(input: {
   slug: string;
   format: "v9x16" | "text" | "email" | "article";
   campaign?: string;
+  medium?: string;
+  term?: string;
   now?: Date;
 }): string {
   const campaign = input.campaign ?? `${campaignMonth(input.now)}-smb-us-demo`;
   const url = new URL("https://reelmino.com/");
   url.searchParams.set("utm_source", SOURCE[input.network] ?? input.network);
-  url.searchParams.set("utm_medium", input.network === "email" ? "email" : "organic");
+  url.searchParams.set("utm_medium", input.medium ?? (input.network === "email" ? "email" : "organic"));
   url.searchParams.set("utm_campaign", campaign);
   url.searchParams.set("utm_content", `${input.slug}-outcome-${input.format}-a`);
+  if (input.term) url.searchParams.set("utm_term", input.term);
   return url.toString();
 }
 
