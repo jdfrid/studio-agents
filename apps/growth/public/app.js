@@ -32,6 +32,7 @@ async function refresh() {
 function render() {
   if (tab === "content") renderContent();
   else if (tab === "accounts") renderAccounts();
+  else if (tab === "groups") renderGroups();
   else if (tab === "calendar") renderCalendar();
   else if (tab === "internet") renderInternet();
   else if (tab === "results") renderResults();
@@ -172,6 +173,114 @@ function renderAccounts() {
   });
 }
 
+function renderGroups() {
+  const groups = state.groups || [];
+  const shares = state.groupShares || [];
+  const pending = shares.filter((row) => row.status === "pending");
+  const history = shares.filter((row) => row.status !== "pending").slice(0, 40);
+  const days = (iso) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null);
+  panel.innerHTML = `
+    <div class="card">
+      <p>אחרי כל פוסט שעולה לעמוד הפייסבוק, נוצרת כאן משימה לכל קבוצה פעילה ברשימה: הטקסט מוכן, וקישור לפוסט בעמוד.</p>
+      <p class="muted">פייסבוק סגרו את ממשק הקבוצות ב-2024, ולכן שום כלי חיצוני לא יכול לפרסם בקבוצה. הלחיצה על <strong>פרסום</strong> נעשית בתוך פייסבוק, בחשבון שלך. הכלי מכין, פותח את הקבוצה ורושם מה פורסם.</p>
+    </div>
+    <div class="card">
+      <h2>משימות פתוחות</h2>
+      ${pending.map((row) => `<div class="card share">
+        <p><strong>${esc(row.groupName)}</strong> · ${esc(row.itemTitle)}</p>
+        ${row.tooSoon ? `<p class="warn-text">פורסם בקבוצה הזו לפני ${days(row.groupLastSharedAt)} ימים. המרווח שהוגדר הוא ${row.groupMinDays} ימים.</p>` : ""}
+        ${row.groupRules ? `<p class="muted">כללי הקבוצה: ${esc(row.groupRules)}</p>` : ""}
+        <label>טקסט לפרסום<textarea readonly data-share-text="${row.id}">${esc(row.text)}</textarea></label>
+        <p class="row">
+          <button class="primary" type="button" data-open-share="${row.id}">העתקה ופתיחת הקבוצה</button>
+          ${row.pagePostUrl ? `<a href="${esc(row.pagePostUrl)}" target="_blank" rel="noreferrer">הפוסט בעמוד, לשיתוף לקבוצה</a>` : ""}
+        </p>
+        <p class="row">
+          <input data-share-url="${row.id}" placeholder="קישור לפוסט בקבוצה, לא חובה" style="max-width:24rem">
+          <button type="button" data-done-share="${row.id}">פורסם</button>
+          <button type="button" data-skip-share="${row.id}">דילוג</button>
+        </p>
+      </div>`).join("") || "<p>אין משימות. הן נוצרות אחרי פרסום לעמוד הפייסבוק.</p>"}
+    </div>
+    <div class="card">
+      <h2>הקבוצות שלי</h2>
+      <p class="muted">רק קבוצות שאתה כבר חבר בהן ומותר בהן לפרסם. כתובת בפורמט https://www.facebook.com/groups/...</p>
+      <div class="row">
+        <input id="group-name" placeholder="שם" style="max-width:12rem">
+        <input id="group-url" placeholder="https://www.facebook.com/groups/..." style="max-width:22rem">
+        <input id="group-days" type="number" min="0" value="7" style="max-width:6rem" title="מינימום ימים בין פרסומים">
+      </div>
+      <label>כללי הקבוצה, לתזכורת<input id="group-rules" placeholder="למשל: קידום עצמי רק ביום שישי"></label>
+      <p class="row"><button class="primary" type="button" id="add-group">הוספת קבוצה</button></p>
+      <table>
+        <thead><tr><th>קבוצה</th><th>מרווח בימים</th><th>פרסום אחרון</th><th>פעילה</th><th></th></tr></thead>
+        <tbody>
+          ${groups.map((row) => `<tr>
+            <td><a href="${esc(row.url)}" target="_blank" rel="noreferrer">${esc(row.name)}</a>${row.rules ? `<br><span class="muted">${esc(row.rules)}</span>` : ""}</td>
+            <td><input type="number" min="0" value="${row.minDays}" data-group-days="${row.id}" style="max-width:5rem"></td>
+            <td>${row.lastSharedAt ? esc(row.lastSharedAt.slice(0, 10)) : "—"}</td>
+            <td><input type="checkbox" data-group-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
+            <td><button type="button" data-group-drop="${row.id}">הסרה</button></td>
+          </tr>`).join("") || "<tr><td colspan='5'>אין קבוצות</td></tr>"}
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>היסטוריה</h2>
+      <table>
+        <thead><tr><th>תאריך</th><th>קבוצה</th><th>פריט</th><th>מצב</th><th>קישור</th></tr></thead>
+        <tbody>
+          ${history.map((row) => `<tr>
+            <td>${esc((row.doneAt || "").slice(0, 10))}</td>
+            <td>${esc(row.groupName)}</td>
+            <td>${esc(row.itemTitle)}</td>
+            <td>${row.status === "done" ? "פורסם" : "דולג"}</td>
+            <td>${row.postUrl ? `<a href="${esc(row.postUrl)}" target="_blank" rel="noreferrer">פוסט</a>` : "—"}</td>
+          </tr>`).join("") || "<tr><td colspan='5'>עדיין אין</td></tr>"}
+        </tbody>
+      </table>
+    </div>
+  `;
+  panel.querySelector("#add-group").onclick = () => run(() => api("/api/groups", {
+    method: "POST",
+    body: JSON.stringify({
+      name: panel.querySelector("#group-name").value,
+      url: panel.querySelector("#group-url").value,
+      rules: panel.querySelector("#group-rules").value,
+      minDays: Number(panel.querySelector("#group-days").value)
+    })
+  }));
+  panel.querySelectorAll("[data-group-enabled]").forEach((box) => {
+    box.onchange = () => run(() => api(`/api/groups/${box.dataset.groupEnabled}`, { method: "PATCH", body: JSON.stringify({ enabled: box.checked }) }));
+  });
+  panel.querySelectorAll("[data-group-days]").forEach((input) => {
+    input.onchange = () => run(() => api(`/api/groups/${input.dataset.groupDays}`, { method: "PATCH", body: JSON.stringify({ minDays: Number(input.value) }) }));
+  });
+  panel.querySelectorAll("[data-group-drop]").forEach((button) => {
+    button.onclick = () => run(() => api(`/api/groups/${button.dataset.groupDrop}`, { method: "DELETE" }));
+  });
+  panel.querySelectorAll("[data-open-share]").forEach((button) => {
+    button.onclick = async () => {
+      const row = pending.find((share) => share.id === button.dataset.openShare);
+      if (!row) return;
+      window.open(row.groupUrl, "_blank", "noopener");
+      try {
+        await navigator.clipboard.writeText(row.text);
+        banner.textContent = `הטקסט הועתק. בקבוצה ${row.groupName}: כתבו פוסט, הדביקו, והוסיפו את הסרטון אם צריך.`;
+      } catch {
+        panel.querySelector(`[data-share-text="${row.id}"]`).select();
+        banner.textContent = "ההעתקה האוטומטית נחסמה. הטקסט מסומן: Ctrl+C.";
+      }
+    };
+  });
+  const finish = (id, status) => run(() => api(`/api/group-shares/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, postUrl: panel.querySelector(`[data-share-url="${id}"]`)?.value || "" })
+  }));
+  panel.querySelectorAll("[data-done-share]").forEach((button) => { button.onclick = () => finish(button.dataset.doneShare, "done"); });
+  panel.querySelectorAll("[data-skip-share]").forEach((button) => { button.onclick = () => finish(button.dataset.skipShare, "skipped"); });
+}
+
 function renderCalendar() {
   panel.innerHTML = `
     <div class="card row">
@@ -242,7 +351,7 @@ function renderResults() {
   panel.innerHTML = `
     <div class="card">
       <table>
-        <thead><tr><th>זמן</th><th>פריט</th><th>רשת</th><th>סטטוס</th><th>קישור</th><th>שגיאה</th></tr></thead>
+        <thead><tr><th>זמן</th><th>פריט</th><th>רשת</th><th>סטטוס</th><th>קישור</th><th>שגיאה</th><th></th></tr></thead>
         <tbody>
           ${state.jobs.map((row) => `<tr>
             <td>${esc((row.publishedAt || row.createdAt || "").replace("T", " ").slice(0, 16))}</td>
@@ -251,11 +360,18 @@ function renderResults() {
             <td>${esc(row.status)}</td>
             <td>${row.remoteUrl ? `<a href="${esc(row.remoteUrl)}" target="_blank" rel="noreferrer">פוסט</a>` : "—"}</td>
             <td class="error">${esc(row.lastError || row.errorCode || "")}</td>
-          </tr>`).join("") || "<tr><td colspan='6'>אין פרסומים עדיין</td></tr>"}
+            <td>${row.network === "facebook" && row.status === "published" ? `<button type="button" data-to-groups="${row.id}">לקבוצות</button>` : ""}</td>
+          </tr>`).join("") || "<tr><td colspan='7'>אין פרסומים עדיין</td></tr>"}
         </tbody>
       </table>
     </div>
   `;
+  panel.querySelectorAll("[data-to-groups]").forEach((button) => {
+    button.onclick = () => run(async () => {
+      await api(`/api/jobs/${button.dataset.toGroups}/groups`, { method: "POST", body: "{}" });
+      tab = "groups";
+    });
+  });
 }
 
 function renderPeople() {

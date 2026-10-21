@@ -16,6 +16,7 @@ import {
   getDestination,
   getJob,
   insertJob,
+  queueGroupShares,
   updateConnectionTokens,
   updateJob,
   type Destination,
@@ -172,7 +173,7 @@ function applyResult(db: GrowthDb, jobId: string, result: PublishHandle): Job {
       attempts: 1
     })!;
   }
-  return updateJob(db, jobId, {
+  const job = updateJob(db, jobId, {
     status: result.status === "draft" ? "draft" : "published",
     remotePostId: result.remotePostId ?? null,
     remoteUrl: result.remoteUrl ?? null,
@@ -181,6 +182,8 @@ function applyResult(db: GrowthDb, jobId: string, result: PublishHandle): Job {
     lastError: result.status === "draft" ? "Waiting in the network inbox. Finish it in the app." : null,
     attempts: 1
   })!;
+  if (job.network === "facebook" && job.status === "published") queueGroupShares(db, job, nid);
+  return job;
 }
 
 export async function pollPublish(db: GrowthDb, key: Buffer, jobId: string): Promise<Job | null> {

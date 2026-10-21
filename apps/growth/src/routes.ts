@@ -9,12 +9,21 @@ import { emptyCopy, EXPORT_NETWORKS, networkText, type ItemCopy } from "./copy.j
 import { hashPassword, hashToken, nid, verifyPassword } from "./crypto.js";
 import {
   createSession,
+  deleteGroup,
   deleteOperator,
   deleteSession,
   findOperatorByPassword,
+  finishGroupShare,
   flag,
+  getGroupShare,
+  getJob,
+  insertGroup,
   insertOperator,
+  listGroups,
+  listGroupShares,
   listOperators,
+  queueGroupShares,
+  updateGroup,
   getDestination,
   getEmail,
   getItem,
@@ -38,6 +47,7 @@ import {
   upsertPlannedSlot,
   type GrowthDb
 } from "./db.js";
+import { groupShareText, normalizeGroupUrl, sharedTooRecently } from "./groups.js";
 import { writeLearnSite } from "./internet.js";
 import { sendGrowthMail } from "./mail.js";
 import { applyLink, trackedLink } from "./utm.js";
@@ -123,8 +133,67 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
     mailConfigured: Boolean(process.env.GROWTH_RESEND_API_KEY && process.env.GROWTH_MAIL_FROM && process.env.GROWTH_MAIL_TO),
     produceConfigured: Boolean(process.env.REELMINO_SESSION),
     operators: listOperators(ctx.db),
-    publicBase: ctx.publicBase
+    publicBase: ctx.publicBase,
+    groups: listGroups(ctx.db),
+    groupShares: listGroupShares(ctx.db).map((share) => {
+      const item = getItem(ctx.db, share.itemId);
+      return {
+        ...share,
+        text: item ? groupShareText(item.copy, share.pagePostUrl) : "",
+        tooSoon: share.status === "pending" && sharedTooRecently(share.groupLastSharedAt, share.groupMinDays)
+      };
+    })
   }));
+
+  app.post("/api/groups", async (request, reply) => {
+    const body = request.body as { name?: string; url?: string; rules?: string; minDays?: number };
+    const url = normalizeGroupUrl(body.url ?? "");
+    if (!url) return reply.code(400).send({ error: "כתובת קבוצה בפורמט https://www.facebook.com/groups/..." });
+    const name = body.name?.trim() || url.split("/").pop()!;
+    const minDays = Number.isFinite(body.minDays) ? Math.max(0, Math.round(body.minDays!)) : 7;
+    try {
+      return insertGroup(ctx.db, { id: nid(), name, url, rules: body.rules?.trim() ?? "", minDays });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("UNIQUE")) return reply.code(409).send({ error: "הקבוצה כבר ברשימה" });
+      throw error;
+    }
+  });
+
+  app.patch("/api/groups/:id", async (request, reply) => {
+    const body = request.body as { name?: string; rules?: string; minDays?: number; enabled?: boolean };
+    const row = updateGroup(ctx.db, (request.params as { id: string }).id, {
+      ...(body.name?.trim() ? { name: body.name.trim() } : {}),
+      ...(body.rules !== undefined ? { rules: body.rules.trim() } : {}),
+      ...(Number.isFinite(body.minDays) ? { minDays: Math.max(0, Math.round(body.minDays!)) } : {}),
+      ...(body.enabled !== undefined ? { enabled: body.enabled } : {})
+    });
+    if (!row) return reply.code(404).send({ error: "not found" });
+    return row;
+  });
+
+  app.delete("/api/groups/:id", async (request) => {
+    deleteGroup(ctx.db, (request.params as { id: string }).id);
+    return { ok: true };
+  });
+
+  app.post("/api/jobs/:id/groups", async (request, reply) => {
+    const job = getJob(ctx.db, (request.params as { id: string }).id);
+    if (!job || job.network !== "facebook" || job.status !== "published") {
+      return reply.code(400).send({ error: "רק פוסט שפורסם בעמוד הפייסבוק" });
+    }
+    return { added: queueGroupShares(ctx.db, job, nid) };
+  });
+
+  app.patch("/api/group-shares/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as { status?: string; postUrl?: string };
+    if (body.status !== "done" && body.status !== "skipped") return reply.code(400).send({ error: "status must be done or skipped" });
+    if (!getGroupShare(ctx.db, id)) return reply.code(404).send({ error: "not found" });
+    const postUrl = body.postUrl?.trim() || null;
+    if (postUrl && !/^https:\/\/(www\.|m\.|web\.)?facebook\.com\//.test(postUrl)) return reply.code(400).send({ error: "קישור פייסבוק בלבד" });
+    return finishGroupShare(ctx.db, id, body.status, postUrl);
+  });
 
   app.post("/api/operators", async (request, reply) => {
     const body = request.body as { name?: string; password?: string };

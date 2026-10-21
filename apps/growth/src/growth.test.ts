@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { assetKind, CALENDAR, networksForKind } from "./calendar.js";
 import { importCalendar, importPromoKit } from "./catalog.js";
 import { signPayload, verifyPayload } from "./crypto.js";
-import { openDb } from "./db.js";
+import { insertJob, openDb, updateJob } from "./db.js";
+import { normalizeGroupUrl } from "./groups.js";
 import { renderArticle, spliceSitemap, writeLearnSite } from "./internet.js";
 import { linkedinPostBody } from "./linkedin.js";
 import { decideSlot } from "./schedule.js";
@@ -93,7 +94,9 @@ describe("growth console", () => {
     writeFileSync(path.join(publicDir, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://reelmino.com/</loc></url>\n</urlset>\n`);
     const html = renderArticle({ slug: "one", title: "A & B", description: "desc", body: "Line\n\n<script>" }, "https://reelmino.com/learn/one/");
     expect(html).toContain("A &amp; B");
-    expect(html).not.toContain("<script>");
+    expect(html).toContain("<p>&lt;script&gt;</p>");
+    expect(html).not.toContain("<p><script></p>");
+    expect(html).toContain("googletagmanager.com/gtag/js?id=G-JX95ZGHQ6Z");
     const written = writeLearnSite({
       publicDir,
       origin: "https://reelmino.com",
@@ -152,6 +155,50 @@ describe("growth console", () => {
       payload: { name: "Short", password: "tiny" }
     });
     expect(short.statusCode).toBe(400);
+    await built.close();
+  });
+
+  it("queues a facebook page post for the operator's groups without posting into them", async () => {
+    process.env.GROWTH_OPERATOR_PASSWORD = "secret";
+    process.env.GROWTH_DISABLE_SCHEDULER = "1";
+    expect(normalizeGroupUrl("https://m.facebook.com/groups/reelmino.club/?ref=share")).toBe("https://www.facebook.com/groups/reelmino.club");
+    expect(normalizeGroupUrl("https://www.facebook.com/reelmino")).toBeNull();
+    expect(normalizeGroupUrl("http://facebook.com/groups/x")).toBeNull();
+    const dir = tempDir();
+    const built = await buildApp({ dataDir: dir, webPublic: path.join(dir, "public"), promoKit: path.join(repoRoot, "marketing/promo-kit"), listen: false });
+    const login = await built.app.inject({ method: "POST", url: "/api/login", payload: { password: "secret" } });
+    const setCookie = login.headers["set-cookie"];
+    const cookie = (Array.isArray(setCookie) ? setCookie[0] : setCookie)!.split(";")[0]!;
+    const call = (method: "GET" | "POST" | "PATCH", url: string, payload?: object) =>
+      built.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+
+    await call("POST", "/api/import/kit", {});
+    expect((await call("POST", "/api/groups", { name: "Bad", url: "https://www.facebook.com/reelmino" })).statusCode).toBe(400);
+    expect((await call("POST", "/api/groups", { name: "Creators", url: "https://www.facebook.com/groups/creators", minDays: 7 })).statusCode).toBe(200);
+    expect((await call("POST", "/api/groups", { url: "https://m.facebook.com/groups/creators/" })).statusCode).toBe(409);
+    const off = (await call("POST", "/api/groups", { name: "Off", url: "https://www.facebook.com/groups/off" })).json() as { id: string };
+    await call("PATCH", `/api/groups/${off.id}`, { enabled: false });
+
+    const item = (built.db.prepare("SELECT id FROM items LIMIT 1").get() as { id: string }).id;
+    const job = insertJob(built.db, { id: "job-fb", itemId: item, destinationId: null, slotId: null, network: "facebook", status: "queued" });
+    expect((await call("POST", `/api/jobs/${job.id}/groups`)).statusCode).toBe(400);
+    updateJob(built.db, job.id, { status: "published", remoteUrl: "https://www.facebook.com/reelmino/posts/1" });
+    expect((await call("POST", `/api/jobs/${job.id}/groups`, {})).json()).toEqual({ added: 1 });
+    expect((await call("POST", `/api/jobs/${job.id}/groups`, {})).json()).toEqual({ added: 0 });
+
+    type Share = { id: string; groupName: string; status: string; text: string; tooSoon: boolean };
+    const shares = ((await call("GET", "/api/state")).json() as { groupShares: Share[] }).groupShares;
+    expect(shares).toHaveLength(1);
+    expect(shares[0]!.groupName).toBe("Creators");
+    expect(shares[0]!.text).toContain("https://www.facebook.com/reelmino/posts/1");
+    const done = await call("PATCH", `/api/group-shares/${shares[0]!.id}`, { status: "done", postUrl: "https://www.facebook.com/groups/creators/posts/9" });
+    expect(done.statusCode).toBe(200);
+
+    const next = insertJob(built.db, { id: "job-fb-2", itemId: item, destinationId: null, slotId: null, network: "facebook", status: "queued" });
+    updateJob(built.db, next.id, { status: "published", remoteUrl: "https://www.facebook.com/reelmino/posts/2" });
+    await call("POST", `/api/jobs/${next.id}/groups`, {});
+    const after = ((await call("GET", "/api/state")).json() as { groupShares: Share[] }).groupShares;
+    expect(after.find((row) => row.status === "pending")!.tooSoon).toBe(true);
     await built.close();
   });
 });
