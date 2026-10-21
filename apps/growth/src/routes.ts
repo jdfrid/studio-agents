@@ -1,6 +1,6 @@
 import "@fastify/cookie";
 import "@fastify/multipart";
-import { createReadStream, mkdirSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { beginOAuth, connectTelegram, finishOAuth, networkSetup, oauthNetworks, removeConnection, syncConnection } from "./accounts.js";
@@ -576,12 +576,12 @@ function redirectUri(ctx: AppCtx, network: string): string {
   return `${ctx.publicBase.replace(/\/$/, "")}/oauth/${network}/callback`;
 }
 
-export function sendMedia(reply: FastifyReply, mediaDir: string, filename: string): void {
-  if (!/^[a-f0-9]+\.(mp4|mov|webm|png|jpg|jpeg|webp)$/i.test(filename)) {
-    reply.code(404).send({ error: "not found" });
-    return;
-  }
+export function sendMedia(reply: FastifyReply, mediaDir: string, filename: string, range?: string): FastifyReply {
   const file = path.join(mediaDir, filename);
+  if (!/^[a-f0-9]+\.(mp4|mov|webm|png|jpg|jpeg|webp)$/i.test(filename) || !existsSync(file)) {
+    return reply.code(404).send({ error: "not found" });
+  }
+  const size = statSync(file).size;
   const type = filename.endsWith(".png")
     ? "image/png"
     : filename.endsWith(".webp")
@@ -589,5 +589,17 @@ export function sendMedia(reply: FastifyReply, mediaDir: string, filename: strin
       : filename.endsWith(".jpg") || filename.endsWith(".jpeg")
         ? "image/jpeg"
         : "video/mp4";
-  reply.type(type).send(createReadStream(file));
+  reply.type(type).header("accept-ranges", "bytes");
+  const match = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null;
+  if (match && (match[1] || match[2])) {
+    const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
+    const end = match[1] && match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+    if (start >= size || start > end) return reply.code(416).header("content-range", `bytes */${size}`).send();
+    return reply
+      .code(206)
+      .header("content-range", `bytes ${start}-${end}/${size}`)
+      .header("content-length", end - start + 1)
+      .send(createReadStream(file, { start, end }));
+  }
+  return reply.header("content-length", size).send(createReadStream(file));
 }

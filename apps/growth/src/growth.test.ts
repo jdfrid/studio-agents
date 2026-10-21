@@ -169,6 +169,24 @@ describe("growth console", () => {
     await built.close();
   });
 
+  it("serves media files whole and by byte range for network fetchers", async () => {
+    process.env.GROWTH_DISABLE_SCHEDULER = "1";
+    const dir = tempDir();
+    mkdirSync(path.join(dir, "media"), { recursive: true });
+    writeFileSync(path.join(dir, "media", "abc123.mp4"), Buffer.from("0123456789"));
+    const built = await buildApp({ dataDir: dir, webPublic: path.join(dir, "public"), promoKit: path.join(repoRoot, "marketing/promo-kit"), listen: false });
+    const whole = await built.app.inject({ method: "GET", url: "/media/abc123.mp4" });
+    expect(whole.statusCode).toBe(200);
+    expect(whole.headers["content-length"]).toBe("10");
+    expect(whole.body).toBe("0123456789");
+    const part = await built.app.inject({ method: "GET", url: "/media/abc123.mp4", headers: { range: "bytes=2-4" } });
+    expect(part.statusCode).toBe(206);
+    expect(part.headers["content-range"]).toBe("bytes 2-4/10");
+    expect(part.body).toBe("234");
+    expect((await built.app.inject({ method: "GET", url: "/media/missing1.mp4" })).statusCode).toBe(404);
+    await built.close();
+  });
+
   it("accepts only real group addresses for each network", () => {
     expect(normalizeGroupUrl("https://m.facebook.com/groups/reelmino.club/?ref=share")).toBe("https://www.facebook.com/groups/reelmino.club");
     expect(normalizeGroupUrl("https://www.facebook.com/reelmino")).toBeNull();

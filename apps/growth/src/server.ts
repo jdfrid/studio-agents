@@ -67,9 +67,9 @@ export async function buildApp(options: BuildOptions = {}) {
   app.get("/app.js", async (_request, reply) => {
     reply.type("application/javascript").send(readFileSync(path.join(publicDir, "app.js")));
   });
-  app.get("/media/:filename", async (request, reply) => {
-    sendMedia(reply, ctx.mediaDir, (request.params as { filename: string }).filename);
-  });
+  app.get("/media/:filename", async (request, reply) =>
+    sendMedia(reply, ctx.mediaDir, (request.params as { filename: string }).filename, request.headers.range)
+  );
   registerRoutes(app, ctx);
   app.setErrorHandler((error, _request, reply) => {
     const status = typeof error.statusCode === "number" ? error.statusCode : 500;
