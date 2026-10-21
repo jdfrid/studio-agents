@@ -87,7 +87,10 @@ export async function importPromoKit(db: GrowthDb, promoKit: string, mediaDir: s
       });
       imported += 1;
     } else {
-      updateItem(db, existing.id, { title: pkg.name, summary: pkg.message, copy });
+      const cut = existing.mediaPath ? null : findCut(promoKit, pkg);
+      const media = cut ? { mediaPath: `${existing.id}.mp4`, mediaMime: "video/mp4", mediaKind: "video", mediaWidth: 1080, mediaHeight: 1920, mediaDurationMs: 30_000 } : {};
+      if (cut) copyFileSync(cut, path.join(mediaDir, media.mediaPath!));
+      updateItem(db, existing.id, { title: pkg.name, summary: pkg.message, copy, ...media });
     }
   }
   return { imported };
