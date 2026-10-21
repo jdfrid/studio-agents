@@ -108,6 +108,17 @@ describe("growth console", () => {
     expect(sitemap).toContain("https://reelmino.com/");
     expect(sitemap).toContain("https://reelmino.com/learn/one/");
     expect(spliceSitemap(sitemap, ["https://reelmino.com/learn/two/"])).not.toContain("/learn/one/");
+    const volume = path.join(dir, "volume");
+    writeLearnSite({
+      publicDir: volume,
+      origin: "https://reelmino.com",
+      articles: [{ slug: "two", title: "Two", description: "desc", body: "Hi" }],
+      sitemapBase: path.join(publicDir, "sitemap.xml")
+    });
+    const shared = readFileSync(path.join(volume, "sitemap.xml"), "utf8");
+    expect(shared).toContain("<loc>https://reelmino.com/</loc>");
+    expect(shared).toContain("/learn/two/");
+    expect(shared.match(/growth:learn:start/g)).toHaveLength(1);
   });
 
   it("requires the operator password and then shows imported content", async () => {

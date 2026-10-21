@@ -12,6 +12,16 @@ export function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+const GOOGLE_TAG = `<!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-JX95ZGHQ6Z"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-JX95ZGHQ6Z');
+  </script>`;
+
 export type LearnArticle = {
   slug: string;
   title: string;
@@ -29,6 +39,7 @@ export function renderArticle(article: LearnArticle, pageUrl: string): string {
   return `<!doctype html>
 <html lang="en">
 <head>
+  ${GOOGLE_TAG}
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(article.title)} — Reelmino</title>
@@ -61,6 +72,7 @@ export function renderLearnIndex(articles: LearnArticle[], origin: string): stri
   return `<!doctype html>
 <html lang="en">
 <head>
+  ${GOOGLE_TAG}
   <meta charset="utf-8">
   <title>Learn — Reelmino</title>
   <meta name="description" content="How Reelmino turns a business idea into a finished video.">
@@ -92,6 +104,8 @@ export function writeLearnSite(input: {
   publicDir: string;
   origin: string;
   articles: LearnArticle[];
+  /** The site's own sitemap, when the output folder is a separate volume served next to the built site. */
+  sitemapBase?: string;
 }): { count: number; index: string } {
   const learnDir = path.join(input.publicDir, "learn");
   mkdirSync(learnDir, { recursive: true });
@@ -110,8 +124,9 @@ export function writeLearnSite(input: {
   writeFileSync(path.join(learnDir, "index.html"), renderLearnIndex(input.articles, input.origin), "utf8");
   writeFileSync(manifestPath, JSON.stringify([...next], null, 2), "utf8");
   const sitemapPath = path.join(input.publicDir, "sitemap.xml");
-  const current = existsSync(sitemapPath)
-    ? readFileSync(sitemapPath, "utf8")
+  const source = input.sitemapBase && existsSync(input.sitemapBase) ? input.sitemapBase : sitemapPath;
+  const current = existsSync(source)
+    ? readFileSync(source, "utf8")
     : `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n</urlset>\n`;
   const locs = [`${input.origin}/learn/`, ...input.articles.map((article) => `${input.origin}/learn/${article.slug}/`)];
   writeFileSync(sitemapPath, spliceSitemap(current, locs), "utf8");

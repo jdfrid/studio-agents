@@ -234,8 +234,10 @@ services:
       GROWTH_MAIL_TO: ${GROWTH_MAIL_TO:-}
       REELMINO_API: ${REELMINO_API:-https://reelmino.com/api}
       REELMINO_SESSION: ${REELMINO_SESSION:-}
+      GROWTH_WEB_PUBLIC: /srv/site
     volumes:
       - growth_data:/app/apps/growth/data
+      - growth_site:/srv/site
     ports:
       - "127.0.0.1:${GROWTH_HTTP_PORT:-8082}:4180"
     networks:
@@ -252,6 +254,8 @@ services:
       - "${HTTP_PORT:-80}:80"
       # Admin SPA (admin.reelmino.com) — dedicated port so Host mismatches cannot serve the user app
       - "${ADMIN_HTTP_PORT:-8081}:81"
+    volumes:
+      - growth_site:/usr/share/nginx/site:ro
     depends_on:
       api:
         condition: service_healthy
@@ -262,6 +266,7 @@ volumes:
   studio_pg:
   studio_redis:
   growth_data:
+  growth_site:
 
 networks:
   internal:

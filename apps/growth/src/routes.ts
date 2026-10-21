@@ -525,7 +525,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
   });
 
   app.post("/api/internet/export", async () => {
-    const result = writeLearnSite({ publicDir: ctx.webPublic, origin: ctx.origin, articles: articles(ctx.db) });
+    const result = writeLearnSite({ publicDir: ctx.webPublic, origin: ctx.origin, articles: articles(ctx.db), sitemapBase: ctx.sitemapBase });
     return result;
   });
 

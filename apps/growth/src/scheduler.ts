@@ -31,6 +31,7 @@ export type DispatchContext = {
   mediaDir: string;
   publicBase: string;
   webPublic: string;
+  sitemapBase?: string;
   origin: string;
 };
 
@@ -73,7 +74,7 @@ export async function dispatchSlot(ctx: DispatchContext, slot: Slot): Promise<vo
     return;
   }
   if (slot.network === "site") {
-    writeLearnSite({ publicDir: ctx.webPublic, origin: ctx.origin, articles: articlesOf(ctx.db) });
+    writeLearnSite({ publicDir: ctx.webPublic, origin: ctx.origin, articles: articlesOf(ctx.db), sitemapBase: ctx.sitemapBase });
     const job = insertJob(ctx.db, { id: nid(), itemId: item.id, destinationId: null, slotId: slot.id, network: "site", status: "published" });
     updateJob(ctx.db, job.id, { status: "published", remoteUrl: `${ctx.origin}/learn/${item.slug}/`, publishedAt: new Date().toISOString(), lastError: null });
     return;

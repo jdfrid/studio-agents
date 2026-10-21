@@ -35,7 +35,7 @@ export async function buildApp(options: BuildOptions = {}) {
   const defaults = defaultPaths();
   loadEnv(path.join(defaults.appRoot, ".env"));
   const dataDir = options.dataDir ?? defaults.dataDir;
-  const webPublic = options.webPublic ?? defaults.webPublic;
+  const webPublic = options.webPublic ?? (process.env.GROWTH_WEB_PUBLIC?.trim() || defaults.webPublic);
   const promoKit = options.promoKit ?? defaults.promoKit;
   const publicDir = options.publicDir ?? path.join(defaults.appRoot, "public");
   const port = Number(process.env.GROWTH_PORT || 4180);
@@ -54,6 +54,7 @@ export async function buildApp(options: BuildOptions = {}) {
     mediaDir: path.join(dataDir, "media"),
     publicBase,
     webPublic,
+    sitemapBase: path.join(defaults.webPublic, "sitemap.xml"),
     origin,
     repoPromo: promoKit
   };
