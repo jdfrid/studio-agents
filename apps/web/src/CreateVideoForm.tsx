@@ -1019,8 +1019,18 @@ export function CreateVideoForm({
           {t(`music.${musicMode}`)}
           {lockedCreativeKeys.length ? <span className="origin-tag">{t("quick.customized")}</span> : null}
         </p>
-        <button type="button" className="button-secondary adjustments-open-btn" onClick={() => setAdjustmentsOpen(true)}>
-          {t("quick.moreAdjustments")}
+        <button
+          type="button"
+          className={`adjustments-open-btn${adjustmentsOpen ? " is-open" : ""}`}
+          aria-expanded={adjustmentsOpen}
+          onClick={() => setAdjustmentsOpen((open) => !open)}
+        >
+          <span className="adjustments-open-icon" aria-hidden>⚙</span>
+          <span className="adjustments-open-text">
+            <strong>{adjustmentsOpen ? t("quick.hideAdjustments") : t("quick.moreAdjustments")}</strong>
+            <small>{t("quick.moreAdjustmentsHint")}</small>
+          </span>
+          <span className="adjustments-open-chevron" aria-hidden>⌄</span>
         </button>
 
         <div className={`create-adjustments-sheet${adjustmentsOpen ? " is-open" : ""}`}>

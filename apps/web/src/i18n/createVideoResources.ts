@@ -156,6 +156,8 @@ export const en = {
     duration: "{{count}} sec",
     proposalHelp: "We'll show a script and scenes before producing the video.",
     moreAdjustments: "More adjustments",
+    hideAdjustments: "Hide adjustments",
+    moreAdjustmentsHint: "Title and goal · platform, film type, narration, music and captions · branding · advanced: style, script, voice, music, camera and editing",
     closeAdjustments: "Back to the idea",
     messageAudience: "Message & audience",
     look: "Look",
@@ -613,6 +615,8 @@ export const he = {
     language: "שפה", format: "פורמט", portrait: "אנכי", landscape: "אופקי", duration: "{{count}} שנ׳",
     proposalHelp: "נציג תסריט וסקיצה לפני הפקת הסרטון.",
     moreAdjustments: "התאמות נוספות", closeAdjustments: "חזרה לרעיון",
+    hideAdjustments: "הסתרת ההתאמות",
+    moreAdjustmentsHint: "כותרת ומטרה · פלטפורמה, סוג סרט, קריינות, מוזיקה וכתוביות · מיתוג · הגדרות מתקדמות: סגנון, תסריט, קול, מוזיקה, צילום ועריכה",
     messageAudience: "מסר וקהל", look: "מראה", voice: "קול", brand: "מותג", guidance: "הנחיות",
     customized: "מותאם", summaryVoiceMusic: "קול ומוזיקה אוטומטיים", summaryCaptions: "כתוביות פעילות"
   },

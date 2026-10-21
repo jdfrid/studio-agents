@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { apiDelete, apiGet } from "./api.js";
 import { useAuth } from "./AuthContext.js";
 import { formatDate, formatNumber } from "./i18n/format.js";
 import { CREDIT_NEW_VIDEO } from "@studio/shared";
 import { brandPosterFor } from "./brand/posters.js";
+import { becameReady, playReadyBeep } from "./readyBeep.js";
 
 type RunSummary = {
   id: string;
@@ -41,6 +42,7 @@ export function Dashboard({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<DashFilter>("all");
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const seenStatus = useRef(new Map<string, string>());
 
   async function refreshRuns() {
     try {
@@ -57,6 +59,22 @@ export function Dashboard({
   useEffect(() => {
     void refreshRuns();
   }, []);
+
+  const waiting = runs.some((run) => run.status === "RUNNING" || run.status === "QUEUED");
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = window.setInterval(() => void refreshRuns(), 8000);
+    return () => window.clearInterval(timer);
+  }, [waiting]);
+
+  useEffect(() => {
+    let chime = false;
+    for (const run of runs) {
+      if (becameReady(seenStatus.current.get(run.id), run.status)) chime = true;
+    }
+    seenStatus.current = new Map(runs.map((run) => [run.id, run.status]));
+    if (chime) playReadyBeep();
+  }, [runs]);
 
   useEffect(() => {
     const saved = Number(sessionStorage.getItem(SCROLL_KEY) ?? "0");

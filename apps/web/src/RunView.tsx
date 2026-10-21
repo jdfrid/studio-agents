@@ -16,6 +16,7 @@ import {
 } from "@studio/shared";
 import type { ArtifactRow, ProjectRunView, StageName } from "./types.js";
 import { formatDateTime } from "./i18n/format.js";
+import { becameReady, playReadyBeep } from "./readyBeep.js";
 
 type ScriptScene = {
   id: string;
@@ -53,6 +54,7 @@ export function RunView({
   const [menuOpen, setMenuOpen] = useState(false);
   const [sceneEditorOpen, setSceneEditorOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const seenStatus = useRef<string | null>(null);
 
   async function refresh() {
     try {
@@ -79,10 +81,18 @@ export function RunView({
   }
 
   useEffect(() => {
+    seenStatus.current = null;
+    setRun(null);
     void refresh();
     const timer = window.setInterval(() => void refresh(), 4000);
     return () => window.clearInterval(timer);
   }, [runId]);
+
+  useEffect(() => {
+    if (!run) return;
+    if (becameReady(seenStatus.current, run.status)) playReadyBeep();
+    seenStatus.current = run.status;
+  }, [run]);
 
   useEffect(() => {
     function onDocClick(event: MouseEvent) {

@@ -3061,6 +3061,29 @@ a { color: inherit; }
 .scene-editor textarea { resize: vertical; line-height: 1.5; }
 .quick-choice-row { display: grid; gap: 14px; }
 .active-settings-summary { color: var(--muted); font-size: .85rem; }
+.adjustments-open-btn {
+  width: 100%;
+  margin: 4px 0 0;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  border: 1.5px solid var(--forest);
+  border-radius: 14px;
+  background: var(--primary-soft);
+  color: var(--forest);
+  text-align: start;
+  cursor: pointer;
+}
+.adjustments-open-btn:hover { filter: brightness(0.97); }
+.adjustments-open-btn:focus-visible { outline: 3px solid var(--forest); outline-offset: 2px; }
+.adjustments-open-icon { font-size: 1.3rem; line-height: 1; }
+.adjustments-open-text { display: grid; gap: 3px; min-width: 0; }
+.adjustments-open-text strong { font-size: 1rem; }
+.adjustments-open-text small { color: var(--muted); font-size: 0.8rem; line-height: 1.5; font-weight: 450; }
+.adjustments-open-chevron { font-size: 1.1rem; transition: transform 0.15s ease; }
+.adjustments-open-btn.is-open .adjustments-open-chevron { transform: rotate(180deg); }
 .checkbox-row { display: flex; gap: 8px; align-items: center; }
 .dash-toolbar { display: grid; gap: 10px; margin: 0 0 16px; }
 .dash-toolbar input[type="search"] {
