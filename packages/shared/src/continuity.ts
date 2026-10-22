@@ -4,9 +4,9 @@ import type { SceneSpec, ScriptOutput } from "./schemas/script.js";
 export const CONTINUITY_LOCK =
   "CRITICAL: Use the EXACT same characters (same gender, age, face, hair, skin tone, wardrobe) and the EXACT same location in every scene. Only action, pose, and camera may change.";
 
-/** When the user uploaded character photos — preserve those identities. */
+/** When the user uploaded character photos — keep faces; setting/wardrobe follow the brief. */
 export const CONTINUITY_LOCK_USER_PHOTOS =
-  "CRITICAL: The attached/uploaded photos ARE the cast. Preserve each person's exact face, hair, skin tone, age, identity, AND wardrobe (same coat/jacket color, fabric, and outfit in every scene). Place them in the event location together. Only pose, framing, and micro-action may change — never invent different people or recolor clothing.";
+  "CRITICAL: The attached/uploaded photos ARE the faces of the cast only. Preserve each person's exact face, hair, skin tone, age, and identity. Do NOT copy the photo's background, room, or clothes if the brief asks for a different place, weather, or wardrobe — composite those faces into the described setting and outfits. Never invent different people.";
 
 /** Hotel / product stills: the engine places each photo; locations may change. */
 export const CONTINUITY_LOCK_LOCATION_PLATES =
@@ -73,8 +73,8 @@ export function buildReferenceImagePrompt(
   const sameLine = ctx.hasLocationPlates
     ? "Animate this scene's uploaded still; do not reuse a previous room as if it were the only location."
     : ctx.hasUserCharacterPhotos
-      ? "Composite the uploaded people into the event setting with identical wardrobe/coat colors; prefer speaker close-up or OTS (listener closed mouth)."
-      : "Same people, same clothes, same place — only pose and micro-action change.";
+      ? "Composite the uploaded faces into the brief's setting and wardrobe; prefer speaker close-up or OTS (listener closed mouth). Do not keep the photo background if the brief names another place."
+      : "Same people throughout. Setting, weather, and wardrobe follow the brief — only pose and camera may change.";
   // Reserve room for lock + action; trim bible/location so Zod max(1600) never fails.
   const fixed = [lock, sexLock, ageLock, `Scene ${ctx.order + 1} of ${ctx.total}.`, sameLine].filter(Boolean).join(" ");
   const budget = PROMPT_MAX - fixed.length - 48;
@@ -89,8 +89,10 @@ export function buildReferenceImagePrompt(
       sexLock,
       ageLock,
       `Scene ${ctx.order + 1} of ${ctx.total}.`,
-      ctx.hasLocationPlates ? `Look (brand palette): ${characters}.` : `Characters (locked): ${characters}.`,
-      ctx.hasLocationPlates ? `Setting from this still: ${location}.` : `Location (locked): ${location}.`,
+      ctx.hasLocationPlates
+        ? `Setting from this still: ${location}.`
+        : `SETTING (mandatory, must be visible): ${location}.`,
+      ctx.hasLocationPlates ? `Look (brand palette): ${characters}.` : `Faces (locked): ${characters}.`,
       `Action for this frame only: ${actionClamped}.`,
       sameLine
     ].filter(Boolean).join(" ")
@@ -108,10 +110,10 @@ export function buildVeoContinuityPrefix(ctx: ContinuityContext): string {
     `Scene ${ctx.order + 1} of ${ctx.total}.`,
     ctx.hasLocationPlates
       ? `Brand look: ${ctx.characterBible.trim()}.`
-      : `Character lock: ${ctx.characterBible.trim()}.`,
+      : `Faces: ${ctx.characterBible.trim()}.`,
     ctx.hasLocationPlates
       ? `Setting for this beat: ${ctx.backgroundVisualPrompt.trim()}.`
-      : `Location lock: ${ctx.backgroundVisualPrompt.trim()}.`
+      : `SETTING (mandatory, must be visible): ${ctx.backgroundVisualPrompt.trim()}.`
   ].filter(Boolean).join(" ");
 }
 
@@ -137,9 +139,10 @@ function prefixScenePrompt(existing: string, ctx: ContinuityContext): string {
   const sexLock = ctx.hasLocationPlates || ctx.hasUserCharacterPhotos ? "" : presenterSexLock(ctx.presenterSex);
   const ageLock = ctx.hasLocationPlates || ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
   const extra = [sexLock, ageLock].filter(Boolean).join(" ");
+  const setting = ctx.backgroundVisualPrompt.trim();
   const prefix = ctx.hasLocationPlates
     ? `Tour uploaded stills. ${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`
-    : `Same cast & location. ${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`;
+    : `SETTING (must be visible): ${setting}. Faces: ${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`;
   const combined = `${prefix}${core}`;
   return combined.length <= 1200 ? combined : combined.slice(0, 1200);
 }

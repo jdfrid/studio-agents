@@ -78,6 +78,22 @@ describe("continuity", () => {
     expect(prompt).toContain("On-screen speaker is a child (about 6–10 years old), not an adult.");
   });
 
+  it("keeps uploaded faces but puts the brief setting first", () => {
+    const prompt = buildReferenceImagePrompt({
+      characterBible: "Two young men",
+      backgroundVisualPrompt: "Paris cafe terrace with the Eiffel Tower large in the background",
+      sceneAction: "They laugh at a tiny table",
+      order: 0,
+      total: 4,
+      hasUserCharacterPhotos: true
+    });
+    expect(prompt).toContain("SETTING (mandatory, must be visible)");
+    expect(prompt).toContain("Eiffel Tower");
+    expect(prompt).toContain("faces of the cast only");
+    expect(prompt).not.toContain("AND wardrobe");
+    expect(prompt.indexOf("Eiffel Tower")).toBeLessThan(prompt.indexOf("Two young men"));
+  });
+
   it("lets location stills change setting between beats", () => {
     const prompt = buildReferenceImagePrompt({
       characterBible: "Luxury boutique hotel",
@@ -100,7 +116,8 @@ describe("continuity", () => {
     expect(out.characterBible.length).toBeGreaterThan(10);
     for (const scene of out.scenes) {
       expect(scene.referenceImagePrompt).toContain("EXACT same characters");
-      expect(scene.visualPrompt).toContain("Same cast & location");
+      expect(scene.visualPrompt).toContain("SETTING (must be visible)");
+      expect(scene.visualPrompt).toContain("Coastal highway at golden hour");
     }
   });
 

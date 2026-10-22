@@ -92,16 +92,16 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
         ? "NARRATION MUST be Yiddish (ייִדיש), not Modern Israeli Hebrew. Prefer Yiddish wording even when the brief summary drifted into Hebrew."
         : "",
       hasCastPhotos
-        ? `User uploaded ${castPhotoCount} CHARACTER PHOTO(s). Those people ARE the cast — describe them in characterBible from the photos (gender, age, hair, skin, outfit). visualPrompt/referenceImagePrompt must keep those exact identities; do not invent different faces.`
+        ? `User uploaded ${castPhotoCount} CHARACTER PHOTO(s). Those people ARE the FACES of the cast — keep gender, age, hair, and identity from the photos. Location, weather, time of day, and wardrobe MUST follow the brief even if they differ from the photo. Do not copy the photo's background. Do not invent different faces.`
         : "",
       plateCount >= 2
         ? `User uploaded ${plateCount} location/B-roll stills. Treat them as a visual POOL — each still is a different place, product, or angle. Write ${sceneCount} distinct scenes so every still can appear. Do NOT collapse them into one locked location or one composite plate.`
         : "",
       `Keep each narration under ${narrationLimit} characters (must fit ${clipSeconds}s of spoken audio) in ${langEn}.`,
-      "Keep visualPrompt and veoPrompt under 200 characters each.",
+      "Keep visualPrompt and veoPrompt under 700 characters. Lead with the required SETTING (place, weather, wardrobe), then faces, then the beat's action. The named place MUST appear in every visualPrompt and veoPrompt.",
       plateCount >= 2
         ? "Locations MAY change between scenes to showcase the uploaded stills (hotel lobby, room, pool, restaurant, product angles, etc.). Keep brand palette consistent when people appear."
-        : "CRITICAL: all scenes must share the SAME location, characters, wardrobe, and color palette.",
+        : "CRITICAL: all scenes share the SAME people. Location, weather, and wardrobe follow the brief (and stay consistent once chosen). If the brief names a landmark or outfit, it must appear in every scene — do not replace it with whatever is in an uploaded photo.",
       plateCount >= 2
         ? `Output characterBible in ${langEn}: brand look and typical guests if any — locations change per still. Explicitly state gender only if people appear.`
         : `Output characterBible in ${langEn}: a fixed description of each character (gender, age, hair, skin tone, outfit) and the single location — this NEVER changes between scenes. Explicitly state each character's gender (male/female or זכר/נקבה).`,
@@ -144,7 +144,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "CRITICAL AUDIO: each narration is ONLY one character's spoken words for that beat — never put both characters' lines in the same narration (no overlapping dialogue, no chorus).",
       plateCount >= 2
         ? "Keep brand palette consistent across stills; wardrobe may match each location photo."
-        : "WARDROBE LOCK: coat/jacket/shirt colors and outfits stay identical in every scene — do not invent new clothing colors.",
+        : hasCastPhotos
+          ? "WARDROBE: follow the brief. If the user asked for funny/costume/formal clothes, change outfits from the photo while keeping the same faces. Then keep that new outfit identical in every scene."
+          : "WARDROBE LOCK: coat/jacket/shirt colors and outfits stay identical in every scene — do not invent new clothing colors.",
       contentLang === "he" || contentLang === "yi"
         ? "HEBREW NIKUD (mandatory): every narration line MUST include full niqqud (ניקוד) for correct TTS pronunciation and stress — e.g. שָׁלוֹם not שלום."
         : contentLang === "ar"

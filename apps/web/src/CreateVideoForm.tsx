@@ -806,6 +806,17 @@ export function CreateVideoForm({
     "filmTemplate",
     "karaokeCaptions"
   ]);
+  const lookKeys = new Set<keyof CreativeOptions>([
+    "location",
+    "timeOfDay",
+    "weather",
+    "wardrobe",
+    "characterType",
+    "lighting"
+  ]);
+  const lookFields = ["brief", "script", "visual"].flatMap((id) => fieldsFor(id)).filter((field) =>
+    lookKeys.has(field.key as keyof CreativeOptions)
+  );
   const advancedGroups = [
     {
       id: "format",
@@ -818,14 +829,17 @@ export function CreateVideoForm({
       title: t("advanced.groups.visualStyle.title"),
       description: t("advanced.groups.visualStyle.description"),
       fields: [...fieldsFor("brief"), ...fieldsFor("visual").filter((field) => field.key === "lighting")].filter(
-        (field) => !basicKeys.has(field.key) && !LOGO_FIELD_KEYS.has(field.key)
+        (field) =>
+          !basicKeys.has(field.key) &&
+          !lookKeys.has(field.key) &&
+          !LOGO_FIELD_KEYS.has(field.key)
       )
     },
     {
       id: "script",
       title: t("advanced.groups.script.title"),
       description: t("advanced.groups.script.description"),
-      fields: fieldsFor("script")
+      fields: fieldsFor("script").filter((field) => !lookKeys.has(field.key))
     },
     {
       id: "voice",
@@ -1467,6 +1481,34 @@ export function CreateVideoForm({
       </fieldset>
       </section>
 
+      <section className="create-topic-card look-settings-section adjustments-only" aria-labelledby="look-settings-heading">
+        <div className="form-section-heading">
+          <span className="form-section-icon" aria-hidden>◐</span>
+          <div>
+            <h2 id="look-settings-heading">{t("look.heading")}</h2>
+            <p>{t("look.help")}</p>
+          </div>
+        </div>
+        <div className="common-fields-grid common-fields-grid-three">
+          {lookFields.map((field) => (
+            <label key={String(field.key)} className="field-block">
+              {field.labelHe}
+              <select
+                value={String(creative[field.key] ?? "")}
+                onChange={(event) => setCreativeField(field.key, (event.target.value || "") as never)}
+              >
+                <option value="">{t("advanced.auto")}</option>
+                {(field.options ?? []).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.labelHe}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+      </section>
+
       <details
         className="branding-section optional-disclosure adjustments-only"
         open={brandingOpen}
@@ -1719,8 +1761,8 @@ export function CreateVideoForm({
             </button>
           </div>
 
-          {advancedGroups.map((group, index) => (
-            <details key={group.id} className="advanced-accordion" open={index === 0}>
+          {advancedGroups.map((group) => (
+            <details key={group.id} className="advanced-accordion" open={group.id === "format" || group.id === "script"}>
               <summary>
                 <span><strong>{group.title}</strong><small>{group.description}</small></span>
                 <span aria-hidden>⌄</span>

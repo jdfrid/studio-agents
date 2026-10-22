@@ -91,10 +91,9 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
 
     }
 
-    // A single uploaded person can be used directly as the locked cast plate.
-    // With multiple people, leave the chain empty so scene 1 generates one
-    // composite plate from every uploaded face; later scenes reuse that plate.
-    // 3+ unassigned stills are a location pool (see locationPlateRefs), not a cast lock.
+    // Never use a raw selfie as the video plate: that copies the photo's room and clothes.
+    // Scene 1 generates a plate (faces from uploads, setting/wardrobe from the brief);
+    // later scenes reuse that generated plate. 3+ unassigned stills are a location pool.
 
     const productPaths = Array.from(new Set((input.visualProductGcsPaths ?? []).filter(Boolean)));
     const productReferences: ReferenceImageBytes[] = [];
@@ -107,10 +106,6 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
         count: productReferences.length,
         gcsPaths: productPaths
       });
-    }
-
-    if (anchorReferences.length === 1 && productReferences.length === 0) {
-      chainReference = anchorReferences[0]!;
     }
 
     const locationPlateRefs: ReferenceImageBytes[] =
@@ -377,7 +372,7 @@ export const assetAgent: Agent<AssetInput, AssetOutput> = {
             });
           } else {
           const anchorHint = continuityRefs.length
-            ? " The attached photo(s) ARE the cast: preserve their exact faces, identities, AND wardrobe (same coat/jacket colors). Place them at the event. Prefer a conversational framing. Do not invent different people or recolor clothing. Keep outfits identical for the whole film."
+            ? " The attached photo(s) ARE the faces only. Keep those exact faces. Place them in the SETTING named in the prompt (landmark, restaurant, weather, wardrobe). Do not copy the photo's background or clothes if the brief asked for something else. Prefer conversational framing. Do not invent different people."
             : "";
 
           let plateProvider = "gemini";

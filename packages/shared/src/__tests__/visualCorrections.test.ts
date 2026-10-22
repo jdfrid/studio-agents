@@ -40,7 +40,7 @@ describe("visualCorrections", () => {
     expect(out.visualCorrections).toBe("no bangs, wear baseball cap");
     expect(out.characterBible).toContain("baseball cap");
     expect(out.scenes[0]!.referenceImagePrompt).toContain("baseball cap");
-    expect(out.scenes[0]!.visualPrompt).toContain("Same cast & location");
+    expect(out.scenes[0]!.visualPrompt).toContain("SETTING (must be visible)");
   });
 
   it("applies per-scene visual overrides", () => {

@@ -120,7 +120,7 @@ export const en = {
     uploaded_other: "{{count}} files uploaded",
     manual: "Choose manually by role",
     characters: "Character photos (optional)",
-    charactersHelp: "Up to {{count}} images if you want specific people to appear. Image 1 is character A, image 2 is character B.",
+    charactersHelp: "Up to {{count}} photos if you want specific faces. Image 1 is character A, image 2 is character B. Faces stay; set place and clothing under More adjustments → Look of the scene.",
     characterAlt: "Character or background image: {{name}}",
     products: "Product / location / B-roll stills (optional)",
     productsHelp: "Up to {{count}} stills per request (size limit). The engine places them across scenes automatically — you do not assign one photo per scene.",
@@ -157,7 +157,7 @@ export const en = {
     proposalHelp: "We'll show a script and scenes before producing the video.",
     moreAdjustments: "More adjustments",
     hideAdjustments: "Hide adjustments",
-    moreAdjustmentsHint: "Title and goal · platform, film type, narration, music and captions · branding · advanced: style, script, voice, music, camera and editing",
+    moreAdjustmentsHint: "Title and goal · location, weather, wardrobe · platform, film type, narration · branding · advanced camera and editing",
     closeAdjustments: "Back to the idea",
     messageAudience: "Message & audience",
     look: "Look",
@@ -196,6 +196,10 @@ export const en = {
     narration: "Speech",
     music: "Music",
     captions: "Captions"
+  },
+  look: {
+    heading: "Look of the scene",
+    help: "Place, weather, time of day, and clothing. These override an uploaded selfie’s background and outfit; faces stay."
   },
   platforms: {
     instagram_reels: "Instagram Reels",
@@ -590,7 +594,7 @@ export const he = {
     classification: "ברירת המחדל היא שיבוץ אוטומטי. תפקידים אופציונליים: מוצר, לוגו, דמות או רקע — אין חובה לשייך לסצנה.",
     manage: "ניהול וסיווג חומרי הגלם", uploaded_one: "קובץ אחד הועלה", uploaded_other: "{{count}} קבצים הועלו", manual: "בחירה ידנית לפי תפקיד",
     characters: "תמונות דמויות (אופציונלי)",
-    charactersHelp: "עד {{count}} תמונות אם תרצו שאנשים ספציפיים יופיעו. תמונה 1 = דמות א׳, תמונה 2 = דמות ב׳.",
+    charactersHelp: "עד {{count}} תמונות אם תרצו פנים ספציפיות. תמונה 1 = דמות א׳, תמונה 2 = דמות ב׳. הפנים נשארות; מיקום ולבוש בוחרים ב״התאמות נוספות״ → מראה הסצנה.",
     characterAlt: "תמונת דמות או רקע: {{name}}", products: "תמונות מוצר / מיקום / B-roll (אופציונלי)",
     productsHelp: "עד {{count}} תמונות בבקשה אחת (מגבלת גודל). המנוע משבץ אותן בין הסצנות — אין צורך לשייך תמונה לכל סצנה.",
     productAlt: "תמונת מוצר: {{name}}", voice: "שיבוט קול (אופציונלי)",
@@ -616,7 +620,7 @@ export const he = {
     proposalHelp: "נציג תסריט וסקיצה לפני הפקת הסרטון.",
     moreAdjustments: "התאמות נוספות", closeAdjustments: "חזרה לרעיון",
     hideAdjustments: "הסתרת ההתאמות",
-    moreAdjustmentsHint: "כותרת ומטרה · פלטפורמה, סוג סרט, קריינות, מוזיקה וכתוביות · מיתוג · הגדרות מתקדמות: סגנון, תסריט, קול, מוזיקה, צילום ועריכה",
+    moreAdjustmentsHint: "כותרת ומטרה · מיקום, מזג אוויר, לבוש · פלטפורמה וסוג סרט · מיתוג · הגדרות מתקדמות",
     messageAudience: "מסר וקהל", look: "מראה", voice: "קול", brand: "מותג", guidance: "הנחיות",
     customized: "מותאם", summaryVoiceMusic: "קול ומוזיקה אוטומטיים", summaryCaptions: "כתוביות פעילות"
   },
@@ -637,6 +641,10 @@ export const he = {
     platform: "פלטפורמה", contentLanguage: "שפת תוכן הסרטון",
     contentLanguageHelp: "בחירה זו קובעת את שפת הדיבור והטקסט בסרטון, ולא את שפת הממשק.",
     filmType: "סוג הסרטון", narration: "דיבור", music: "מוזיקה", captions: "כתוביות"
+  },
+  look: {
+    heading: "מראה הסצנה",
+    help: "מיקום, מזג אוויר, שעה ולבוש. אלה גוברים על הרקע והבגדים בתמונת סלפי; הפנים נשארות."
   },
   platforms: { instagram_reels: "Instagram Reels", tiktok: "TikTok", youtube_shorts: "YouTube Shorts", linkedin: "LinkedIn", youtube: "YouTube לרוחב", website: "אתר / מצגת" },
   languages: { Hebrew: "עברית", English: "אנגלית", Arabic: "ערבית", Russian: "רוסית", French: "צרפתית", Spanish: "ספרדית", Yiddish: "יידיש" },

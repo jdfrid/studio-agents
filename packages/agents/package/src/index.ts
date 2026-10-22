@@ -333,7 +333,7 @@ function enrichVeoPrompt(input: {
 
   const cast = input.characterBible.trim().slice(0, 280);
   const place = input.backgroundVisualPrompt.trim().slice(0, 220);
-  const continuity = `Same cast (${cast}). Same place (${place}). Scene ${input.order + 1}/${input.total}.`;
+  const continuity = `SETTING (must be visible): ${place}. Faces: ${cast}. Scene ${input.order + 1}/${input.total}.`;
   const refPrompt = (input.referenceFramePrompt ?? input.referenceImagePrompt ?? "").trim().slice(0, 400);
   const refSuffix = refPrompt ? ` Match look: ${refPrompt}.` : "";
   return clampText(`${continuity} ${motion}${listenLock}${refSuffix}`.trim(), MAX);
@@ -342,6 +342,7 @@ function enrichVeoPrompt(input: {
 function stripDuplicatedContinuity(text: string): string {
   let t = text.trim();
   // Drop prior continuity prefixes so package enrichment does not stack them.
+  t = t.replace(/^SETTING \(must be visible\):\s*.*?\.\s*Faces:\s*.*?\.\s*/i, "");
   t = t.replace(/^Same cast & location\.\s*[^.]*\.\s*/i, "");
   t = t.replace(/^Same exact characters[^.]*\.\s*/i, "");
   t = t.replace(/^CRITICAL:\s*Use the EXACT same fictional characters[\s\S]*?may change\.\s*/i, "");
