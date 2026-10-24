@@ -2565,8 +2565,10 @@ a { color: inherit; }
   .brand-template-variation-row { grid-template-columns: 1fr; }
   .advanced-accordion .advanced-grid { grid-template-columns: 1fr; }
   .create-actions {
-    width: calc(100vw - 20px);
-    bottom: 8px;
+    position: static;
+    width: 100%;
+    max-width: 720px;
+    margin-inline: auto;
     grid-template-columns: 1fr;
     gap: 9px;
   }
@@ -2889,10 +2891,16 @@ a { color: inherit; }
     font-size: .58rem;
   }
 
+  .saas-layout--create .saas-nav {
+    display: none;
+  }
+  .saas-layout--create > main {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
   .create-form {
     width: 100%;
     max-width: 100%;
-    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 8px;
   }
   .create-topic-card {
     padding: 16px 14px;
@@ -2921,18 +2929,21 @@ a { color: inherit; }
   }
 
   .create-actions {
-    position: fixed;
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-    inset-inline: 0;
-    width: auto;
+    position: static;
+    inset: auto;
+    width: 100%;
     max-width: none;
-    margin: 0;
-    padding: 10px 12px;
-    border-radius: 16px 16px 0 0;
+    margin: 16px 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
     display: grid;
     grid-template-columns: 1fr;
     gap: 8px;
-    z-index: 40;
+    z-index: auto;
   }
   .creation-summary-metrics,
   .creation-summary-popover { display: none; }
@@ -3236,12 +3247,8 @@ a { color: inherit; }
     line-height: 1.1;
     font-weight: 650;
   }
-  .creation-summary-metrics {
-    display: flex !important;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .creation-summary-metrics > span { min-width: 0; }
+  .creation-summary-metrics,
+  .creation-summary-popover { display: none; }
   .create-form:not(.adjustments-open) .adjustments-only { display: none !important; }
   .create-adjustments-sheet { display: none; }
   .create-adjustments-sheet.is-open {

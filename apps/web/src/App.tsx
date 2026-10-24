@@ -226,7 +226,7 @@ function AppShell() {
   const appView = view === "landing" ? "dashboard" : view;
 
   return (
-    <div className="layout saas-layout">
+    <div className={`layout saas-layout${appView === "create" ? " saas-layout--create" : ""}`}>
       <header className="saas-header">
         <button
           type="button"
