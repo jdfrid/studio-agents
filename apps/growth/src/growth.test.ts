@@ -4,10 +4,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { assetKind, CALENDAR, networksForKind } from "./calendar.js";
-import { importCalendar, importPromoKit } from "./catalog.js";
+import { composeFreshCopy, factsForItem } from "./angles.js";
+import { importCalendar, importPromoKit, slugify } from "./catalog.js";
 import { signPayload, verifyPayload } from "./crypto.js";
-import { emptyCopy } from "./copy.js";
-import { insertJob, listGroups, migrate, openDb, queueGroupPosts, updateJob, type Item } from "./db.js";
+import { copyFromCalendar, emptyCopy } from "./copy.js";
+import { getItemBySlug, insertJob, listGroups, migrate, openDb, queueGroupPosts, updateItem, updateJob, type Item } from "./db.js";
 import { publishCopy } from "./publish.js";
 import { deliverDueGroupPosts, normalizeGroupUrl, parseDiscordWebhook, parseGroupAddress, sharedTooRecently } from "./groups.js";
 import { renderArticle, spliceSitemap, writeLearnSite } from "./internet.js";
@@ -50,7 +51,12 @@ describe("growth console", () => {
       title: "Hello",
       summary: "",
       language: "en",
-      copy: { ...emptyCopy(), instagram: { body: "See the workflow" }, youtube: { body: "Watch the full walkthrough" } },
+      copy: {
+        ...emptyCopy(),
+        angles: { function: "proposal before production", outcome: "a finished branded MP4", need: "no crew and no editor" },
+        instagram: { body: "See the workflow" },
+        youtube: { body: "Watch the full walkthrough" }
+      },
       mediaPath: null,
       mediaMime: null,
       mediaKind: null,
@@ -62,11 +68,66 @@ describe("growth console", () => {
       updatedAt: "2026-10-26T00:00:00Z"
     };
     const instagram = publishCopy(item, "instagram", "202610-smb-us-demo");
-    expect(instagram.body).toBe("See the workflow");
+    expect(instagram.body).toBeTruthy();
+    expect(instagram.body).not.toContain("utm_source");
     expect(instagram.link).toContain("utm_source=instagram");
     const youtube = publishCopy(item, "youtube", "202610-smb-us-demo");
     expect(youtube.body).toContain("utm_source=youtube");
     expect(youtube.link).toBeUndefined();
+  });
+
+  it("composes a unique caption per slot and network, and keeps retry text locked", () => {
+    const copy = copyFromCalendar({
+      title: "Restaurant offer video.",
+      goal: "Reach restaurants, clinics, services and retail.",
+      cta: "Create your first 30-second video.",
+      kind: "short"
+    });
+    const item = { title: "Restaurant offer video.", summary: "Reach restaurants, clinics, services and retail.", copy };
+    const slotA = composeFreshCopy({ item, network: "tiktok", seed: "slot-a:2026-10-19T06:00:00.000Z" });
+    const slotB = composeFreshCopy({ item, network: "tiktok", seed: "slot-b:2026-10-20T06:00:00.000Z" });
+    expect(slotA.body).not.toBe(slotB.body);
+    const instagram = composeFreshCopy({ item, network: "instagram", seed: "slot-a:2026-10-19T06:00:00.000Z" });
+    expect(instagram.body).not.toBe(slotA.body);
+    expect(composeFreshCopy({ item, network: "tiktok", seed: "slot-a:2026-10-19T06:00:00.000Z" })).toEqual(slotA);
+    const locked = composeFreshCopy({
+      item,
+      network: "tiktok",
+      seed: "other-seed",
+      locked: slotA,
+      recentBodies: [slotA.body]
+    });
+    expect(locked.body).toBe(slotA.body);
+    const skipped = composeFreshCopy({ item, network: "tiktok", seed: "slot-a:2026-10-19T06:00:00.000Z", recentBodies: [slotA.body] });
+    expect(skipped.body).not.toBe(slotA.body);
+    const facts = factsForItem(item);
+    for (const caption of [slotA, slotB, instagram, skipped]) {
+      expect(caption.body).toContain(facts[caption.angleKind]);
+    }
+  });
+
+  it("gives each calendar asset its own copy and refreshes it on re-import", () => {
+    const dir = tempDir();
+    const db = openDb(path.join(dir, "growth.sqlite"));
+    try {
+      importCalendar(db, "2026-10-19");
+      const week = CALENDAR[0]!;
+      const first = getItemBySlug(db, `w01-1-${slugify(week.assets[0]!)}`)!;
+      const second = getItemBySlug(db, `w01-2-${slugify(week.assets[1]!)}`)!;
+      expect(first.copy.tiktok.body).toBeTruthy();
+      expect(first.copy.tiktok.body).not.toBe(second.copy.tiktok.body);
+      expect(first.copy.instagram.body).not.toBe(first.copy.tiktok.body);
+      expect(first.copy.angles?.need).toContain("Establish that generated clips are not the same as a finished business-video workflow");
+      expect(first.copy.angles?.function).not.toBe(second.copy.angles?.function);
+      updateItem(db, first.id, { copy: emptyCopy() });
+      expect(getItemBySlug(db, first.slug)!.copy.tiktok.body).toBe("");
+      importCalendar(db, "2026-10-19");
+      const refreshed = getItemBySlug(db, first.slug)!;
+      expect(refreshed.copy.tiktok.body).toBe(first.copy.tiktok.body);
+      expect(refreshed.copy.angles?.need).toBe(first.copy.angles?.need);
+    } finally {
+      db.close();
+    }
   });
 
   it("places Jerusalem wall time on the right UTC instant", () => {

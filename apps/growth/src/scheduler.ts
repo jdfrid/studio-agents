@@ -20,7 +20,7 @@ import {
 import { nid } from "./crypto.js";
 import { writeLearnSite, type LearnArticle } from "./internet.js";
 import { sendGrowthMail } from "./mail.js";
-import { networkText } from "./copy.js";
+import { composeFreshCopy } from "./angles.js";
 import { applyLink, trackedLink } from "./utm.js";
 import { deliverDueGroupPosts } from "./groups.js";
 import { pollPublish, postDueFirstComments, runPublish } from "./publish.js";
@@ -102,17 +102,22 @@ export async function dispatchSlot(ctx: DispatchContext, slot: Slot): Promise<vo
 async function sendEmailSlot(ctx: DispatchContext, slot: Slot, itemId: string): Promise<void> {
   const item = getItem(ctx.db, itemId);
   if (!item) return;
-  const text = networkText(item.copy, "email");
-  const body = applyLink(text.body, trackedLink({ network: "email", slug: item.slug, format: "email", campaign: getSetting(ctx.db, "utm_campaign") ?? undefined }));
+  const caption = composeFreshCopy({
+    item,
+    network: "email",
+    seed: `email:${slot.id}:${slot.scheduledFor}`
+  });
+  const body = applyLink(caption.body, trackedLink({ network: "email", slug: item.slug, format: "email", campaign: getSetting(ctx.db, "utm_campaign") ?? undefined }));
   const to = process.env.GROWTH_MAIL_TO?.trim();
   const job = insertJob(ctx.db, { id: nid(), itemId, destinationId: null, slotId: slot.id, network: "email", status: "uploading" });
+  updateJob(ctx.db, job.id, { handle: { caption } });
   const draft = listEmails(ctx.db).find((row) => row.itemId === itemId && row.status === "draft");
   if (!to) {
     updateJob(ctx.db, job.id, { status: "failed", lastError: "Set GROWTH_MAIL_TO", errorCode: "validation" });
     return;
   }
   try {
-    await sendGrowthMail({ to, subject: text.subject || item.title, text: body });
+    await sendGrowthMail({ to, subject: caption.title || item.title, text: body });
     if (draft) updateEmail(ctx.db, draft.id, { status: "sent", sentAt: new Date().toISOString(), lastError: null });
     updateJob(ctx.db, job.id, { status: "published", publishedAt: new Date().toISOString(), lastError: null });
   } catch (error) {

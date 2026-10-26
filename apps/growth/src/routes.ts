@@ -5,7 +5,8 @@ import path from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { beginOAuth, connectTelegram, finishOAuth, networkSetup, oauthNetworks, removeConnection, syncConnection } from "./accounts.js";
 import { importCalendar, importPromoKit, slugify } from "./catalog.js";
-import { emptyCopy, EXPORT_NETWORKS, networkText, type ItemCopy } from "./copy.js";
+import { composeFreshCopy } from "./angles.js";
+import { emptyCopy, EXPORT_NETWORKS, type ItemCopy } from "./copy.js";
 import { encryptJson, hashPassword, hashToken, nid, verifyPassword } from "./crypto.js";
 import {
   createSession,
@@ -426,11 +427,11 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
     if (!(EXPORT_NETWORKS as readonly string[]).includes(network)) return reply.code(400).send({ error: "export only" });
     const item = getItem(ctx.db, id);
     if (!item) return reply.code(404).send({ error: "not found" });
-    const text = networkText(item.copy, network);
+    const caption = composeFreshCopy({ item, network, seed: `export:${item.id}:${network}` });
     const link = trackedLink({ network, slug: item.slug, format: "text", campaign: getSetting(ctx.db, "utm_campaign") ?? undefined });
     return {
       network,
-      text: applyLink(text.body || text.title, link),
+      text: applyLink(caption.body || caption.title, link),
       mediaUrl: item.mediaPath ? `/media/${item.mediaPath}` : null
     };
   });
@@ -555,9 +556,9 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
   app.post("/api/items/:id/email", async (request, reply) => {
     const item = getItem(ctx.db, (request.params as { id: string }).id);
     if (!item) return reply.code(404).send({ error: "not found" });
-    const text = networkText(item.copy, "email");
-    const body = applyLink(text.body, trackedLink({ network: "email", slug: item.slug, format: "email" }));
-    return insertEmail(ctx.db, { id: nid(), itemId: item.id, subject: text.subject || item.title, body });
+    const caption = composeFreshCopy({ item, network: "email", seed: `email:${item.id}:${nid()}` });
+    const body = applyLink(caption.body, trackedLink({ network: "email", slug: item.slug, format: "email" }));
+    return insertEmail(ctx.db, { id: nid(), itemId: item.id, subject: caption.title || item.title, body });
   });
 
   app.post("/api/emails/:id/send", async (request, reply) => {

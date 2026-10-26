@@ -106,12 +106,13 @@ export function importCalendar(db: GrowthDb, startMonday: string): { items: numb
       const slug = `w${String(week.week).padStart(2, "0")}-${index + 1}-${slugify(title)}`;
       const copy: ItemCopy = copyFromCalendar({ title, goal: week.goal, cta: week.cta, kind });
       let item = getItemBySlug(db, slug);
+      const titleText = title.replaceAll("Prompt2Spot", "Reelmino");
       if (!item) {
         item = insertItem(db, {
           id: nid(),
           slug,
           source: "calendar",
-          title: title.replaceAll("Prompt2Spot", "Reelmino"),
+          title: titleText,
           summary: week.goal,
           language: "en",
           copy,
@@ -124,6 +125,8 @@ export function importCalendar(db: GrowthDb, startMonday: string): { items: numb
           reelminoRunId: null
         });
         items += 1;
+      } else {
+        item = updateItem(db, item.id, { title: titleText, summary: week.goal, copy }) ?? item;
       }
       if (kind === "email" && !listEmails(db).some((email) => email.itemId === item!.id)) {
         insertEmail(db, { id: nid(), itemId: item.id, subject: copy.email.subject ?? title, body: copy.email.body ?? "" });
@@ -144,25 +147,29 @@ export function importCalendar(db: GrowthDb, startMonday: string): { items: numb
     });
   }
   for (const script of SCRIPT_STARTERS) {
-    if (getItemBySlug(db, script.slug)) continue;
     const copy = copyFromCalendar({ title: script.title, goal: script.body, cta: "https://reelmino.com", kind: "short" });
-    insertItem(db, {
-      id: nid(),
-      slug: script.slug,
-      source: "script",
-      title: script.title,
-      summary: "Reusable short-form script. Do not invent measured numbers.",
-      language: "en",
-      copy,
-      mediaPath: null,
-      mediaMime: null,
-      mediaKind: null,
-      mediaWidth: null,
-      mediaHeight: null,
-      mediaDurationMs: null,
-      reelminoRunId: null
-    });
-    items += 1;
+    const existing = getItemBySlug(db, script.slug);
+    if (!existing) {
+      insertItem(db, {
+        id: nid(),
+        slug: script.slug,
+        source: "script",
+        title: script.title,
+        summary: "Reusable short-form script. Do not invent measured numbers.",
+        language: "en",
+        copy,
+        mediaPath: null,
+        mediaMime: null,
+        mediaKind: null,
+        mediaWidth: null,
+        mediaHeight: null,
+        mediaDurationMs: null,
+        reelminoRunId: null
+      });
+      items += 1;
+    } else {
+      updateItem(db, existing.id, { title: script.title, copy });
+    }
   }
   return { items, slots };
 }

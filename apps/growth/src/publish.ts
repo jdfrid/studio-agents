@@ -18,13 +18,15 @@ import {
   type PackageMediaItem,
   type SocialNetwork
 } from "@studio/shared";
-import { networkText, type ItemCopy } from "./copy.js";
+import { captionFromHandle, composeFreshCopy, type CaptionLock } from "./angles.js";
+import type { ItemCopy } from "./copy.js";
 import { decryptJson, encryptJson, nid } from "./crypto.js";
 import {
   getConnection,
   getDestination,
   getItem,
   getJob,
+  getSlot,
   insertJob,
   listJobs,
   queueGroupPosts,
@@ -72,17 +74,65 @@ function canComment(adapter: ReturnType<typeof publisher>): adapter is ReturnTyp
   return typeof (adapter as { commentOnPost?: unknown }).commentOnPost === "function";
 }
 
-export function publishCopy(item: Item, network: string, campaign?: string): PackageCopyInput {
-  const text = networkText(item.copy, network);
+export type PublishCopyOptions = {
+  seed?: string;
+  recentBodies?: string[];
+  locked?: CaptionLock | null;
+};
+
+export function publishCopy(item: Item, network: string, campaign?: string, options?: PublishCopyOptions): PackageCopyInput {
+  const caption = composeFreshCopy({
+    item,
+    network,
+    seed: options?.seed ?? `${item.id}:${network}`,
+    recentBodies: options?.recentBodies,
+    locked: options?.locked
+  });
   const link = trackedLink({ network, slug: item.slug, format: formatForNetwork(network), campaign });
   const parkLink = networkSupportsFirstComment(network);
-  const body = parkLink ? text.body || text.title : applyLink(text.body || text.title, link);
+  const body = parkLink ? caption.body : applyLink(caption.body, link);
   return {
-    title: text.title || item.title,
+    title: caption.title || item.title,
     body,
     hashtags: body.includes("#") ? [] : item.copy.hashtags,
     language: item.language,
     link: parkLink ? link : undefined
+  };
+}
+
+export function recentCaptionBodies(db: GrowthDb, network: string, exceptJobId?: string): string[] {
+  return listJobs(db)
+    .filter((job) => job.network === network && job.id !== exceptJobId)
+    .slice(0, 12)
+    .map((job) => captionFromHandle(job.handle)?.body)
+    .filter((body): body is string => Boolean(body?.trim()));
+}
+
+export function lockPublishCopy(input: {
+  db: GrowthDb;
+  job: Job;
+  item: Item;
+  network: string;
+  campaign?: string;
+}): { copy: PackageCopyInput; caption: CaptionLock } {
+  const locked = captionFromHandle(input.job.handle);
+  const slot = input.job.slotId ? getSlot(input.db, input.job.slotId) : null;
+  const seed = input.job.slotId
+    ? `${input.job.slotId}:${slot?.scheduledFor ?? input.job.scheduledFor ?? ""}`
+    : input.job.id;
+  const caption = composeFreshCopy({
+    item: input.item,
+    network: input.network,
+    seed,
+    recentBodies: recentCaptionBodies(input.db, input.network, input.job.id),
+    locked
+  });
+  if (!locked) {
+    updateJob(input.db, input.job.id, { handle: { ...input.job.handle, caption } });
+  }
+  return {
+    caption,
+    copy: publishCopy(input.item, input.network, input.campaign, { locked: caption })
   };
 }
 
@@ -146,10 +196,16 @@ export async function runPublish(input: {
     network: input.destination.network,
     status: "uploading"
   });
+  const { copy } = lockPublishCopy({
+    db: input.db,
+    job,
+    item: input.item,
+    network: input.destination.network,
+    campaign: input.campaign
+  });
   try {
     const adapter = publisher(input.destination.network);
     const tokens = await freshTokens(input.db, input.destination.connectionId, input.key, input.destination.network);
-    const copy = publishCopy(input.item, input.destination.network, input.campaign);
     const config = publishConfig(input.destination.network, input.destination.config, copy.link);
     const media = mediaOf(input.item, input.mediaDir, input.publicBase);
     const preview = adapter.preview(
@@ -200,7 +256,9 @@ function applyResult(
   extras?: { copy?: PackageCopyInput; config?: ReturnType<typeof publishConfig>; network?: string }
 ): Job {
   const current = getJob(db, jobId);
+  const caption = current?.handle.caption;
   const handle = { ...(current?.handle ?? {}), ...(result.poll ?? result.nativePayload ?? {}) };
+  if (caption) handle.caption = caption;
   if (result.status === "published" && extras?.network && extras.config) {
     const existing = handle.firstComment as FirstCommentPlan | undefined;
     if (!existing || existing.status === "planned") {
@@ -243,7 +301,9 @@ export async function pollPublish(db: GrowthDb, key: Buffer, jobId: string): Pro
   try {
     const tokens = await freshTokens(db, destination.connectionId, key, job.network);
     const item = getItem(db, job.itemId);
-    const copy = item ? publishCopy(item, job.network) : { hashtags: [] as string[] };
+    const copy = item
+      ? lockPublishCopy({ db, job, item, network: job.network }).copy
+      : { hashtags: [] as string[] };
     const config = publishConfig(job.network, destination.config, copy.link);
     const result = await adapter.poll({
       tokens,
@@ -300,10 +360,17 @@ export async function retryPublish(input: {
   const item = getItem(input.db, job.itemId);
   if (!destination || !item) return { job, error: "no_destination" };
   updateJob(input.db, job.id, { status: "uploading", lastError: null, errorCode: null });
+  const current = getJob(input.db, job.id) ?? job;
+  const { copy } = lockPublishCopy({
+    db: input.db,
+    job: current,
+    item,
+    network: destination.network,
+    campaign: input.campaign
+  });
   try {
     const adapter = publisher(destination.network);
     const tokens = await freshTokens(input.db, destination.connectionId, input.key, destination.network);
-    const copy = publishCopy(item, destination.network, input.campaign);
     const config = publishConfig(destination.network, destination.config, copy.link);
     const media = mediaOf(item, input.mediaDir, input.publicBase);
     const preview = adapter.preview(

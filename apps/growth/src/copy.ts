@@ -1,3 +1,5 @@
+import { calendarAngles, composeFreshCopy, promoAngles, type ItemAngles } from "./angles.js";
+
 export type NetworkCopy = { title?: string; body?: string; subject?: string };
 
 export type ItemCopy = {
@@ -14,6 +16,7 @@ export type ItemCopy = {
   whatsapp: NetworkCopy;
   email: NetworkCopy;
   article: { title: string; description: string; body: string };
+  angles?: ItemAngles;
 };
 
 export const EXPORT_NETWORKS = ["x", "whatsapp", "pinterest", "threads"] as const;
@@ -46,6 +49,30 @@ function tags(list: string[]): string {
   return list.map((tag) => (tag.startsWith("#") ? tag : `#${tag}`)).join(" ");
 }
 
+function fillNetworks(copy: ItemCopy, title: string, summary: string, seedKey: string): ItemCopy {
+  const item = { title, summary, copy };
+  const used: string[] = [];
+  const fill = (network: string) => {
+    const caption = composeFreshCopy({ item, network, seed: `${seedKey}:${network}`, recentBodies: used });
+    used.push(caption.body);
+    return { title: caption.title, body: caption.body };
+  };
+  return {
+    ...copy,
+    youtube: fill("youtube"),
+    tiktok: fill("tiktok"),
+    telegram: fill("telegram"),
+    instagram: fill("instagram"),
+    facebook: fill("facebook"),
+    x: fill("x"),
+    linkedin: fill("linkedin"),
+    threads: fill("threads"),
+    pinterest: { title, body: fill("pinterest").body },
+    whatsapp: fill("whatsapp"),
+    email: { subject: title, body: fill("email").body }
+  };
+}
+
 export function copyFromPromo(input: {
   name: string;
   feature: string;
@@ -60,53 +87,35 @@ export function copyFromPromo(input: {
   x: string;
 }): ItemCopy {
   const copy = emptyCopy();
-  const hash = tags(input.hashtags);
   copy.hashtags = input.hashtags;
-  copy.youtube = { title: input.youtubeTitle, body: input.youtubeDescription };
-  copy.tiktok = { body: hash && !input.tiktokCaption.includes("#") ? `${input.tiktokCaption} ${hash}` : input.tiktokCaption };
-  copy.telegram = { body: input.telegram };
-  copy.instagram = { body: copy.tiktok.body };
-  copy.facebook = { body: input.telegram };
-  copy.x = { body: input.x };
-  copy.threads = { body: input.x };
-  copy.whatsapp = { body: input.telegram };
-  copy.pinterest = { title: input.name, body: input.message };
-  copy.linkedin = { body: `${input.hook}\n\n${input.description}\n\nhttps://reelmino.com` };
-  copy.email = {
-    subject: input.name,
-    body: `${input.hook}\n\n${input.description}\n\nhttps://reelmino.com`
-  };
   copy.article = {
     title: input.name,
     description: input.message,
     body: `${input.description}\n\n${input.feature}\n\n${input.hook}`
   };
-  return copy;
+  const filled = fillNetworks({ ...copy, angles: promoAngles(input) }, input.name, input.message, input.name);
+  const hash = tags(input.hashtags);
+  if (hash) {
+    for (const network of ["tiktok", "instagram"] as const) {
+      const row = filled[network];
+      if (row.body && !row.body.includes("#")) filled[network] = { ...row, body: `${row.body} ${hash}` };
+    }
+  }
+  filled.youtube = { title: input.youtubeTitle.slice(0, 90), body: filled.youtube.body };
+  return filled;
 }
 
 export function copyFromCalendar(input: { title: string; goal: string; cta: string; kind: string }): ItemCopy {
   const title = asReelmino(input.title);
   const goal = asReelmino(input.goal);
   const cta = asReelmino(input.cta);
-  const body = `${title}\n\n${goal}\n\n${cta}\n\nhttps://reelmino.com`;
   const copy = emptyCopy();
-  copy.youtube = { title: title.slice(0, 90), body };
-  copy.tiktok = { body: `${title}\n\n${cta}` };
-  copy.instagram = { body: copy.tiktok.body };
-  copy.facebook = { body };
-  copy.telegram = { body };
-  copy.x = { body: `${title}\n\n${cta}\n\nhttps://reelmino.com`.slice(0, 280) };
-  copy.threads = { body: copy.x.body };
-  copy.whatsapp = { body };
-  copy.pinterest = { title, body: goal };
-  copy.linkedin = { body };
-  copy.email = { subject: title, body };
   copy.article = {
     title,
     description: goal,
     body: input.kind === "short" ? `${title}\n\n${goal}\n\n${cta}` : `${goal}\n\n${title}\n\n${cta}`
   };
-  return copy;
+  return fillNetworks({ ...copy, angles: calendarAngles(title, goal, cta) }, title, goal, title);
 }
 
 export function networkText(copy: ItemCopy, network: string): { title: string; body: string; subject: string } {

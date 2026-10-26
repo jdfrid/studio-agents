@@ -1,6 +1,6 @@
 import { getNetworkAdapter, type SocialTokens } from "@studio/providers";
 import { DestinationConfigSchema, type PackageCopyInput } from "@studio/shared";
-import { networkText } from "./copy.js";
+import { composeFreshCopy } from "./angles.js";
 import { decryptJson } from "./crypto.js";
 import {
   claimGroupPost,
@@ -100,10 +100,20 @@ function termOf(name: string): string {
     .slice(0, 40) || "group";
 }
 
-/** The text a group receives: that network's copy, with a link tagged utm_medium=community and the group in utm_term. */
-export function groupText(group: Pick<ShareGroup, "network" | "name">, item: Item, post: Pick<GroupPost, "facebookPostUrl">, campaign?: string): string {
-  const text = networkText(item.copy, COPY_FROM[group.network as GroupNetwork] ?? "facebook");
-  const raw = (text.body || text.title || item.title).trim();
+/** The text a group receives: a fresh caption for that group, with a link tagged utm_medium=community and the group in utm_term. */
+export function groupText(
+  group: Pick<ShareGroup, "network" | "name"> & { id?: string },
+  item: Item,
+  post: Pick<GroupPost, "facebookPostUrl">,
+  campaign?: string
+): string {
+  const network = COPY_FROM[group.network as GroupNetwork] ?? "facebook";
+  const caption = composeFreshCopy({
+    item,
+    network,
+    seed: `group:${group.id ?? group.name}:${item.id}`
+  });
+  const raw = (caption.body || caption.title || item.title).trim();
   const link = trackedLink({ network: group.network, slug: item.slug, format: "text", campaign, medium: "community", term: termOf(group.name) });
   let body = applyLink(raw, link);
   if (group.network === "facebook" && post.facebookPostUrl && !body.includes(post.facebookPostUrl)) {
