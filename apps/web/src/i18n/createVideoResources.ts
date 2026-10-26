@@ -201,6 +201,12 @@ export const en = {
     heading: "Look of the scene",
     help: "Place, weather, time of day, and clothing. These override an uploaded selfie’s background and outfit; faces stay."
   },
+  filmStyle: {
+    heading: "Film style",
+    help: "A named look for the whole video: picture, camera, and a move only this style can do. Optional.",
+    none: "No specific style",
+    noneHelp: "The system chooses from the brief and mood"
+  },
   platforms: {
     instagram_reels: "Instagram Reels",
     tiktok: "TikTok",
@@ -377,7 +383,8 @@ export const en = {
       sideWatermark: "Side watermark",
       preferHeygenDub: "Lip movement (Kling Avatar)",
       lowerThirds: "Lower thirds",
-      filmTemplate: "Video structure"
+      filmTemplate: "Video structure",
+      filmStyle: "Film style"
     },
     optionValues: {
       portrait: "Portrait (vertical)",
@@ -646,6 +653,12 @@ export const he = {
     heading: "מראה הסצנה",
     help: "מיקום, מזג אוויר, שעה ולבוש. אלה גוברים על הרקע והבגדים בתמונת סלפי; הפנים נשארות."
   },
+  filmStyle: {
+    heading: "סגנון קולנועי",
+    help: "מראה בשם לכל הסרטון: תמונה, מצלמה, ומהלך שרק הסגנון הזה יודע. לא חובה.",
+    none: "בלי סגנון מסוים",
+    noneHelp: "המערכת תבחר לפי הבריף והאווירה"
+  },
   platforms: { instagram_reels: "Instagram Reels", tiktok: "TikTok", youtube_shorts: "YouTube Shorts", linkedin: "LinkedIn", youtube: "YouTube לרוחב", website: "אתר / מצגת" },
   languages: { Hebrew: "עברית", English: "אנגלית", Arabic: "ערבית", Russian: "רוסית", French: "צרפתית", Spanish: "ספרדית", Yiddish: "יידיש" },
   filmTypes: { social_explainer: "סרטון הסברה לרשתות", product_demo: "הדגמת מוצר", testimonial: "סיפור לקוח", public_service_explainer: "שירות ציבורי", corporate_product: "סרט מוצר B2B" },
@@ -715,7 +728,8 @@ export const he = {
       subtitlePosition: "מיקום כתוביות", subtitleSize: "גודל כתוביות", subtitleFont: "גופן כתוביות",
       subtitleRotation: "זווית כתוביות", subtitleEffect: "אפקט טקסט",
       sideWatermark: "ווטרמארק צדדי", preferHeygenDub: "תנועות שפתיים (Kling Avatar)", lowerThirds: "כותרות תחתונות (lower third)",
-      filmTemplate: "מבנה הסרטון"
+      filmTemplate: "מבנה הסרטון",
+      filmStyle: "סגנון קולנועי"
     },
     optionValues: {
       portrait: "לאורך (אנכי)", landscape: "לרוחב (אופקי)", male: "זכר", female: "נקבה", on: "פעיל", off: "כבוי",

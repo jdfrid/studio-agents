@@ -7,6 +7,7 @@ import {
   resolveVoiceCharacterPreset,
   voiceCharacterFieldOptions
 } from "./voiceCatalog.js";
+import { filmStyleFieldOptions, resolveFilmStyle } from "./filmStyleLibrary.js";
 
 const SubtitleRotationSchema = z.preprocess(
   (value) =>
@@ -28,6 +29,8 @@ export const CreativeOptionsSchema = z
     communicationStyle: z.string().max(80).optional(),
     pace: z.string().max(40).optional(),
     designStyle: z.string().max(80).optional(),
+    /** Named cinematic look from the film-style library. */
+    filmStyle: z.string().max(40).optional(),
     colorPalette: z.string().max(80).optional(),
     lighting: z.string().max(80).optional(),
     realism: z.string().max(80).optional(),
@@ -208,6 +211,12 @@ export const CREATIVE_FIELD_SECTIONS: CreativeFieldSection[] = [
     id: "brief",
     titleHe: "בריף",
     fields: [
+      {
+        key: "filmStyle",
+        labelHe: "סגנון קולנועי",
+        kind: "select",
+        options: filmStyleFieldOptions()
+      },
       {
         key: "designStyle",
         labelHe: "סגנון עיצוב / אנימציה",
@@ -818,6 +827,7 @@ const FIELD_LABEL_EN: Record<keyof CreativeOptions, string> = {
   communicationStyle: "Communication style",
   pace: "Pace",
   designStyle: "Design / animation style",
+  filmStyle: "Film style",
   colorPalette: "Color palette",
   lighting: "Lighting",
   realism: "Realism",
@@ -1342,6 +1352,25 @@ export function formatCreativeConstraints(
         testimonial: "בעיה אישית → חוויה → שינוי → המלצה"
       };
       lines.push(`${label}: ${locale === "he" ? (map[normalizedValue] ?? displayValue) : displayValue}`);
+      continue;
+    }
+    if (key === "filmStyle") {
+      const style = resolveFilmStyle(normalizedValue);
+      if (style) {
+        lines.push(`${label}: ${locale === "he" ? style.labelHe : style.labelEn} (${style.promptEn})`);
+        lines.push(
+          locale === "he"
+            ? `דקדוק מצלמה: ${style.cameraEn}`
+            : `Camera grammar: ${style.cameraEn}`
+        );
+        lines.push(
+          locale === "he"
+            ? `מהלך ייחודי: ${style.nativeMoveEn}`
+            : `Native move: ${style.nativeMoveEn}`
+        );
+      } else {
+        lines.push(`${label}: ${displayValue}`);
+      }
       continue;
     }
     if (key === "designStyle") {

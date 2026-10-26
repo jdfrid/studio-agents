@@ -20,6 +20,8 @@ import {
 } from "./suggestBrief.js";
 import {
   CREATIVE_FIELD_SECTIONS,
+  FILM_STYLE_CATEGORIES,
+  filmStylesInCategory,
   durationOptionsFor,
   clampVideoDurationSeconds,
   aspectRatioFromCreative,
@@ -29,6 +31,7 @@ import {
   remixFormFromBrief,
   remixHasAdvancedCreative,
   type ApprovalMode,
+  type FilmStyleCategoryId,
   type BrandTemplateView,
   type BriefOutput,
   type CreativeOptions,
@@ -90,6 +93,7 @@ export function CreateVideoForm({
   const [desiredAction, setDesiredAction] = useState("");
   const [targetAudience, setTargetAudience] = useState("");
   const [moods, setMoods] = useState<string[]>([]);
+  const [filmStyleCategory, setFilmStyleCategory] = useState<FilmStyleCategoryId | "all">("all");
   const [platform, setPlatform] = useState("instagram_reels");
   const [narrationMode, setNarrationMode] = useState("voiceover");
   const [musicMode, setMusicMode] = useState("auto");
@@ -832,6 +836,7 @@ export function CreateVideoForm({
         (field) =>
           !basicKeys.has(field.key) &&
           !lookKeys.has(field.key) &&
+          field.key !== "filmStyle" &&
           !LOGO_FIELD_KEYS.has(field.key)
       )
     },
@@ -1123,6 +1128,54 @@ export function CreateVideoForm({
           </div>
           <small className="field-help">{t("details.moodHelp")}</small>
         </fieldset>
+
+        <section className="film-style-picker" aria-labelledby="film-style-heading">
+          <div className="form-section-heading">
+            <span className="form-section-icon" aria-hidden>🎞</span>
+            <div>
+              <h2 id="film-style-heading">{t("filmStyle.heading")}</h2>
+              <p>{t("filmStyle.help")}</p>
+            </div>
+          </div>
+          <div className="choice-chips film-style-categories">
+            {FILM_STYLE_CATEGORIES.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                className={filmStyleCategory === category.id ? "is-selected" : ""}
+                aria-pressed={filmStyleCategory === category.id}
+                onClick={() => setFilmStyleCategory(category.id)}
+              >
+                {uiLocale === "en" ? category.labelEn : category.labelHe}
+              </button>
+            ))}
+          </div>
+          <div className="film-style-grid">
+            <button
+              type="button"
+              className={`film-style-card${!creative.filmStyle ? " is-selected" : ""}`}
+              aria-pressed={!creative.filmStyle}
+              onClick={() => setCreativeField("filmStyle", "")}
+            >
+              <strong>{t("filmStyle.none")}</strong>
+              <small>{t("filmStyle.noneHelp")}</small>
+            </button>
+            {filmStylesInCategory(filmStyleCategory).map((style) => (
+              <button
+                key={style.id}
+                type="button"
+                className={`film-style-card${creative.filmStyle === style.id ? " is-selected" : ""}`}
+                aria-pressed={creative.filmStyle === style.id}
+                onClick={() =>
+                  setCreativeField("filmStyle", creative.filmStyle === style.id ? "" : style.id)
+                }
+              >
+                <strong>{uiLocale === "en" ? style.labelEn : style.labelHe}</strong>
+                <small>{uiLocale === "en" ? style.blurbEn : style.blurbHe}</small>
+              </button>
+            ))}
+          </div>
+        </section>
 
         <label className="field-block">
           {t("details.instructions")} <span className="optional-mark">{t("common.optional")}</span>

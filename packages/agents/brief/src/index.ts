@@ -11,6 +11,7 @@ import {
   geminiVoiceNameFromCreative,
   languageCodeFromCreative,
   normalizeCreativeOptions,
+  resolveFilmStyle,
   normalizeContentLanguage,
   presenterCastInstruction,
   resolveContentLanguage,
@@ -470,7 +471,12 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         .filter(Boolean)
         .join("; "),
       style:
-        [parsed.style ?? input.style ?? "", creative?.designStyle, creative?.pace]
+        [
+          parsed.style ?? input.style ?? "",
+          resolveFilmStyle(creative?.filmStyle)?.labelEn,
+          creative?.designStyle,
+          creative?.pace
+        ]
           .filter(Boolean)
           .join("; ") || "",
       durationSeconds: parsed.durationSeconds ?? input.durationSeconds,

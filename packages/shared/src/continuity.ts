@@ -37,6 +37,8 @@ export type ContinuityContext = {
   presenterSex?: "male" | "female";
   /** Locked on-screen speaker age when the chosen voice is a child or baby. */
   presenterAge?: "child" | "baby";
+  /** Short film-look lock injected into every scene prompt. */
+  styleLock?: string;
 };
 
 export function deriveCharacterBible(backgroundVisualPrompt: string, explicit?: string | null): string {
@@ -75,8 +77,9 @@ export function buildReferenceImagePrompt(
     : ctx.hasUserCharacterPhotos
       ? "Composite the uploaded faces into the brief's setting and wardrobe; prefer speaker close-up or OTS (listener closed mouth). Do not keep the photo background if the brief names another place."
       : "Same people throughout. Setting, weather, and wardrobe follow the brief — only pose and camera may change.";
+  const styleLock = ctx.styleLock?.trim() ?? "";
   // Reserve room for lock + action; trim bible/location so Zod max(1600) never fails.
-  const fixed = [lock, sexLock, ageLock, `Scene ${ctx.order + 1} of ${ctx.total}.`, sameLine].filter(Boolean).join(" ");
+  const fixed = [lock, sexLock, ageLock, styleLock, `Scene ${ctx.order + 1} of ${ctx.total}.`, sameLine].filter(Boolean).join(" ");
   const budget = PROMPT_MAX - fixed.length - 48;
   const half = Math.max(80, Math.floor(budget / 3));
   const characters = ctx.characterBible.trim().slice(0, half);
@@ -88,6 +91,7 @@ export function buildReferenceImagePrompt(
       lock,
       sexLock,
       ageLock,
+      styleLock,
       `Scene ${ctx.order + 1} of ${ctx.total}.`,
       ctx.hasLocationPlates
         ? `Setting from this still: ${location}.`
@@ -107,6 +111,7 @@ export function buildVeoContinuityPrefix(ctx: ContinuityContext): string {
     lock,
     sexLock,
     ageLock,
+    ctx.styleLock?.trim() ?? "",
     `Scene ${ctx.order + 1} of ${ctx.total}.`,
     ctx.hasLocationPlates
       ? `Brand look: ${ctx.characterBible.trim()}.`
@@ -140,9 +145,10 @@ function prefixScenePrompt(existing: string, ctx: ContinuityContext): string {
   const ageLock = ctx.hasLocationPlates || ctx.hasUserCharacterPhotos ? "" : presenterAgeLock(ctx.presenterAge);
   const extra = [sexLock, ageLock].filter(Boolean).join(" ");
   const setting = ctx.backgroundVisualPrompt.trim();
+  const look = ctx.styleLock?.trim() ? `${ctx.styleLock.trim()} ` : "";
   const prefix = ctx.hasLocationPlates
-    ? `Tour uploaded stills. ${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`
-    : `SETTING (must be visible): ${setting}. Faces: ${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`;
+    ? `Tour uploaded stills. ${look}${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`
+    : `SETTING (must be visible): ${setting}. ${look}Faces: ${ctx.characterBible.trim()}. ${extra ? `${extra} ` : ""}`;
   const combined = `${prefix}${core}`;
   return combined.length <= 1200 ? combined : combined.slice(0, 1200);
 }
@@ -156,6 +162,7 @@ export function applyContinuityToScript(
     hasLocationPlates?: boolean;
     presenterSex?: "male" | "female";
     presenterAge?: "child" | "baby";
+    styleLock?: string;
   }
 ): ScriptOutput {
   const characterBible = deriveCharacterBible(output.backgroundVisualPrompt, explicitCharacterBible ?? output.characterBible);
@@ -174,7 +181,8 @@ export function applyContinuityToScript(
       hasUserCharacterPhotos,
       hasLocationPlates,
       presenterSex,
-      presenterAge
+      presenterAge,
+      styleLock: opts?.styleLock
     };
     const actionSource = scene.referenceImagePrompt ?? scene.visualPrompt ?? scene.veoPrompt;
     return {

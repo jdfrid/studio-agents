@@ -5,6 +5,8 @@ import {
   ScriptInputSchema,
   ScriptOutputSchema,
   applyContinuityToScript,
+  FILM_DIRECTOR_RULES,
+  filmStylePromptClause,
   applyVisualPlateSceneCount,
   contentLanguageEnglishName,
   contentLanguageNativeName,
@@ -121,6 +123,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       "NO UNSOLICITED GRAPHICS: do not invent wall maps, globes, news tickers, lower-thirds, or on-screen data overlays unless the user brief explicitly asks for them.",
       "NARRATION–MOTION SYNC (mandatory): narration and veoPrompt are one timed beat — write them together.",
       "NARRATION TONE (mandatory): every spoken line must match the event mood and creative style — not generic announcer copy.",
+      FILM_DIRECTOR_RULES,
+      "If a LOOK / film style is set in the creative constraints, open every visualPrompt and veoPrompt with that look, camera grammar, and native move — do not fall back to generic cinematic commercial.",
       "If creative/communicationStyle/designStyle/location/targetAudience are set, narration vocabulary and energy MUST reflect them (e.g. wedding warmth, news urgency, kids playful, Pixar whimsy).",
       "Do not write flat product-demo narration when the brief describes a ceremony, party, documentary, or stylized world.",
       lipSyncMode
@@ -440,7 +444,8 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
               language: contentLang,
               userText
             }),
-        presenterAge: hasCastPhotos ? undefined : presenterAge
+        presenterAge: hasCastPhotos ? undefined : presenterAge,
+        styleLock: filmStylePromptClause(brief.creative?.filmStyle)
       }
     );
 
