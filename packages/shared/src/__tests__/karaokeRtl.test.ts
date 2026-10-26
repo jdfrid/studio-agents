@@ -13,6 +13,7 @@ import {
 describe("stripNiqqud", () => {
   it("removes vowel points but keeps letters", () => {
     expect(stripNiqqud("שָׁלוֹם")).toBe("שלום");
+    expect(stripNiqqud("עִם נְחוֹשֻׁת וַחֲיוּךְ")).toBe("עם נחושת וחיוך");
   });
 });
 

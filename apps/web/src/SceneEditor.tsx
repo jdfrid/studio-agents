@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiPatch } from "./api.js";
-import { correctionCreditCost } from "@studio/shared";
+import { correctionCreditCost, stripNiqqud } from "@studio/shared";
 import type { ProjectRunView } from "./types.js";
 import { useModalFocus } from "./useModalFocus.js";
 
@@ -28,7 +28,7 @@ function scenesFromOutput(output: unknown): SceneDraft[] {
       id: String(scene.id ?? `scene-${index}`),
       order: Number(scene.order ?? index),
       title: String(scene.title ?? ""),
-      narration: String(scene.narration ?? ""),
+      narration: stripNiqqud(String(scene.narration ?? "")),
       visualPrompt: String(scene.visualPrompt ?? ""),
       veoPrompt: String(scene.veoPrompt ?? scene.visualPrompt ?? ""),
       durationSeconds: Number(scene.durationSeconds ?? 8),

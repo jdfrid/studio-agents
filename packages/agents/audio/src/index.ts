@@ -11,6 +11,7 @@ import {
   AudioInputSchema,
   AudioOutputSchema,
   ProviderError,
+  stripNiqqud,
   type Agent,
   type AudioInput,
   type AudioOutput
@@ -69,7 +70,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           (!useClonedVoice && !defaultTts) ||
           scene.audioPolicy === "veo_native_audio" ||
           scene.audioPolicy === "muted" ||
-          !String(scene.narration ?? "").trim()
+          !stripNiqqud(String(scene.narration ?? "")).trim()
         ) {
           perScene.push({
             sceneId: scene.sceneId,
@@ -82,6 +83,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           });
           continue;
         }
+        const spoken = stripNiqqud(scene.narration);
         try {
           let audio: SpeechResult;
           if (useClonedVoice && elevenApiKey && clonedVoiceId) {
@@ -94,7 +96,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
                 config: { model: "eleven_multilingual_v2" },
                 secret: elevenApiKey
               },
-              { text: scene.narration, language: input.language, voice: clonedVoiceId }
+              { text: spoken, language: input.language, voice: clonedVoiceId }
             );
           } else if (defaultTts?.type === "GEMINI") {
             const primaryTts = defaultTts;
@@ -102,7 +104,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
               audio = await geminiSynthesizeSpeech(
                 primaryTts,
                 {
-                  text: scene.narration,
+                  text: spoken,
                   language: input.language,
                   ...((scene.voiceName || input.voiceName)
                     ? { voiceName: scene.voiceName || input.voiceName }
@@ -124,13 +126,13 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
                 primaryError: primaryError instanceof Error ? primaryError.message : String(primaryError)
               });
               audio = await synthesizeSpeech(ttsProvider, {
-                text: scene.narration,
+                text: spoken,
                 language: input.language
               });
             }
           } else {
             audio = await synthesizeSpeech(defaultTts!, {
-              text: scene.narration,
+              text: spoken,
               language: input.language
             });
           }
@@ -191,7 +193,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
         (scene) =>
           scene.audioPolicy !== "veo_native_audio" &&
           scene.audioPolicy !== "muted" &&
-          Boolean(String(scene.narration ?? "").trim())
+          Boolean(stripNiqqud(String(scene.narration ?? "")).trim())
       );
       const voicedCount = perScene.filter((row) => row.voiceArtifactId).length;
       if (scenesNeedingVoice.length > 0 && voicedCount === 0) {

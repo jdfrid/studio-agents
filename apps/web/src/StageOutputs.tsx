@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { apiGet, mediaUrl } from "./api.js";
 import type { ArtifactRow, StageName } from "./types.js";
-import { formatApiErrorMessage, type RenderProfileId } from "@studio/shared";
+import { formatApiErrorMessage, stripNiqqud, type RenderProfileId } from "@studio/shared";
 
 const STAGE_LABELS: Record<StageName, string> = {
   brief: "בריף",
@@ -102,7 +102,7 @@ function ScriptOutputView({ data, renderProfileId }: { data: Record<string, unkn
             <strong>
               {t("common.scene", { number: (Number(scene.order) ?? 0) + 1 })}: {String(scene.title ?? "")}
             </strong>
-            <p>{String(scene.narration ?? "")}</p>
+            <p>{stripNiqqud(String(scene.narration ?? ""))}</p>
             <details className="tech-prompt">
               <summary className="muted">{t("outputs.technical", { label: promptLabel })}</summary>
               <small className="muted">{String(scene.veoPrompt ?? "—")}</small>

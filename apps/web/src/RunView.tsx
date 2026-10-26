@@ -10,6 +10,7 @@ import { SceneEditor } from "./SceneEditor.js";
 import {
   STAGE_ORDER,
   formatCreativeConstraints,
+  stripNiqqud,
   getRenderProfile,
   isRenderProfileId,
   languageCodeFromCreative
@@ -230,7 +231,7 @@ export function RunView({
               <strong>
                 {index + 1}. {scene.title}
               </strong>
-              <p>{scene.narration}</p>
+              <p>{stripNiqqud(scene.narration ?? "")}</p>
               <button type="button" className="link-btn" onClick={() => setSceneEditorOpen(true)}>
                 {t("sceneEditor.edit")}
               </button>
@@ -333,7 +334,7 @@ function ProposalReview({
             <strong>
               {index + 1}. {scene.title}
             </strong>
-            <p>{scene.narration}</p>
+            <p>{stripNiqqud(scene.narration ?? "")}</p>
             <small className="muted">{scene.visualPrompt}</small>
             <button type="button" className="link-btn" onClick={onEditScene}>
               {t("sceneEditor.edit")}
