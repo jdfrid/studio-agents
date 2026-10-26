@@ -106,4 +106,17 @@ export interface NetworkAdapter {
   preview(media: PackageMediaItem[], copy: PackageCopyInput, destConfig?: DestinationConfig): TransformPreview;
   publish(ctx: PublishContext): Promise<PublishHandle>;
   poll?(ctx: PollContext): Promise<PublishHandle>;
+  commentOnPost?(input: CommentOnPostInput): Promise<CommentOnPostResult>;
+}
+
+export interface CommentOnPostInput {
+  tokens: SocialTokens;
+  destination: PublishContext["destination"];
+  remotePostId: string;
+  text: string;
+}
+
+export interface CommentOnPostResult {
+  commentId?: string;
+  commentUrl?: string;
 }

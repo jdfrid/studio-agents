@@ -173,6 +173,17 @@ export function createInstagramAdapter(): NetworkAdapter {
         remotePostId: published.id,
         remoteUrl: published.id ? `https://www.instagram.com/p/${published.id}/` : undefined
       };
+    },
+    async commentOnPost(input) {
+      const access =
+        input.destination.config.pageAccessToken || pageToken(input.tokens, input.destination.config.categoryId ?? "");
+      const result = await graphPost<{ id?: string }>(
+        "instagram",
+        `/${input.remotePostId}/comments`,
+        { message: input.text },
+        access
+      );
+      return { commentId: result.id };
     }
   };
 }

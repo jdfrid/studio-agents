@@ -115,6 +115,10 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
   const [file, setFile] = useState<File | null>(null);
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [mode, setMode] = useState<"now" | "schedule" | "draft">("now");
+  const [scheduleAt, setScheduleAt] = useState("");
+  const [firstComment, setFirstComment] = useState("");
+  const [firstCommentDelayMinutes, setFirstCommentDelayMinutes] = useState(2);
+  const [linkInFirstComment, setLinkInFirstComment] = useState(true);
   const [confirmLossy, setConfirmLossy] = useState(false);
   const [previews, setPreviews] = useState<Array<{ destination: DestinationView; preview: { accepted: boolean; lossy: boolean; warnings: string[]; errors: string[]; nativeCopy: { caption?: string; title?: string } } }>>([]);
   const [busy, setBusy] = useState("");
@@ -252,12 +256,22 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
           mimeType: file.type || "application/octet-stream"
         });
       }
+      const scheduledIso =
+        mode === "schedule" && scheduleAt ? new Date(scheduleAt).toISOString() : undefined;
+      if (mode === "schedule" && (!scheduledIso || Number.isNaN(Date.parse(scheduledIso)))) {
+        setMessage(t("distribution.scheduleRequired"));
+        return;
+      }
       await apiPost("/distribution/packages", {
         source: "manual",
         runId: runId || undefined,
         destinationIds: selectedDestinations,
         mode,
+        scheduleAt: scheduledIso,
         confirmLossy,
+        firstComment: firstComment.trim() || undefined,
+        firstCommentDelayMinutes,
+        linkInFirstComment,
         copy: {
           title,
           body,
@@ -444,10 +458,53 @@ export function DistributionPage({ sourceRunId }: { sourceRunId?: string | null 
           </label>
           <label>
             {t("distribution.mode")}
-            <select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>
+            <select
+              value={mode}
+              onChange={(event) => {
+                const next = event.target.value as typeof mode;
+                setMode(next);
+                if (next === "schedule" && !scheduleAt) {
+                  const later = new Date(Date.now() + 60 * 60_000);
+                  const pad = (n: number) => String(n).padStart(2, "0");
+                  setScheduleAt(
+                    `${later.getFullYear()}-${pad(later.getMonth() + 1)}-${pad(later.getDate())}T${pad(later.getHours())}:${pad(later.getMinutes())}`
+                  );
+                }
+              }}
+            >
               <option value="now">{t("distribution.now")}</option>
+              <option value="schedule">{t("distribution.schedule")}</option>
               <option value="draft">{t("distribution.draft")}</option>
             </select>
+          </label>
+          {mode === "schedule" ? (
+            <label>
+              {t("distribution.scheduleAt")}
+              <input type="datetime-local" value={scheduleAt} onChange={(event) => setScheduleAt(event.target.value)} />
+            </label>
+          ) : null}
+          <label>
+            {t("distribution.firstComment")}
+            <textarea value={firstComment} onChange={(event) => setFirstComment(event.target.value)} rows={3} />
+            <small className="muted">{t("distribution.firstCommentHint")}</small>
+          </label>
+          <label>
+            {t("distribution.firstCommentDelay")}
+            <input
+              type="number"
+              min={0}
+              max={120}
+              value={firstCommentDelayMinutes}
+              onChange={(event) => setFirstCommentDelayMinutes(Math.max(0, Math.min(120, Number(event.target.value) || 0)))}
+            />
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={linkInFirstComment}
+              onChange={(event) => setLinkInFirstComment(event.target.checked)}
+            />{" "}
+            {t("distribution.linkInFirstComment")}
           </label>
           <label>
             <input type="checkbox" checked={confirmLossy} onChange={(event) => setConfirmLossy(event.target.checked)} />{" "}

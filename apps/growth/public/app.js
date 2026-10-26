@@ -409,7 +409,7 @@ function renderResults() {
             <td>${esc(row.status)}</td>
             <td>${row.remoteUrl ? `<a href="${esc(row.remoteUrl)}" target="_blank" rel="noreferrer">פוסט</a>` : "—"}</td>
             <td class="error">${esc(row.lastError || row.errorCode || "")}</td>
-            <td>${row.status === "published" ? `<button type="button" data-to-groups="${row.id}">לקבוצות</button>` : ""}</td>
+            <td>${row.status === "published" ? `<button type="button" data-to-groups="${row.id}">לקבוצות</button>` : row.status === "failed" ? `<button type="button" data-retry-job="${row.id}">ניסיון חוזר</button>` : ""}</td>
           </tr>`).join("") || "<tr><td colspan='7'>אין פרסומים עדיין</td></tr>"}
         </tbody>
       </table>
@@ -420,6 +420,9 @@ function renderResults() {
       await api(`/api/jobs/${button.dataset.toGroups}/groups`, { method: "POST", body: "{}" });
       tab = "groups";
     });
+  });
+  panel.querySelectorAll("[data-retry-job]").forEach((button) => {
+    button.onclick = () => run(() => api(`/api/jobs/${button.dataset.retryJob}/retry`, { method: "POST", body: "{}" }));
   });
 }
 

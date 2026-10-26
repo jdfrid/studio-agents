@@ -40,6 +40,8 @@ export const DestinationConfigSchema = z.object({
   timezone: z.string().max(80).optional(),
   copyTemplate: z.string().max(4000).optional(),
   firstComment: z.string().max(2000).optional(),
+  firstCommentDelayMinutes: z.number().int().min(0).max(120).optional(),
+  linkInFirstComment: z.boolean().optional(),
   notifyFollowers: z.boolean().optional(),
   madeForKids: z.boolean().optional(),
   categoryId: z.string().max(40).optional(),
@@ -146,6 +148,9 @@ export const CreateContentPackageRequestSchema = z.object({
   mode: PublishModeSchema.default("now"),
   scheduleAt: z.string().datetime().optional(),
   confirmLossy: z.boolean().optional(),
+  firstComment: z.string().max(2000).optional(),
+  firstCommentDelayMinutes: z.number().int().min(0).max(120).optional(),
+  linkInFirstComment: z.boolean().optional(),
   overrides: z.record(z.string(), DestinationConfigSchema).optional()
 });
 export type CreateContentPackageRequest = z.infer<typeof CreateContentPackageRequestSchema>;

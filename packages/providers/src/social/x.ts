@@ -139,6 +139,22 @@ export function createXAdapter(): NetworkAdapter {
         remoteUrl: id && ctx.destination.handle ? `https://x.com/${ctx.destination.handle.replace(/^@/, "")}/status/${id}` : undefined,
         nativePayload: { text, mediaIds }
       };
+    },
+    async commentOnPost(input) {
+      const tweet = await socialJson<{ data?: { id: string } }>("x", "https://api.twitter.com/2/tweets", {
+        method: "POST",
+        headers: { authorization: `Bearer ${input.tokens.accessToken}` },
+        body: {
+          text: input.text.slice(0, 280),
+          reply: { in_reply_to_tweet_id: input.remotePostId }
+        }
+      });
+      const id = tweet.data?.id;
+      const handle = input.destination.handle?.replace(/^@/, "");
+      return {
+        commentId: id,
+        commentUrl: id && handle ? `https://x.com/${handle}/status/${id}` : undefined
+      };
     }
   };
 }

@@ -32,7 +32,7 @@ import {
   toPrismaPackageSource,
   toPrismaPublishMode
 } from "./map.js";
-import { connectionView, destinationView, jobView, packageView, parseCopy, parseDestConfig, parseMedia } from "./views.js";
+import { connectionView, destinationView, jobView, mergeDestConfig, packageView, parseCopy, parseDestConfig, parseMedia } from "./views.js";
 
 async function tenantIdForUser(userId: string): Promise<string> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { tenantId: true } });
@@ -444,7 +444,16 @@ export async function createDistributionPackage(userId: string, request: CreateC
       scheduleAt: request.scheduleAt ? new Date(request.scheduleAt) : null,
       createdByUserId: userId,
       copy: request.copy as Prisma.InputJsonValue,
-      overrides: (request.overrides ?? {}) as Prisma.InputJsonValue
+      overrides: {
+        ...(request.overrides ?? {}),
+        __package: {
+          ...(request.firstComment ? { firstComment: request.firstComment } : {}),
+          ...(request.firstCommentDelayMinutes !== undefined
+            ? { firstCommentDelayMinutes: request.firstCommentDelayMinutes }
+            : {}),
+          ...(request.linkInFirstComment !== undefined ? { linkInFirstComment: request.linkInFirstComment } : {})
+        }
+      } as Prisma.InputJsonValue
     }
   });
 
@@ -476,10 +485,20 @@ export async function createDistributionPackage(userId: string, request: CreateC
   const jobs = [];
   for (const destination of destinations) {
     const adapter = getNetworkAdapter(fromPrismaNetwork(destination.connection.network));
-    const destConfig = {
-      ...parseDestConfig(destination.config),
-      ...(request.overrides?.[destination.id] ?? {})
-    };
+    const destConfig = mergeDestConfig(
+      destination.config,
+      {
+        ...(request.overrides ?? {}),
+        __package: {
+          ...(request.firstComment ? { firstComment: request.firstComment } : {}),
+          ...(request.firstCommentDelayMinutes !== undefined
+            ? { firstCommentDelayMinutes: request.firstCommentDelayMinutes }
+            : {}),
+          ...(request.linkInFirstComment !== undefined ? { linkInFirstComment: request.linkInFirstComment } : {})
+        }
+      },
+      destination.id
+    );
     const preview: TransformPreview = adapter.preview(media, copy, destConfig);
     const delayMs =
       request.mode === "schedule" && request.scheduleAt

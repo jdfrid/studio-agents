@@ -10,6 +10,7 @@ export const META_SCOPES = [
   "pages_manage_engagement",
   "instagram_basic",
   "instagram_content_publish",
+  "instagram_manage_comments",
   "business_management"
 ];
 

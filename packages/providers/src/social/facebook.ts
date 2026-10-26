@@ -103,6 +103,16 @@ export function createFacebookAdapter(): NetworkAdapter {
         remoteUrl: result.id ? `https://www.facebook.com/${result.id}` : undefined,
         nativePayload: { method: "feed", message }
       };
+    },
+    async commentOnPost(input) {
+      const access = input.destination.config.pageAccessToken || pageToken(input.tokens, input.destination.externalId);
+      const result = await graphPost<{ id?: string }>(
+        "facebook",
+        `/${input.remotePostId}/comments`,
+        { message: input.text },
+        access
+      );
+      return { commentId: result.id };
     }
   };
 }

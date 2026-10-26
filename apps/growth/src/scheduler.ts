@@ -23,7 +23,7 @@ import { sendGrowthMail } from "./mail.js";
 import { networkText } from "./copy.js";
 import { applyLink, trackedLink } from "./utm.js";
 import { deliverDueGroupPosts } from "./groups.js";
-import { pollPublish, runPublish } from "./publish.js";
+import { pollPublish, postDueFirstComments, runPublish } from "./publish.js";
 
 export type DispatchContext = {
   db: GrowthDb;
@@ -141,6 +141,11 @@ export async function tick(ctx: DispatchContext): Promise<void> {
     await deliverDueGroupPosts({ ...ctx, campaign: getSetting(ctx.db, "utm_campaign") ?? undefined });
   } catch (error) {
     console.error("[growth] group delivery failed", error);
+  }
+  try {
+    await postDueFirstComments({ db: ctx.db, key: ctx.key });
+  } catch (error) {
+    console.error("[growth] first comment failed", error);
   }
 }
 

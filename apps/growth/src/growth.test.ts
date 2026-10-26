@@ -6,7 +6,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { assetKind, CALENDAR, networksForKind } from "./calendar.js";
 import { importCalendar, importPromoKit } from "./catalog.js";
 import { signPayload, verifyPayload } from "./crypto.js";
-import { insertJob, listGroups, migrate, openDb, queueGroupPosts, updateJob } from "./db.js";
+import { emptyCopy } from "./copy.js";
+import { insertJob, listGroups, migrate, openDb, queueGroupPosts, updateJob, type Item } from "./db.js";
+import { publishCopy } from "./publish.js";
 import { deliverDueGroupPosts, normalizeGroupUrl, parseDiscordWebhook, parseGroupAddress, sharedTooRecently } from "./groups.js";
 import { renderArticle, spliceSitemap, writeLearnSite } from "./internet.js";
 import { linkedinPostBody } from "./linkedin.js";
@@ -38,6 +40,33 @@ describe("growth console", () => {
     expect(url.searchParams.get("utm_content")).toBe("kit-00-hero-outcome-v9x16-a");
     expect(applyLink("See https://reelmino.com today", link)).toContain("utm_source=instagram");
     expect(applyLink("Already https://reelmino.com/?utm_source=keep", link)).toContain("utm_source=keep");
+  });
+
+  it("keeps instagram captions clean and parks the tracked link for a delayed comment", () => {
+    const item: Item = {
+      id: "i1",
+      slug: "kit-00-hero",
+      source: "kit",
+      title: "Hello",
+      summary: "",
+      language: "en",
+      copy: { ...emptyCopy(), instagram: { body: "See the workflow" }, youtube: { body: "Watch the full walkthrough" } },
+      mediaPath: null,
+      mediaMime: null,
+      mediaKind: null,
+      mediaWidth: null,
+      mediaHeight: null,
+      mediaDurationMs: null,
+      reelminoRunId: null,
+      createdAt: "2026-10-26T00:00:00Z",
+      updatedAt: "2026-10-26T00:00:00Z"
+    };
+    const instagram = publishCopy(item, "instagram", "202610-smb-us-demo");
+    expect(instagram.body).toBe("See the workflow");
+    expect(instagram.link).toContain("utm_source=instagram");
+    const youtube = publishCopy(item, "youtube", "202610-smb-us-demo");
+    expect(youtube.body).toContain("utm_source=youtube");
+    expect(youtube.link).toBeUndefined();
   });
 
   it("places Jerusalem wall time on the right UTC instant", () => {
@@ -251,6 +280,11 @@ describe("growth console", () => {
     updateJob(built.db, facebook.id, { status: "published", remoteUrl: "https://www.facebook.com/reelmino/posts/1" });
     expect((await call("POST", `/api/jobs/${facebook.id}/groups`, {})).json()).toEqual({ added: 1 });
     expect((await call("POST", `/api/jobs/${facebook.id}/groups`, {})).json()).toEqual({ added: 0 });
+    expect((await call("POST", `/api/jobs/missing/retry`, {})).statusCode).toBe(404);
+    expect((await call("POST", `/api/jobs/${facebook.id}/retry`, {})).statusCode).toBe(400);
+    const failed = insertJob(built.db, { id: "job-fail", itemId: first!.id, destinationId: null, slotId: null, network: "facebook", status: "queued" });
+    updateJob(built.db, failed.id, { status: "failed", lastError: "boom" });
+    expect((await call("POST", `/api/jobs/${failed.id}/retry`, {})).statusCode).toBe(400);
 
     type Post = { id: string; network: string; groupName: string; status: string; text: string; openUrl: string; shareUrl: string | null; auto: boolean };
     const posts = ((await call("GET", "/api/state")).json() as { groupPosts: Post[] }).groupPosts;

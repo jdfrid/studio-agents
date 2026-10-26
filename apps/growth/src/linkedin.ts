@@ -12,7 +12,7 @@ const LINKEDIN_CAPABILITIES: CapabilityManifest = {
   features: {
     scheduleNative: false,
     cover: false,
-    firstComment: false,
+    firstComment: true,
     privacy: false,
     location: false,
     altText: false,
@@ -189,6 +189,31 @@ export function createLinkedInAdapter() {
         remoteUrl: remotePostId ? `https://www.linkedin.com/feed/update/${encodeURIComponent(remotePostId)}` : "https://www.linkedin.com/feed/",
         nativePayload: { commentary, mediaId }
       };
+    },
+    async commentOnPost(input: {
+      tokens: SocialTokens;
+      destination: { externalId: string };
+      remotePostId: string;
+      text: string;
+    }) {
+      const urn = input.remotePostId;
+      const posted = await socialRequest(
+        "linkedin",
+        `https://api.linkedin.com/rest/socialActions/${encodeURIComponent(urn)}/comments`,
+        {
+          method: "POST",
+          headers: { ...headers(input.tokens.accessToken), "content-type": "application/json" },
+          body: JSON.stringify({
+            actor: input.destination.externalId,
+            object: urn,
+            message: { text: input.text.slice(0, 1250) }
+          })
+        }
+      );
+      if (posted.status >= 300) {
+        throw new SocialApiError("linkedin", posted.text.slice(0, 400), posted.status, "network_rejected", posted.text);
+      }
+      return { commentId: posted.headers.get("x-restli-id") ?? undefined };
     }
   };
 }

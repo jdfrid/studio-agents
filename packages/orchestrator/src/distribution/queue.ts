@@ -6,6 +6,7 @@ export const DISTRIBUTION_QUEUE_NAME = "distribution";
 export interface DistributionJobData {
   publishJobId: string;
   poll?: boolean;
+  comment?: boolean;
 }
 
 let queue: Queue<DistributionJobData> | null = null;
@@ -27,10 +28,15 @@ export function distributionQueue(): Queue<DistributionJobData> {
 
 export async function enqueuePublishJob(
   publishJobId: string,
-  opts: { delayMs?: number; poll?: boolean } = {}
+  opts: { delayMs?: number; poll?: boolean; comment?: boolean } = {}
 ): Promise<void> {
   const q = distributionQueue();
-  const jobId = opts.poll ? `poll-${publishJobId}-${Date.now()}` : `publish-${publishJobId}`;
+  const kind = opts.comment ? "comment" : opts.poll ? "poll" : "publish";
+  const jobId = opts.comment
+    ? `comment-${publishJobId}`
+    : opts.poll
+      ? `poll-${publishJobId}-${Date.now()}`
+      : `publish-${publishJobId}`;
   if (!opts.poll) {
     const existing = await q.getJob(jobId);
     if (existing) {
@@ -44,9 +50,9 @@ export async function enqueuePublishJob(
     }
   }
   await q.add(
-    opts.poll ? "poll" : "publish",
-    { publishJobId, poll: Boolean(opts.poll) },
-    { jobId, delay: opts.delayMs, attempts: opts.poll ? 1 : 2 }
+    kind,
+    { publishJobId, poll: Boolean(opts.poll), comment: Boolean(opts.comment) },
+    { jobId, delay: opts.delayMs, attempts: opts.comment ? 2 : opts.poll ? 1 : 2 }
   );
 }
 

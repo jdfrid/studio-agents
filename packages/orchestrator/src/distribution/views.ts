@@ -37,6 +37,22 @@ export function parseDestConfig(value: unknown): DestinationConfig {
   return parsed.success ? parsed.data : {};
 }
 
+export function mergeDestConfig(
+  destinationConfig: unknown,
+  packageOverrides: unknown,
+  destinationId?: string
+): DestinationConfig {
+  const overrides =
+    packageOverrides && typeof packageOverrides === "object" && !Array.isArray(packageOverrides)
+      ? (packageOverrides as Record<string, unknown>)
+      : {};
+  return {
+    ...parseDestConfig(destinationConfig),
+    ...parseDestConfig(overrides.__package),
+    ...(destinationId ? parseDestConfig(overrides[destinationId]) : {})
+  };
+}
+
 export function connectionView(row: SocialConnection): SocialConnectionView {
   return {
     id: row.id,

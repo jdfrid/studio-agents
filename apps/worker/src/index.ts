@@ -117,8 +117,11 @@ async function main() {
 
   const distributionWorker = new Worker(
     DISTRIBUTION_QUEUE_NAME,
-    async (job: Job<{ publishJobId: string; poll?: boolean }>) => {
-      await runDistributionJob(job.data.publishJobId, Boolean(job.data.poll));
+    async (job: Job<{ publishJobId: string; poll?: boolean; comment?: boolean }>) => {
+      await runDistributionJob(job.data.publishJobId, {
+        poll: Boolean(job.data.poll),
+        comment: Boolean(job.data.comment)
+      });
     },
     {
       connection: redisConnection() as WorkerOptions["connection"],

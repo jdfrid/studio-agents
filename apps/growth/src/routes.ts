@@ -65,7 +65,7 @@ import { writeLearnSite } from "./internet.js";
 import { sendGrowthMail } from "./mail.js";
 import { applyLink, trackedLink } from "./utm.js";
 import { produceItem, pullItem, pullReady } from "./produce.js";
-import { runPublish } from "./publish.js";
+import { retryPublish, runPublish } from "./publish.js";
 import { dispatchSlot, type DispatchContext } from "./scheduler.js";
 import { nextMondayIso } from "./time.js";
 
@@ -268,6 +268,22 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
     const job = getJob(ctx.db, (request.params as { id: string }).id);
     if (!job || job.status !== "published") return reply.code(400).send({ error: "רק פוסט שפורסם" });
     return { added: queueGroupPosts(ctx.db, { itemId: job.itemId, jobId: job.id, network: job.network }, nid, { force: true }) };
+  });
+
+  app.post("/api/jobs/:id/retry", async (request, reply) => {
+    const result = await retryPublish({
+      db: ctx.db,
+      key: ctx.key,
+      mediaDir: ctx.mediaDir,
+      publicBase: ctx.publicBase,
+      jobId: (request.params as { id: string }).id,
+      campaign: getSetting(ctx.db, "utm_campaign") ?? undefined
+    });
+    if (result.error === "not_found") return reply.code(404).send({ error: "not found" });
+    if (result.error === "not_failed") return reply.code(400).send({ error: "רק פרסום שנכשל" });
+    if (result.error === "no_destination") return reply.code(400).send({ error: "אין יעד לפרסום חוזר" });
+    if (result.job?.status === "failed") return reply.code(502).send(result.job);
+    return result.job;
   });
 
   app.post("/api/items/:id/groups", async (request, reply) => {

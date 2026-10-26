@@ -1,3 +1,4 @@
+import { composeFirstComment } from "./firstComment.js";
 import type { CapabilityManifest, DestinationConfig, NativeCopy, PackageCopyInput, PackageMediaItem, TransformChange, TransformPreview } from "./schemas.js";
 
 function ratioLabel(width?: number, height?: number): string | null {
@@ -24,12 +25,16 @@ function hashtagsText(tags: string[]): string {
     .join(" ");
 }
 
-export function composeCaption(copy: PackageCopyInput, captionLimit?: number): { caption: string; changes: TransformChange[]; lossy: boolean } {
+export function composeCaption(
+  copy: PackageCopyInput,
+  captionLimit?: number,
+  opts?: { omitLink?: boolean }
+): { caption: string; changes: TransformChange[]; lossy: boolean } {
   const parts: string[] = [];
   if (copy.body?.trim()) parts.push(copy.body.trim());
   const tags = hashtagsText(copy.hashtags ?? []);
   if (tags) parts.push(tags);
-  if (copy.link) parts.push(copy.link);
+  if (copy.link && !opts?.omitLink) parts.push(copy.link);
   const full = parts.join("\n\n");
   const changes: TransformChange[] = [];
   let lossy = false;
@@ -91,7 +96,8 @@ export function previewTransform(
   let captionLimit = capabilities.limits.captionChars;
   if (destConfig.premiumCopyLimit && captionLimit === 280) captionLimit = 25_000;
 
-  const composed = composeCaption(copy, captionLimit);
+  const parkLink = Boolean(capabilities.features.firstComment && destConfig.linkInFirstComment);
+  const composed = composeCaption(copy, captionLimit, { omitLink: parkLink });
   changes.push(...composed.changes);
   let lossy = composed.lossy;
 
@@ -150,7 +156,13 @@ export function previewTransform(
     caption: composed.caption || undefined,
     description: composed.caption || undefined,
     tags: copy.hashtags,
-    firstComment: destConfig.firstComment,
+    firstComment: capabilities.features.firstComment
+      ? composeFirstComment({
+          firstComment: destConfig.firstComment,
+          link: copy.link,
+          linkInFirstComment: destConfig.linkInFirstComment
+        }) || destConfig.firstComment
+      : destConfig.firstComment,
     privacy: destConfig.privacy
   };
 

@@ -20,6 +20,20 @@ describe("distribution request schemas", () => {
     expect(parsed.copy.hashtags).toEqual([]);
   });
 
+  it("accepts a scheduled package with a delayed first comment", () => {
+    const parsed = CreateContentPackageRequestSchema.parse({
+      destinationIds: ["dest_1"],
+      mode: "schedule",
+      scheduleAt: "2026-10-26T18:00:00.000Z",
+      firstComment: "https://reelmino.com/?utm_source=instagram",
+      firstCommentDelayMinutes: 5,
+      linkInFirstComment: true
+    });
+    expect(parsed.scheduleAt).toBe("2026-10-26T18:00:00.000Z");
+    expect(parsed.firstCommentDelayMinutes).toBe(5);
+    expect(parsed.linkInFirstComment).toBe(true);
+  });
+
   it("rejects a short telegram token", () => {
     expect(() => ConnectTelegramRequestSchema.parse({ botToken: "short" })).toThrow();
   });

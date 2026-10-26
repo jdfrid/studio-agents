@@ -53,7 +53,8 @@ export const NETWORK_CAPABILITIES: Record<SocialNetwork, CapabilityManifest> = {
       ...commonFeatures,
       scheduleNative: true,
       cover: true,
-      privacy: true
+      privacy: true,
+      firstComment: true
     },
     publishProtocol: "sync"
   },
@@ -67,7 +68,7 @@ export const NETWORK_CAPABILITIES: Record<SocialNetwork, CapabilityManifest> = {
       aspects: ["9:16", "1:1", "4:5"],
       imageCount: 10
     },
-    features: { ...commonFeatures, cover: true, altText: true },
+    features: { ...commonFeatures, cover: true, altText: true, firstComment: true },
     publishProtocol: "container_then_publish",
     strictAspect: true
   },
@@ -80,7 +81,7 @@ export const NETWORK_CAPABILITIES: Record<SocialNetwork, CapabilityManifest> = {
       titleChars: 0,
       imageCount: 4
     },
-    features: { ...commonFeatures, altText: true },
+    features: { ...commonFeatures, altText: true, firstComment: true },
     publishProtocol: "resumable"
   },
   tiktok: {

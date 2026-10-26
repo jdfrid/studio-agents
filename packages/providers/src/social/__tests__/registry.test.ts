@@ -16,6 +16,13 @@ describe("social adapter registry", () => {
     }
   });
 
+  it("comments on facebook, instagram and x after publish", () => {
+    expect(typeof getNetworkAdapter("facebook").commentOnPost).toBe("function");
+    expect(typeof getNetworkAdapter("instagram").commentOnPost).toBe("function");
+    expect(typeof getNetworkAdapter("x").commentOnPost).toBe("function");
+    expect(getNetworkAdapter("youtube").commentOnPost).toBeUndefined();
+  });
+
   it("marks Telegram as always configured (bot token per connection)", () => {
     const telegram = listNetworkPublicViews().find((view) => view.network === "telegram");
     expect(telegram?.configured).toBe(true);
