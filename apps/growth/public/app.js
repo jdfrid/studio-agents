@@ -137,14 +137,33 @@ function editor(item) {
   </div>`;
 }
 
+const NETWORK_LABELS = {
+  youtube: "יוטיוב",
+  instagram: "אינסטגרם",
+  facebook: "פייסבוק",
+  tiktok: "טיקטוק",
+  telegram: "טלגרם",
+  linkedin: "לינקדאין"
+};
+
 function renderAccounts() {
+  const connectable = state.networks.filter((row) => row.oauth || row.network === "telegram");
   panel.innerHTML = `
     <div class="card">
-      <p class="muted">לפני חיבור: אפליקציות מפתחים ב-Google, Meta, TikTok ו-LinkedIn, ערוץ YouTube, עמוד פייסבוק, אינסטגרם מקצועי, ובוט טלגרם כמנהל הערוץ. האישור אצל Meta, TikTok ו-LinkedIn הוא ידני. TikTok נכנס לטיוטות עד ש-TIKTOK_DIRECT_POST=1. ל-X אין חיבור אוטומטי.</p>
-      ${state.networks.filter((row) => row.oauth || row.network === "telegram").map((row) => `<p>${esc(row.network)} — ${row.configured ? "מוגדר" : "חסר " + row.missingEnv.join(", ")} ${row.oauth ? `<button type="button" data-connect="${row.network}">חיבור</button>` : ""}</p>`).join("")}
-      <label>טוקן בוט טלגרם<input id="tg-token"></label>
-      <label>מזהה צ'אט או @ערוץ<input id="tg-chat"></label>
-      <button type="button" id="tg-save">חיבור טלגרם</button>
+      <p class="muted">לחיצה על חיבור פותחת את אתר הרשת. מאשרים שם את החשבון, ואז חוזרים לכאן. טלגרם מתחבר כאן עם טוקן בוט, בלי אפליקציית מפתחים.</p>
+      ${connectable.map((row) => {
+        const name = NETWORK_LABELS[row.network] || row.network;
+        if (row.network === "telegram") {
+          return `<p><strong>${esc(name)}</strong> — מדביקים למטה טוקן ומזהה ערוץ</p>`;
+        }
+        if (!row.configured) {
+          return `<p><strong>${esc(name)}</strong> — <span class="error">אין מפתח בשרת, אי אפשר לחבר עדיין</span></p>`;
+        }
+        return `<p><strong>${esc(name)}</strong> — מוכן לחיבור <button class="primary" type="button" data-connect="${row.network}">חיבור ${esc(name)}</button></p>`;
+      }).join("")}
+      <label>טוקן בוט טלגרם<input id="tg-token" autocomplete="off"></label>
+      <label>מזהה צ'אט או @ערוץ<input id="tg-chat" placeholder="@reelmino"></label>
+      <button class="primary" type="button" id="tg-save">חיבור טלגרם</button>
     </div>
     <div class="card">
       ${state.connections.map((row) => `<p>${esc(row.network)} · ${esc(row.displayName)} · ${esc(row.status)}
@@ -167,11 +186,21 @@ function renderAccounts() {
   `;
   panel.querySelectorAll("[data-connect]").forEach((button) => {
     button.onclick = () => run(async () => {
-      const started = await api(`/api/oauth/${button.dataset.connect}/start`, { method: "POST", body: "{}" });
-      location.href = started.authorizeUrl;
+      banner.className = "muted";
+      banner.textContent = "פותח את דף האישור של הרשת…";
+      const started = await api(`/api/connect/${button.dataset.connect}/start`, { method: "POST", body: "{}" });
+      if (!started.authorizeUrl) throw new Error("לא התקבלה כתובת חיבור מהשרת");
+      location.assign(started.authorizeUrl);
+      return "skip-refresh";
     });
   });
-  panel.querySelector("#tg-save").onclick = () => run(() => api("/api/connections/telegram", { method: "POST", body: JSON.stringify({ token: panel.querySelector("#tg-token").value, chatId: panel.querySelector("#tg-chat").value }) }));
+  panel.querySelector("#tg-save").onclick = () => run(async () => {
+    const token = panel.querySelector("#tg-token").value.trim();
+    const chatId = panel.querySelector("#tg-chat").value.trim();
+    if (!token) throw new Error("מדביקים קודם את הטוקן מ-BotFather");
+    if (!chatId) throw new Error("כותבים מזהה ערוץ, למשל @reelmino");
+    await api("/api/connections/telegram", { method: "POST", body: JSON.stringify({ token, chatId }) });
+  });
   panel.querySelectorAll("[data-sync]").forEach((button) => { button.onclick = () => run(() => api(`/api/connections/${button.dataset.sync}/sync`, { method: "POST", body: "{}" })); });
   panel.querySelectorAll("[data-drop]").forEach((button) => { button.onclick = () => run(() => api(`/api/connections/${button.dataset.drop}`, { method: "DELETE" })); });
   panel.querySelectorAll("[data-flag]").forEach((box) => {
@@ -459,10 +488,13 @@ function renderPeople() {
 
 async function run(action) {
   try {
-    await action();
+    const result = await action();
+    if (result === "skip-refresh") return;
+    banner.className = "muted";
     await refresh();
   } catch (error) {
-    banner.textContent = error.message;
+    banner.className = "error";
+    banner.textContent = error.message || String(error);
   }
 }
 

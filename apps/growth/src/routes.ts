@@ -486,14 +486,16 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
     return listSlots(ctx.db).find((row) => row.id === id) ?? { id };
   });
 
-  app.post("/api/oauth/:network/start", async (request, reply) => {
+  async function startNetworkConnect(request: FastifyRequest, reply: FastifyReply) {
     const { network } = request.params as { network: string };
     try {
       return await beginOAuth(network, redirectUri(ctx, network), ctx.secret);
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
     }
-  });
+  }
+  app.post("/api/oauth/:network/start", startNetworkConnect);
+  app.post("/api/connect/:network/start", startNetworkConnect);
 
   app.get("/oauth/:network/callback", async (request, reply) => {
     const { network } = request.params as { network: string };
