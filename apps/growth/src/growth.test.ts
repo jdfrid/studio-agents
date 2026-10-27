@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { assetKind, CALENDAR, networksForKind } from "./calendar.js";
 import { composeFreshCopy, factsForItem } from "./angles.js";
 import { importCalendar, importPromoKit, slugify } from "./catalog.js";
+import { growthOAuthRedirect } from "./accounts.js";
 import { signPayload, verifyPayload } from "./crypto.js";
 import { copyFromCalendar, emptyCopy } from "./copy.js";
 import { getItemBySlug, insertJob, listGroups, migrate, openDb, queueGroupPosts, updateItem, updateJob, type Item } from "./db.js";
@@ -154,6 +155,31 @@ describe("growth console", () => {
     expect(decideSlot({ network: "youtube", origin: "calendar", destination: { enabled: false, autopilot: true }, emailAutopilot: false, siteAutopilot: false })).toBe("skipped");
     expect(decideSlot({ network: "email", origin: "calendar", destination: null, emailAutopilot: false, siteAutopilot: false })).toBe("needs_review");
     expect(decideSlot({ network: "site", origin: "calendar", destination: null, emailAutopilot: false, siteAutopilot: true })).toBe("publish");
+  });
+
+  it("returns YouTube through the site Google callback when the clients are shared", () => {
+    const previousYoutube = process.env.YOUTUBE_CLIENT_ID;
+    const previousGoogle = process.env.GOOGLE_CLIENT_ID;
+    delete process.env.YOUTUBE_CLIENT_ID;
+    process.env.GOOGLE_CLIENT_ID = "site-client";
+    try {
+      expect(growthOAuthRedirect({
+        network: "youtube",
+        publicBase: "https://growth.reelmino.com",
+        siteOrigin: "https://reelmino.com"
+      })).toBe("https://reelmino.com/auth/google/callback");
+      process.env.YOUTUBE_CLIENT_ID = "other-client";
+      expect(growthOAuthRedirect({
+        network: "youtube",
+        publicBase: "https://growth.reelmino.com/",
+        siteOrigin: "https://reelmino.com"
+      })).toBe("https://growth.reelmino.com/oauth/youtube/callback");
+    } finally {
+      if (previousYoutube === undefined) delete process.env.YOUTUBE_CLIENT_ID;
+      else process.env.YOUTUBE_CLIENT_ID = previousYoutube;
+      if (previousGoogle === undefined) delete process.env.GOOGLE_CLIENT_ID;
+      else process.env.GOOGLE_CLIENT_ID = previousGoogle;
+    }
   });
 
   it("signs oauth state and builds a linkedin post", () => {

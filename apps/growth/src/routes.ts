@@ -3,7 +3,7 @@ import "@fastify/multipart";
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { beginOAuth, connectTelegram, finishOAuth, networkSetup, oauthNetworks, removeConnection, syncConnection } from "./accounts.js";
+import { beginOAuth, connectTelegram, finishOAuth, growthOAuthRedirect, networkSetup, oauthNetworks, removeConnection, syncConnection } from "./accounts.js";
 import { importCalendar, importPromoKit, slugify } from "./catalog.js";
 import { composeFreshCopy } from "./angles.js";
 import { emptyCopy, EXPORT_NETWORKS, type ItemCopy } from "./copy.js";
@@ -618,7 +618,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
 }
 
 function redirectUri(ctx: AppCtx, network: string): string {
-  return `${ctx.publicBase.replace(/\/$/, "")}/oauth/${network}/callback`;
+  return growthOAuthRedirect({ network, publicBase: ctx.publicBase, siteOrigin: ctx.origin });
 }
 
 export function sendMedia(reply: FastifyReply, mediaDir: string, filename: string, range?: string): FastifyReply {

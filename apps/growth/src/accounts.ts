@@ -14,7 +14,16 @@ import {
   type GrowthDb
 } from "./db.js";
 
-export type OAuthState = { network: string; verifier?: string; exp: number };
+export type OAuthState = { network: string; verifier?: string; exp: number; via: "growth" };
+
+/** YouTube on the shared site Google client must return to the URI Google already allows. */
+export function growthOAuthRedirect(input: { network: string; publicBase: string; siteOrigin: string }): string {
+  const youtubeId = process.env.YOUTUBE_CLIENT_ID?.trim();
+  const googleId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const sharesSiteClient = input.network === "youtube" && (!youtubeId || youtubeId === googleId);
+  if (sharesSiteClient) return `${input.siteOrigin.replace(/\/$/, "")}/auth/google/callback`;
+  return `${input.publicBase.replace(/\/$/, "")}/oauth/${input.network}/callback`;
+}
 
 const OAUTH_NETWORKS = ["youtube", "facebook", "instagram", "tiktok", "linkedin"];
 
@@ -45,7 +54,7 @@ export async function beginOAuth(network: string, redirectUri: string, secret: s
   const adapter = adapterFor(network);
   if (!adapter.startOAuth) throw new Error("OAuth is not available");
   const pkce = adapter.pkce ? randomPkce() : undefined;
-  const state = signPayload({ network, verifier: pkce?.verifier, exp: Date.now() + 15 * 60_000 } satisfies OAuthState, secret);
+  const state = signPayload({ network, verifier: pkce?.verifier, exp: Date.now() + 15 * 60_000, via: "growth" } satisfies OAuthState, secret);
   return adapter.startOAuth({ redirectUri, state, codeChallenge: pkce?.challenge });
 }
 

@@ -88,6 +88,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       APP_URL: ${APP_URL:-http://localhost:5173}
+      GROWTH_PUBLIC_BASE: ${GROWTH_PUBLIC_BASE:-https://growth.reelmino.com}
       ADMIN_URL: ${ADMIN_URL:-http://localhost:5174}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174}
       AUTH_DISABLED: ${AUTH_DISABLED:-0}

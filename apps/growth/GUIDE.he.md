@@ -77,7 +77,7 @@ https://growth.reelmino.com/oauth/linkedin/callback
 2. **APIs & Services → Library**, מחפשים `YouTube Data API v3`, ולוחצים **Enable**.
 3. **APIs & Services → OAuth consent screen**. בוחרים External, ממלאים שם אפליקציה ומייל, ומוסיפים את המשתמש שלך כ-Test user. בסטטוס Testing רק מיילים שברשימה יכולים לאשר.
 4. **APIs & Services → Credentials → Create credentials → OAuth client ID**. סוג: **Web application**.
-5. ב-**Authorized redirect URIs** מדביקים `https://growth.reelmino.com/oauth/youtube/callback`.
+5. אם משתמשים באותו לקוח גוגל של התחברות לאתר, כתובת החזרה כבר רשומה: `https://reelmino.com/auth/google/callback`. לקוח יוטיוב נפרד צריך גם את `https://growth.reelmino.com/oauth/youtube/callback`.
 6. מעתיקים את Client ID ואת Client secret אל `infra/hetzner/.env` בשרת:
 
 ```text

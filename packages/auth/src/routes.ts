@@ -5,6 +5,7 @@ import {
   googleAuthUrl,
   appUrl
 } from "./google.js";
+import { growthOAuthBounceUrl } from "./oauthBounce.js";
 import { SocialNetworkSchema, type UserView } from "@studio/shared";
 import { startEmailAuth, verifyEmailAuth, EmailAuthFailed } from "./emailAuth.js";
 import { clientIp, recordUserLogin } from "./loginAudit.js";
@@ -100,6 +101,10 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       error?: string;
       error_description?: string;
     };
+    if (query.state) {
+      const growthDest = growthOAuthBounceUrl(query.state, query);
+      if (growthDest) return reply.redirect(growthDest);
+    }
     const distributionNetwork = query.state ? peekDistributionOAuthNetwork(query.state) : null;
     if (distributionNetwork) {
       const dest = new URL(`${appUrl()}/api/distribution/oauth/${distributionNetwork}/callback`);
