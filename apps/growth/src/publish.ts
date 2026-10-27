@@ -80,13 +80,22 @@ export type PublishCopyOptions = {
   locked?: CaptionLock | null;
 };
 
+function trendCaption(item: Item, locked?: CaptionLock | null): CaptionLock | null {
+  if (locked?.body?.trim()) return locked;
+  if (item.source !== "youtube-trend") return null;
+  const title = item.copy.youtube?.title?.trim() || item.title;
+  const body = item.copy.youtube?.body?.trim();
+  if (!body) return null;
+  return { angleKind: "outcome", frame: 0, title: title.slice(0, 90), body };
+}
+
 export function publishCopy(item: Item, network: string, campaign?: string, options?: PublishCopyOptions): PackageCopyInput {
   const caption = composeFreshCopy({
     item,
     network,
     seed: options?.seed ?? `${item.id}:${network}`,
     recentBodies: options?.recentBodies,
-    locked: options?.locked
+    locked: trendCaption(item, options?.locked)
   });
   const link = trackedLink({ network, slug: item.slug, format: formatForNetwork(network), campaign });
   const parkLink = networkSupportsFirstComment(network);
@@ -115,7 +124,7 @@ export function lockPublishCopy(input: {
   network: string;
   campaign?: string;
 }): { copy: PackageCopyInput; caption: CaptionLock } {
-  const locked = captionFromHandle(input.job.handle);
+  const stored = captionFromHandle(input.job.handle);
   const slot = input.job.slotId ? getSlot(input.db, input.job.slotId) : null;
   const seed = input.job.slotId
     ? `${input.job.slotId}:${slot?.scheduledFor ?? input.job.scheduledFor ?? ""}`
@@ -125,9 +134,9 @@ export function lockPublishCopy(input: {
     network: input.network,
     seed,
     recentBodies: recentCaptionBodies(input.db, input.network, input.job.id),
-    locked
+    locked: trendCaption(input.item, stored)
   });
-  if (!locked) {
+  if (!stored) {
     updateJob(input.db, input.job.id, { handle: { ...input.job.handle, caption } });
   }
   return {
@@ -163,7 +172,7 @@ export function mediaOf(item: Item, mediaDir: string, publicBase: string): Publi
   ];
 }
 
-async function freshTokens(db: GrowthDb, connectionId: string, key: Buffer, network: string): Promise<SocialTokens> {
+export async function freshConnectionTokens(db: GrowthDb, connectionId: string, key: Buffer, network: string): Promise<SocialTokens> {
   const connection = getConnection(db, connectionId);
   if (!connection || connection.status === "revoked") throw new Error("connection is not active");
   let tokens = decryptJson<SocialTokens>(connection.encryptedTokens, key);
@@ -205,7 +214,7 @@ export async function runPublish(input: {
   });
   try {
     const adapter = publisher(input.destination.network);
-    const tokens = await freshTokens(input.db, input.destination.connectionId, input.key, input.destination.network);
+    const tokens = await freshConnectionTokens(input.db, input.destination.connectionId, input.key, input.destination.network);
     const config = publishConfig(input.destination.network, input.destination.config, copy.link);
     const media = mediaOf(input.item, input.mediaDir, input.publicBase);
     const preview = adapter.preview(
@@ -299,7 +308,7 @@ export async function pollPublish(db: GrowthDb, key: Buffer, jobId: string): Pro
   const adapter = publisher(job.network);
   if (!("poll" in adapter) || typeof adapter.poll !== "function") return job;
   try {
-    const tokens = await freshTokens(db, destination.connectionId, key, job.network);
+    const tokens = await freshConnectionTokens(db, destination.connectionId, key, job.network);
     const item = getItem(db, job.itemId);
     const copy = item
       ? lockPublishCopy({ db, job, item, network: job.network }).copy
@@ -370,7 +379,7 @@ export async function retryPublish(input: {
   });
   try {
     const adapter = publisher(destination.network);
-    const tokens = await freshTokens(input.db, destination.connectionId, input.key, destination.network);
+    const tokens = await freshConnectionTokens(input.db, destination.connectionId, input.key, destination.network);
     const config = publishConfig(destination.network, destination.config, copy.link);
     const media = mediaOf(item, input.mediaDir, input.publicBase);
     const preview = adapter.preview(
@@ -443,7 +452,7 @@ export async function postDueFirstComments(input: {
       continue;
     }
     try {
-      const tokens = await freshTokens(input.db, destination.connectionId, input.key, job.network);
+      const tokens = await freshConnectionTokens(input.db, destination.connectionId, input.key, job.network);
       const config = DestinationConfigSchema.parse(destination.config);
       const result = await adapter.commentOnPost({
         tokens,

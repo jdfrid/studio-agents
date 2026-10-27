@@ -34,6 +34,7 @@ function render() {
   else if (tab === "accounts") renderAccounts();
   else if (tab === "groups") renderGroups();
   else if (tab === "calendar") renderCalendar();
+  else if (tab === "trends") renderTrends();
   else if (tab === "internet") renderInternet();
   else if (tab === "results") renderResults();
   else renderPeople();
@@ -357,6 +358,76 @@ function renderGroups() {
   }));
   panel.querySelectorAll("[data-done-post]").forEach((button) => { button.onclick = () => finish(button.dataset.donePost, "done"); });
   panel.querySelectorAll("[data-skip-post]").forEach((button) => { button.onclick = () => finish(button.dataset.skipPost, "skipped"); });
+}
+
+const TREND_STATUS = {
+  sensing: "קורא מגמות",
+  producing: "מפיק סרטון",
+  publishing: "מעלה ליוטיוב",
+  published: "עלה לערוץ",
+  failed: "נכשל",
+  skipped: "אין נושא חדש"
+};
+
+function renderTrends() {
+  const trends = state.youtubeTrends || { enabled: false, hours: 4, region: "IL", language: "he", niche: "", destinationId: "", cycles: [] };
+  const channels = state.destinations.filter((row) => row.network === "youtube" && row.kind === "channel" && row.enabled);
+  panel.innerHTML = `
+    <div class="card">
+      <p class="muted">כל ${esc(trends.hours)} שעות המערכת קוראת מה תופס צפיות ביוטיוב ומה כבר עבד בערוץ, מכינה סרטון מקורי של 30 שניות, שולחת אותו להפקה, ומעלה אותו לערוץ. הסרטון לא מעתיק סרטון של יוצר אחר. כל סרטון משתמש בקרדיטים של חשבון הסטודיו.</p>
+      <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${channels.length ? "ערוץ יוטיוב מחובר." : "חברו ערוץ יוטיוב בלשונית חשבונות."}</p>
+      <label><input id="trend-enabled" type="checkbox" ${trends.enabled ? "checked" : ""}> הפעלה אוטומטית</label>
+      <label>מרווח
+        <select id="trend-hours">
+          ${[1, 2, 4, 6, 8, 12, 24].map((hours) => `<option value="${hours}" ${Number(trends.hours) === hours ? "selected" : ""}>${hours} שעות</option>`).join("")}
+        </select>
+      </label>
+      <label>אזור<input id="trend-region" value="${esc(trends.region || "IL")}" maxlength="2"></label>
+      <label>שפה
+        <select id="trend-language">
+          <option value="he" ${trends.language === "he" ? "selected" : ""}>עברית</option>
+          <option value="en" ${trends.language === "en" ? "selected" : ""}>English</option>
+        </select>
+      </label>
+      <label>נישה<input id="trend-niche" value="${esc(trends.niche || "")}" placeholder="לדוגמה: שיווק לעסקים קטנים"></label>
+      <label>ערוץ
+        <select id="trend-destination">
+          <option value="">ערוץ יוטיוב פעיל ראשון</option>
+          ${channels.map((row) => `<option value="${esc(row.id)}" ${trends.destinationId === row.id ? "selected" : ""}>${esc(row.name)}</option>`).join("")}
+        </select>
+      </label>
+      <div class="row">
+        <button class="primary" type="button" id="trend-save">שמירה</button>
+        <button type="button" id="trend-run">הרצה עכשיו</button>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>זמן</th><th>נושא</th><th>מצב</th><th>קישור</th></tr></thead>
+        <tbody>
+          ${(trends.cycles || []).map((row) => `<tr>
+            <td>${esc((row.createdAt || "").replace("T", " ").slice(0, 16))}</td>
+            <td>${esc(row.topic || "—")}${row.signal?.inspirationTitle ? `<div class="muted">אות: ${esc(row.signal.inspirationTitle)}</div>` : ""}</td>
+            <td>${esc(TREND_STATUS[row.status] || row.status)}${row.error ? `<div class="error">${esc(row.error)}</div>` : ""}</td>
+            <td>${row.remoteUrl ? `<a href="${esc(row.remoteUrl)}" target="_blank" rel="noreferrer">סרטון</a>` : ""}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  const payload = () => ({
+    enabled: panel.querySelector("#trend-enabled").checked,
+    hours: Number(panel.querySelector("#trend-hours").value),
+    region: panel.querySelector("#trend-region").value,
+    language: panel.querySelector("#trend-language").value,
+    niche: panel.querySelector("#trend-niche").value,
+    destinationId: panel.querySelector("#trend-destination").value || null
+  });
+  panel.querySelector("#trend-save").onclick = () => run(() => api("/api/youtube-trends", { method: "PATCH", body: JSON.stringify(payload()) }));
+  panel.querySelector("#trend-run").onclick = () => run(async () => {
+    await api("/api/youtube-trends", { method: "PATCH", body: JSON.stringify(payload()) });
+    return api("/api/youtube-trends/run", { method: "POST", body: "{}" });
+  });
 }
 
 function renderCalendar() {

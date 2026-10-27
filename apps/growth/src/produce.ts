@@ -55,26 +55,20 @@ async function reelmino(pathname: string, init: RequestInit = {}): Promise<unkno
   return text ? JSON.parse(text) : {};
 }
 
-export async function produceItem(db: GrowthDb, promoKit: string, item: Item): Promise<Item> {
-  const match = /^kit-(\d+)-/.exec(item.slug);
-  if (!match) throw new Error("production from Reelmino is available for promo-kit items");
-  const packages = await loadPromoPackages(promoKit);
-  const pkg = packages.find((row) => row.id === match[1]);
-  if (!pkg) throw new Error("promo package not found");
+export async function submitReelminoBrief(brief: Record<string, unknown>): Promise<string> {
   const created = (await reelmino("/runs", {
     method: "POST",
-    body: JSON.stringify({ brief: briefForPackage(pkg) })
+    body: JSON.stringify({ brief })
   })) as { id?: string };
   if (!created.id) throw new Error("Reelmino did not return a run id");
-  return updateItem(db, item.id, { reelminoRunId: created.id })!;
+  return created.id;
 }
 
-export async function pullItem(db: GrowthDb, mediaDir: string, item: Item): Promise<Item> {
-  if (!item.reelminoRunId) throw new Error("this item has no Reelmino run");
-  const payload = (await reelmino(`/runs/${item.reelminoRunId}/artifacts`)) as { artifacts?: Array<{ id: string; kind: string }> } | Array<{ id: string; kind: string }>;
+export async function downloadReelminoFinal(runId: string, mediaDir: string): Promise<{ filename: string } | null> {
+  const payload = (await reelmino(`/runs/${runId}/artifacts`)) as { artifacts?: Array<{ id: string; kind: string }> } | Array<{ id: string; kind: string }>;
   const list = Array.isArray(payload) ? payload : payload.artifacts ?? [];
   const final = [...list].reverse().find((row) => row.kind === "final_video");
-  if (!final) throw new Error("video is not ready yet");
+  if (!final) return null;
   const signed = (await reelmino(`/artifacts/${final.id}/signed-url`)) as { url?: string; signedUrl?: string };
   const remote = signed.url ?? signed.signedUrl;
   if (!remote) throw new Error("missing download url");
@@ -83,8 +77,25 @@ export async function pullItem(db: GrowthDb, mediaDir: string, item: Item): Prom
   mkdirSync(mediaDir, { recursive: true });
   const filename = `${nid()}.mp4`;
   writeFileSync(path.join(mediaDir, filename), Buffer.from(await response.arrayBuffer()));
+  return { filename };
+}
+
+export async function produceItem(db: GrowthDb, promoKit: string, item: Item): Promise<Item> {
+  const match = /^kit-(\d+)-/.exec(item.slug);
+  if (!match) throw new Error("production from Reelmino is available for promo-kit items");
+  const packages = await loadPromoPackages(promoKit);
+  const pkg = packages.find((row) => row.id === match[1]);
+  if (!pkg) throw new Error("promo package not found");
+  const runId = await submitReelminoBrief(briefForPackage(pkg));
+  return updateItem(db, item.id, { reelminoRunId: runId })!;
+}
+
+export async function pullItem(db: GrowthDb, mediaDir: string, item: Item): Promise<Item> {
+  if (!item.reelminoRunId) throw new Error("this item has no Reelmino run");
+  const file = await downloadReelminoFinal(item.reelminoRunId, mediaDir);
+  if (!file) throw new Error("video is not ready yet");
   return updateItem(db, item.id, {
-    mediaPath: filename,
+    mediaPath: file.filename,
     mediaMime: "video/mp4",
     mediaKind: "video",
     mediaWidth: 1080,

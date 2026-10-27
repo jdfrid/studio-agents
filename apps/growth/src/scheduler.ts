@@ -24,6 +24,7 @@ import { composeFreshCopy } from "./angles.js";
 import { applyLink, trackedLink } from "./utm.js";
 import { deliverDueGroupPosts } from "./groups.js";
 import { pollPublish, postDueFirstComments, runPublish } from "./publish.js";
+import { advanceYoutubeTrends } from "./youtubeTrends.js";
 
 export type DispatchContext = {
   db: GrowthDb;
@@ -151,6 +152,11 @@ export async function tick(ctx: DispatchContext): Promise<void> {
     await postDueFirstComments({ db: ctx.db, key: ctx.key });
   } catch (error) {
     console.error("[growth] first comment failed", error);
+  }
+  try {
+    await advanceYoutubeTrends(ctx);
+  } catch (error) {
+    console.error("[growth] youtube trends failed", error);
   }
 }
 

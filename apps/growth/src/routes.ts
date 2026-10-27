@@ -39,6 +39,7 @@ import {
   listItems,
   listJobs,
   listSlots,
+  listTrendCycles,
   reopenSlot,
   sessionValid,
   setDestinationFlags,
@@ -69,6 +70,7 @@ import { produceItem, pullItem, pullReady } from "./produce.js";
 import { retryPublish, runPublish } from "./publish.js";
 import { dispatchSlot, type DispatchContext } from "./scheduler.js";
 import { nextMondayIso } from "./time.js";
+import { applyTrendSettings, readTrendSettings, runTrendNow } from "./youtubeTrends.js";
 
 export type AppCtx = DispatchContext & {
   db: GrowthDb;
@@ -154,7 +156,8 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
       auto: isAutoNetwork(group.network),
       tooSoon: sharedTooRecently(group.lastSharedAt, group.minDays)
     })),
-    groupPosts: groupPostsView()
+    groupPosts: groupPostsView(),
+    youtubeTrends: { ...readTrendSettings(ctx.db), cycles: listTrendCycles(ctx.db, 12) }
   }));
 
   function groupPostsView() {
@@ -533,6 +536,29 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
     const row = setDestinationFlags(ctx.db, (request.params as { id: string }).id, body);
     if (!row) return reply.code(404).send({ error: "not found" });
     return row;
+  });
+
+  app.patch("/api/youtube-trends", async (request, reply) => {
+    const body = (request.body ?? {}) as Partial<{
+      enabled: boolean;
+      hours: number;
+      region: string;
+      language: string;
+      niche: string;
+      destinationId: string | null;
+    }>;
+    const error = applyTrendSettings(ctx.db, body);
+    if (error) return reply.code(400).send({ error });
+    return { ...readTrendSettings(ctx.db), cycles: listTrendCycles(ctx.db, 12) };
+  });
+
+  app.post("/api/youtube-trends/run", async (_request, reply) => {
+    try {
+      return await runTrendNow(ctx);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return reply.code(message.includes("כבר רץ") ? 409 : 400).send({ error: message });
+    }
   });
 
   app.patch("/api/settings", async (request) => {

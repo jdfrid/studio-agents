@@ -166,8 +166,28 @@ export function migrate(db: GrowthDb): void {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS trend_cycles (
+      id TEXT PRIMARY KEY,
+      slot_key TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL,
+      topic TEXT,
+      score REAL,
+      language TEXT,
+      region TEXT,
+      niche TEXT,
+      destination_id TEXT,
+      item_id TEXT,
+      run_id TEXT,
+      job_id TEXT,
+      remote_url TEXT,
+      signal_json TEXT NOT NULL DEFAULT '{}',
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS slots_due ON slots(status, scheduled_for);
     CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status, created_at);
+    CREATE INDEX IF NOT EXISTS trend_cycles_status ON trend_cycles(status, created_at);
   `);
   const sessionColumns = rows(db.prepare("PRAGMA table_info(sessions)").all());
   if (!sessionColumns.some((column) => str(column, "name") === "operator_id")) {
@@ -892,6 +912,157 @@ export function updateEmail(db: GrowthDb, id: string, patch: Partial<Pick<EmailD
     id
   );
   return getEmail(db, id);
+}
+
+export type TrendCycle = {
+  id: string;
+  slotKey: string;
+  status: string;
+  topic: string | null;
+  score: number | null;
+  language: string | null;
+  region: string | null;
+  niche: string | null;
+  destinationId: string | null;
+  itemId: string | null;
+  runId: string | null;
+  jobId: string | null;
+  remoteUrl: string | null;
+  signal: Record<string, unknown>;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function signalOf(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw || "{}") as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function mapTrendCycle(row: Row): TrendCycle {
+  return {
+    id: str(row, "id"),
+    slotKey: str(row, "slot_key"),
+    status: str(row, "status"),
+    topic: str(row, "topic") || null,
+    score: row.score == null ? null : Number(row.score),
+    language: str(row, "language") || null,
+    region: str(row, "region") || null,
+    niche: str(row, "niche") || null,
+    destinationId: str(row, "destination_id") || null,
+    itemId: str(row, "item_id") || null,
+    runId: str(row, "run_id") || null,
+    jobId: str(row, "job_id") || null,
+    remoteUrl: str(row, "remote_url") || null,
+    signal: signalOf(str(row, "signal_json")),
+    error: str(row, "error") || null,
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at")
+  };
+}
+
+export function getTrendCycle(db: GrowthDb, id: string): TrendCycle | null {
+  const row = db.prepare("SELECT * FROM trend_cycles WHERE id = ?").get(id) as Row | undefined;
+  return row ? mapTrendCycle(row) : null;
+}
+
+export function trendCycleBySlot(db: GrowthDb, slotKey: string): TrendCycle | null {
+  const row = db.prepare("SELECT * FROM trend_cycles WHERE slot_key = ?").get(slotKey) as Row | undefined;
+  return row ? mapTrendCycle(row) : null;
+}
+
+export function listTrendCycles(db: GrowthDb, limit = 20): TrendCycle[] {
+  return rows(db.prepare("SELECT * FROM trend_cycles ORDER BY created_at DESC LIMIT ?").all(limit)).map(mapTrendCycle);
+}
+
+export function openTrendCycle(db: GrowthDb): TrendCycle | null {
+  const row = db
+    .prepare("SELECT * FROM trend_cycles WHERE status IN ('sensing', 'producing', 'publishing') ORDER BY created_at ASC LIMIT 1")
+    .get() as Row | undefined;
+  return row ? mapTrendCycle(row) : null;
+}
+
+export function insertTrendCycle(
+  db: GrowthDb,
+  input: {
+    id: string;
+    slotKey: string;
+    status: string;
+    topic?: string | null;
+    score?: number | null;
+    language?: string | null;
+    region?: string | null;
+    niche?: string | null;
+    destinationId?: string | null;
+    itemId?: string | null;
+    runId?: string | null;
+    jobId?: string | null;
+    remoteUrl?: string | null;
+    signal?: Record<string, unknown>;
+    error?: string | null;
+  }
+): TrendCycle {
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO trend_cycles (
+      id, slot_key, status, topic, score, language, region, niche, destination_id, item_id, run_id, job_id,
+      remote_url, signal_json, error, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    input.id,
+    input.slotKey,
+    input.status,
+    input.topic ?? null,
+    input.score ?? null,
+    input.language ?? null,
+    input.region ?? null,
+    input.niche ?? null,
+    input.destinationId ?? null,
+    input.itemId ?? null,
+    input.runId ?? null,
+    input.jobId ?? null,
+    input.remoteUrl ?? null,
+    JSON.stringify(input.signal ?? {}),
+    input.error ?? null,
+    now,
+    now
+  );
+  return getTrendCycle(db, input.id)!;
+}
+
+export function updateTrendCycle(
+  db: GrowthDb,
+  id: string,
+  patch: Partial<Pick<TrendCycle, "status" | "topic" | "score" | "language" | "region" | "niche" | "destinationId" | "itemId" | "runId" | "jobId" | "remoteUrl" | "signal" | "error">>
+): TrendCycle | null {
+  const current = getTrendCycle(db, id);
+  if (!current) return null;
+  const next = { ...current, ...patch };
+  db.prepare(
+    `UPDATE trend_cycles SET status = ?, topic = ?, score = ?, language = ?, region = ?, niche = ?, destination_id = ?,
+      item_id = ?, run_id = ?, job_id = ?, remote_url = ?, signal_json = ?, error = ?, updated_at = ? WHERE id = ?`
+  ).run(
+    next.status,
+    next.topic,
+    next.score,
+    next.language,
+    next.region,
+    next.niche,
+    next.destinationId,
+    next.itemId,
+    next.runId,
+    next.jobId,
+    next.remoteUrl,
+    JSON.stringify(next.signal),
+    next.error,
+    new Date().toISOString(),
+    id
+  );
+  return getTrendCycle(db, id);
 }
 
 export function getSetting(db: GrowthDb, key: string): string | null {
