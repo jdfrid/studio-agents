@@ -60,6 +60,14 @@ describe("script bank", () => {
     expect(script.brief.sourceText).toBe("פותחים את המקרר.\nמוציאים עגבנייה.");
     expect(String(script.brief.instructions)).toContain("התסריט");
     expect(script.title).toBe("פותחים את המקרר.");
+    const foreign = briefForEntry({ kind: "keywords", body: "onion cutting, sharp knife", language: "he" });
+    expect(foreign.title).not.toMatch(/[A-Za-z]/);
+    expect(foreign.description).not.toMatch(/onion/);
+    expect(String(foreign.brief.instructions)).toContain("בעברית בלבד");
+    expect(String(foreign.brief.sourceText)).toContain("onion cutting");
+    const english = briefForEntry({ kind: "keywords", body: "חיתוך בצל", language: "en" });
+    expect(english.title).toBe("What matters now");
+    expect(english.description).not.toMatch(/\p{Script=Hebrew}/u);
   });
 
   it("keeps the bank caption when the video is uploaded", () => {

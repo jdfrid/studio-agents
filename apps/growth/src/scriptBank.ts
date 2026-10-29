@@ -1,4 +1,5 @@
 import { slugify } from "./catalog.js";
+import { languageLock, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
 import { emptyCopy, type ItemCopy } from "./copy.js";
 import { nid } from "./crypto.js";
 import {
@@ -123,22 +124,30 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
   brief: Record<string, unknown>;
 } {
   const he = input.language.startsWith("he");
-  const title = (input.kind === "script" ? input.body.split(/\r?\n/).find((line) => line.trim()) ?? input.body : input.body.replace(/[,\n]+/g, " "))
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 80);
+  const source = input.kind === "script" ? (input.body.split(/\r?\n/).find((line) => line.trim()) ?? input.body) : input.body;
+  const title = titleInLanguage(source, input.language);
+  const ownWords = textMatchesLanguage(input.body, input.language);
   const summary = input.kind === "script"
     ? (he ? "סרטון אנכי לפי התסריט שנשמר במאגר." : "A vertical video that follows the saved script.")
-    : (he
-      ? `סרטון מקורי קצר על ${title}. מסבירים את הנושא בפשטות ונותנים טיפ אחד שאפשר ליישם מיד.`
-      : `An original short about ${title}. Explain the subject plainly and give one tip people can use immediately.`);
-  const instructions = input.kind === "script"
+    : ownWords
+      ? (he
+        ? `סרטון מקורי קצר על ${title}. מסבירים את הנושא בפשטות ונותנים טיפ אחד שאפשר ליישם מיד.`
+        : `An original short about ${title}. Explain the subject plainly and give one tip people can use immediately.`)
+      : (he
+        ? "סרטון מקורי קצר. מסבירים את הנושא בפשטות ונותנים טיפ אחד שאפשר ליישם מיד."
+        : "An original short. Explain the subject plainly and give one tip people can use immediately.");
+  const subject = ownWords
+    ? ""
+    : he
+      ? `\nהנושא לכיסוי, בלי להעתיק את הניסוח לכותרת או לתיאור: ${input.body.trim()}`
+      : `\nSubject to cover, without copying this wording into the title or the description: ${input.body.trim()}`;
+  const instructions = `${input.kind === "script"
     ? (he
       ? "עוקבים אחרי התסריט שסופק: הוא הקריינות והמהלך של הסרטון. בלי להעתיק סרטון, תסריט או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, מסך אנכי."
       : "Follow the supplied script as the narration and the sequence. Do not copy another creator's video, script, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, vertical frame.")
     : (he
       ? "תוכן מקורי בלבד לפי מילות המפתח. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, קריינות קצרה, מסך אנכי."
-      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.");
+      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(input.language)}`;
   const tags = ["#Shorts", ...tokens(title).slice(0, 3).map((token) => `#${token}`)];
   const description = `${summary}\n\n${tags.join(" ")}`;
   return {
@@ -147,7 +156,7 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
     description,
     brief: {
       title,
-      sourceText: input.kind === "script" ? input.body.trim() : summary,
+      sourceText: (input.kind === "script" && ownWords ? input.body.trim() : summary) + subject,
       instructions,
       targetAudience: he ? "צופים בסרטונים קצרים ביוטיוב" : "YouTube Shorts viewers",
       language: input.language,

@@ -103,6 +103,9 @@ describe("youtube trend loop", () => {
     expect(content.brief.approvalMode).toBe("auto");
     expect(content.brief.durationSeconds).toBe(30);
     expect(String(content.brief.instructions)).toContain("מקורי");
+    expect(String(content.brief.instructions)).toContain("בעברית בלבד");
+    expect(content.title).not.toMatch(/[A-Za-z]/);
+    expect(content.description.replaceAll("#Shorts", "")).not.toMatch(/[A-Za-z]/);
     expect(JSON.stringify(content)).not.toContain(raw);
     expect(content.description).toContain("#Shorts");
   });

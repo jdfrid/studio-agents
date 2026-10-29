@@ -1,4 +1,5 @@
 import { slugify } from "./catalog.js";
+import { languageLock, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
 import { emptyCopy, type ItemCopy } from "./copy.js";
 import { nid } from "./crypto.js";
 import {
@@ -225,23 +226,30 @@ export function contentForTrend(input: { topic: string; niche: string; language:
 } {
   const he = input.language.startsWith("he");
   const niche = input.niche.trim();
-  const title = (he ? `${input.topic} — מה כדאי לדעת` : `${input.topic} — what matters now`).slice(0, 90);
+  const title = titleInLanguage(input.topic, input.language).slice(0, 90);
+  const topicInLanguage = textMatchesLanguage(input.topic, input.language);
   const summary = he
-    ? `סרטון מקורי קצר על ${input.topic}.${niche ? ` הקהל: ${niche}.` : ""} מסבירים למה זה תופס תשומת לב עכשיו, ונותנים טיפ אחד שאפשר ליישם מיד.`
-    : `An original short about ${input.topic}.${niche ? ` Audience: ${niche}.` : ""} Explain why people are paying attention right now, and give one tip they can use immediately.`;
-  const instructions = he
+    ? `סרטון מקורי קצר${topicInLanguage ? ` על ${input.topic}` : ""}.${niche && textMatchesLanguage(niche, input.language) ? ` הקהל: ${niche}.` : ""} מסבירים למה זה תופס תשומת לב עכשיו, ונותנים טיפ אחד שאפשר ליישם מיד.`
+    : `An original short${topicInLanguage ? ` about ${input.topic}` : ""}.${niche && textMatchesLanguage(niche, input.language) ? ` Audience: ${niche}.` : ""} Explain why people are paying attention right now, and give one tip they can use immediately.`;
+  const subject = topicInLanguage
+    ? ""
+    : he
+      ? `\nהנושא לכיסוי, בלי להעתיק את הניסוח לכותרת או לתיאור: ${input.topic}`
+      : `\nSubject to cover, without copying this wording into the title or the description: ${input.topic}`;
+  const instructions = `${he
     ? "תוכן מקורי בלבד. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים, בלי לוגואים של מותג אחר, ובלי לטעון שהסרטון שייך למישהו אחר. פתיח ברור בשלוש השניות הראשונות, קריינות קצרה, מסך אנכי."
-    : "Original content only. Do not copy another creator's video, script, title, or narration. No other channel names, no third-party logos, and no claim that this video belongs to someone else. Clear hook in the first three seconds, short narration, vertical frame.";
-  const tags = ["#Shorts", ...tokens(input.topic).slice(0, 3).map((token) => `#${token}`)];
+    : "Original content only. Do not copy another creator's video, script, title, or narration. No other channel names, no third-party logos, and no claim that this video belongs to someone else. Clear hook in the first three seconds, short narration, vertical frame."} ${languageLock(input.language)}`;
+  const tags = ["#Shorts", ...tokens(title).slice(0, 3).map((token) => `#${token}`)];
+  const description = `${he ? `${title}. סרטון קצר ומקורי עם טיפ אחד ליישום.` : `${title}. An original short with one practical tip.`}\n\n${tags.join(" ")}`;
   return {
     title,
     summary,
-    description: `${he ? `${input.topic}. סרטון קצר ומקורי עם טיפ אחד ליישום.` : `${input.topic}. An original short with one practical tip.`}\n\n${tags.join(" ")}`,
+    description,
     brief: {
       title,
-      sourceText: summary,
+      sourceText: summary + subject,
       instructions,
-      targetAudience: niche || (he ? "צופים בסרטונים קצרים ביוטיוב" : "YouTube Shorts viewers"),
+      targetAudience: niche && textMatchesLanguage(niche, input.language) ? niche : (he ? "צופים בסרטונים קצרים ביוטיוב" : "YouTube Shorts viewers"),
       language: input.language,
       durationSeconds: 30,
       aspectRatio: "9:16",
@@ -371,9 +379,9 @@ function recentMemory(db: GrowthDb): { tokens: string[][]; videoIds: string[] } 
   return { tokens: tokensets, videoIds };
 }
 
-function trendItemCopy(title: string, description: string, topic: string): ItemCopy {
+function trendItemCopy(title: string, description: string): ItemCopy {
   const copy = emptyCopy();
-  copy.hashtags = ["Shorts", ...tokens(topic).slice(0, 4)];
+  copy.hashtags = ["Shorts", ...tokens(title).slice(0, 4)];
   copy.youtube = { title: title.slice(0, 90), body: description };
   copy.article = { title, description, body: description };
   return copy;
@@ -491,7 +499,7 @@ async function senseAndSubmit(ctx: TrendContext, cycle: TrendCycle, deps: TrendD
       title: content.title,
       summary: content.summary,
       language: current.language || settings.language,
-      copy: trendItemCopy(content.title, content.description, picked.topic),
+      copy: trendItemCopy(content.title, content.description),
       mediaPath: null,
       mediaMime: null,
       mediaKind: null,
