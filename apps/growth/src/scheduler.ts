@@ -24,6 +24,7 @@ import { composeFreshCopy } from "./angles.js";
 import { applyLink, trackedLink } from "./utm.js";
 import { deliverDueGroupPosts } from "./groups.js";
 import { pollPublish, postDueFirstComments, runPublish } from "./publish.js";
+import { advanceKeywordFeeds } from "./keywordFeeds.js";
 import { advanceScriptBank } from "./scriptBank.js";
 import { advanceYoutubeTrends } from "./youtubeTrends.js";
 
@@ -158,6 +159,11 @@ export async function tick(ctx: DispatchContext): Promise<void> {
     await advanceYoutubeTrends(ctx);
   } catch (error) {
     console.error("[growth] youtube trends failed", error);
+  }
+  try {
+    await advanceKeywordFeeds(ctx);
+  } catch (error) {
+    console.error("[growth] keyword feeds failed", error);
   }
   try {
     await advanceScriptBank(ctx);

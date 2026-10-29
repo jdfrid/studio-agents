@@ -195,8 +195,21 @@ export function migrate(db: GrowthDb): void {
       body TEXT NOT NULL,
       language TEXT NOT NULL,
       destination_id TEXT,
+      feed_id TEXT,
       enabled INTEGER NOT NULL DEFAULT 1,
       last_run_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS keyword_feeds (
+      id TEXT PRIMARY KEY,
+      query TEXT NOT NULL,
+      language TEXT NOT NULL,
+      destination_id TEXT NOT NULL,
+      hours INTEGER NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      last_filled_at TEXT,
+      last_error TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -225,6 +238,9 @@ export function migrate(db: GrowthDb): void {
   const entryColumns = rows(db.prepare("PRAGMA table_info(script_entries)").all());
   if (entryColumns.length && !entryColumns.some((column) => str(column, "name") === "title")) {
     db.exec("ALTER TABLE script_entries ADD COLUMN title TEXT NOT NULL DEFAULT ''");
+  }
+  if (entryColumns.length && !entryColumns.some((column) => str(column, "name") === "feed_id")) {
+    db.exec("ALTER TABLE script_entries ADD COLUMN feed_id TEXT");
   }
   migrateFacebookGroups(db);
   seedDirectories(db);
@@ -1175,6 +1191,7 @@ export type ScriptEntry = {
   body: string;
   language: string;
   destinationId: string | null;
+  feedId: string | null;
   enabled: boolean;
   lastRunAt: string | null;
   createdAt: string;
@@ -1189,6 +1206,7 @@ function mapScriptEntry(row: Row): ScriptEntry {
     body: str(row, "body"),
     language: str(row, "language"),
     destinationId: str(row, "destination_id") || null,
+    feedId: str(row, "feed_id") || null,
     enabled: num(row, "enabled") === 1,
     lastRunAt: str(row, "last_run_at") || null,
     createdAt: str(row, "created_at"),
@@ -1211,9 +1229,9 @@ export function insertScriptEntry(
 ): ScriptEntry {
   const now = input.createdAt ?? new Date().toISOString();
   db.prepare(
-    `INSERT INTO script_entries (id, kind, title, body, language, destination_id, enabled, last_run_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
-  ).run(input.id, input.kind, input.title, input.body, input.language, input.destinationId, input.enabled === false ? 0 : 1, now, now);
+    `INSERT INTO script_entries (id, kind, title, body, language, destination_id, feed_id, enabled, last_run_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
+  ).run(input.id, input.kind, input.title, input.body, input.language, input.destinationId, input.feedId, input.enabled === false ? 0 : 1, now, now);
   return getScriptEntry(db, input.id)!;
 }
 
@@ -1237,9 +1255,87 @@ export function deleteScriptEntry(db: GrowthDb, id: string): boolean {
 
 export function nextScriptEntry(db: GrowthDb): ScriptEntry | null {
   const row = db
-    .prepare("SELECT * FROM script_entries WHERE enabled = 1 ORDER BY last_run_at IS NULL DESC, last_run_at, created_at, id LIMIT 1")
+    .prepare("SELECT * FROM script_entries WHERE enabled = 1 AND feed_id IS NULL ORDER BY last_run_at IS NULL DESC, last_run_at, created_at, id LIMIT 1")
     .get() as Row | undefined;
   return row ? mapScriptEntry(row) : null;
+}
+
+export type KeywordFeed = {
+  id: string;
+  query: string;
+  language: string;
+  destinationId: string;
+  hours: number;
+  enabled: boolean;
+  lastFilledAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function mapKeywordFeed(row: Row): KeywordFeed {
+  return {
+    id: str(row, "id"),
+    query: str(row, "query"),
+    language: str(row, "language"),
+    destinationId: str(row, "destination_id"),
+    hours: num(row, "hours"),
+    enabled: num(row, "enabled") === 1,
+    lastFilledAt: str(row, "last_filled_at") || null,
+    lastError: str(row, "last_error") || null,
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at")
+  };
+}
+
+export function listKeywordFeeds(db: GrowthDb): KeywordFeed[] {
+  return rows(db.prepare("SELECT * FROM keyword_feeds ORDER BY created_at, id").all()).map(mapKeywordFeed);
+}
+
+export function getKeywordFeed(db: GrowthDb, id: string): KeywordFeed | null {
+  const row = db.prepare("SELECT * FROM keyword_feeds WHERE id = ?").get(id) as Row | undefined;
+  return row ? mapKeywordFeed(row) : null;
+}
+
+export function insertKeywordFeed(db: GrowthDb, input: Omit<KeywordFeed, "lastFilledAt" | "lastError" | "createdAt" | "updatedAt">): KeywordFeed {
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO keyword_feeds (id, query, language, destination_id, hours, enabled, last_filled_at, last_error, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`
+  ).run(input.id, input.query, input.language, input.destinationId, input.hours, input.enabled ? 1 : 0, now, now);
+  return getKeywordFeed(db, input.id)!;
+}
+
+export function updateKeywordFeed(
+  db: GrowthDb,
+  id: string,
+  patch: Partial<Pick<KeywordFeed, "query" | "language" | "destinationId" | "hours" | "enabled" | "lastFilledAt" | "lastError">>
+): KeywordFeed | null {
+  const current = getKeywordFeed(db, id);
+  if (!current) return null;
+  const next = { ...current, ...patch };
+  db.prepare(
+    `UPDATE keyword_feeds SET query = ?, language = ?, destination_id = ?, hours = ?, enabled = ?, last_filled_at = ?, last_error = ?, updated_at = ? WHERE id = ?`
+  ).run(next.query, next.language, next.destinationId, next.hours, next.enabled ? 1 : 0, next.lastFilledAt, next.lastError, new Date().toISOString(), id);
+  return getKeywordFeed(db, id);
+}
+
+export function deleteKeywordFeed(db: GrowthDb, id: string): boolean {
+  db.prepare("DELETE FROM script_entries WHERE feed_id = ? AND last_run_at IS NULL").run(id);
+  db.prepare("UPDATE script_entries SET feed_id = NULL WHERE feed_id = ?").run(id);
+  return db.prepare("DELETE FROM keyword_feeds WHERE id = ?").run(id).changes > 0;
+}
+
+export function nextFeedEntry(db: GrowthDb, feedId: string): ScriptEntry | null {
+  const row = db
+    .prepare("SELECT * FROM script_entries WHERE enabled = 1 AND feed_id = ? AND last_run_at IS NULL ORDER BY created_at, id LIMIT 1")
+    .get(feedId) as Row | undefined;
+  return row ? mapScriptEntry(row) : null;
+}
+
+export function countPendingFeedEntries(db: GrowthDb, feedId: string): number {
+  const row = db.prepare("SELECT COUNT(*) AS n FROM script_entries WHERE enabled = 1 AND feed_id = ? AND last_run_at IS NULL").get(feedId) as Row | undefined;
+  return row ? num(row, "n") : 0;
 }
 
 export type ScriptRun = {

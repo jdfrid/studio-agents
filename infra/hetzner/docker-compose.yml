@@ -237,6 +237,9 @@ services:
       GROWTH_MAIL_TO: ${GROWTH_MAIL_TO:-}
       REELMINO_API: ${REELMINO_API:-https://reelmino.com/api}
       REELMINO_SESSION: ${REELMINO_SESSION:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_TEXT_MODEL: ${GEMINI_TEXT_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GROWTH_WEB_PUBLIC: /srv/site
     volumes:
       - growth_data:/app/apps/growth/data

@@ -32,7 +32,7 @@ import { downloadReelminoFinal, submitReelminoBrief } from "./produce.js";
 import { runPublish } from "./publish.js";
 import { tokens } from "./youtubeTrends.js";
 
-type BankContext = {
+export type BankContext = {
   db: GrowthDb;
   key: Buffer;
   mediaDir: string;
@@ -88,7 +88,7 @@ export function applyScriptBankSettings(
 
 export function saveScriptEntry(
   db: GrowthDb,
-  input: { id?: string; kind: string; title?: string; body: string; language?: string; destinationId?: string | null; enabled?: boolean; createdAt?: string }
+  input: { id?: string; kind: string; title?: string; body: string; language?: string; destinationId?: string | null; feedId?: string | null; enabled?: boolean; createdAt?: string }
 ): { entry: ScriptEntry | null; error: string | null } {
   const kind = input.kind === "script" ? "script" : input.kind === "keywords" ? "keywords" : null;
   if (!kind) return { entry: null, error: MSG_KIND };
@@ -115,7 +115,7 @@ export function saveScriptEntry(
     return updated ? { entry: updated, error: null } : { entry: null, error: "הפריט לא נמצא" };
   }
   return {
-    entry: insertScriptEntry(db, { id: nid(), kind, title, body, language, destinationId, enabled: input.enabled, createdAt: input.createdAt }),
+    entry: insertScriptEntry(db, { id: nid(), kind, title, body, language, destinationId, feedId: input.feedId ?? null, enabled: input.enabled, createdAt: input.createdAt }),
     error: null
   };
 }
@@ -192,14 +192,14 @@ export async function advanceScriptBank(ctx: BankContext, deps: ScriptBankDeps =
   if (scriptRunBySlot(ctx.db, slot)) return;
   const entry = nextScriptEntry(ctx.db);
   if (!entry) return;
-  await startEntry(ctx, entry, slot, deps);
+  await produceBankEntry(ctx, entry, slot, deps);
 }
 
 export async function runScriptEntry(ctx: BankContext, entryId: string, deps: ScriptBankDeps = {}): Promise<ScriptRun> {
   if (openScriptRun(ctx.db)) throw new Error(MSG_BUSY);
   const entry = getScriptEntry(ctx.db, entryId);
   if (!entry) throw new Error("הפריט לא נמצא");
-  const run = await startEntry(ctx, entry, `manual-${Date.now()}`, deps);
+  const run = await produceBankEntry(ctx, entry, `manual-${Date.now()}`, deps);
   if (!run) throw new Error(MSG_BUSY);
   return getScriptRun(ctx.db, run.id) ?? run;
 }
@@ -226,7 +226,7 @@ function bankChannel(db: GrowthDb, entry: ScriptEntry, fallbackId: string | null
   return destinationsForNetwork(db, "youtube").find((row) => row.enabled && row.kind === "channel") ?? null;
 }
 
-async function startEntry(ctx: BankContext, entry: ScriptEntry, slot: string, deps: ScriptBankDeps): Promise<ScriptRun | null> {
+export async function produceBankEntry(ctx: BankContext, entry: ScriptEntry, slot: string, deps: ScriptBankDeps): Promise<ScriptRun | null> {
   const settings = readScriptBankSettings(ctx.db);
   const content = briefForEntry(entry);
   const destination = bankChannel(ctx.db, entry, settings.destinationId);

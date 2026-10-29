@@ -444,6 +444,7 @@ const BANK_STATUS = {
 
 function renderScriptBank() {
   const bank = state.scriptBank || { enabled: false, hours: 4, destinationId: "", entries: [], runs: [] };
+  const feeds = state.keywordFeeds?.feeds || [];
   const channels = state.destinations.filter((row) => row.network === "youtube" && row.kind === "channel" && row.enabled);
   const options = (selected) => `<option value="">ערוץ ברירת המחדל</option>${channels.map((row) => `<option value="${esc(row.id)}" ${selected === row.id ? "selected" : ""}>${esc(channelLabel(row))}</option>`).join("")}`;
   const nameOf = (id) => {
@@ -467,6 +468,41 @@ function renderScriptBank() {
         <button class="primary" type="button" id="bank-save">שמירה</button>
         <button type="button" id="bank-run">הפריט הבא עכשיו</button>
       </div>
+    </div>
+    <div class="card">
+      <p class="muted">מילת מפתח לכל ערוץ. המערכת מחפשת נושאים, כותבת תסריטים מקוריים בשפה שנבחרה, וכשהשורה פעילה מפיצה סרטון לערוץ לפי המרווח שלה. כל ערוץ רץ בנפרד.</p>
+      <label>מילת מפתח<input id="feed-query" dir="auto" placeholder="טיפים למטבח"></label>
+      <label>שפה
+        <select id="feed-language">
+          <option value="he">עברית</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <label>ערוץ
+        <select id="feed-destination">${channels.length ? channels.map((row) => `<option value="${esc(row.id)}">${esc(channelLabel(row))}</option>`).join("") : `<option value="">אין ערוץ מחובר</option>`}</select>
+      </label>
+      <label>מרווח
+        <select id="feed-hours">
+          ${[1, 2, 4, 6, 8, 12, 24].map((hours) => `<option value="${hours}" ${hours === 4 ? "selected" : ""}>${hours} שעות</option>`).join("")}
+        </select>
+      </label>
+      <p class="row"><button class="primary" type="button" id="feed-add">הוספה ומילוי תסריטים</button></p>
+      <table>
+        <thead><tr><th>מילת מפתח</th><th>שפה</th><th>ערוץ</th><th>מרווח</th><th>פעיל</th><th></th></tr></thead>
+        <tbody>
+          ${feeds.map((row) => `<tr>
+            <td>${esc(row.query)}${row.lastError ? `<div class="error">${esc(row.lastError)}</div>` : ""}</td>
+            <td>${row.language === "en" ? "English" : "עברית"}</td>
+            <td>${esc(nameOf(row.destinationId))}</td>
+            <td>${esc(row.hours)} שעות</td>
+            <td><input type="checkbox" data-feed-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
+            <td>
+              <button type="button" data-feed-fill="${row.id}">מילוי</button>
+              <button type="button" data-feed-drop="${row.id}">מחיקה</button>
+            </td>
+          </tr>`).join("") || "<tr><td colspan='6'>אין מילות מפתח</td></tr>"}
+        </tbody>
+      </table>
     </div>
     <div class="card">
       <label>סוג
@@ -530,6 +566,32 @@ function renderScriptBank() {
   panel.querySelector("#bank-run").onclick = () => run(async () => {
     await api("/api/script-bank", { method: "PATCH", body: JSON.stringify(settings()) });
     return api("/api/script-bank/run", { method: "POST", body: "{}" });
+  });
+  panel.querySelector("#feed-add").onclick = () => run(async () => {
+    const created = await api("/api/keyword-feeds", {
+      method: "POST",
+      body: JSON.stringify({
+        query: panel.querySelector("#feed-query").value,
+        language: panel.querySelector("#feed-language").value,
+        destinationId: panel.querySelector("#feed-destination").value || null,
+        hours: Number(panel.querySelector("#feed-hours").value)
+      })
+    });
+    try {
+      return await api(`/api/keyword-feeds/${created.feed.id}/fill`, { method: "POST", body: "{}" });
+    } catch (error) {
+      await refresh();
+      throw error;
+    }
+  });
+  panel.querySelectorAll("[data-feed-enabled]").forEach((box) => {
+    box.onchange = () => run(() => api(`/api/keyword-feeds/${box.dataset.feedEnabled}`, { method: "PATCH", body: JSON.stringify({ enabled: box.checked }) }));
+  });
+  panel.querySelectorAll("[data-feed-fill]").forEach((button) => {
+    button.onclick = () => run(() => api(`/api/keyword-feeds/${button.dataset.feedFill}/fill`, { method: "POST", body: "{}" }));
+  });
+  panel.querySelectorAll("[data-feed-drop]").forEach((button) => {
+    button.onclick = () => run(() => api(`/api/keyword-feeds/${button.dataset.feedDrop}`, { method: "DELETE" }));
   });
   panel.querySelector("#bank-add").onclick = () => run(() => api("/api/script-bank/entries", {
     method: "POST",
