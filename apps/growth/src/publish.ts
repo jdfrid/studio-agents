@@ -82,7 +82,7 @@ export type PublishCopyOptions = {
 
 function trendCaption(item: Item, locked?: CaptionLock | null): CaptionLock | null {
   if (locked?.body?.trim()) return locked;
-  if (item.source !== "youtube-trend") return null;
+  if (item.source !== "youtube-trend" && item.source !== "script-bank") return null;
   const title = item.copy.youtube?.title?.trim() || item.title;
   const body = item.copy.youtube?.body?.trim();
   if (!body) return null;

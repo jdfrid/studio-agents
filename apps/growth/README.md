@@ -22,6 +22,8 @@ Default is manual. Turn on autopilot per destination when a due calendar slot sh
 
 לשונית **מגמות** מריצה סרטון יוטיוב קצר לפי לוח זמנים, ברירת המחדל כל 4 שעות. בכל סבב המערכת קוראת את הסרטונים החמים באזור ואת הביצועים של הערוץ המחובר, בוחרת נושא שעוד לא כוסה, שולחת בריף מקורי ל-API של Reelmino, ומעלה את הקובץ המוכן לערוץ. צריך ערוץ יוטיוב מחובר ו-`REELMINO_SESSION`. הלולאה כבויה עד שמפעילים אותה.
 
+לשונית **מאגר** שומרת מילות מפתח או תסריט, וכל שורה יכולה להצביע לערוץ יוטיוב אחר. כשהמאגר פועל, כל חלון זמן נשלחת שורה אחת להפקה ועולה לערוץ שלה, ואז התור עובר לשורה הבאה. גם המאגר כבוי עד שמפעילים אותו. ערוץ מופיע ברשימה רק אחרי חיבור יוטיוב בלשונית חשבונות.
+
 X, WhatsApp, Pinterest and Threads export a caption and file. They are not posted through an API. TikTok stays in the account inbox until `TIKTOK_DIRECT_POST=1` and TikTok has approved the app.
 
 Before a network can publish: a YouTube channel, a Facebook Page, a professional Instagram account linked to that Page, a Telegram bot that admins the channel, and developer apps at Google, Meta, TikTok and LinkedIn. Meta, TikTok and LinkedIn app review is done on their sites.

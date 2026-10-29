@@ -188,6 +188,34 @@ export function migrate(db: GrowthDb): void {
     CREATE INDEX IF NOT EXISTS slots_due ON slots(status, scheduled_for);
     CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status, created_at);
     CREATE INDEX IF NOT EXISTS trend_cycles_status ON trend_cycles(status, created_at);
+    CREATE TABLE IF NOT EXISTS script_entries (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      body TEXT NOT NULL,
+      language TEXT NOT NULL,
+      destination_id TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      last_run_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS script_runs (
+      id TEXT PRIMARY KEY,
+      entry_id TEXT NOT NULL,
+      slot_key TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL,
+      title TEXT,
+      language TEXT,
+      destination_id TEXT,
+      item_id TEXT,
+      run_id TEXT,
+      job_id TEXT,
+      remote_url TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS script_runs_status ON script_runs(status, created_at);
   `);
   const sessionColumns = rows(db.prepare("PRAGMA table_info(sessions)").all());
   if (!sessionColumns.some((column) => str(column, "name") === "operator_id")) {
@@ -1133,4 +1161,197 @@ export function sessionValid(db: GrowthDb, tokenHash: string, nowIso: string): b
 
 export function deleteSession(db: GrowthDb, tokenHash: string): void {
   db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(tokenHash);
+}
+
+export type ScriptEntry = {
+  id: string;
+  kind: "keywords" | "script";
+  body: string;
+  language: string;
+  destinationId: string | null;
+  enabled: boolean;
+  lastRunAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function mapScriptEntry(row: Row): ScriptEntry {
+  return {
+    id: str(row, "id"),
+    kind: str(row, "kind") === "script" ? "script" : "keywords",
+    body: str(row, "body"),
+    language: str(row, "language"),
+    destinationId: str(row, "destination_id") || null,
+    enabled: num(row, "enabled") === 1,
+    lastRunAt: str(row, "last_run_at") || null,
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at")
+  };
+}
+
+export function listScriptEntries(db: GrowthDb): ScriptEntry[] {
+  return rows(db.prepare("SELECT * FROM script_entries ORDER BY created_at, id").all()).map(mapScriptEntry);
+}
+
+export function getScriptEntry(db: GrowthDb, id: string): ScriptEntry | null {
+  const row = db.prepare("SELECT * FROM script_entries WHERE id = ?").get(id) as Row | undefined;
+  return row ? mapScriptEntry(row) : null;
+}
+
+export function insertScriptEntry(
+  db: GrowthDb,
+  input: Omit<ScriptEntry, "enabled" | "lastRunAt" | "createdAt" | "updatedAt"> & { enabled?: boolean; createdAt?: string }
+): ScriptEntry {
+  const now = input.createdAt ?? new Date().toISOString();
+  db.prepare(
+    `INSERT INTO script_entries (id, kind, body, language, destination_id, enabled, last_run_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`
+  ).run(input.id, input.kind, input.body, input.language, input.destinationId, input.enabled === false ? 0 : 1, now, now);
+  return getScriptEntry(db, input.id)!;
+}
+
+export function updateScriptEntry(
+  db: GrowthDb,
+  id: string,
+  patch: Partial<Pick<ScriptEntry, "kind" | "body" | "language" | "destinationId" | "enabled" | "lastRunAt">>
+): ScriptEntry | null {
+  const current = getScriptEntry(db, id);
+  if (!current) return null;
+  const next = { ...current, ...patch };
+  db.prepare(
+    `UPDATE script_entries SET kind = ?, body = ?, language = ?, destination_id = ?, enabled = ?, last_run_at = ?, updated_at = ? WHERE id = ?`
+  ).run(next.kind, next.body, next.language, next.destinationId, next.enabled ? 1 : 0, next.lastRunAt, new Date().toISOString(), id);
+  return getScriptEntry(db, id);
+}
+
+export function deleteScriptEntry(db: GrowthDb, id: string): boolean {
+  return db.prepare("DELETE FROM script_entries WHERE id = ?").run(id).changes > 0;
+}
+
+export function nextScriptEntry(db: GrowthDb): ScriptEntry | null {
+  const row = db
+    .prepare("SELECT * FROM script_entries WHERE enabled = 1 ORDER BY last_run_at IS NULL DESC, last_run_at, created_at, id LIMIT 1")
+    .get() as Row | undefined;
+  return row ? mapScriptEntry(row) : null;
+}
+
+export type ScriptRun = {
+  id: string;
+  entryId: string;
+  slotKey: string;
+  status: string;
+  title: string | null;
+  language: string | null;
+  destinationId: string | null;
+  itemId: string | null;
+  runId: string | null;
+  jobId: string | null;
+  remoteUrl: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function mapScriptRun(row: Row): ScriptRun {
+  return {
+    id: str(row, "id"),
+    entryId: str(row, "entry_id"),
+    slotKey: str(row, "slot_key"),
+    status: str(row, "status"),
+    title: str(row, "title") || null,
+    language: str(row, "language") || null,
+    destinationId: str(row, "destination_id") || null,
+    itemId: str(row, "item_id") || null,
+    runId: str(row, "run_id") || null,
+    jobId: str(row, "job_id") || null,
+    remoteUrl: str(row, "remote_url") || null,
+    error: str(row, "error") || null,
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at")
+  };
+}
+
+export function listScriptRuns(db: GrowthDb, limit = 20): ScriptRun[] {
+  return rows(db.prepare("SELECT * FROM script_runs ORDER BY created_at DESC LIMIT ?").all(limit)).map(mapScriptRun);
+}
+
+export function getScriptRun(db: GrowthDb, id: string): ScriptRun | null {
+  const row = db.prepare("SELECT * FROM script_runs WHERE id = ?").get(id) as Row | undefined;
+  return row ? mapScriptRun(row) : null;
+}
+
+export function scriptRunBySlot(db: GrowthDb, slotKey: string): ScriptRun | null {
+  const row = db.prepare("SELECT * FROM script_runs WHERE slot_key = ?").get(slotKey) as Row | undefined;
+  return row ? mapScriptRun(row) : null;
+}
+
+export function openScriptRun(db: GrowthDb): ScriptRun | null {
+  const row = db
+    .prepare("SELECT * FROM script_runs WHERE status IN ('producing', 'publishing') ORDER BY created_at ASC LIMIT 1")
+    .get() as Row | undefined;
+  return row ? mapScriptRun(row) : null;
+}
+
+export function insertScriptRun(
+  db: GrowthDb,
+  input: {
+    id: string;
+    entryId: string;
+    slotKey: string;
+    status: string;
+    title?: string | null;
+    language?: string | null;
+    destinationId?: string | null;
+    itemId?: string | null;
+    runId?: string | null;
+    error?: string | null;
+  }
+): ScriptRun {
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO script_runs (
+      id, entry_id, slot_key, status, title, language, destination_id, item_id, run_id, job_id, remote_url, error, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)`
+  ).run(
+    input.id,
+    input.entryId,
+    input.slotKey,
+    input.status,
+    input.title ?? null,
+    input.language ?? null,
+    input.destinationId ?? null,
+    input.itemId ?? null,
+    input.runId ?? null,
+    input.error ?? null,
+    now,
+    now
+  );
+  return getScriptRun(db, input.id)!;
+}
+
+export function updateScriptRun(
+  db: GrowthDb,
+  id: string,
+  patch: Partial<Pick<ScriptRun, "status" | "title" | "language" | "destinationId" | "itemId" | "runId" | "jobId" | "remoteUrl" | "error">>
+): ScriptRun | null {
+  const current = getScriptRun(db, id);
+  if (!current) return null;
+  const next = { ...current, ...patch };
+  db.prepare(
+    `UPDATE script_runs SET status = ?, title = ?, language = ?, destination_id = ?, item_id = ?, run_id = ?, job_id = ?,
+      remote_url = ?, error = ?, updated_at = ? WHERE id = ?`
+  ).run(
+    next.status,
+    next.title,
+    next.language,
+    next.destinationId,
+    next.itemId,
+    next.runId,
+    next.jobId,
+    next.remoteUrl,
+    next.error,
+    new Date().toISOString(),
+    id
+  );
+  return getScriptRun(db, id);
 }

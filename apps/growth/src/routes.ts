@@ -39,6 +39,8 @@ import {
   listItems,
   listJobs,
   listSlots,
+  deleteScriptEntry,
+  listScriptEntries,
   listTrendCycles,
   reopenSlot,
   sessionValid,
@@ -70,6 +72,7 @@ import { produceItem, pullItem, pullReady } from "./produce.js";
 import { retryPublish, runPublish } from "./publish.js";
 import { dispatchSlot, type DispatchContext } from "./scheduler.js";
 import { nextMondayIso } from "./time.js";
+import { applyScriptBankSettings, runScriptBankNow, runScriptEntry, saveScriptEntry, scriptBankView } from "./scriptBank.js";
 import { applyTrendSettings, readTrendSettings, runTrendNow } from "./youtubeTrends.js";
 
 export type AppCtx = DispatchContext & {
@@ -157,7 +160,8 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
       tooSoon: sharedTooRecently(group.lastSharedAt, group.minDays)
     })),
     groupPosts: groupPostsView(),
-    youtubeTrends: { ...readTrendSettings(ctx.db), cycles: listTrendCycles(ctx.db, 12) }
+    youtubeTrends: { ...readTrendSettings(ctx.db), cycles: listTrendCycles(ctx.db, 12) },
+    scriptBank: scriptBankView(ctx.db)
   }));
 
   function groupPostsView() {
@@ -555,6 +559,64 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
   app.post("/api/youtube-trends/run", async (_request, reply) => {
     try {
       return await runTrendNow(ctx);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return reply.code(message.includes("כבר רץ") ? 409 : 400).send({ error: message });
+    }
+  });
+
+  app.patch("/api/script-bank", async (request, reply) => {
+    const body = (request.body ?? {}) as Partial<{ enabled: boolean; hours: number; destinationId: string | null }>;
+    const error = applyScriptBankSettings(ctx.db, body);
+    if (error) return reply.code(400).send({ error });
+    return scriptBankView(ctx.db);
+  });
+
+  app.post("/api/script-bank/entries", async (request, reply) => {
+    const body = (request.body ?? {}) as { kind?: string; body?: string; language?: string; destinationId?: string | null };
+    const saved = saveScriptEntry(ctx.db, {
+      kind: body.kind ?? "",
+      body: body.body ?? "",
+      language: body.language,
+      destinationId: body.destinationId
+    });
+    if (saved.error) return reply.code(400).send({ error: saved.error });
+    return scriptBankView(ctx.db);
+  });
+
+  app.patch("/api/script-bank/entries/:id", async (request, reply) => {
+    const body = (request.body ?? {}) as { kind?: string; body?: string; language?: string; destinationId?: string | null; enabled?: boolean };
+    const current = listScriptEntries(ctx.db).find((row) => row.id === (request.params as { id: string }).id);
+    if (!current) return reply.code(404).send({ error: "הפריט לא נמצא" });
+    const saved = saveScriptEntry(ctx.db, {
+      id: current.id,
+      kind: body.kind ?? current.kind,
+      body: body.body ?? current.body,
+      language: body.language ?? current.language,
+      destinationId: body.destinationId === undefined ? current.destinationId : body.destinationId,
+      enabled: body.enabled ?? current.enabled
+    });
+    if (saved.error) return reply.code(400).send({ error: saved.error });
+    return scriptBankView(ctx.db);
+  });
+
+  app.delete("/api/script-bank/entries/:id", async (request, reply) => {
+    if (!deleteScriptEntry(ctx.db, (request.params as { id: string }).id)) return reply.code(404).send({ error: "הפריט לא נמצא" });
+    return scriptBankView(ctx.db);
+  });
+
+  app.post("/api/script-bank/entries/:id/run", async (request, reply) => {
+    try {
+      return await runScriptEntry(ctx, (request.params as { id: string }).id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return reply.code(message.includes("כבר רץ") ? 409 : 400).send({ error: message });
+    }
+  });
+
+  app.post("/api/script-bank/run", async (_request, reply) => {
+    try {
+      return await runScriptBankNow(ctx);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return reply.code(message.includes("כבר רץ") ? 409 : 400).send({ error: message });

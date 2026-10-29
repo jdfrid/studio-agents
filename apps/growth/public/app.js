@@ -35,6 +35,7 @@ function render() {
   else if (tab === "groups") renderGroups();
   else if (tab === "calendar") renderCalendar();
   else if (tab === "trends") renderTrends();
+  else if (tab === "bank") renderScriptBank();
   else if (tab === "internet") renderInternet();
   else if (tab === "results") renderResults();
   else renderPeople();
@@ -393,7 +394,7 @@ function renderTrends() {
       <label>ערוץ
         <select id="trend-destination">
           <option value="">ערוץ יוטיוב פעיל ראשון</option>
-          ${channels.map((row) => `<option value="${esc(row.id)}" ${trends.destinationId === row.id ? "selected" : ""}>${esc(row.name)}</option>`).join("")}
+          ${channels.map((row) => `<option value="${esc(row.id)}" ${trends.destinationId === row.id ? "selected" : ""}>${esc(channelLabel(row))}</option>`).join("")}
         </select>
       </label>
       <div class="row">
@@ -427,6 +428,124 @@ function renderTrends() {
   panel.querySelector("#trend-run").onclick = () => run(async () => {
     await api("/api/youtube-trends", { method: "PATCH", body: JSON.stringify(payload()) });
     return api("/api/youtube-trends/run", { method: "POST", body: "{}" });
+  });
+}
+
+function channelLabel(row) {
+  return row.handle ? `${row.name} · ${row.handle}` : row.name;
+}
+
+const BANK_STATUS = {
+  producing: "מפיק סרטון",
+  publishing: "מעלה ליוטיוב",
+  published: "עלה לערוץ",
+  failed: "נכשל"
+};
+
+function renderScriptBank() {
+  const bank = state.scriptBank || { enabled: false, hours: 4, destinationId: "", entries: [], runs: [] };
+  const channels = state.destinations.filter((row) => row.network === "youtube" && row.kind === "channel" && row.enabled);
+  const options = (selected) => `<option value="">ערוץ ברירת המחדל</option>${channels.map((row) => `<option value="${esc(row.id)}" ${selected === row.id ? "selected" : ""}>${esc(channelLabel(row))}</option>`).join("")}`;
+  const nameOf = (id) => {
+    const row = state.destinations.find((item) => item.id === id);
+    return row ? channelLabel(row) : "ברירת המחדל";
+  };
+  panel.innerHTML = `
+    <div class="card">
+      <p class="muted">כל פריט הוא מילות מפתח או תסריט. כל ${esc(bank.hours)} שעות, כשהמאגר פועל, נשלח הפריט הבא להפקה ועולה לערוץ שלו. הסרטון מקורי, 30 שניות, אנכי. כל סרטון משתמש בקרדיטים של חשבון הסטודיו.</p>
+      <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${channels.length ? "אפשר לבחור ערוץ מחובר." : "חברו ערוץ יוטיוב בלשונית חשבונות. ערוץ שלא חובר לא מופיע כאן."}</p>
+      <label><input id="bank-enabled" type="checkbox" ${bank.enabled ? "checked" : ""}> הפעלה אוטומטית</label>
+      <label>מרווח
+        <select id="bank-hours">
+          ${[1, 2, 4, 6, 8, 12, 24].map((hours) => `<option value="${hours}" ${Number(bank.hours) === hours ? "selected" : ""}>${hours} שעות</option>`).join("")}
+        </select>
+      </label>
+      <label>ערוץ ברירת מחדל
+        <select id="bank-destination">${options(bank.destinationId || "")}</select>
+      </label>
+      <div class="row">
+        <button class="primary" type="button" id="bank-save">שמירה</button>
+        <button type="button" id="bank-run">הפריט הבא עכשיו</button>
+      </div>
+    </div>
+    <div class="card">
+      <label>סוג
+        <select id="bank-kind">
+          <option value="keywords">מילות מפתח</option>
+          <option value="script">תסריט</option>
+        </select>
+      </label>
+      <label>טקסט<textarea id="bank-body" dir="auto" placeholder="מילות מפתח מופרדות בפסיק, או תסריט מלא"></textarea></label>
+      <label>שפה
+        <select id="bank-language">
+          <option value="he">עברית</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <label>ערוץ לפריט הזה
+        <select id="bank-entry-destination">${options("")}</select>
+      </label>
+      <p class="row"><button class="primary" type="button" id="bank-add">הוספה למאגר</button></p>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>סוג</th><th>טקסט</th><th>ערוץ</th><th>פעיל</th><th></th></tr></thead>
+        <tbody>
+          ${(bank.entries || []).map((row) => `<tr>
+            <td>${row.kind === "script" ? "תסריט" : "מילות מפתח"}</td>
+            <td>${esc(row.body.slice(0, 120))}</td>
+            <td>${esc(nameOf(row.destinationId))}</td>
+            <td><input type="checkbox" data-bank-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
+            <td>
+              <button type="button" data-bank-run="${row.id}">הרצה</button>
+              <button type="button" data-bank-drop="${row.id}">מחיקה</button>
+            </td>
+          </tr>`).join("") || "<tr><td colspan='5'>אין פריטים במאגר</td></tr>"}
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>זמן</th><th>נושא</th><th>ערוץ</th><th>מצב</th><th>קישור</th></tr></thead>
+        <tbody>
+          ${(bank.runs || []).map((row) => `<tr>
+            <td>${esc((row.createdAt || "").replace("T", " ").slice(0, 16))}</td>
+            <td>${esc(row.title || "—")}</td>
+            <td>${esc(nameOf(row.destinationId))}</td>
+            <td>${esc(BANK_STATUS[row.status] || row.status)}${row.error ? `<div class="error">${esc(row.error)}</div>` : ""}</td>
+            <td>${row.remoteUrl ? `<a href="${esc(row.remoteUrl)}" target="_blank" rel="noreferrer">סרטון</a>` : ""}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  const settings = () => ({
+    enabled: panel.querySelector("#bank-enabled").checked,
+    hours: Number(panel.querySelector("#bank-hours").value),
+    destinationId: panel.querySelector("#bank-destination").value || null
+  });
+  panel.querySelector("#bank-save").onclick = () => run(() => api("/api/script-bank", { method: "PATCH", body: JSON.stringify(settings()) }));
+  panel.querySelector("#bank-run").onclick = () => run(async () => {
+    await api("/api/script-bank", { method: "PATCH", body: JSON.stringify(settings()) });
+    return api("/api/script-bank/run", { method: "POST", body: "{}" });
+  });
+  panel.querySelector("#bank-add").onclick = () => run(() => api("/api/script-bank/entries", {
+    method: "POST",
+    body: JSON.stringify({
+      kind: panel.querySelector("#bank-kind").value,
+      body: panel.querySelector("#bank-body").value,
+      language: panel.querySelector("#bank-language").value,
+      destinationId: panel.querySelector("#bank-entry-destination").value || null
+    })
+  }));
+  panel.querySelectorAll("[data-bank-enabled]").forEach((box) => {
+    box.onchange = () => run(() => api(`/api/script-bank/entries/${box.dataset.bankEnabled}`, { method: "PATCH", body: JSON.stringify({ enabled: box.checked }) }));
+  });
+  panel.querySelectorAll("[data-bank-run]").forEach((button) => {
+    button.onclick = () => run(() => api(`/api/script-bank/entries/${button.dataset.bankRun}/run`, { method: "POST", body: "{}" }));
+  });
+  panel.querySelectorAll("[data-bank-drop]").forEach((button) => {
+    button.onclick = () => run(() => api(`/api/script-bank/entries/${button.dataset.bankDrop}`, { method: "DELETE" }));
   });
 }
 
