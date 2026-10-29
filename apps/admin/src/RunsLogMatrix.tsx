@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "./api.js";
+import { RunPublicLink } from "./RunPublicLink.js";
 import { STAGE_LABELS } from "./StageOutputs.js";
 import {
   COST_ACTIVITY_ORDER,
@@ -134,7 +135,10 @@ export function RunsLogMatrix({ onSelectRun }: { onSelectRun: (runId: string) =>
                 return (
                   <tr key={run.id} className="runs-log-row" onClick={() => onSelectRun(run.id)} title="לחץ לפתיחת הריצה">
                     <td className="sticky-col mono">{formatDateTime(run.createdAt)}</td>
-                    <td className="sticky-col-2 title-cell">{run.title}</td>
+                    <td className="sticky-col-2 title-cell">
+                      {run.title}
+                      <RunPublicLink runId={run.id} />
+                    </td>
                     <td>
                       <span className={`badge badge-${run.status.toLowerCase()}`}>{run.status}</span>
                     </td>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { statusLabelHe } from "@studio/shared";
 import { apiGet } from "./api.js";
+import { RunPublicLink } from "./RunPublicLink.js";
 
 type SubscriptionInfo = {
   planType: string;
@@ -309,6 +310,7 @@ export function CustomersPanel() {
                       <th>סוג</th>
                       <th>קרדיטים שחויבו</th>
                       <th>עודכן</th>
+                      <th>קישור</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -320,6 +322,7 @@ export function CustomersPanel() {
                         <td>{r.automation ? "אוטומציה" : r.correction ? "תיקון" : "רגיל"}</td>
                         <td>{r.creditsCharged}</td>
                         <td>{when(r.updatedAt)}</td>
+                        <td><RunPublicLink runId={r.id} /></td>
                       </tr>
                     ))}
                   </tbody>

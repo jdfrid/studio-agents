@@ -10,6 +10,7 @@ import { RunsLogMatrix } from "./RunsLogMatrix.js";
 import { CreativeCatalogPanel } from "./CreativeCatalogPanel.js";
 import { ServicesPanel } from "./ServicesPanel.js";
 import { CustomersPanel } from "./CustomersPanel.js";
+import { RunPublicLink } from "./RunPublicLink.js";
 import type { ArtifactRow, ProjectRunView, RunSummary, StageName } from "./types.js";
 import {
   STAGE_ORDER,
@@ -265,6 +266,7 @@ export function App() {
               {runs.map((r) => (
                 <li key={r.id} className={r.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(r.id)}>
                   <strong>{r.title}</strong>
+                  <RunPublicLink runId={r.id} />
                   <span>{r.userEmail ?? "—"}</span>
                   <span>{statusLabelHe(r.status)}</span>
                 </li>
@@ -276,6 +278,7 @@ export function App() {
             {run && (
               <>
                 <h2>{run.brief.title}</h2>
+                <RunPublicLink runId={run.id} />
                 {costConfig && renderProfileId ? (
                   <CostIndicator
                     estimate={estimateRunCost(

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost, apiPatch, apiDelete } from "./api.js";
+import { RunPublicLink } from "./RunPublicLink.js";
 
 type AdminUser = {
   id: string;
@@ -773,6 +774,7 @@ export function AdminUsersPanel() {
             {pnl.runs.slice(0, 10).map((r) => (
               <li key={r.id}>
                 <strong>{r.title || "(ללא כותרת)"}</strong> — {r.status} — {formatWhen(r.updatedAt)}
+                <RunPublicLink runId={r.id} />
               </li>
             ))}
           </ul>
