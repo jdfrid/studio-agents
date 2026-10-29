@@ -170,7 +170,12 @@ async function collectStageInput(runId: string, stage: StageName, brief: unknown
       };
       const briefInput = brief as { creative?: Parameters<typeof geminiVoiceNameFromCreative>[0] };
       const creative = briefData.creative ?? briefInput.creative;
-      const pair = geminiDialogueVoicePair(creative, script?.characterBible, briefData.language);
+      const pair = geminiDialogueVoicePair(
+        creative,
+        script?.characterBible,
+        briefData.language,
+        [briefData.title, briefData.branding?.businessName].filter(Boolean).join(" ")
+      );
       const voiceName = voiceSexFromCreative(creative)
         ? (briefData.ttsVoiceName ?? pair.primary)
         : pair.primary;

@@ -1539,17 +1539,25 @@ function presenterOppositePhrase(sex: "male" | "female", age?: "child" | "baby")
   return sex === "female" ? "a man or male host" : "a woman or female host";
 }
 
-function pickGeminiVoiceForSex(sex: "male" | "female", blob: string): string {
+function pickGeminiVoiceForSex(sex: "male" | "female", blob: string, seed = ""): string {
   if (sex === "male") {
     if (/צעיר|ידידותי|קליל|puck/i.test(blob)) return "Puck";
     if (/עמוק|סמכותי|דרמטי|fenrir/i.test(blob)) return "Fenrir";
     if (/חדשותי|מבוגר|orus/i.test(blob)) return "Orus";
+    if (seed.trim()) return hashPick(geminiVoicesForSex("male"), seed);
     return "Charon";
   }
   if (/צעיר|ידידותי|קליל|aoede/i.test(blob)) return "Aoede";
   if (/מרגש|דרמטי|zephyr/i.test(blob)) return "Zephyr";
   if (/רגוע|leda/i.test(blob)) return "Leda";
+  if (seed.trim()) return hashPick(geminiVoicesForSex("female"), seed);
   return "Kore";
+}
+
+function hashPick(pool: readonly string[], seed: string): string {
+  let hash = 0;
+  for (const char of seed) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) >>> 0;
+  return pool[hash % pool.length] ?? pool[0]!;
 }
 
 /** Infer character sexes from locked cast text (Hebrew/English cues). */
@@ -1590,7 +1598,8 @@ function pickDifferentGeminiVoice(sex: "male" | "female", exclude: string): stri
 export function geminiDialogueVoicePair(
   creative?: CreativeOptions | null,
   characterBible?: string | null,
-  language?: string | null
+  language?: string | null,
+  seed?: string | null
 ): {
   primary: string;
   secondary: string;
@@ -1603,7 +1612,8 @@ export function geminiDialogueVoicePair(
   const primarySex: "male" | "female" =
     locked ?? (cast[0] ? cast[0] : defaultVoiceSexForLanguage(lang));
   const primary =
-    (locked ? geminiVoiceNameFromCreative(creative) : undefined) ?? pickGeminiVoiceForSex(primarySex, blob);
+    (locked ? geminiVoiceNameFromCreative(creative) : undefined) ??
+    pickGeminiVoiceForSex(primarySex, blob, seed ?? "");
 
   let secondarySex: "male" | "female";
   if (cast.length >= 2) {

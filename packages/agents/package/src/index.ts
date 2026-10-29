@@ -84,7 +84,8 @@ export const packageAgent: Agent<PackageInput, PackageOutput> = {
           textToVideoOnly: !a?.referenceFrame?.signedUrl && !a?.referenceFrame?.gcsPath,
           speakerName: scene.speakerName ?? null,
           multiCast: Boolean(script.characterBible && /(?:and|ו-|זכר|male|female|נקבה|גבר|אישה)/i.test(script.characterBible)),
-          styleLock: filmStylePromptClause(brief.creative?.filmStyle)
+          styleLock: filmStylePromptClause(brief.creative?.filmStyle),
+          userRequirements: brief.instructions
         }),
         referenceImagePrompt: scene.referenceImagePrompt ?? null,
         firstFramePrompt: scene.firstFramePrompt ?? null,
@@ -309,11 +310,14 @@ function enrichVeoPrompt(input: {
   speakerName?: string | null;
   multiCast?: boolean;
   styleLock?: string;
+  userRequirements?: string | null;
 }): string {
   // Kling / fal I2V reject prompts longer than 2500 chars — keep headroom.
   const MAX = 2400;
   const motion = stripDuplicatedContinuity(input.veoPrompt).trim();
   const look = input.styleLock?.trim() ?? "";
+  const requirements = input.userRequirements?.trim().slice(0, 600) ?? "";
+  const requirementLock = requirements ? `Mandatory user requirements: ${requirements}` : "";
   const speaker = input.speakerName?.trim();
   const listenLock =
     input.multiCast || speaker
@@ -326,6 +330,7 @@ function enrichVeoPrompt(input: {
   if (!input.textToVideoOnly) {
     const compact = [
       `Scene ${input.order + 1} of ${input.total}.`,
+      requirementLock,
       look,
       "Match the reference image faces, wardrobe and setting exactly; keep those identities; only change pose and camera as described.",
       motion,
@@ -338,7 +343,7 @@ function enrichVeoPrompt(input: {
 
   const cast = input.characterBible.trim().slice(0, 280);
   const place = input.backgroundVisualPrompt.trim().slice(0, 220);
-  const continuity = `SETTING (must be visible): ${place}. ${look ? `${look} ` : ""}Faces: ${cast}. Scene ${input.order + 1}/${input.total}.`;
+  const continuity = `${requirementLock ? `${requirementLock} ` : ""}SETTING (must be visible): ${place}. ${look ? `${look} ` : ""}Faces: ${cast}. Scene ${input.order + 1}/${input.total}.`;
   const refPrompt = (input.referenceFramePrompt ?? input.referenceImagePrompt ?? "").trim().slice(0, 400);
   const refSuffix = refPrompt ? ` Match look: ${refPrompt}.` : "";
   return clampText(`${continuity} ${motion}${listenLock}${refSuffix}`.trim(), MAX);

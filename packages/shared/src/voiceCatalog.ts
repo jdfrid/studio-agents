@@ -9,12 +9,30 @@ export type VoiceCharacterId =
   | "male_gravel"
   | "male_warm"
   | "male_news"
+  | "male_friendly"
+  | "male_firm"
+  | "male_breathy"
+  | "male_crisp"
+  | "male_lively"
+  | "male_teacher"
+  | "male_even"
+  | "male_casual"
+  | "male_excitable"
+  | "male_relaxed"
   | "female_clear"
   | "female_soft"
   | "female_bright"
   | "female_mature"
   | "female_warm"
   | "female_young"
+  | "female_gentle"
+  | "female_easy"
+  | "female_smooth"
+  | "female_crisp"
+  | "female_upbeat"
+  | "female_forward"
+  | "female_airy"
+  | "female_spark"
   | "child_boy"
   | "child_girl"
   | "baby"
@@ -103,6 +121,106 @@ export const VOICE_CHARACTER_PRESETS: readonly VoiceCharacterPreset[] = [
     labelEn: "Man — news"
   },
   {
+    id: "male_friendly",
+    group: "adult_male",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Achird",
+    timbrePrompt: "Friendly adult male, approachable and smiling, conversational",
+    labelHe: "גבר — ידידותי",
+    labelEn: "Man — friendly"
+  },
+  {
+    id: "male_firm",
+    group: "adult_male",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Alnilam",
+    timbrePrompt: "Firm adult male, steady and decisive, no rush",
+    labelHe: "גבר — יציב",
+    labelEn: "Man — firm"
+  },
+  {
+    id: "male_breathy",
+    group: "adult_male",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Enceladus",
+    timbrePrompt: "Breathy adult male, soft and close, quiet intensity",
+    labelHe: "גבר — לוחש",
+    labelEn: "Man — breathy"
+  },
+  {
+    id: "male_crisp",
+    group: "adult_male",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Iapetus",
+    timbrePrompt: "Crisp adult male, clean articulation, bright mid voice",
+    labelHe: "גבר — צלול",
+    labelEn: "Man — crisp"
+  },
+  {
+    id: "male_lively",
+    group: "adult_male",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Sadachbia",
+    timbrePrompt: "Lively adult male, quick energy, upbeat but still an adult",
+    labelHe: "גבר — חי",
+    labelEn: "Man — lively"
+  },
+  {
+    id: "male_teacher",
+    group: "adult_male",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Sadaltager",
+    timbrePrompt: "Knowledgeable adult male explainer, patient and clear, teacher cadence",
+    labelHe: "גבר — מסביר",
+    labelEn: "Man — explainer"
+  },
+  {
+    id: "male_even",
+    group: "adult_male",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Schedar",
+    timbrePrompt: "Even adult male, neutral and balanced, no theatrical color",
+    labelHe: "גבר — אחיד",
+    labelEn: "Man — even"
+  },
+  {
+    id: "male_casual",
+    group: "adult_male",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Zubenelgenubi",
+    timbrePrompt: "Casual adult male, everyday and relaxed, not an announcer",
+    labelHe: "גבר — יומיומי",
+    labelEn: "Man — casual"
+  },
+  {
+    id: "male_excitable",
+    group: "adult_male",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Fenrir",
+    timbrePrompt: "Excitable adult male, high energy, eager and forward",
+    labelHe: "גבר — נלהב",
+    labelEn: "Man — excitable"
+  },
+  {
+    id: "male_relaxed",
+    group: "adult_male",
+    sex: "male",
+    age: "adult",
+    geminiVoice: "Umbriel",
+    timbrePrompt: "Easy-going adult male, unhurried and mellow",
+    labelHe: "גבר — רגוע",
+    labelEn: "Man — relaxed"
+  },
+  {
     id: "female_clear",
     group: "adult_female",
     sex: "female",
@@ -161,6 +279,86 @@ export const VOICE_CHARACTER_PRESETS: readonly VoiceCharacterPreset[] = [
     timbrePrompt: "Young adult female, light and youthful, early-20s energy",
     labelHe: "אישה — צעירה",
     labelEn: "Woman — young"
+  },
+  {
+    id: "female_gentle",
+    group: "adult_female",
+    sex: "female",
+    age: "adult",
+    geminiVoice: "Vindemiatrix",
+    timbrePrompt: "Gentle adult female, soft and careful, never sharp",
+    labelHe: "אישה — עדינה",
+    labelEn: "Woman — gentle"
+  },
+  {
+    id: "female_easy",
+    group: "adult_female",
+    sex: "female",
+    age: "adult",
+    geminiVoice: "Callirrhoe",
+    timbrePrompt: "Easy-going adult female, relaxed and unforced",
+    labelHe: "אישה — נינוחה",
+    labelEn: "Woman — easy-going"
+  },
+  {
+    id: "female_smooth",
+    group: "adult_female",
+    sex: "female",
+    age: "adult",
+    geminiVoice: "Despina",
+    timbrePrompt: "Smooth adult female, polished and even, studio narrator",
+    labelHe: "אישה — חלקה",
+    labelEn: "Woman — smooth"
+  },
+  {
+    id: "female_crisp",
+    group: "adult_female",
+    sex: "female",
+    age: "adult",
+    geminiVoice: "Erinome",
+    timbrePrompt: "Crisp adult female, clean diction, bright and precise",
+    labelHe: "אישה — צלולה",
+    labelEn: "Woman — crisp"
+  },
+  {
+    id: "female_upbeat",
+    group: "adult_female",
+    sex: "female",
+    age: "adult",
+    geminiVoice: "Laomedeia",
+    timbrePrompt: "Upbeat adult female, cheerful and forward, still clear",
+    labelHe: "אישה — עולצת",
+    labelEn: "Woman — upbeat"
+  },
+  {
+    id: "female_forward",
+    group: "adult_female",
+    sex: "female",
+    age: "adult",
+    geminiVoice: "Pulcherrima",
+    timbrePrompt: "Forward adult female, present and confident, close to the mic",
+    labelHe: "אישה — בולטת",
+    labelEn: "Woman — forward"
+  },
+  {
+    id: "female_airy",
+    group: "adult_female",
+    sex: "female",
+    age: "adult",
+    geminiVoice: "Achernar",
+    timbrePrompt: "Soft airy adult female, light and quiet, not whispery to the point of loss",
+    labelHe: "אישה — אוורירית",
+    labelEn: "Woman — airy"
+  },
+  {
+    id: "female_spark",
+    group: "adult_female",
+    sex: "female",
+    age: "adult",
+    geminiVoice: "Autonoe",
+    timbrePrompt: "Bright sparkling adult female, lively and clear",
+    labelHe: "אישה — נוצצת",
+    labelEn: "Woman — sparkling"
   },
   {
     id: "child_boy",
@@ -328,6 +526,7 @@ export function resolveVoiceCharacterPreset(input?: {
   return legacyId ? PRESET_BY_ID.get(legacyId) : undefined;
 }
 
+/** All 30 Gemini prebuilt TTS voices. https://ai.google.dev/gemini-api/docs/speech-generation */
 export const MALE_GEMINI_VOICES = [
   "Charon",
   "Puck",
@@ -338,7 +537,13 @@ export const MALE_GEMINI_VOICES = [
   "Enceladus",
   "Iapetus",
   "Rasalgethi",
-  "Umbriel"
+  "Umbriel",
+  "Achird",
+  "Alnilam",
+  "Sadachbia",
+  "Sadaltager",
+  "Schedar",
+  "Zubenelgenubi"
 ] as const;
 
 export const FEMALE_GEMINI_VOICES = [
@@ -351,7 +556,11 @@ export const FEMALE_GEMINI_VOICES = [
   "Achernar",
   "Autonoe",
   "Callirrhoe",
-  "Despina"
+  "Despina",
+  "Erinome",
+  "Laomedeia",
+  "Pulcherrima",
+  "Vindemiatrix"
 ] as const;
 
 const MALE_VOICE_SET = new Set(MALE_GEMINI_VOICES.map((name) => name.toLowerCase()));

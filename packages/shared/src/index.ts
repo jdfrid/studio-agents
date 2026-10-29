@@ -35,6 +35,7 @@ export * from "./continuity.js";
 export * from "./visualCorrections.js";
 export * from "./hebrewUi.js";
 export * from "./karaokeCaptions.js";
+export * from "./hebrewSpeech.js";
 export * from "./veoPrompt.js";
 export * from "./social/index.js";
 export * from "./schemas/automation.js";

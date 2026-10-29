@@ -10,6 +10,7 @@ import {
 import {
   AudioInputSchema,
   AudioOutputSchema,
+  pointHebrewForSpeech,
   ProviderError,
   stripNiqqud,
   type Agent,
@@ -83,7 +84,8 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           });
           continue;
         }
-        const spoken = stripNiqqud(scene.narration);
+        const spoken = await spokenHebrew(input.language, scene.narration);
+        const deliveryStyle = hebrewDeliveryStyle(input.language, input.voiceStyle);
         try {
           let audio: SpeechResult;
           if (useClonedVoice && elevenApiKey && clonedVoiceId) {
@@ -93,7 +95,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
                 type: "TTS",
                 provider: "elevenlabs",
                 priority: 0,
-                config: { model: "eleven_multilingual_v2" },
+                config: { model: "eleven_v3" },
                 secret: elevenApiKey
               },
               { text: spoken, language: input.language, voice: clonedVoiceId }
@@ -109,7 +111,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
                   ...((scene.voiceName || input.voiceName)
                     ? { voiceName: scene.voiceName || input.voiceName }
                     : {}),
-                  ...(input.voiceStyle ? { style: input.voiceStyle } : {})
+                  ...(deliveryStyle ? { style: deliveryStyle } : {})
                 },
                 async (event) => {
                   await ctx.cost.record({ ...event, sceneId: scene.sceneId });
@@ -282,14 +284,16 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
       const brandLine = input.brandEndNarration?.trim();
       if (brandLine && !useClonedVoice && defaultTts?.type === "GEMINI") {
         try {
+          const brandSpoken = await spokenHebrew(input.language, brandLine);
+          const brandStyle = hebrewDeliveryStyle(input.language, input.voiceStyle);
           const audio = applyVoicePitchShift(
             await geminiSynthesizeSpeech(
               defaultTts,
               {
-                text: brandLine,
+                text: brandSpoken,
                 language: input.language,
                 ...(input.voiceName ? { voiceName: input.voiceName } : {}),
-                ...(input.voiceStyle ? { style: input.voiceStyle } : {})
+                ...(brandStyle ? { style: brandStyle } : {})
               },
               async (event) => {
                 await ctx.cost.record({ ...event, sceneId: "brand_end" });
@@ -350,3 +354,17 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
     }
   }
 };
+
+async function spokenHebrew(language: string, text: string): Promise<string> {
+  const plain = stripNiqqud(text);
+  if (!language.trim().toLowerCase().startsWith("he")) return plain;
+  return pointHebrewForSpeech(plain);
+}
+
+function hebrewDeliveryStyle(language: string, style?: string): string | undefined {
+  const hint = language.trim().toLowerCase().startsWith("he")
+    ? "Modern Israeli Hebrew. Pronounce the vowel points. Do not translate or spell the words."
+    : "";
+  const joined = [hint, style?.trim()].filter(Boolean).join(" | ");
+  return joined || undefined;
+}

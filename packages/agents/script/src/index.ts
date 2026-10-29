@@ -90,6 +90,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
 
     const systemParts = [
       "You are a senior script writer for short vertical promotional videos. Generate a tight, scene-by-scene timeline.",
+      "USER DEMANDS WIN: brief.instructions and brandConstraints are mandatory. Every concrete demand (wording, objects, setting, who appears, what must not appear) must survive in narration or veoPrompt. Do not replace a specific request with a generic ad.",
       userFacingLanguageInstruction(contentLang),
       contentLang === "yi"
         ? "NARRATION MUST be Yiddish (ייִדיש), not Modern Israeli Hebrew. Prefer Yiddish wording even when the brief summary drifted into Hebrew."
@@ -173,10 +174,11 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     }
     if (lipSyncMode) {
       systemParts.push(
-        "LIP-SYNC MODE (Kling Avatar / HeyGen): each beat is a talking-head clip from a reference still with true lip-sync to the scene narration audio.",
-        "veoPrompt is a short motion_prompt (body/gesture only — mouth sync comes from audio). Prefer facing camera, natural head nods, hand gestures that match the spoken line.",
-        `Narration must be clear spoken lines in ${langEn} (this audio drives lip-sync). Keep visual continuity via referenceImagePrompt.`,
-        `Each beat targets ~${clipSeconds}s of story time.`
+        "LIP-SYNC MODE (Kling Avatar / HeyGen): the speaker's mouth is driven by the narration audio. That does not replace the story with a static portrait.",
+        "SHOW THE LINE: if the narration mentions an action or object, that action or object must be visible in visualPrompt, referenceImagePrompt, and veoPrompt. A line about tossing dough must show dough in the air. A line about sauce must show sauce being spread. A line about serving must show the handoff. Never narrate an action that is off-screen.",
+        "Keep the speaker's face large enough for lip-sync, but frame the hands, product, and action in the same shot. Do not default every beat to a head-and-shoulders portrait facing camera.",
+        "veoPrompt describes the visible action and gesture. Mouth shapes come from the audio, so do not describe lip shapes.",
+        `Narration must be clear spoken lines in ${langEn}. Keep the same people, wardrobe, and place. Each beat targets ~${clipSeconds}s.`
       );
     }
     if (filmTemplate === "social_explainer") {
@@ -225,11 +227,12 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
     const sceneSchema: Record<string, unknown> = {
       title: `short ${langNative} title`,
       narration: `${langNative} narration, 1 short sentence (max ${narrationLimit} chars); empty string if sceneKind=title_card`,
-      visualPrompt:
-        "English visual: for 2+ cast prefer two-shot both people visible; name speaker vs listener (max 200 chars)",
+      visualPrompt: lipSyncMode
+        ? "English visual of THIS line's action in frame (dough, sauce, pizza, hands), speaker face visible for lip-sync, not a portrait-only shot (max 700 chars)"
+        : "English visual: for 2+ cast prefer two-shot both people visible; name speaker vs listener (max 200 chars)",
       veoPrompt: lipSyncMode
-        ? "English lip-sync motion prompt: body/gaze/gesture timed to narration (max 200 chars)"
-        : "English motion prompt timed to narration (speaking vs silent, gaze, gestures; max 200 chars)",
+        ? "English motion of the visible action the narration describes. Face stays readable. Do not describe lip shapes (max 700 chars)"
+        : "English motion prompt timed to narration, including every concrete user demand (speaking vs silent, gaze, gestures; max 700 chars)",
       durationBucket: "4 | 6 | 8",
       audioPolicy: lipSyncMode
         ? "gemini_tts_only"
@@ -295,7 +298,17 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       plateCount >= 2
         ? ` Place each uploaded still on its own beat (round-robin if ${sceneCount} > ${plateCount}); vary location/product per still.`
         : "";
-    const userPrompt = `Brief:\n${JSON.stringify(brief, null, 2)}${creativeBlock}${toneHint ? `\n\n${toneHint}` : ""}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Scenes total ~${totalVideoSeconds}s; with the automatic end card the video is ~${brief.durationSeconds}s. User-facing text (titles, narration, characterBible, backgroundVisualPrompt, musicPrompt) MUST be in ${langEn}. Narration must sound like it belongs to this specific event/style (not generic ads). For every scene, align narration wording with the motion described in veoPrompt.${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}${plateHint}`;
+    const mustFollow = [
+      brief.instructions?.trim()
+        ? `User instructions (mandatory — do not drop, soften, or replace):\n${brief.instructions.trim()}`
+        : "",
+      brief.brandConstraints.length
+        ? `Brand constraints (mandatory):\n${brief.brandConstraints.map((line) => `- ${line}`).join("\n")}`
+        : ""
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const userPrompt = `${mustFollow ? `${mustFollow}\n\n` : ""}Brief:\n${JSON.stringify(brief, null, 2)}${creativeBlock}${toneHint ? `\n\n${toneHint}` : ""}\n\nProduce exactly ${sceneCount} scenes of ${clipSeconds}s each (story beat length). Scenes total ~${totalVideoSeconds}s; with the automatic end card the video is ~${brief.durationSeconds}s. User-facing text (titles, narration, characterBible, backgroundVisualPrompt, musicPrompt) MUST be in ${langEn}. Narration must sound like it belongs to this specific event/style (not generic ads). For every scene, align narration wording with the motion described in veoPrompt. If the user named a phrase, object, place, or prohibition, it must appear.${budget ? " Budget mode: narration must fit short clips; no first/last frame prompts needed." : ""}${adHint}${extendHint}${plateHint}`;
 
     const completeJson = provider.type === "GEMINI" ? geminiCompleteJson : llmCompleteJson;
     const { parsed, model } = await completeJson<{

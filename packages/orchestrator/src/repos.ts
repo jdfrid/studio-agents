@@ -94,7 +94,7 @@ function envProvider(type: string): ProviderCredentialView | null {
         type: "TTS",
         provider: "elevenlabs",
         priority: 0,
-        config: { model: "eleven_multilingual_v2" },
+        config: { model: "eleven_v3" },
         secret: elevenKey
       };
     }

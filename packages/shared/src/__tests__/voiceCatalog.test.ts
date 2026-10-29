@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { VOICE_CHARACTER_PRESETS } from "../voiceCatalog.js";
 import {
   geminiTtsStyleFromCreative,
   geminiVoiceNameFromCreative,
@@ -11,6 +12,14 @@ import {
 } from "../index.js";
 
 describe("voice character catalog", () => {
+  it("offers every Gemini prebuilt voice as its own adult choice", () => {
+    const adults = VOICE_CHARACTER_PRESETS.filter((preset) => preset.group !== "character");
+    const names = new Set(adults.map((preset) => preset.geminiVoice));
+    expect(names.size).toBe(30);
+    expect(adults.filter((preset) => preset.sex === "male")).toHaveLength(16);
+    expect(adults.filter((preset) => preset.sex === "female")).toHaveLength(14);
+  });
+
   it("maps adult and character presets to Gemini voices and timbre", () => {
     expect(geminiVoiceNameFromCreative({ voiceCharacter: "male_deep" })).toBe("Rasalgethi");
     expect(geminiVoiceNameFromCreative({ voiceCharacter: "female_soft" })).toBe("Sulafat");

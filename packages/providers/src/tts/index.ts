@@ -1,6 +1,9 @@
 import type { ProviderCredentialView } from "@studio/shared";
 import { ProviderError } from "@studio/shared";
 import { httpBytes } from "../http.js";
+import { resolveElevenLabsSpeech } from "./elevenLabsSpeech.js";
+
+export { ELEVENLABS_HEBREW_MODEL, resolveElevenLabsSpeech } from "./elevenLabsSpeech.js";
 
 export { elevenLabsCloneVoice, elevenLabsDeleteVoice } from "./elevenlabsClone.js";
 
@@ -28,12 +31,20 @@ async function elevenLabs(provider: ProviderCredentialView, req: TtsRequest): Pr
   const apiKey = provider.secret;
   if (!apiKey) throw new ProviderError("ElevenLabs missing API key", { provider: provider.provider });
   const voice = req.voice ?? String(provider.config.voiceId ?? "21m00Tcm4TlvDq8ikWAM");
-  const model = String(provider.config.model ?? "eleven_multilingual_v2");
+  const speech = resolveElevenLabsSpeech({
+    text: req.text,
+    language: req.language,
+    model: typeof provider.config.model === "string" ? provider.config.model : null
+  });
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${voice}`;
   const { body, mimeType } = await httpBytes(url, {
     method: "POST",
     headers: { "xi-api-key": apiKey, accept: "audio/mpeg", "content-type": "application/json" },
-    body: { text: req.text, model_id: model, language_code: req.language },
+    body: {
+      text: speech.text,
+      model_id: speech.modelId,
+      ...(speech.languageCode ? { language_code: speech.languageCode } : {})
+    },
     timeoutMs: 120_000
   });
   return { provider: provider.provider, body, mimeType, durationSeconds: null };
