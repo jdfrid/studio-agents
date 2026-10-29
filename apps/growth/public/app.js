@@ -475,6 +475,7 @@ function renderScriptBank() {
           <option value="script">תסריט</option>
         </select>
       </label>
+      <label>כותרת<input id="bank-title" dir="auto" maxlength="90" placeholder="הכותרת ביוטיוב, בשפה שנבחרה. אפשר להשאיר ריק"></label>
       <label>טקסט<textarea id="bank-body" dir="auto" placeholder="מילות מפתח מופרדות בפסיק, או תסריט מלא"></textarea></label>
       <label>שפה
         <select id="bank-language">
@@ -489,10 +490,11 @@ function renderScriptBank() {
     </div>
     <div class="card">
       <table>
-        <thead><tr><th>סוג</th><th>טקסט</th><th>ערוץ</th><th>פעיל</th><th></th></tr></thead>
+        <thead><tr><th>סוג</th><th>כותרת</th><th>טקסט</th><th>ערוץ</th><th>פעיל</th><th></th></tr></thead>
         <tbody>
           ${(bank.entries || []).map((row) => `<tr>
             <td>${row.kind === "script" ? "תסריט" : "מילות מפתח"}</td>
+            <td>${esc(row.title || "—")}</td>
             <td>${esc(row.body.slice(0, 120))}</td>
             <td>${esc(nameOf(row.destinationId))}</td>
             <td><input type="checkbox" data-bank-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
@@ -500,7 +502,7 @@ function renderScriptBank() {
               <button type="button" data-bank-run="${row.id}">הרצה</button>
               <button type="button" data-bank-drop="${row.id}">מחיקה</button>
             </td>
-          </tr>`).join("") || "<tr><td colspan='5'>אין פריטים במאגר</td></tr>"}
+          </tr>`).join("") || "<tr><td colspan='6'>אין פריטים במאגר</td></tr>"}
         </tbody>
       </table>
     </div>
@@ -533,6 +535,7 @@ function renderScriptBank() {
     method: "POST",
     body: JSON.stringify({
       kind: panel.querySelector("#bank-kind").value,
+      title: panel.querySelector("#bank-title").value,
       body: panel.querySelector("#bank-body").value,
       language: panel.querySelector("#bank-language").value,
       destinationId: panel.querySelector("#bank-entry-destination").value || null

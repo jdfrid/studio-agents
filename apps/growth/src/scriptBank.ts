@@ -88,7 +88,7 @@ export function applyScriptBankSettings(
 
 export function saveScriptEntry(
   db: GrowthDb,
-  input: { id?: string; kind: string; body: string; language?: string; destinationId?: string | null; enabled?: boolean; createdAt?: string }
+  input: { id?: string; kind: string; title?: string; body: string; language?: string; destinationId?: string | null; enabled?: boolean; createdAt?: string }
 ): { entry: ScriptEntry | null; error: string | null } {
   const kind = input.kind === "script" ? "script" : input.kind === "keywords" ? "keywords" : null;
   if (!kind) return { entry: null, error: MSG_KIND };
@@ -96,6 +96,11 @@ export function saveScriptEntry(
   if (body.length < 2) return { entry: null, error: MSG_EMPTY };
   const language = (input.language ?? "he").trim().toLowerCase();
   if (!/^[a-z]{2}$/.test(language)) return { entry: null, error: "שפה חייבת להיות קוד בן שתי אותיות" };
+  const title = (input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 90);
+  if (title && title.length < 2) return { entry: null, error: "הכותרת קצרה מדי" };
+  if (title && !textMatchesLanguage(title, language)) {
+    return { entry: null, error: language.startsWith("he") ? "הכותרת צריכה להיות בעברית, כמו השפה שנבחרה" : "The title must be in English, the same language selected" };
+  }
   const destinationId = input.destinationId?.trim() || null;
   if (destinationId) {
     const row = getDestination(db, destinationId);
@@ -104,6 +109,7 @@ export function saveScriptEntry(
   if (input.id) {
     const updated = updateScriptEntry(db, input.id, {
       kind,
+      title,
       body,
       language,
       destinationId,
@@ -112,20 +118,22 @@ export function saveScriptEntry(
     return updated ? { entry: updated, error: null } : { entry: null, error: "הפריט לא נמצא" };
   }
   return {
-    entry: insertScriptEntry(db, { id: nid(), kind, body, language, destinationId, enabled: input.enabled, createdAt: input.createdAt }),
+    entry: insertScriptEntry(db, { id: nid(), kind, title, body, language, destinationId, enabled: input.enabled, createdAt: input.createdAt }),
     error: null
   };
 }
 
-export function briefForEntry(input: { kind: "keywords" | "script"; body: string; language: string }): {
+export function briefForEntry(input: { kind: "keywords" | "script"; body: string; language: string; title?: string | null }): {
   title: string;
   summary: string;
   description: string;
   brief: Record<string, unknown>;
 } {
   const he = input.language.startsWith("he");
+  const given = (input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 90);
+  const givenOk = Boolean(given) && textMatchesLanguage(given, input.language);
   const source = input.kind === "script" ? (input.body.split(/\r?\n/).find((line) => line.trim()) ?? input.body) : input.body;
-  const title = titleInLanguage(source, input.language);
+  const title = givenOk ? given : titleInLanguage(source, input.language);
   const ownWords = textMatchesLanguage(input.body, input.language);
   const summary = input.kind === "script"
     ? (he ? "סרטון אנכי לפי התסריט שנשמר במאגר." : "A vertical video that follows the saved script.")
@@ -147,9 +155,9 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
       : "Follow the supplied script as the narration and the sequence. Do not copy another creator's video, script, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, vertical frame.")
     : (he
       ? "תוכן מקורי בלבד לפי מילות המפתח. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, קריינות קצרה, מסך אנכי."
-      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(input.language)}`;
+      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(input.language)}${givenOk ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
   const tags = ["#Shorts", ...tokens(title).slice(0, 3).map((token) => `#${token}`)];
-  const description = `${summary}\n\n${tags.join(" ")}`;
+  const description = `${summary.includes(title) ? summary : `${title}. ${summary}`}\n\n${tags.join(" ")}`;
   return {
     title,
     summary,

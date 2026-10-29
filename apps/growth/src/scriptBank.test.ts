@@ -68,6 +68,12 @@ describe("script bank", () => {
     const english = briefForEntry({ kind: "keywords", body: "חיתוך בצל", language: "en" });
     expect(english.title).toBe("What matters now");
     expect(english.description).not.toMatch(/\p{Script=Hebrew}/u);
+    const titled = briefForEntry({ kind: "keywords", body: "onion cutting", language: "he", title: "איך חותכים בצל" });
+    expect(titled.title).toBe("איך חותכים בצל");
+    expect(titled.brief.title).toBe("איך חותכים בצל");
+    expect(titled.description).toContain("איך חותכים בצל");
+    expect(titled.description).not.toMatch(/onion/);
+    expect(String(titled.brief.instructions)).toContain("איך חותכים בצל");
   });
 
   it("keeps the bank caption when the video is uploaded", () => {
@@ -158,6 +164,9 @@ describe("script bank", () => {
     );
     expect(run).toMatchObject({ status: "producing", destinationId: "kitchen", runId: "run-manual" });
     expect(saveScriptEntry(opened.db, { kind: "keywords", body: " " }).error).toContain("כותבים");
+    expect(saveScriptEntry(opened.db, { kind: "keywords", body: "חיתוך בצל", language: "he", title: "How to cut an onion" }).error).toContain("עברית");
+    const titled = saveScriptEntry(opened.db, { kind: "keywords", body: "onion cutting", language: "he", title: "איך חותכים בצל", destinationId: "kitchen" });
+    expect(titled.entry?.title).toBe("איך חותכים בצל");
   });
 
   it("exposes the bank on the console", async () => {
@@ -191,7 +200,22 @@ describe("script bank", () => {
       });
       expect(saved.statusCode).toBe(200);
       expect(saved.json().entries).toHaveLength(1);
-      expect(saved.json().entries[0]).toMatchObject({ kind: "script", enabled: true, destinationId: null });
+      expect(saved.json().entries[0]).toMatchObject({ kind: "script", title: "", enabled: true, destinationId: null });
+      const withTitle = await built.app.inject({
+        method: "POST",
+        url: "/api/script-bank/entries",
+        headers: { cookie },
+        payload: { kind: "keywords", title: "איך חותכים בצל", body: "onion cutting", language: "he" }
+      });
+      expect(withTitle.statusCode).toBe(200);
+      expect(withTitle.json().entries.some((row: { title: string }) => row.title === "איך חותכים בצל")).toBe(true);
+      const wrongLanguage = await built.app.inject({
+        method: "POST",
+        url: "/api/script-bank/entries",
+        headers: { cookie },
+        payload: { kind: "keywords", title: "How to cut an onion", body: "חיתוך בצל", language: "he" }
+      });
+      expect(wrongLanguage.statusCode).toBe(400);
       const settings = await built.app.inject({
         method: "PATCH",
         url: "/api/script-bank",

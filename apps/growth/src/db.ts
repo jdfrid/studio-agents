@@ -191,6 +191,7 @@ export function migrate(db: GrowthDb): void {
     CREATE TABLE IF NOT EXISTS script_entries (
       id TEXT PRIMARY KEY,
       kind TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
       body TEXT NOT NULL,
       language TEXT NOT NULL,
       destination_id TEXT,
@@ -220,6 +221,10 @@ export function migrate(db: GrowthDb): void {
   const sessionColumns = rows(db.prepare("PRAGMA table_info(sessions)").all());
   if (!sessionColumns.some((column) => str(column, "name") === "operator_id")) {
     db.exec("ALTER TABLE sessions ADD COLUMN operator_id TEXT");
+  }
+  const entryColumns = rows(db.prepare("PRAGMA table_info(script_entries)").all());
+  if (entryColumns.length && !entryColumns.some((column) => str(column, "name") === "title")) {
+    db.exec("ALTER TABLE script_entries ADD COLUMN title TEXT NOT NULL DEFAULT ''");
   }
   migrateFacebookGroups(db);
   seedDirectories(db);
@@ -1166,6 +1171,7 @@ export function deleteSession(db: GrowthDb, tokenHash: string): void {
 export type ScriptEntry = {
   id: string;
   kind: "keywords" | "script";
+  title: string;
   body: string;
   language: string;
   destinationId: string | null;
@@ -1179,6 +1185,7 @@ function mapScriptEntry(row: Row): ScriptEntry {
   return {
     id: str(row, "id"),
     kind: str(row, "kind") === "script" ? "script" : "keywords",
+    title: str(row, "title"),
     body: str(row, "body"),
     language: str(row, "language"),
     destinationId: str(row, "destination_id") || null,
@@ -1204,23 +1211,23 @@ export function insertScriptEntry(
 ): ScriptEntry {
   const now = input.createdAt ?? new Date().toISOString();
   db.prepare(
-    `INSERT INTO script_entries (id, kind, body, language, destination_id, enabled, last_run_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`
-  ).run(input.id, input.kind, input.body, input.language, input.destinationId, input.enabled === false ? 0 : 1, now, now);
+    `INSERT INTO script_entries (id, kind, title, body, language, destination_id, enabled, last_run_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
+  ).run(input.id, input.kind, input.title, input.body, input.language, input.destinationId, input.enabled === false ? 0 : 1, now, now);
   return getScriptEntry(db, input.id)!;
 }
 
 export function updateScriptEntry(
   db: GrowthDb,
   id: string,
-  patch: Partial<Pick<ScriptEntry, "kind" | "body" | "language" | "destinationId" | "enabled" | "lastRunAt">>
+  patch: Partial<Pick<ScriptEntry, "kind" | "title" | "body" | "language" | "destinationId" | "enabled" | "lastRunAt">>
 ): ScriptEntry | null {
   const current = getScriptEntry(db, id);
   if (!current) return null;
   const next = { ...current, ...patch };
   db.prepare(
-    `UPDATE script_entries SET kind = ?, body = ?, language = ?, destination_id = ?, enabled = ?, last_run_at = ?, updated_at = ? WHERE id = ?`
-  ).run(next.kind, next.body, next.language, next.destinationId, next.enabled ? 1 : 0, next.lastRunAt, new Date().toISOString(), id);
+    `UPDATE script_entries SET kind = ?, title = ?, body = ?, language = ?, destination_id = ?, enabled = ?, last_run_at = ?, updated_at = ? WHERE id = ?`
+  ).run(next.kind, next.title, next.body, next.language, next.destinationId, next.enabled ? 1 : 0, next.lastRunAt, new Date().toISOString(), id);
   return getScriptEntry(db, id);
 }
 

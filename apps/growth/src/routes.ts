@@ -573,9 +573,10 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
   });
 
   app.post("/api/script-bank/entries", async (request, reply) => {
-    const body = (request.body ?? {}) as { kind?: string; body?: string; language?: string; destinationId?: string | null };
+    const body = (request.body ?? {}) as { kind?: string; title?: string; body?: string; language?: string; destinationId?: string | null };
     const saved = saveScriptEntry(ctx.db, {
       kind: body.kind ?? "",
+      title: body.title,
       body: body.body ?? "",
       language: body.language,
       destinationId: body.destinationId
@@ -585,12 +586,13 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
   });
 
   app.patch("/api/script-bank/entries/:id", async (request, reply) => {
-    const body = (request.body ?? {}) as { kind?: string; body?: string; language?: string; destinationId?: string | null; enabled?: boolean };
+    const body = (request.body ?? {}) as { kind?: string; title?: string; body?: string; language?: string; destinationId?: string | null; enabled?: boolean };
     const current = listScriptEntries(ctx.db).find((row) => row.id === (request.params as { id: string }).id);
     if (!current) return reply.code(404).send({ error: "הפריט לא נמצא" });
     const saved = saveScriptEntry(ctx.db, {
       id: current.id,
       kind: body.kind ?? current.kind,
+      title: body.title === undefined ? current.title : body.title,
       body: body.body ?? current.body,
       language: body.language ?? current.language,
       destinationId: body.destinationId === undefined ? current.destinationId : body.destinationId,
