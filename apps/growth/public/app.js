@@ -475,7 +475,7 @@ function renderScriptBank() {
           <option value="script">תסריט</option>
         </select>
       </label>
-      <label>כותרת<input id="bank-title" dir="auto" maxlength="90" placeholder="הכותרת שתופיע ביוטיוב. אפשר להשאיר ריק"></label>
+      <label>כותרת<input id="bank-title" dir="auto" maxlength="90" placeholder="הכותרת ביוטיוב, בשפה שנבחרה. אפשר להשאיר ריק"></label>
       <label>טקסט<textarea id="bank-body" dir="auto" placeholder="מילות מפתח מופרדות בפסיק, או תסריט מלא"></textarea></label>
       <label>שפה
         <select id="bank-language">

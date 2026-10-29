@@ -8,12 +8,6 @@ export function textMatchesLanguage(text: string, language: string): boolean {
   return latin > 0 && latin > hebrew;
 }
 
-export function languageOfText(text: string, fallback: string): string {
-  if (textMatchesLanguage(text, "he")) return "he";
-  if (textMatchesLanguage(text, "en")) return "en";
-  return fallback.toLowerCase().startsWith("he") ? "he" : "en";
-}
-
 export function titleInLanguage(source: string, language: string): string {
   const cleaned = source.replace(/[,\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
   if (cleaned && textMatchesLanguage(cleaned, language)) return cleaned;

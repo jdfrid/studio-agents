@@ -75,10 +75,19 @@ describe("script bank", () => {
     expect(titled.description).not.toMatch(/onion/);
     expect(String(titled.brief.instructions)).toContain("איך חותכים בצל");
     const kept = briefForEntry({ kind: "script", body: "איך חותכים בצל עם פחות דמעות?\nחותכים את השורש.", language: "en" });
-    expect(kept.title).toBe("איך חותכים בצל עם פחות דמעות?");
-    expect(kept.brief.language).toBe("he");
+    expect(kept.title).toBe("What matters now");
+    expect(kept.brief.language).toBe("en");
+    expect(kept.title).not.toMatch(/\p{Script=Hebrew}/u);
+    expect(kept.description).not.toMatch(/\p{Script=Hebrew}/u);
     expect(String(kept.brief.sourceText)).toContain("חותכים את השורש");
-    expect(kept.description).not.toContain("What matters now");
+    expect(String(kept.brief.instructions)).toContain("English only");
+    const englishTitle = briefForEntry({ kind: "script", body: "איך חותכים בצל עם פחות דמעות?", language: "en", title: "How to cut an onion" });
+    expect(englishTitle.title).toBe("How to cut an onion");
+    expect(englishTitle.description).not.toMatch(/\p{Script=Hebrew}/u);
+    expect(englishTitle.brief.language).toBe("en");
+    const ignored = briefForEntry({ kind: "keywords", body: "onion cutting", language: "he", title: "How to cut an onion" });
+    expect(ignored.title).not.toMatch(/[A-Za-z]/);
+    expect(ignored.description.replaceAll("#Shorts", "")).not.toMatch(/[A-Za-z]/);
   });
 
   it("keeps the bank caption when the video is uploaded", () => {

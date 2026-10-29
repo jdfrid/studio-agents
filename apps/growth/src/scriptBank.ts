@@ -1,5 +1,5 @@
 import { slugify } from "./catalog.js";
-import { languageLock, languageOfText, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
+import { languageLock, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
 import { emptyCopy, type ItemCopy } from "./copy.js";
 import { nid } from "./crypto.js";
 import {
@@ -126,12 +126,12 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
   description: string;
   brief: Record<string, unknown>;
 } {
+  const he = input.language.startsWith("he");
   const given = (input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 90);
-  const firstLine = (input.body.split(/\r?\n/).find((line) => line.trim()) ?? input.body).replace(/\s+/g, " ").trim().slice(0, 90);
-  const spoken = input.kind === "script" ? languageOfText(input.body, input.language) : input.language;
-  const title = given || (input.kind === "script" ? firstLine : titleInLanguage(input.body, spoken));
-  const he = languageOfText(title, spoken).startsWith("he");
-  const ownWords = textMatchesLanguage(input.body, he ? "he" : "en");
+  const givenOk = Boolean(given) && textMatchesLanguage(given, input.language);
+  const firstLine = (input.body.split(/\r?\n/).find((line) => line.trim()) ?? input.body).replace(/\s+/g, " ").trim();
+  const title = givenOk ? given : titleInLanguage(input.kind === "script" ? firstLine : input.body, input.language);
+  const ownWords = textMatchesLanguage(input.body, input.language);
   const summary = input.kind === "script"
     ? (he ? "סרטון אנכי לפי התסריט שנשמר במאגר." : "A vertical video that follows the saved script.")
     : ownWords
@@ -144,15 +144,19 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
   const subject = ownWords
     ? ""
     : he
-      ? `\nהנושא לכיסוי, בלי להעתיק את הניסוח לכותרת או לתיאור: ${input.body.trim()}`
-      : `\nSubject to cover, without copying this wording into the title or the description: ${input.body.trim()}`;
+      ? `\nהטקסט הבא הוא חומר גלם בלבד. מפיקים ממנו סרטון בעברית, בלי להשאיר את הניסוח המקורי בכותרת, בתיאור, בקריינות או על המסך:\n${input.body.trim()}`
+      : `\nThe text below is source material only. Produce the video in English, and do not keep its original wording in the title, the description, the narration, or on screen:\n${input.body.trim()}`;
   const instructions = `${input.kind === "script"
-    ? (he
-      ? "עוקבים אחרי התסריט שסופק: הוא הקריינות והמהלך של הסרטון. בלי להעתיק סרטון, תסריט או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, מסך אנכי."
-      : "Follow the supplied script as the narration and the sequence. Do not copy another creator's video, script, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, vertical frame.")
+    ? (ownWords
+      ? (he
+        ? "עוקבים אחרי התסריט שסופק: הוא הקריינות והמהלך של הסרטון. בלי להעתיק סרטון, תסריט או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, מסך אנכי."
+        : "Follow the supplied script as the narration and the sequence. Do not copy another creator's video, script, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, vertical frame.")
+      : (he
+        ? "הטקסט שהוזן הוא חומר גלם בשפה אחרת. כותבים ממנו סרטון חדש בעברית בלבד. בלי להעתיק סרטון של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, מסך אנכי."
+        : "The entered text is source material in another language. Write a new video from it in English only. Do not copy another creator's video. No other channel names and no third-party logos. Clear hook in the first three seconds, vertical frame."))
     : (he
       ? "תוכן מקורי בלבד לפי מילות המפתח. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, קריינות קצרה, מסך אנכי."
-      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(he ? "he" : "en")}${given ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
+      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(input.language)}${givenOk ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
   const tags = ["#Shorts", ...tokens(title).slice(0, 3).map((token) => `#${token}`)];
   const description = `${summary.includes(title) ? summary : `${title}. ${summary}`}\n\n${tags.join(" ")}`;
   return {
@@ -161,10 +165,10 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
     description,
     brief: {
       title,
-      sourceText: (input.kind === "script" ? input.body.trim() : summary) + (input.kind === "script" ? "" : subject),
+      sourceText: (input.kind === "script" && ownWords ? input.body.trim() : summary) + subject,
       instructions,
       targetAudience: he ? "צופים בסרטונים קצרים ביוטיוב" : "YouTube Shorts viewers",
-      language: he ? "he" : "en",
+      language: input.language,
       durationSeconds: 30,
       aspectRatio: "9:16",
       budgetMode: true,
