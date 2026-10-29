@@ -1,5 +1,5 @@
 import { slugify } from "./catalog.js";
-import { languageLock, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
+import { languageLock, languageOfText, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
 import { emptyCopy, type ItemCopy } from "./copy.js";
 import { nid } from "./crypto.js";
 import {
@@ -98,9 +98,6 @@ export function saveScriptEntry(
   if (!/^[a-z]{2}$/.test(language)) return { entry: null, error: "שפה חייבת להיות קוד בן שתי אותיות" };
   const title = (input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 90);
   if (title && title.length < 2) return { entry: null, error: "הכותרת קצרה מדי" };
-  if (title && !textMatchesLanguage(title, language)) {
-    return { entry: null, error: language.startsWith("he") ? "הכותרת צריכה להיות בעברית, כמו השפה שנבחרה" : "The title must be in English, the same language selected" };
-  }
   const destinationId = input.destinationId?.trim() || null;
   if (destinationId) {
     const row = getDestination(db, destinationId);
@@ -129,12 +126,12 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
   description: string;
   brief: Record<string, unknown>;
 } {
-  const he = input.language.startsWith("he");
   const given = (input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 90);
-  const givenOk = Boolean(given) && textMatchesLanguage(given, input.language);
-  const source = input.kind === "script" ? (input.body.split(/\r?\n/).find((line) => line.trim()) ?? input.body) : input.body;
-  const title = givenOk ? given : titleInLanguage(source, input.language);
-  const ownWords = textMatchesLanguage(input.body, input.language);
+  const firstLine = (input.body.split(/\r?\n/).find((line) => line.trim()) ?? input.body).replace(/\s+/g, " ").trim().slice(0, 90);
+  const spoken = input.kind === "script" ? languageOfText(input.body, input.language) : input.language;
+  const title = given || (input.kind === "script" ? firstLine : titleInLanguage(input.body, spoken));
+  const he = languageOfText(title, spoken).startsWith("he");
+  const ownWords = textMatchesLanguage(input.body, he ? "he" : "en");
   const summary = input.kind === "script"
     ? (he ? "סרטון אנכי לפי התסריט שנשמר במאגר." : "A vertical video that follows the saved script.")
     : ownWords
@@ -155,7 +152,7 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
       : "Follow the supplied script as the narration and the sequence. Do not copy another creator's video, script, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, vertical frame.")
     : (he
       ? "תוכן מקורי בלבד לפי מילות המפתח. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, קריינות קצרה, מסך אנכי."
-      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(input.language)}${givenOk ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
+      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(he ? "he" : "en")}${given ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
   const tags = ["#Shorts", ...tokens(title).slice(0, 3).map((token) => `#${token}`)];
   const description = `${summary.includes(title) ? summary : `${title}. ${summary}`}\n\n${tags.join(" ")}`;
   return {
@@ -164,10 +161,10 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
     description,
     brief: {
       title,
-      sourceText: (input.kind === "script" && ownWords ? input.body.trim() : summary) + subject,
+      sourceText: (input.kind === "script" ? input.body.trim() : summary) + (input.kind === "script" ? "" : subject),
       instructions,
       targetAudience: he ? "צופים בסרטונים קצרים ביוטיוב" : "YouTube Shorts viewers",
-      language: input.language,
+      language: he ? "he" : "en",
       durationSeconds: 30,
       aspectRatio: "9:16",
       budgetMode: true,
