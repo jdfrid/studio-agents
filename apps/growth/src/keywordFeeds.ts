@@ -7,8 +7,9 @@ import {
   listKeywordFeeds,
   listScriptEntries,
   nextFeedEntry,
+  nextOpenSlot,
   openScriptRun,
-  scriptRunBySlot,
+  scriptSlotBuckets,
   updateKeywordFeed,
   type GrowthDb,
   type KeywordFeed
@@ -141,8 +142,9 @@ export async function advanceKeywordFeeds(ctx: FeedContext, deps: FeedDeps = {})
   }
   if (openScriptRun(ctx.db)) return;
   for (const feed of listKeywordFeeds(ctx.db).filter((row) => row.enabled)) {
-    const slot = feedSlotKey(feed.id, now, feed.hours);
-    if (scriptRunBySlot(ctx.db, slot)) continue;
+    const bucket = nextOpenSlot(feed.hours, now, scriptSlotBuckets(ctx.db, `feed-${feed.id}-`));
+    if (bucket === null) continue;
+    const slot = `feed-${feed.id}-${bucket}`;
     const entry = nextFeedEntry(ctx.db, feed.id, now);
     if (!entry) continue;
     await produceBankEntry(ctx, entry, slot, deps);

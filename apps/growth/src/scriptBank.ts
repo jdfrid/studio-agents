@@ -15,8 +15,10 @@ import {
   insertScriptRun,
   listScriptEntries,
   listScriptRuns,
+  nextOpenSlot,
   nextScriptEntry,
   scriptEntryCooling,
+  scriptSlotBuckets,
   SCRIPT_REUSE_MS,
   openScriptRun,
   scriptRunBySlot,
@@ -205,8 +207,9 @@ export async function advanceScriptBank(ctx: BankContext, deps: ScriptBankDeps =
   if (openScriptRun(ctx.db)) return;
   const settings = readScriptBankSettings(ctx.db);
   const now = deps.now ?? new Date();
-  const slot = bankSlotKey(now, settings.hours);
-  if (scriptRunBySlot(ctx.db, slot)) return;
+  const bucket = nextOpenSlot(settings.hours, now, scriptSlotBuckets(ctx.db, "bank-"));
+  if (bucket === null) return;
+  const slot = `bank-${bucket}`;
   const entry = nextScriptEntry(ctx.db, now);
   if (!entry) return;
   await produceBankEntry(ctx, entry, slot, deps);

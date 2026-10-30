@@ -12,9 +12,11 @@ import {
   insertItem,
   insertTrendCycle,
   listTrendCycles,
+  nextOpenSlot,
   openTrendCycle,
   setSetting,
   trendCycleBySlot,
+  trendSlotBuckets,
   updateItem,
   updateTrendCycle,
   flag,
@@ -338,9 +340,11 @@ export async function advanceYoutubeTrends(ctx: TrendContext, deps: TrendDeps = 
   if (!readTrendSettings(ctx.db).enabled) return;
   if (openTrendCycle(ctx.db)) return;
   const settings = readTrendSettings(ctx.db);
-  const slot = trendSlotKey(deps.now ?? new Date(), settings.hours);
-  if (trendCycleBySlot(ctx.db, slot)) return;
-  await startCycle(ctx, slot, deps);
+  const now = deps.now ?? new Date();
+  const prefix = `${settings.hours}h-`;
+  const bucket = nextOpenSlot(settings.hours, now, trendSlotBuckets(ctx.db, prefix));
+  if (bucket === null) return;
+  await startCycle(ctx, `${prefix}${bucket}`, deps);
 }
 
 export async function runTrendNow(ctx: TrendContext, deps: TrendDeps = {}): Promise<TrendCycle> {

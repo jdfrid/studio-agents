@@ -204,6 +204,40 @@ describe("script bank", () => {
     expect(briefs).toHaveLength(2);
   });
 
+  it("still sends the scheduled video after a manual run in the same hour", async () => {
+    const opened = db();
+    channel(opened.db, "kitchen", "KitchenTips");
+    expect(applyScriptBankSettings(opened.db, { enabled: true, hours: 1, destinationId: "kitchen" })).toBeNull();
+    const first = saveScriptEntry(opened.db, { kind: "script", body: "שוטפים ירקות.\nחותכים גזר.", language: "he", destinationId: "kitchen", createdAt: "2026-10-29T10:00:00.000Z" });
+    saveScriptEntry(opened.db, { kind: "script", body: "ממלאים מים בסיר.\nמוסיפים אורז.", language: "he", destinationId: "kitchen", createdAt: "2026-10-29T10:05:00.000Z" });
+    saveScriptEntry(opened.db, { kind: "script", body: "סוחטים לימון.\nמוסיפים לסלט.", language: "he", destinationId: "kitchen", createdAt: "2026-10-29T10:10:00.000Z" });
+    const briefs: string[] = [];
+    let ready = false;
+    const deps = {
+      now: new Date("2026-10-29T10:30:00.000Z"),
+      pollAfterMs: 0,
+      submitBrief: async (brief: Record<string, unknown>) => {
+        briefs.push(String(brief.sourceText));
+        return `run-${briefs.length}`;
+      },
+      downloadFinal: async () => (ready ? { filename: "ready.mp4" } : null),
+      publish: async () => ({ id: "job-1", status: "published", remoteUrl: "https://youtu.be/ready" })
+    };
+    const ctx = { db: opened.db, key: Buffer.alloc(32), mediaDir: opened.dir, publicBase: "http://127.0.0.1:4180" };
+    await runScriptEntry(ctx, first.entry!.id, deps);
+    ready = true;
+    await advanceScriptBank(ctx, deps);
+    expect(listScriptRuns(opened.db).some((run) => run.slotKey.startsWith("manual-") && run.status === "published")).toBe(true);
+    await advanceScriptBank(ctx, deps);
+    expect(briefs).toHaveLength(2);
+    expect(listScriptRuns(opened.db).some((run) => run.slotKey.startsWith("bank-"))).toBe(true);
+    await advanceScriptBank(ctx, deps);
+    expect(briefs).toHaveLength(2);
+    await advanceScriptBank(ctx, { ...deps, now: new Date("2026-10-29T11:30:00.000Z") });
+    expect(briefs).toHaveLength(3);
+    expect(listScriptRuns(opened.db).filter((run) => run.slotKey.startsWith("bank-"))).toHaveLength(2);
+  });
+
   it("runs one saved entry on demand while the bank is off", async () => {
     const opened = db();
     channel(opened.db, "kitchen", "KitchenTips");

@@ -1405,6 +1405,36 @@ export function getScriptRun(db: GrowthDb, id: string): ScriptRun | null {
   return row ? mapScriptRun(row) : null;
 }
 
+export function nextOpenSlot(hours: number, now: Date, taken: number[]): number | null {
+  const span = Math.max(1, hours) * 60 * 60 * 1000;
+  const current = Math.floor(now.getTime() / span);
+  if (!taken.length) return current;
+  const last = Math.max(...taken);
+  if (last >= current) return null;
+  const start = Math.max(last + 1, current - 2);
+  for (let bucket = start; bucket <= current; bucket += 1) {
+    if (!taken.includes(bucket)) return bucket;
+  }
+  return null;
+}
+
+function slotBuckets(db: GrowthDb, sql: string, prefix: string): number[] {
+  const found: number[] = [];
+  for (const row of rows(db.prepare(sql).all(`${prefix}%`))) {
+    const rest = str(row, "slot_key").slice(prefix.length);
+    if (/^\d+$/.test(rest)) found.push(Number(rest));
+  }
+  return found;
+}
+
+export function scriptSlotBuckets(db: GrowthDb, prefix: string): number[] {
+  return slotBuckets(db, "SELECT slot_key FROM script_runs WHERE slot_key LIKE ?", prefix);
+}
+
+export function trendSlotBuckets(db: GrowthDb, prefix: string): number[] {
+  return slotBuckets(db, "SELECT slot_key FROM trend_cycles WHERE slot_key LIKE ?", prefix);
+}
+
 export function scriptRunBySlot(db: GrowthDb, slotKey: string): ScriptRun | null {
   const row = db.prepare("SELECT * FROM script_runs WHERE slot_key = ?").get(slotKey) as Row | undefined;
   return row ? mapScriptRun(row) : null;
