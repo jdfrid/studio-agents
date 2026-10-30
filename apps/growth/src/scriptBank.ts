@@ -16,6 +16,8 @@ import {
   listScriptEntries,
   listScriptRuns,
   nextScriptEntry,
+  scriptEntryCooling,
+  SCRIPT_REUSE_MS,
   openScriptRun,
   scriptRunBySlot,
   setSetting,
@@ -47,6 +49,16 @@ const MSG_BUSY = "כבר רץ סרטון מהמאגר. הוא יסתיים לפ�
 const MSG_EMPTY = "כותבים מילות מפתח או תסריט";
 const MSG_HOURS = "בחרו מרווח של 1, 2, 4, 6, 8, 12 או 24 שעות";
 const MSG_KIND = "בחרו מילות מפתח או תסריט";
+const MSG_NONE = "אין במאגר פריט פעיל";
+const MSG_WEEK = "הסרטונים שכבר נוצרו זמינים שוב בעוד כשבוע.";
+
+function reuseMessage(lastRunAt: string | null, now: Date): string {
+  const at = lastRunAt ? Date.parse(lastRunAt) : Number.NaN;
+  if (!Number.isFinite(at)) return MSG_WEEK;
+  const again = new Date(at + SCRIPT_REUSE_MS);
+  const formatted = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", day: "2-digit", month: "2-digit" }).format(again);
+  return `הסרטון כבר נוצר. אפשר להשתמש בו שוב ב-${formatted}.`;
+}
 
 export type ScriptBankSettings = {
   enabled: boolean;
@@ -195,7 +207,7 @@ export async function advanceScriptBank(ctx: BankContext, deps: ScriptBankDeps =
   const now = deps.now ?? new Date();
   const slot = bankSlotKey(now, settings.hours);
   if (scriptRunBySlot(ctx.db, slot)) return;
-  const entry = nextScriptEntry(ctx.db);
+  const entry = nextScriptEntry(ctx.db, now);
   if (!entry) return;
   await produceBankEntry(ctx, entry, slot, deps);
 }
@@ -204,6 +216,8 @@ export async function runScriptEntry(ctx: BankContext, entryId: string, deps: Sc
   if (openScriptRun(ctx.db)) throw new Error(MSG_BUSY);
   const entry = getScriptEntry(ctx.db, entryId);
   if (!entry) throw new Error("הפריט לא נמצא");
+  const now = deps.now ?? new Date();
+  if (scriptEntryCooling(entry.lastRunAt, now)) throw new Error(reuseMessage(entry.lastRunAt, now));
   const run = await produceBankEntry(ctx, entry, `manual-${Date.now()}`, deps);
   if (!run) throw new Error(MSG_BUSY);
   return getScriptRun(ctx.db, run.id) ?? run;
@@ -211,8 +225,12 @@ export async function runScriptEntry(ctx: BankContext, entryId: string, deps: Sc
 
 export async function runScriptBankNow(ctx: BankContext, deps: ScriptBankDeps = {}): Promise<ScriptRun> {
   if (openScriptRun(ctx.db)) throw new Error(MSG_BUSY);
-  const entry = nextScriptEntry(ctx.db);
-  if (!entry) throw new Error("אין במאגר פריט פעיל");
+  const now = deps.now ?? new Date();
+  const entry = nextScriptEntry(ctx.db, now);
+  if (!entry) {
+    const waiting = listScriptEntries(ctx.db).some((row) => row.enabled && !row.feedId && scriptEntryCooling(row.lastRunAt, now));
+    throw new Error(waiting ? MSG_WEEK : MSG_NONE);
+  }
   return runScriptEntry(ctx, entry.id, deps);
 }
 
@@ -267,7 +285,7 @@ export async function produceBankEntry(ctx: BankContext, entry: ScriptEntry, slo
     try {
       const runId = await (deps.submitBrief ?? submitReelminoBrief)(content.brief);
       updateItem(ctx.db, item.id, { reelminoRunId: runId });
-      updateScriptEntry(ctx.db, entry.id, { lastRunAt: new Date().toISOString() });
+      updateScriptEntry(ctx.db, entry.id, { lastRunAt: (deps.now ?? new Date()).toISOString() });
       return updateScriptRun(ctx.db, run.id, { runId, error: null }) ?? run;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

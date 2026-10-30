@@ -1253,10 +1253,27 @@ export function deleteScriptEntry(db: GrowthDb, id: string): boolean {
   return db.prepare("DELETE FROM script_entries WHERE id = ?").run(id).changes > 0;
 }
 
-export function nextScriptEntry(db: GrowthDb): ScriptEntry | null {
+export const SCRIPT_REUSE_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function scriptReuseCutoff(now = new Date()): string {
+  return new Date(now.getTime() - SCRIPT_REUSE_MS).toISOString();
+}
+
+export function scriptEntryCooling(lastRunAt: string | null, now = new Date()): boolean {
+  if (!lastRunAt) return false;
+  const at = Date.parse(lastRunAt);
+  return Number.isFinite(at) && now.getTime() - at < SCRIPT_REUSE_MS;
+}
+
+const READY_ENTRY = "(last_run_at IS NULL OR last_run_at <= ?)";
+
+export function nextScriptEntry(db: GrowthDb, now = new Date()): ScriptEntry | null {
   const row = db
-    .prepare("SELECT * FROM script_entries WHERE enabled = 1 AND feed_id IS NULL ORDER BY last_run_at IS NULL DESC, last_run_at, created_at, id LIMIT 1")
-    .get() as Row | undefined;
+    .prepare(
+      `SELECT * FROM script_entries WHERE enabled = 1 AND feed_id IS NULL AND ${READY_ENTRY}
+       ORDER BY last_run_at IS NULL DESC, last_run_at, created_at, id LIMIT 1`
+    )
+    .get(scriptReuseCutoff(now)) as Row | undefined;
   return row ? mapScriptEntry(row) : null;
 }
 
@@ -1326,15 +1343,20 @@ export function deleteKeywordFeed(db: GrowthDb, id: string): boolean {
   return db.prepare("DELETE FROM keyword_feeds WHERE id = ?").run(id).changes > 0;
 }
 
-export function nextFeedEntry(db: GrowthDb, feedId: string): ScriptEntry | null {
+export function nextFeedEntry(db: GrowthDb, feedId: string, now = new Date()): ScriptEntry | null {
   const row = db
-    .prepare("SELECT * FROM script_entries WHERE enabled = 1 AND feed_id = ? AND last_run_at IS NULL ORDER BY created_at, id LIMIT 1")
-    .get(feedId) as Row | undefined;
+    .prepare(
+      `SELECT * FROM script_entries WHERE enabled = 1 AND feed_id = ? AND ${READY_ENTRY}
+       ORDER BY last_run_at IS NULL DESC, last_run_at, created_at, id LIMIT 1`
+    )
+    .get(feedId, scriptReuseCutoff(now)) as Row | undefined;
   return row ? mapScriptEntry(row) : null;
 }
 
-export function countPendingFeedEntries(db: GrowthDb, feedId: string): number {
-  const row = db.prepare("SELECT COUNT(*) AS n FROM script_entries WHERE enabled = 1 AND feed_id = ? AND last_run_at IS NULL").get(feedId) as Row | undefined;
+export function countPendingFeedEntries(db: GrowthDb, feedId: string, now = new Date()): number {
+  const row = db
+    .prepare(`SELECT COUNT(*) AS n FROM script_entries WHERE enabled = 1 AND feed_id = ? AND ${READY_ENTRY}`)
+    .get(feedId, scriptReuseCutoff(now)) as Row | undefined;
   return row ? num(row, "n") : 0;
 }
 

@@ -442,6 +442,22 @@ const BANK_STATUS = {
   failed: "נכשל"
 };
 
+const REUSE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function entryCooling(row) {
+  const at = Date.parse(row.lastRunAt || "");
+  return Number.isFinite(at) && Date.now() - at < REUSE_MS;
+}
+
+function madeLabel(row) {
+  if (!row.lastRunAt) return "—";
+  const at = Date.parse(row.lastRunAt);
+  if (!Number.isFinite(at)) return "נוצר";
+  if (!entryCooling(row)) return "נוצר";
+  const formatted = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", day: "2-digit", month: "2-digit" }).format(new Date(at + REUSE_MS));
+  return `נוצר · שוב ב-${formatted}`;
+}
+
 function renderScriptBank() {
   const bank = state.scriptBank || { enabled: false, hours: 4, destinationId: "", entries: [], runs: [] };
   const feeds = state.keywordFeeds?.feeds || [];
@@ -453,7 +469,7 @@ function renderScriptBank() {
   };
   panel.innerHTML = `
     <div class="card">
-      <p class="muted">כל פריט הוא מילות מפתח או תסריט. כל ${esc(bank.hours)} שעות, כשהמאגר פועל, נשלח הפריט הבא להפקה ועולה לערוץ שלו. הסרטון מקורי, 30 שניות, אנכי. כל סרטון משתמש בקרדיטים של חשבון הסטודיו.</p>
+      <p class="muted">כל פריט הוא מילות מפתח או תסריט. כל ${esc(bank.hours)} שעות, כשהמאגר פועל, נשלח הפריט הבא להפקה ועולה לערוץ שלו. פריט שכבר הפך לסרטון מסומן ולא נבחר שוב במשך שבוע. הסרטון מקורי, 30 שניות, אנכי. כל סרטון משתמש בקרדיטים של חשבון הסטודיו.</p>
       <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${channels.length ? "אפשר לבחור ערוץ מחובר." : "חברו ערוץ יוטיוב בלשונית חשבונות. ערוץ שלא חובר לא מופיע כאן."}</p>
       <label><input id="bank-enabled" type="checkbox" ${bank.enabled ? "checked" : ""}> הפעלה אוטומטית</label>
       <label>מרווח
@@ -526,19 +542,20 @@ function renderScriptBank() {
     </div>
     <div class="card">
       <table>
-        <thead><tr><th>סוג</th><th>כותרת</th><th>טקסט</th><th>ערוץ</th><th>פעיל</th><th></th></tr></thead>
+        <thead><tr><th>סוג</th><th>כותרת</th><th>טקסט</th><th>ערוץ</th><th>מצב</th><th>פעיל</th><th></th></tr></thead>
         <tbody>
           ${(bank.entries || []).map((row) => `<tr>
             <td>${row.kind === "script" ? "תסריט" : "מילות מפתח"}</td>
             <td><input data-bank-title="${row.id}" dir="auto" maxlength="90" value="${esc(row.title || "")}" placeholder="כותרת ביוטיוב"></td>
             <td>${esc(row.body.slice(0, 120))}</td>
             <td>${esc(nameOf(row.destinationId))}</td>
+            <td>${esc(madeLabel(row))}</td>
             <td><input type="checkbox" data-bank-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
             <td>
-              <button type="button" data-bank-run="${row.id}">הרצה</button>
+              <button type="button" data-bank-run="${row.id}" ${entryCooling(row) ? "disabled" : ""}>הרצה</button>
               <button type="button" data-bank-drop="${row.id}">מחיקה</button>
             </td>
-          </tr>`).join("") || "<tr><td colspan='6'>אין פריטים במאגר</td></tr>"}
+          </tr>`).join("") || "<tr><td colspan='7'>אין פריטים במאגר</td></tr>"}
         </tbody>
       </table>
     </div>

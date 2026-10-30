@@ -173,6 +173,37 @@ describe("script bank", () => {
     expect(listScriptRuns(opened.db)[0]).toMatchObject({ destinationId: "main", status: "producing" });
   });
 
+  it("marks a created video and waits a week before using it again", async () => {
+    const opened = db();
+    channel(opened.db, "kitchen", "KitchenTips");
+    expect(applyScriptBankSettings(opened.db, { enabled: true, hours: 4, destinationId: "kitchen" })).toBeNull();
+    const saved = saveScriptEntry(opened.db, { kind: "script", body: "שוטפים ירקות.\nחותכים גזר.", language: "he", destinationId: "kitchen" });
+    const briefs: string[] = [];
+    let ready = false;
+    const deps = {
+      now: new Date("2026-10-29T12:00:00.000Z"),
+      pollAfterMs: 0,
+      submitBrief: async () => {
+        briefs.push("made");
+        return `run-${briefs.length}`;
+      },
+      downloadFinal: async () => (ready ? { filename: "ready.mp4" } : null),
+      publish: async () => ({ id: "job-1", status: "published", remoteUrl: "https://youtu.be/ready" })
+    };
+    const ctx = { db: opened.db, key: Buffer.alloc(32), mediaDir: opened.dir, publicBase: "http://127.0.0.1:4180" };
+    await advanceScriptBank(ctx, deps);
+    ready = true;
+    await advanceScriptBank(ctx, deps);
+    expect(listScriptRuns(opened.db)[0]?.status).toBe("published");
+    await advanceScriptBank(ctx, { ...deps, now: new Date("2026-10-29T16:00:00.000Z") });
+    expect(briefs).toHaveLength(1);
+    await expect(runScriptEntry(ctx, saved.entry!.id, { ...deps, now: new Date("2026-10-30T12:00:00.000Z") })).rejects.toThrow("כבר נוצר");
+    await advanceScriptBank(ctx, { ...deps, now: new Date("2026-11-05T11:59:00.000Z") });
+    expect(briefs).toHaveLength(1);
+    await advanceScriptBank(ctx, { ...deps, now: new Date("2026-11-05T12:00:00.000Z") });
+    expect(briefs).toHaveLength(2);
+  });
+
   it("runs one saved entry on demand while the bank is off", async () => {
     const opened = db();
     channel(opened.db, "kitchen", "KitchenTips");

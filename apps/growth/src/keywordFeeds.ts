@@ -136,14 +136,14 @@ export async function advanceKeywordFeeds(ctx: FeedContext, deps: FeedDeps = {})
   if (openScriptRun(ctx.db)) return;
   const now = deps.now ?? new Date();
   for (const feed of listKeywordFeeds(ctx.db).filter((row) => row.enabled)) {
-    if (countPendingFeedEntries(ctx.db, feed.id) > 0 || !dueForFill(feed, now)) continue;
+    if (countPendingFeedEntries(ctx.db, feed.id, now) > 0 || !dueForFill(feed, now)) continue;
     await fillKeywordFeed(ctx, feed.id, deps);
   }
   if (openScriptRun(ctx.db)) return;
   for (const feed of listKeywordFeeds(ctx.db).filter((row) => row.enabled)) {
     const slot = feedSlotKey(feed.id, now, feed.hours);
     if (scriptRunBySlot(ctx.db, slot)) continue;
-    const entry = nextFeedEntry(ctx.db, feed.id);
+    const entry = nextFeedEntry(ctx.db, feed.id, now);
     if (!entry) continue;
     await produceBankEntry(ctx, entry, slot, deps);
     return;
