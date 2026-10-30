@@ -85,8 +85,15 @@ describe("script bank", () => {
     expect(englishTitle.title).toBe("How to cut an onion");
     expect(englishTitle.description).not.toMatch(/\p{Script=Hebrew}/u);
     expect(englishTitle.brief.language).toBe("en");
+    const field = briefForEntry({ kind: "script", body: "איך מקבלים תפוחי אדמה קריספיים", language: "en", title: "תפוחי אדמה קריספיים בתנור" });
+    expect(field.title).toBe("תפוחי אדמה קריספיים בתנור");
+    expect(field.brief.title).toBe("תפוחי אדמה קריספיים בתנור");
+    expect(field.brief.language).toBe("en");
+    expect(field.description).not.toMatch(/\p{Script=Hebrew}/u);
+    expect(String(field.brief.instructions)).toContain("תפוחי אדמה קריספיים בתנור");
     const ignored = briefForEntry({ kind: "keywords", body: "onion cutting", language: "he", title: "How to cut an onion" });
-    expect(ignored.title).not.toMatch(/[A-Za-z]/);
+    expect(ignored.title).toBe("How to cut an onion");
+    expect(ignored.brief.title).toBe("How to cut an onion");
     expect(ignored.description.replaceAll("#Shorts", "")).not.toMatch(/[A-Za-z]/);
   });
 

@@ -130,22 +130,27 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
   const given = (input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 90);
   const givenOk = Boolean(given) && textMatchesLanguage(given, input.language);
   const firstLine = (input.body.split(/\r?\n/).find((line) => line.trim()) ?? input.body).replace(/\s+/g, " ").trim();
-  const title = givenOk ? given : titleInLanguage(input.kind === "script" ? firstLine : input.body, input.language);
+  const spoken = titleInLanguage(input.kind === "script" ? firstLine : input.body, input.language);
+  const headline = givenOk ? given : spoken;
+  const title = given || headline;
   const ownWords = textMatchesLanguage(input.body, input.language);
   const summary = input.kind === "script"
     ? (he ? "סרטון אנכי לפי התסריט שנשמר במאגר." : "A vertical video that follows the saved script.")
     : ownWords
       ? (he
-        ? `סרטון מקורי קצר על ${title}. מסבירים את הנושא בפשטות ונותנים טיפ אחד שאפשר ליישם מיד.`
-        : `An original short about ${title}. Explain the subject plainly and give one tip people can use immediately.`)
+        ? `סרטון מקורי קצר על ${headline}. מסבירים את הנושא בפשטות ונותנים טיפ אחד שאפשר ליישם מיד.`
+        : `An original short about ${headline}. Explain the subject plainly and give one tip people can use immediately.`)
       : (he
         ? "סרטון מקורי קצר. מסבירים את הנושא בפשטות ונותנים טיפ אחד שאפשר ליישם מיד."
         : "An original short. Explain the subject plainly and give one tip people can use immediately.");
+  const keepOut = given
+    ? (he ? "בתיאור, בקריינות או על המסך" : "the description, the narration, or on screen")
+    : (he ? "בכותרת, בתיאור, בקריינות או על המסך" : "the title, the description, the narration, or on screen");
   const subject = ownWords
     ? ""
     : he
-      ? `\nהטקסט הבא הוא חומר גלם בלבד. מפיקים ממנו סרטון בעברית, בלי להשאיר את הניסוח המקורי בכותרת, בתיאור, בקריינות או על המסך:\n${input.body.trim()}`
-      : `\nThe text below is source material only. Produce the video in English, and do not keep its original wording in the title, the description, the narration, or on screen:\n${input.body.trim()}`;
+      ? `\nהטקסט הבא הוא חומר גלם בלבד. מפיקים ממנו סרטון בעברית, בלי להשאיר את הניסוח המקורי ${keepOut}:\n${input.body.trim()}`
+      : `\nThe text below is source material only. Produce the video in English, and do not keep its original wording in ${keepOut}:\n${input.body.trim()}`;
   const instructions = `${input.kind === "script"
     ? (ownWords
       ? (he
@@ -156,9 +161,9 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
         : "The entered text is source material in another language. Write a new video from it in English only. Do not copy another creator's video. No other channel names and no third-party logos. Clear hook in the first three seconds, vertical frame."))
     : (he
       ? "תוכן מקורי בלבד לפי מילות המפתח. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, קריינות קצרה, מסך אנכי."
-      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(input.language)}${givenOk ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
-  const tags = ["#Shorts", ...tokens(title).slice(0, 3).map((token) => `#${token}`)];
-  const description = `${summary.includes(title) ? summary : `${title}. ${summary}`}\n\n${tags.join(" ")}`;
+      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(input.language)}${given ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
+  const tags = ["#Shorts", ...tokens(headline).slice(0, 3).map((token) => `#${token}`)];
+  const description = `${summary.includes(headline) ? summary : `${headline}. ${summary}`}\n\n${tags.join(" ")}`;
   return {
     title,
     summary,

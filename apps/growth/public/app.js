@@ -511,7 +511,7 @@ function renderScriptBank() {
           <option value="script">תסריט</option>
         </select>
       </label>
-      <label>כותרת<input id="bank-title" dir="auto" maxlength="90" placeholder="הכותרת ביוטיוב, בשפה שנבחרה. אפשר להשאיר ריק"></label>
+      <label>כותרת<input id="bank-title" dir="auto" maxlength="90" placeholder="הכותרת ביוטיוב, כמו שתיכתב. אפשר להשאיר ריק"></label>
       <label>טקסט<textarea id="bank-body" dir="auto" placeholder="מילות מפתח מופרדות בפסיק, או תסריט מלא"></textarea></label>
       <label>שפה
         <select id="bank-language">
@@ -530,7 +530,7 @@ function renderScriptBank() {
         <tbody>
           ${(bank.entries || []).map((row) => `<tr>
             <td>${row.kind === "script" ? "תסריט" : "מילות מפתח"}</td>
-            <td>${esc(row.title || "—")}</td>
+            <td><input data-bank-title="${row.id}" dir="auto" maxlength="90" value="${esc(row.title || "")}" placeholder="כותרת ביוטיוב"></td>
             <td>${esc(row.body.slice(0, 120))}</td>
             <td>${esc(nameOf(row.destinationId))}</td>
             <td><input type="checkbox" data-bank-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
@@ -603,6 +603,9 @@ function renderScriptBank() {
       destinationId: panel.querySelector("#bank-entry-destination").value || null
     })
   }));
+  panel.querySelectorAll("[data-bank-title]").forEach((input) => {
+    input.onchange = () => run(() => api(`/api/script-bank/entries/${input.dataset.bankTitle}`, { method: "PATCH", body: JSON.stringify({ title: input.value }) }));
+  });
   panel.querySelectorAll("[data-bank-enabled]").forEach((box) => {
     box.onchange = () => run(() => api(`/api/script-bank/entries/${box.dataset.bankEnabled}`, { method: "PATCH", body: JSON.stringify({ enabled: box.checked }) }));
   });
