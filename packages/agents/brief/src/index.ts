@@ -96,7 +96,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         targetAudience: `${langNative} target audience`,
         toneOfVoice: `${langNative} tone`,
         style: `${langNative} style`,
-        durationSeconds: "integer 5..180",
+        durationSeconds: "integer 5..600",
         aspectRatio: "9:16 | 16:9 | 1:1",
         language: contentLang,
         brandConstraints: [`short ${langEn} constraint strings`],
@@ -479,7 +479,7 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
         ]
           .filter(Boolean)
           .join("; ") || "",
-      durationSeconds: parsed.durationSeconds ?? input.durationSeconds,
+      durationSeconds: input.durationSeconds,
       aspectRatio: aspectRatioFromCreative(creative) ?? parsed.aspectRatio ?? input.aspectRatio,
       language: resolvedLanguage,
       ...(instructions ? { instructions } : {}),

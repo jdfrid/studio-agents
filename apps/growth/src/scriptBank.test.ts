@@ -63,6 +63,10 @@ describe("script bank", () => {
     const keywords = briefForEntry({ kind: "keywords", body: "חיתוך בצל, סכין חדה", language: "he" });
     expect(keywords.brief.aspectRatio).toBe("9:16");
     expect(keywords.brief.durationSeconds).toBe(30);
+    const long = briefForEntry({ kind: "script", body: "פותחים את המקרר.\nסוגרים אותו.", language: "he", durationSeconds: 600 });
+    expect(long.brief.durationSeconds).toBe(600);
+    expect(long.description).not.toContain("#Shorts");
+    expect(String(long.brief.instructions)).toContain("10 דקות");
     expect(String(keywords.brief.sourceText)).toContain("חיתוך בצל");
     expect(String(keywords.brief.instructions)).toContain("מקורי");
     const script = briefForEntry({ kind: "script", body: "פותחים את המקרר.\nמוציאים עגבנייה.", language: "he" });
@@ -258,6 +262,7 @@ describe("script bank", () => {
       { submitBrief: async () => "run-manual" }
     );
     expect(run).toMatchObject({ status: "producing", destinationId: "kitchen", runId: "run-manual" });
+    expect(saveScriptEntry(opened.db, { kind: "keywords", body: "חיתוך בצל", language: "he", durationSeconds: 45 }).error).toContain("אורך");
     expect(saveScriptEntry(opened.db, { kind: "keywords", body: " " }).error).toContain("כותבים");
     expect(saveScriptEntry(opened.db, { kind: "keywords", body: "חיתוך בצל", language: "he", title: "How to cut an onion" }).entry?.title).toBe("How to cut an onion");
     const titled = saveScriptEntry(opened.db, { kind: "keywords", body: "onion cutting", language: "he", title: "איך חותכים בצל", destinationId: "kitchen" });

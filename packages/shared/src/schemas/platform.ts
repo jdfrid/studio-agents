@@ -32,6 +32,17 @@ export function clampVideoDurationSeconds(_seconds?: number, _allowOver30?: bool
   return STANDARD_MAX_DURATION_SECONDS;
 }
 
+/** Lengths an operator can set when defining a growth task. The public studio form stays at 30 seconds. */
+export const TASK_DURATION_OPTIONS = [30, 60, 120, 180, 300, 600] as const;
+export const TASK_MAX_DURATION_SECONDS = 600;
+
+export function taskDurationSeconds(value: unknown): (typeof TASK_DURATION_OPTIONS)[number] | null {
+  const seconds = typeof value === "number" ? value : Number(value);
+  return (TASK_DURATION_OPTIONS as readonly number[]).includes(seconds)
+    ? (seconds as (typeof TASK_DURATION_OPTIONS)[number])
+    : null;
+}
+
 export const PlatformSettingsPatchSchema = z.object({
   defaultRenderProfile: RenderProfileIdSchema.optional(),
   geminiTextModel: z.string().trim().min(1).nullable().optional(),

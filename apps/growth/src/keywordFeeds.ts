@@ -15,6 +15,7 @@ import {
   type KeywordFeed
 } from "./db.js";
 import { castValue, PRESENTERS, TONES } from "./cast.js";
+import { taskDurationSeconds } from "./duration.js";
 import { textMatchesLanguage } from "./languageCopy.js";
 import { freshConnectionTokens } from "./publish.js";
 import { produceBankEntry, saveScriptEntry, type BankContext, type ScriptBankDeps } from "./scriptBank.js";
@@ -27,7 +28,7 @@ export type FeedContext = BankContext;
 
 export type FeedDeps = ScriptBankDeps & {
   search?: (query: string, language: string, accessToken: string) => Promise<string[]>;
-  writeScripts?: (input: { query: string; language: string; ideas: string[] }) => Promise<Array<{ title: string; script: string }>>;
+  writeScripts?: (input: { query: string; language: string; ideas: string[]; durationSeconds: number }) => Promise<Array<{ title: string; script: string }>>;
 };
 
 export function titlesFromSearch(payload: { items?: Array<{ snippet?: { title?: string } }> }): string[] {
@@ -56,7 +57,7 @@ export function freshIdeas(titles: string[], used: string[], limit = 5): string[
 
 export function saveKeywordFeed(
   db: GrowthDb,
-  input: { id?: string; query?: string; language?: string; destinationId?: string | null; hours?: number; presenter?: string; tone?: string; enabled?: boolean }
+  input: { id?: string; query?: string; language?: string; destinationId?: string | null; hours?: number; presenter?: string; tone?: string; durationSeconds?: number; enabled?: boolean }
 ): { feed: KeywordFeed | null; error: string | null } {
   const query = (input.query ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
   if (query.length < 2) return { feed: null, error: "כותבים מילת מפתח" };
@@ -66,6 +67,8 @@ export function saveKeywordFeed(
   if (!(FEED_HOUR_OPTIONS as readonly number[]).includes(hours)) return { feed: null, error: "בחרו מרווח של 1, 2, 4, 6, 8, 12 או 24 שעות" };
   const presenter = input.presenter === undefined ? undefined : castValue(input.presenter, PRESENTERS);
   const tone = input.tone === undefined ? undefined : castValue(input.tone, TONES);
+  const durationSeconds = input.durationSeconds === undefined ? undefined : taskDurationSeconds(input.durationSeconds);
+  if (input.durationSeconds !== undefined && durationSeconds === null) return { feed: null, error: "בחרו אורך סרטון: 30 שניות, דקה, 2 דקות, 3 דקות, 5 דקות או 10 דקות" };
   const destinationId = input.destinationId?.trim() || "";
   const destination = destinationId ? getDestination(db, destinationId) : null;
   if (!destination || destination.network !== "youtube" || destination.kind !== "channel" || !destination.enabled) {
@@ -79,11 +82,12 @@ export function saveKeywordFeed(
       hours,
       ...(presenter !== undefined ? { presenter } : {}),
       ...(tone !== undefined ? { tone } : {}),
+      ...(durationSeconds ? { durationSeconds } : {}),
       ...(typeof input.enabled === "boolean" ? { enabled: input.enabled } : {})
     });
     return updated ? { feed: updated, error: null } : { feed: null, error: "מילת המפתח לא נמצאה" };
   }
-  return { feed: insertKeywordFeed(db, { id: nid(), query, language, destinationId, hours, presenter: presenter ?? "", tone: tone ?? "", enabled: input.enabled === true }), error: null };
+  return { feed: insertKeywordFeed(db, { id: nid(), query, language, destinationId, hours, presenter: presenter ?? "", tone: tone ?? "", durationSeconds: durationSeconds ?? 30, enabled: input.enabled === true }), error: null };
 }
 
 export function keywordFeedView(db: GrowthDb): { feeds: KeywordFeed[] } {
@@ -117,14 +121,14 @@ export async function fillKeywordFeed(ctx: FeedContext, feedId: string, deps: Fe
   const subjects = ideas.length ? ideas : [feed.query];
   let written: Array<{ title: string; script: string }> = [];
   try {
-    written = await (deps.writeScripts ?? writeScripts)({ query: feed.query, language: feed.language, ideas: subjects });
+    written = await (deps.writeScripts ?? writeScripts)({ query: feed.query, language: feed.language, ideas: subjects, durationSeconds: feed.durationSeconds });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     updateKeywordFeed(ctx.db, feed.id, { lastError: message.slice(0, 300), lastFilledAt: new Date().toISOString() });
     return { added: 0, error: message.slice(0, 300) };
   }
   const accepted = written
-    .map((item) => ({ title: item.title.replace(/\s+/g, " ").trim().slice(0, 90), script: item.script.trim().slice(0, 4000) }))
+    .map((item) => ({ title: item.title.replace(/\s+/g, " ").trim().slice(0, 90), script: item.script.trim().slice(0, 12_000) }))
     .filter((item) => item.script.length >= 2 && textMatchesLanguage(item.script, feed.language) && (!item.title || textMatchesLanguage(item.title, feed.language)))
     .slice(0, BATCH);
   const items = accepted.length ? accepted.map((item) => ({ ...item, kind: "script" as const })) : fallbackItems(feed, subjects);
@@ -136,7 +140,8 @@ export async function fillKeywordFeed(ctx: FeedContext, feedId: string, deps: Fe
       body: item.script,
       language: feed.language,
       destinationId: feed.destinationId,
-      feedId: feed.id
+      feedId: feed.id,
+      durationSeconds: feed.durationSeconds
     });
     if (saved.entry) added += 1;
   }
@@ -205,10 +210,14 @@ function llmReady(): boolean {
   return Boolean(process.env.GEMINI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim());
 }
 
-async function writeScripts(input: { query: string; language: string; ideas: string[] }): Promise<Array<{ title: string; script: string }>> {
+async function writeScripts(input: { query: string; language: string; ideas: string[]; durationSeconds: number }): Promise<Array<{ title: string; script: string }>> {
   if (!llmReady()) return [];
   const languageName = input.language.startsWith("he") ? "Hebrew" : "English";
-  const system = `You write original 30-second vertical video scripts for YouTube Shorts. The title and the script must be entirely in ${languageName}. Do not copy another creator's title, script, or wording. Each script is 4 to 6 short narration lines about one practical tip.`;
+  const minutes = Math.max(1, Math.round(input.durationSeconds / 60));
+  const shape = input.durationSeconds <= 30
+    ? "Each script is 4 to 6 short narration lines about one practical tip."
+    : `Each script fills about ${minutes} minute${minutes === 1 ? "" : "s"} (${input.durationSeconds} seconds): ${minutes * 8 - 2} to ${minutes * 8 + 4} narration lines, with a beginning, a middle, and an ending.`;
+  const system = `You write original vertical YouTube scripts of ${input.durationSeconds} seconds. The title and the script must be entirely in ${languageName}. Do not copy another creator's title, script, or wording. ${shape}`;
   const user = `Keyword: ${input.query}\nCover these subjects without copying their wording:\n${input.ideas.map((idea) => `- ${idea}`).join("\n")}\nReturn JSON {"items":[{"title":"","script":""}]} with up to ${BATCH} items.`;
   const raw = process.env.GEMINI_API_KEY?.trim()
     ? await gemini(system, user)

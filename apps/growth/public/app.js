@@ -399,7 +399,7 @@ function renderTrends() {
   const channels = state.destinations.filter((row) => row.network === "youtube" && row.kind === "channel" && row.enabled);
   panel.innerHTML = `
     <div class="card">
-      <p class="muted">כל ${esc(trends.hours)} שעות המערכת קוראת מה תופס צפיות ביוטיוב ומה כבר עבד בערוץ, מכינה סרטון מקורי של 30 שניות, שולחת אותו להפקה, ומעלה אותו לערוץ. הסרטון לא מעתיק סרטון של יוצר אחר. כל סרטון משתמש בקרדיטים של חשבון הסטודיו.</p>
+      <p class="muted">כל ${esc(trends.hours)} שעות המערכת קוראת מה תופס צפיות ביוטיוב ומה כבר עבד בערוץ, מכינה סרטון מקורי באורך שנבחר כאן, שולחת אותו להפקה, ומעלה אותו לערוץ. הסרטון לא מעתיק סרטון של יוצר אחר. כל סרטון משתמש בקרדיטים של חשבון הסטודיו. לכל ערוץ יש תקרה של 16 העלאות ביום.</p>
       <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${channels.length ? "ערוץ יוטיוב מחובר." : "חברו ערוץ יוטיוב בלשונית חשבונות."}</p>
       <label><input id="trend-enabled" type="checkbox" ${trends.enabled ? "checked" : ""}> הפעלה אוטומטית</label>
       <label>מרווח
@@ -414,6 +414,10 @@ function renderTrends() {
           <option value="en" ${trends.language === "en" ? "selected" : ""}>English</option>
         </select>
       </label>
+      <label>אורך הסרטון
+        <select id="trend-duration">${durationOptionsHtml(trends.durationSeconds)}</select>
+      </label>
+      <p class="muted">אורך הסרטון נקבע כאן, לפני כל הפקה. 30 שניות עד 10 דקות. מעל 3 דקות זה סרטון יוטיוב רגיל, לא שורט.</p>
       <label>נישה<input id="trend-niche" value="${esc(trends.niche || "")}" placeholder="לדוגמה: שיווק לעסקים קטנים"></label>
       <label>ערוץ
         <select id="trend-destination">
@@ -446,7 +450,8 @@ function renderTrends() {
     region: panel.querySelector("#trend-region").value,
     language: panel.querySelector("#trend-language").value,
     niche: panel.querySelector("#trend-niche").value,
-    destinationId: panel.querySelector("#trend-destination").value || null
+    destinationId: panel.querySelector("#trend-destination").value || null,
+    durationSeconds: Number(panel.querySelector("#trend-duration").value)
   });
   panel.querySelector("#trend-save").onclick = () => run(() => api("/api/youtube-trends", { method: "PATCH", body: JSON.stringify(payload()) }));
   panel.querySelector("#trend-run").onclick = () => run(async () => {
@@ -484,6 +489,16 @@ function madeLabel(row) {
 
 const PRESENTER_OPTIONS = [["", "אוטומטי"], ["woman", "אישה"], ["man", "גבר"]];
 const TONE_OPTIONS = [["", "אוטומטי"], ["serious", "רציני"], ["playful", "היתולי"]];
+const DURATION_OPTIONS = [[30, "30 שניות"], [60, "דקה"], [120, "2 דקות"], [180, "3 דקות"], [300, "5 דקות"], [600, "10 דקות"]];
+
+function durationOptionsHtml(selected) {
+  const current = DURATION_OPTIONS.some(([value]) => value === Number(selected)) ? Number(selected) : 30;
+  return DURATION_OPTIONS.map(([value, label]) => `<option value="${value}" ${current === value ? "selected" : ""}>${label}</option>`).join("");
+}
+
+function durationText(seconds) {
+  return DURATION_OPTIONS.find(([value]) => value === Number(seconds))?.[1] || "30 שניות";
+}
 
 function choiceSelect(attr, id, value, options) {
   return `<select data-${attr}="${id}">${options.map(([option, label]) => `<option value="${option}" ${value === option ? "selected" : ""}>${label}</option>`).join("")}</select>`;
@@ -512,6 +527,7 @@ function entryRows(entries, ctx, withKeyword) {
     <td>${esc(ctx.nameOf(row.destinationId))}</td>
     <td>${choiceSelect("bank-presenter", row.id, row.presenter || "", PRESENTER_OPTIONS)}</td>
     <td>${choiceSelect("bank-tone", row.id, row.tone || "", TONE_OPTIONS)}</td>
+    <td>${withKeyword ? esc(durationText(ctx.feedOf(row.feedId)?.durationSeconds || row.durationSeconds)) : `<select data-bank-duration="${row.id}">${durationOptionsHtml(row.durationSeconds)}</select>`}</td>
     <td>${esc(madeLabel(row))}</td>
     <td><input type="checkbox" data-bank-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
     <td>
@@ -554,7 +570,8 @@ function bindProduction() {
       language: panel.querySelector("#bank-language").value,
       destinationId: panel.querySelector("#bank-entry-destination").value || null,
       presenter: panel.querySelector("#bank-presenter").value,
-      tone: panel.querySelector("#bank-tone").value
+      tone: panel.querySelector("#bank-tone").value,
+      durationSeconds: Number(panel.querySelector("#bank-duration").value)
     })
   }));
   const feedAdd = panel.querySelector("#feed-add");
@@ -567,7 +584,8 @@ function bindProduction() {
         destinationId: panel.querySelector("#feed-destination").value || null,
         hours: Number(panel.querySelector("#feed-hours").value),
         presenter: panel.querySelector("#feed-presenter").value,
-        tone: panel.querySelector("#feed-tone").value
+        tone: panel.querySelector("#feed-tone").value,
+        durationSeconds: Number(panel.querySelector("#feed-duration").value)
       })
     });
     try {
@@ -589,6 +607,9 @@ function bindProduction() {
   panel.querySelectorAll("[data-feed-tone]").forEach((select) => {
     select.onchange = () => run(() => api(`/api/keyword-feeds/${select.dataset.feedTone}`, { method: "PATCH", body: JSON.stringify({ tone: select.value }) }));
   });
+  panel.querySelectorAll("[data-feed-duration]").forEach((select) => {
+    select.onchange = () => run(() => api(`/api/keyword-feeds/${select.dataset.feedDuration}`, { method: "PATCH", body: JSON.stringify({ durationSeconds: Number(select.value) }) }));
+  });
   panel.querySelectorAll("[data-feed-fill]").forEach((button) => {
     button.onclick = () => run(() => api(`/api/keyword-feeds/${button.dataset.feedFill}/fill`, { method: "POST", body: "{}" }));
   });
@@ -603,6 +624,9 @@ function bindProduction() {
   });
   panel.querySelectorAll("[data-bank-tone]").forEach((select) => {
     select.onchange = () => run(() => api(`/api/script-bank/entries/${select.dataset.bankTone}`, { method: "PATCH", body: JSON.stringify({ tone: select.value }) }));
+  });
+  panel.querySelectorAll("[data-bank-duration]").forEach((select) => {
+    select.onchange = () => run(() => api(`/api/script-bank/entries/${select.dataset.bankDuration}`, { method: "PATCH", body: JSON.stringify({ durationSeconds: Number(select.value) }) }));
   });
   panel.querySelectorAll("[data-bank-enabled]").forEach((box) => {
     box.onchange = () => run(() => api(`/api/script-bank/entries/${box.dataset.bankEnabled}`, { method: "PATCH", body: JSON.stringify({ enabled: box.checked }) }));
@@ -622,7 +646,7 @@ function renderOwn() {
   panel.innerHTML = `
     <div class="card">
       <h2>הפצת המותג</h2>
-      <p class="muted">תסריטים לפרסום של המערכת עצמה. כל ${esc(ctx.bank.hours)} שעות, כשההפעלה פועלת, נוצר סרטון מהפריט הבא ועולה לערוץ שלו. הרצה ידנית באמצע לא מחליפה את המועד. פריט שכבר הפך לסרטון לא נבחר שוב במשך שבוע.</p>
+      <p class="muted">תסריטים לפרסום של המערכת עצמה. כל ${esc(ctx.bank.hours)} שעות, כשההפעלה פועלת, נוצר סרטון מהפריט הבא ועולה לערוץ שלו. הרצה ידנית באמצע לא מחליפה את המועד. פריט שכבר הפך לסרטון לא נבחר שוב במשך שבוע. לכל ערוץ יש תקרה של 16 העלאות ביום.</p>
       <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${ctx.channels.length ? "" : "חברו ערוץ יוטיוב בלשונית חשבונות."}</p>
       <label><input id="bank-enabled" type="checkbox" ${ctx.bank.enabled ? "checked" : ""}> הפקה אוטומטית</label>
       <label>מרווח
@@ -655,6 +679,8 @@ function renderOwn() {
         </select>
       </label>
       <label>ערוץ<select id="bank-entry-destination">${ctx.options("", "ערוץ ברירת המחדל")}</select></label>
+      <label>אורך הסרטון<select id="bank-duration">${durationOptionsHtml(30)}</select></label>
+      <p class="muted">אורך הסרטון נקבע כאן, לפני ההפקה. 30 שניות עד 10 דקות. מעל 3 דקות זה סרטון יוטיוב רגיל, לא שורט.</p>
       <label>מגיש<select id="bank-presenter">${PRESENTER_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label>
       <label>טון<select id="bank-tone">${TONE_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label>
       <p class="muted">אם המגיש או הטון נשארים על אוטומטי, ההפקה בוחרת אישה או גבר, רציני או היתולי, בלי לחזור יותר מדי על אותו סוג.</p>
@@ -663,8 +689,8 @@ function renderOwn() {
     <div class="card">
       <h2>תסריטים</h2>
       <table>
-        <thead><tr><th>סוג</th><th>כותרת</th><th>טקסט</th><th>ערוץ</th><th>מגיש</th><th>טון</th><th>מצב</th><th>פעיל</th><th></th></tr></thead>
-        <tbody>${entryRows(entries, ctx, false) || "<tr><td colspan='9'>אין תסריטים להפצת המותג</td></tr>"}</tbody>
+        <thead><tr><th>סוג</th><th>כותרת</th><th>טקסט</th><th>ערוץ</th><th>מגיש</th><th>טון</th><th>אורך</th><th>מצב</th><th>פעיל</th><th></th></tr></thead>
+        <tbody>${entryRows(entries, ctx, false) || "<tr><td colspan='10'>אין תסריטים להפצת המותג</td></tr>"}</tbody>
       </table>
     </div>
     <div class="card">
@@ -684,7 +710,7 @@ function renderKeywords() {
   panel.innerHTML = `
     <div class="card">
       <h2>יצירה לפי מילת מפתח</h2>
-      <p class="muted">לכל מילת מפתח יש ערוץ ומרווח. המערכת כותבת תסריטים למאגר, מפיקה מהם סרטון ומפיצה לערוץ. הרצה ידנית באמצע לא מחליפה את המשלוח הקבוע.</p>
+      <p class="muted">לכל מילת מפתח יש ערוץ ומרווח. המערכת כותבת תסריטים למאגר, מפיקה מהם סרטון ומפיצה לערוץ. הרצה ידנית באמצע לא מחליפה את המשלוח הקבוע. לכל ערוץ יש תקרה של 16 העלאות ביום.</p>
       <label>מילת מפתח<input id="feed-query" dir="auto" placeholder="טיפים למטבח"></label>
       <label>שפה
         <select id="feed-language">
@@ -700,13 +726,15 @@ function renderKeywords() {
           ${[1, 2, 4, 6, 8, 12, 24].map((hours) => `<option value="${hours}" ${hours === 4 ? "selected" : ""}>${hours} שעות</option>`).join("")}
         </select>
       </label>
+      <label>אורך הסרטון<select id="feed-duration">${durationOptionsHtml(30)}</select></label>
+      <p class="muted">אורך הסרטון נקבע כאן, לפני כתיבת התסריטים וההפקה. 30 שניות עד 10 דקות. מעל 3 דקות זה סרטון יוטיוב רגיל, לא שורט.</p>
       <label>מגיש<select id="feed-presenter">${PRESENTER_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label>
       <label>טון<select id="feed-tone">${TONE_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label>
       <p class="row"><button class="primary" type="button" id="feed-add">הוספה ומילוי תסריטים</button> <button type="button" data-open-tab="scripts">מאגר התסריטים</button></p>
     </div>
     <div class="card">
       <table>
-        <thead><tr><th>מילת מפתח</th><th>שפה</th><th>ערוץ</th><th>מרווח</th><th>מגיש</th><th>טון</th><th>תסריטים</th><th>פעיל</th><th></th></tr></thead>
+        <thead><tr><th>מילת מפתח</th><th>שפה</th><th>ערוץ</th><th>מרווח</th><th>מגיש</th><th>טון</th><th>אורך</th><th>תסריטים</th><th>פעיל</th><th></th></tr></thead>
         <tbody>
           ${ctx.feeds.map((row) => `<tr>
             <td>${esc(row.query)}${row.lastError ? `<div class="error">${esc(row.lastError)}</div>` : ""}</td>
@@ -715,13 +743,14 @@ function renderKeywords() {
             <td>${esc(row.hours)} שעות</td>
             <td>${choiceSelect("feed-presenter", row.id, row.presenter || "", PRESENTER_OPTIONS)}</td>
             <td>${choiceSelect("feed-tone", row.id, row.tone || "", TONE_OPTIONS)}</td>
+            <td><select data-feed-duration="${row.id}">${durationOptionsHtml(row.durationSeconds)}</select></td>
             <td>${(ctx.bank.entries || []).filter((entry) => entry.feedId === row.id).length}</td>
             <td><input type="checkbox" data-feed-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
             <td>
               <button type="button" data-feed-fill="${row.id}">מילוי</button>
               <button type="button" data-feed-drop="${row.id}">מחיקה</button>
             </td>
-          </tr>`).join("") || "<tr><td colspan='9'>אין מילות מפתח</td></tr>"}
+          </tr>`).join("") || "<tr><td colspan='10'>אין מילות מפתח</td></tr>"}
         </tbody>
       </table>
       <p class="muted">סימון פעיל מתזמן הפקה והפצה לערוץ של השורה. המילוי רק מוסיף תסריטים למאגר.</p>
@@ -743,13 +772,13 @@ function renderKeywordScripts() {
   panel.innerHTML = `
     <div class="card">
       <h2>מאגר תסריטים לפי מילות מפתח</h2>
-      <p class="muted">המאגר הזה עומד בפני עצמו. מילות המפתח כותבות לתוכו, וההפקה האוטומטית לוקחת ממנו את התסריט הבא. אפשר גם להריץ תסריט אחד מכאן.</p>
+      <p class="muted">המאגר הזה עומד בפני עצמו. מילות המפתח כותבות לתוכו, וההפקה האוטומטית לוקחת ממנו את התסריט הבא. אורך הסרטון הוא האורך שנבחר במשימת מילת המפתח. אפשר גם להריץ תסריט אחד מכאן.</p>
       <p class="row"><button type="button" data-open-tab="keywords">חזרה למילות המפתח</button></p>
     </div>
     <div class="card">
       <table>
-        <thead><tr><th>סוג</th><th>מילת מפתח</th><th>כותרת</th><th>טקסט</th><th>ערוץ</th><th>מגיש</th><th>טון</th><th>מצב</th><th>פעיל</th><th></th></tr></thead>
-        <tbody>${entryRows(entries, ctx, true) || "<tr><td colspan='10'>אין תסריטים. מוסיפים מילת מפתח וממלאים.</td></tr>"}</tbody>
+        <thead><tr><th>סוג</th><th>מילת מפתח</th><th>כותרת</th><th>טקסט</th><th>ערוץ</th><th>מגיש</th><th>טון</th><th>אורך</th><th>מצב</th><th>פעיל</th><th></th></tr></thead>
+        <tbody>${entryRows(entries, ctx, true) || "<tr><td colspan='11'>אין תסריטים. מוסיפים מילת מפתח וממלאים.</td></tr>"}</tbody>
       </table>
     </div>
   `;

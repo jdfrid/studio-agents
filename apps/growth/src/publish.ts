@@ -19,6 +19,7 @@ import {
   type SocialNetwork
 } from "@studio/shared";
 import { captionFromHandle, composeFreshCopy, type CaptionLock } from "./angles.js";
+import { YOUTUBE_DAILY_CODE, YOUTUBE_DAILY_MESSAGE, youtubeUploadBlock } from "./youtubeQuota.js";
 import type { ItemCopy } from "./copy.js";
 import { decryptJson, encryptJson, nid } from "./crypto.js";
 import {
@@ -197,6 +198,22 @@ export async function runPublish(input: {
   slotId?: string | null;
   campaign?: string;
 }): Promise<Job> {
+  if (input.destination.network === "youtube" && youtubeUploadBlock(input.db, input.destination.id)) {
+    const stopped = insertJob(input.db, {
+      id: nid(),
+      itemId: input.item.id,
+      destinationId: input.destination.id,
+      slotId: input.slotId ?? null,
+      network: input.destination.network,
+      status: "failed"
+    });
+    return updateJob(input.db, stopped.id, {
+      status: "failed",
+      lastError: YOUTUBE_DAILY_MESSAGE,
+      errorCode: YOUTUBE_DAILY_CODE,
+      attempts: 0
+    })!;
+  }
   const job = insertJob(input.db, {
     id: nid(),
     itemId: input.item.id,

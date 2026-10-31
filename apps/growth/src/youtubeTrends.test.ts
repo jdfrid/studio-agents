@@ -102,6 +102,10 @@ describe("youtube trend loop", () => {
     expect(content.brief.aspectRatio).toBe("9:16");
     expect(content.brief.approvalMode).toBe("auto");
     expect(content.brief.durationSeconds).toBe(30);
+    const long = contentForTrend({ topic: label, niche: "", language: "he", durationSeconds: 600 });
+    expect(long.brief.durationSeconds).toBe(600);
+    expect(long.description).not.toContain("#Shorts");
+    expect(String(long.brief.instructions)).toContain("10 דקות");
     expect(String(content.brief.instructions)).toContain("מקורי");
     expect(String(content.brief.instructions)).toContain("בעברית בלבד");
     expect(content.title).not.toMatch(/[A-Za-z]/);

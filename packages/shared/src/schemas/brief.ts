@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CreativeOptionsSchema } from "../creativeOptions.js";
 import { AspectRatioSchema } from "../enums.js";
 import { RenderProfileIdSchema } from "../renderProfiles.js";
+import { TASK_MAX_DURATION_SECONDS } from "./platform.js";
 
 export const BriefBrandingInputSchema = z
   .object({
@@ -44,7 +45,7 @@ export const BriefInputSchema = z.object({
   instructions: z.string().max(8_000).optional(),
   targetAudience: z.string().max(500).optional(),
   style: z.string().max(500).optional(),
-  durationSeconds: z.number().int().min(5).max(180).default(30),
+  durationSeconds: z.number().int().min(5).max(TASK_MAX_DURATION_SECONDS).default(30),
   aspectRatio: AspectRatioSchema.default("9:16"),
   language: z.string().min(2).max(10).default("en"),
   referenceLinks: z.array(z.string().url()).max(20).default([]),
@@ -113,7 +114,7 @@ export const BriefOutputSchema = z.object({
   targetAudience: z.string(),
   toneOfVoice: z.string(),
   style: z.string(),
-  durationSeconds: z.number().int().min(5).max(180),
+  durationSeconds: z.number().int().min(5).max(TASK_MAX_DURATION_SECONDS),
   aspectRatio: AspectRatioSchema,
   language: z.string(),
   /** Echo of user do/don't instructions for downstream stages. */

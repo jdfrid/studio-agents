@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync, type SqliteDatabase } from "./nodeSqlite.js";
 import type { ItemCopy } from "./copy.js";
+import { taskDurationSeconds } from "./duration.js";
 import { DIRECTORY_BLURB, DIRECTORY_SEEDS } from "./internet.js";
 
 export type GrowthDb = SqliteDatabase;
@@ -248,6 +249,8 @@ export function migrate(db: GrowthDb): void {
   ensureTextColumn(db, "keyword_feeds", "tone");
   ensureTextColumn(db, "script_runs", "presenter");
   ensureTextColumn(db, "script_runs", "tone");
+  ensureIntColumn(db, "script_entries", "duration_seconds", 30);
+  ensureIntColumn(db, "keyword_feeds", "duration_seconds", 30);
   migrateFacebookGroups(db);
   seedDirectories(db);
 }
@@ -257,6 +260,17 @@ function ensureTextColumn(db: GrowthDb, table: string, column: string): void {
   if (columns.length && !columns.some((item) => str(item, "name") === column)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
   }
+}
+
+function ensureIntColumn(db: GrowthDb, table: string, column: string, fallback: number): void {
+  const columns = rows(db.prepare(`PRAGMA table_info(${table})`).all());
+  if (columns.length && !columns.some((item) => str(item, "name") === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} INTEGER NOT NULL DEFAULT ${fallback}`);
+  }
+}
+
+function durationSecondsOf(row: Row): number {
+  return taskDurationSeconds(num(row, "duration_seconds")) ?? 30;
 }
 
 function migrateFacebookGroups(db: GrowthDb): void {
@@ -656,6 +670,17 @@ export function getJob(db: GrowthDb, id: string): Job | null {
 
 export function processingJobs(db: GrowthDb): Job[] {
   return rows(db.prepare(`${JOB_SELECT} WHERE jobs.status = 'processing'`).all()).map(mapJob);
+}
+
+export function countYoutubeUploadAttempts(db: GrowthDb, destinationId: string, sinceIso: string): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM jobs
+       WHERE network = 'youtube' AND destination_id = ? AND created_at >= ?
+       AND COALESCE(error_code, '') != 'daily_upload_limit'`
+    )
+    .get(destinationId, sinceIso) as Row | undefined;
+  return row ? num(row, "n") : 0;
 }
 
 export function insertJob(db: GrowthDb, input: { id: string; itemId: string; destinationId: string | null; slotId: string | null; network: string; status: string; scheduledFor?: string | null }): Job {
@@ -1207,6 +1232,7 @@ export type ScriptEntry = {
   feedId: string | null;
   presenter: string;
   tone: string;
+  durationSeconds: number;
   enabled: boolean;
   lastRunAt: string | null;
   createdAt: string;
@@ -1224,6 +1250,7 @@ function mapScriptEntry(row: Row): ScriptEntry {
     feedId: str(row, "feed_id") || null,
     presenter: str(row, "presenter"),
     tone: str(row, "tone"),
+    durationSeconds: durationSecondsOf(row),
     enabled: num(row, "enabled") === 1,
     lastRunAt: str(row, "last_run_at") || null,
     createdAt: str(row, "created_at"),
@@ -1246,23 +1273,23 @@ export function insertScriptEntry(
 ): ScriptEntry {
   const now = input.createdAt ?? new Date().toISOString();
   db.prepare(
-    `INSERT INTO script_entries (id, kind, title, body, language, destination_id, feed_id, presenter, tone, enabled, last_run_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
-  ).run(input.id, input.kind, input.title, input.body, input.language, input.destinationId, input.feedId, input.presenter || "", input.tone || "", input.enabled === false ? 0 : 1, now, now);
+    `INSERT INTO script_entries (id, kind, title, body, language, destination_id, feed_id, presenter, tone, duration_seconds, enabled, last_run_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
+  ).run(input.id, input.kind, input.title, input.body, input.language, input.destinationId, input.feedId, input.presenter || "", input.tone || "", input.durationSeconds || 30, input.enabled === false ? 0 : 1, now, now);
   return getScriptEntry(db, input.id)!;
 }
 
 export function updateScriptEntry(
   db: GrowthDb,
   id: string,
-  patch: Partial<Pick<ScriptEntry, "kind" | "title" | "body" | "language" | "destinationId" | "presenter" | "tone" | "enabled" | "lastRunAt">>
+  patch: Partial<Pick<ScriptEntry, "kind" | "title" | "body" | "language" | "destinationId" | "presenter" | "tone" | "durationSeconds" | "enabled" | "lastRunAt">>
 ): ScriptEntry | null {
   const current = getScriptEntry(db, id);
   if (!current) return null;
   const next = { ...current, ...patch };
   db.prepare(
-    `UPDATE script_entries SET kind = ?, title = ?, body = ?, language = ?, destination_id = ?, presenter = ?, tone = ?, enabled = ?, last_run_at = ?, updated_at = ? WHERE id = ?`
-  ).run(next.kind, next.title, next.body, next.language, next.destinationId, next.presenter, next.tone, next.enabled ? 1 : 0, next.lastRunAt, new Date().toISOString(), id);
+    `UPDATE script_entries SET kind = ?, title = ?, body = ?, language = ?, destination_id = ?, presenter = ?, tone = ?, duration_seconds = ?, enabled = ?, last_run_at = ?, updated_at = ? WHERE id = ?`
+  ).run(next.kind, next.title, next.body, next.language, next.destinationId, next.presenter, next.tone, next.durationSeconds, next.enabled ? 1 : 0, next.lastRunAt, new Date().toISOString(), id);
   return getScriptEntry(db, id);
 }
 
@@ -1302,6 +1329,7 @@ export type KeywordFeed = {
   hours: number;
   presenter: string;
   tone: string;
+  durationSeconds: number;
   enabled: boolean;
   lastFilledAt: string | null;
   lastError: string | null;
@@ -1318,6 +1346,7 @@ function mapKeywordFeed(row: Row): KeywordFeed {
     hours: num(row, "hours"),
     presenter: str(row, "presenter"),
     tone: str(row, "tone"),
+    durationSeconds: durationSecondsOf(row),
     enabled: num(row, "enabled") === 1,
     lastFilledAt: str(row, "last_filled_at") || null,
     lastError: str(row, "last_error") || null,
@@ -1338,23 +1367,23 @@ export function getKeywordFeed(db: GrowthDb, id: string): KeywordFeed | null {
 export function insertKeywordFeed(db: GrowthDb, input: Omit<KeywordFeed, "lastFilledAt" | "lastError" | "createdAt" | "updatedAt">): KeywordFeed {
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO keyword_feeds (id, query, language, destination_id, hours, presenter, tone, enabled, last_filled_at, last_error, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`
-  ).run(input.id, input.query, input.language, input.destinationId, input.hours, input.presenter || "", input.tone || "", input.enabled ? 1 : 0, now, now);
+    `INSERT INTO keyword_feeds (id, query, language, destination_id, hours, presenter, tone, duration_seconds, enabled, last_filled_at, last_error, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`
+  ).run(input.id, input.query, input.language, input.destinationId, input.hours, input.presenter || "", input.tone || "", input.durationSeconds || 30, input.enabled ? 1 : 0, now, now);
   return getKeywordFeed(db, input.id)!;
 }
 
 export function updateKeywordFeed(
   db: GrowthDb,
   id: string,
-  patch: Partial<Pick<KeywordFeed, "query" | "language" | "destinationId" | "hours" | "presenter" | "tone" | "enabled" | "lastFilledAt" | "lastError">>
+  patch: Partial<Pick<KeywordFeed, "query" | "language" | "destinationId" | "hours" | "presenter" | "tone" | "durationSeconds" | "enabled" | "lastFilledAt" | "lastError">>
 ): KeywordFeed | null {
   const current = getKeywordFeed(db, id);
   if (!current) return null;
   const next = { ...current, ...patch };
   db.prepare(
-    `UPDATE keyword_feeds SET query = ?, language = ?, destination_id = ?, hours = ?, presenter = ?, tone = ?, enabled = ?, last_filled_at = ?, last_error = ?, updated_at = ? WHERE id = ?`
-  ).run(next.query, next.language, next.destinationId, next.hours, next.presenter, next.tone, next.enabled ? 1 : 0, next.lastFilledAt, next.lastError, new Date().toISOString(), id);
+    `UPDATE keyword_feeds SET query = ?, language = ?, destination_id = ?, hours = ?, presenter = ?, tone = ?, duration_seconds = ?, enabled = ?, last_filled_at = ?, last_error = ?, updated_at = ? WHERE id = ?`
+  ).run(next.query, next.language, next.destinationId, next.hours, next.presenter, next.tone, next.durationSeconds, next.enabled ? 1 : 0, next.lastFilledAt, next.lastError, new Date().toISOString(), id);
   return getKeywordFeed(db, id);
 }
 

@@ -61,8 +61,9 @@ describe("keyword feeds", () => {
   it("writes scripts in the selected language for that channel", async () => {
     const opened = db();
     channel(opened.db, "kitchen", "KitchenTips");
-    const saved = saveKeywordFeed(opened.db, { query: "טיפים למטבח", language: "en", destinationId: "kitchen", hours: 4 });
+    const saved = saveKeywordFeed(opened.db, { query: "טיפים למטבח", language: "en", destinationId: "kitchen", hours: 4, durationSeconds: 300 });
     expect(saved.error).toBeNull();
+    expect(saved.feed?.durationSeconds).toBe(300);
     const filled = await fillKeywordFeed(
       { db: opened.db, key: Buffer.alloc(32), mediaDir: opened.dir, publicBase: "http://127.0.0.1:4180" },
       saved.feed!.id,
@@ -77,7 +78,7 @@ describe("keyword feeds", () => {
     expect(filled.added).toBe(1);
     const entries = listScriptEntries(opened.db);
     expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ kind: "script", language: "en", destinationId: "kitchen", feedId: saved.feed!.id, title: "How to cut an onion" });
+    expect(entries[0]).toMatchObject({ kind: "script", language: "en", destinationId: "kitchen", feedId: saved.feed!.id, title: "How to cut an onion", durationSeconds: 300 });
     expect(entries[0]?.body).not.toMatch(/\p{Script=Hebrew}/u);
     expect(saveKeywordFeed(opened.db, { query: "טיפים", language: "he" }).error).toContain("ערוץ");
   });

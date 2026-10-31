@@ -1,4 +1,5 @@
 import { slugify } from "./catalog.js";
+import { chosenDuration, durationPhrase, taskDurationSeconds } from "./duration.js";
 import { languageLock, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
 import { emptyCopy, type ItemCopy } from "./copy.js";
 import { nid } from "./crypto.js";
@@ -25,6 +26,7 @@ import {
   type TrendCycle
 } from "./db.js";
 import { downloadReelminoFinal, submitReelminoBrief } from "./produce.js";
+import { youtubeUploadBlock } from "./youtubeQuota.js";
 import { freshConnectionTokens, runPublish } from "./publish.js";
 
 type TrendContext = {
@@ -70,6 +72,7 @@ export type TrendSettings = {
   language: string;
   niche: string;
   destinationId: string | null;
+  durationSeconds: number;
 };
 
 export type YoutubeTrendClient = {
@@ -220,19 +223,22 @@ export function pickTopic(input: {
   };
 }
 
-export function contentForTrend(input: { topic: string; niche: string; language: string }): {
+export function contentForTrend(input: { topic: string; niche: string; language: string; durationSeconds?: number }): {
   title: string;
   summary: string;
   description: string;
   brief: Record<string, unknown>;
 } {
   const he = input.language.startsWith("he");
+  const durationSeconds = chosenDuration(input.durationSeconds);
+  const form = durationPhrase(durationSeconds, input.language);
+  const shortForm = durationSeconds <= 60;
   const niche = input.niche.trim();
   const title = titleInLanguage(input.topic, input.language).slice(0, 90);
   const topicInLanguage = textMatchesLanguage(input.topic, input.language);
   const summary = he
-    ? `סרטון מקורי קצר${topicInLanguage ? ` על ${input.topic}` : ""}.${niche && textMatchesLanguage(niche, input.language) ? ` הקהל: ${niche}.` : ""} מסבירים למה זה תופס תשומת לב עכשיו, ונותנים טיפ אחד שאפשר ליישם מיד.`
-    : `An original short${topicInLanguage ? ` about ${input.topic}` : ""}.${niche && textMatchesLanguage(niche, input.language) ? ` Audience: ${niche}.` : ""} Explain why people are paying attention right now, and give one tip they can use immediately.`;
+    ? `סרטון מקורי${shortForm ? " קצר" : ""}${topicInLanguage ? ` על ${input.topic}` : ""}.${niche && textMatchesLanguage(niche, input.language) ? ` הקהל: ${niche}.` : ""} מסבירים למה זה תופס תשומת לב עכשיו, ונותנים טיפ אחד שאפשר ליישם מיד.`
+    : `An original ${shortForm ? "short" : "video"}${topicInLanguage ? ` about ${input.topic}` : ""}.${niche && textMatchesLanguage(niche, input.language) ? ` Audience: ${niche}.` : ""} Explain why people are paying attention right now, and give one tip they can use immediately.`;
   const subject = topicInLanguage
     ? ""
     : he
@@ -240,8 +246,8 @@ export function contentForTrend(input: { topic: string; niche: string; language:
       : `\nSubject to cover, without copying this wording into the title or the description: ${input.topic}`;
   const instructions = `${he
     ? "תוכן מקורי בלבד. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים, בלי לוגואים של מותג אחר, ובלי לטעון שהסרטון שייך למישהו אחר. פתיח ברור בשלוש השניות הראשונות, קריינות קצרה, מסך אנכי."
-    : "Original content only. Do not copy another creator's video, script, title, or narration. No other channel names, no third-party logos, and no claim that this video belongs to someone else. Clear hook in the first three seconds, short narration, vertical frame."} ${languageLock(input.language)}`;
-  const tags = ["#Shorts", ...tokens(title).slice(0, 3).map((token) => `#${token}`)];
+    : "Original content only. Do not copy another creator's video, script, title, or narration. No other channel names, no third-party logos, and no claim that this video belongs to someone else. Clear hook in the first three seconds, short narration, vertical frame."} ${languageLock(input.language)}${he ? ` אורך הסרטון שנקבע במשימה הוא ${form}. הקריינות והמהלך ממלאים את כל האורך.` : ` The video length set for this task is ${form}. Narration and story fill that full length.`}`;
+  const tags = [...(durationSeconds <= 180 ? ["#Shorts"] : []), ...tokens(title).slice(0, 3).map((token) => `#${token}`)];
   const description = `${he ? `${title}. סרטון קצר ומקורי עם טיפ אחד ליישום.` : `${title}. An original short with one practical tip.`}\n\n${tags.join(" ")}`;
   return {
     title,
@@ -251,9 +257,9 @@ export function contentForTrend(input: { topic: string; niche: string; language:
       title,
       sourceText: summary + subject,
       instructions,
-      targetAudience: niche && textMatchesLanguage(niche, input.language) ? niche : (he ? "צופים בסרטונים קצרים ביוטיוב" : "YouTube Shorts viewers"),
+      targetAudience: niche && textMatchesLanguage(niche, input.language) ? niche : (he ? (durationSeconds <= 180 ? "צופים בסרטונים קצרים ביוטיוב" : "צופים ביוטיוב") : (durationSeconds <= 180 ? "YouTube Shorts viewers" : "YouTube viewers")),
       language: input.language,
-      durationSeconds: 30,
+      durationSeconds,
       aspectRatio: "9:16",
       budgetMode: true,
       approvalMode: "auto"
@@ -271,13 +277,14 @@ export function readTrendSettings(db: GrowthDb): TrendSettings {
     region: /^[A-Z]{2}$/.test(region) ? region : "IL",
     language: /^[a-z]{2}$/.test(language) ? language : "he",
     niche: (getSetting(db, "youtube_trends_niche") ?? "").slice(0, 200),
-    destinationId: getSetting(db, "youtube_trends_destination")?.trim() || null
+    destinationId: getSetting(db, "youtube_trends_destination")?.trim() || null,
+    durationSeconds: chosenDuration(getSetting(db, "youtube_trends_duration"))
   };
 }
 
 export function applyTrendSettings(
   db: GrowthDb,
-  patch: Partial<{ enabled: boolean; hours: number; region: string; language: string; niche: string; destinationId: string | null }>
+  patch: Partial<{ enabled: boolean; hours: number; region: string; language: string; niche: string; destinationId: string | null; durationSeconds: number }>
 ): string | null {
   if (patch.hours !== undefined && !(TREND_HOUR_OPTIONS as readonly number[]).includes(patch.hours)) {
     return "בחרו מרווח של 1, 2, 4, 6, 8, 12 או 24 שעות";
@@ -287,6 +294,9 @@ export function applyTrendSettings(
   }
   if (patch.language !== undefined && !/^[A-Za-z]{2}$/.test(patch.language.trim())) {
     return "שפה חייבת להיות קוד בן שתי אותיות";
+  }
+  if (patch.durationSeconds !== undefined && taskDurationSeconds(patch.durationSeconds) === null) {
+    return "בחרו אורך סרטון: 30 שניות, דקה, 2 דקות, 3 דקות, 5 דקות או 10 דקות";
   }
   if (patch.destinationId) {
     const row = getDestination(db, patch.destinationId);
@@ -298,6 +308,7 @@ export function applyTrendSettings(
   if (patch.language !== undefined) setSetting(db, "youtube_trends_language", patch.language.trim().toLowerCase());
   if (patch.niche !== undefined) setSetting(db, "youtube_trends_niche", patch.niche.trim().slice(0, 200));
   if (patch.destinationId !== undefined) setSetting(db, "youtube_trends_destination", patch.destinationId ?? "");
+  if (patch.durationSeconds !== undefined) setSetting(db, "youtube_trends_duration", String(patch.durationSeconds));
   return null;
 }
 
@@ -405,6 +416,8 @@ async function startCycle(ctx: TrendContext, slot: string, deps: TrendDeps): Pro
   const settings = readTrendSettings(ctx.db);
   const destination = youtubeChannel(ctx.db, settings.destinationId);
   if (!destination) return recordTerminal(ctx.db, slot, settings, "failed", MSG_CHANNEL);
+  const daily = youtubeUploadBlock(ctx.db, destination.id, deps.now);
+  if (daily) return recordTerminal(ctx.db, slot, settings, "failed", daily);
   if (!deps.submitBrief && !process.env.REELMINO_SESSION?.trim()) return recordTerminal(ctx.db, slot, settings, "failed", MSG_SESSION);
   try {
     const cycle = insertTrendCycle(ctx.db, {
@@ -494,7 +507,8 @@ async function senseAndSubmit(ctx: TrendContext, cycle: TrendCycle, deps: TrendD
     const content = contentForTrend({
       topic: picked.topic,
       niche: current.niche || settings.niche,
-      language: current.language || settings.language
+      language: current.language || settings.language,
+      durationSeconds: settings.durationSeconds
     });
     const item = insertItem(ctx.db, {
       id: nid(),
@@ -509,7 +523,7 @@ async function senseAndSubmit(ctx: TrendContext, cycle: TrendCycle, deps: TrendD
       mediaKind: null,
       mediaWidth: null,
       mediaHeight: null,
-      mediaDurationMs: null,
+      mediaDurationMs: Number(content.brief.durationSeconds) * 1000 || 30_000,
       reelminoRunId: null
     });
     current =
@@ -550,13 +564,14 @@ async function pullAndPublish(ctx: TrendContext, cycle: TrendCycle, deps: TrendD
     updateTrendCycle(ctx.db, cycle.id, { status: "producing" });
     return;
   }
+  const item = getItem(ctx.db, cycle.itemId);
   updateItem(ctx.db, cycle.itemId, {
     mediaPath: file.filename,
     mediaMime: "video/mp4",
     mediaKind: "video",
     mediaWidth: 1080,
     mediaHeight: 1920,
-    mediaDurationMs: 30_000
+    mediaDurationMs: item?.mediaDurationMs || 30_000
   });
   const publishing = updateTrendCycle(ctx.db, cycle.id, { status: "publishing", error: null });
   if (publishing) await finishPublish(ctx, publishing, deps);
