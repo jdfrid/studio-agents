@@ -14,7 +14,9 @@
     .muted { color: #4d635c; font-size: 0.92rem; }
     nav { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
     button, .tab { background: white; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.45rem 0.7rem; cursor: pointer; }
-    button.primary { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+    button.primary, .tab.active { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+    h2 { font-size: 1.05rem; margin: 0.2rem 0 0.5rem; }
+    nav.tools { padding-top: 0; }
     button.warn { background: #fff; }
     .card { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 0.9rem; margin: 0.6rem 0; }
     label { display: block; font-size: 0.85rem; margin-top: 0.55rem; }
@@ -49,12 +51,16 @@
     </form>
     <section id="app" class="hidden">
       <nav>
-        <button class="tab" type="button" data-tab="content">תוכן</button>
         <button class="tab" type="button" data-tab="accounts">חשבונות</button>
+        <button class="tab" type="button" data-tab="own">הפצת המותג</button>
+        <button class="tab" type="button" data-tab="keywords">מילות מפתח</button>
+        <button class="tab" type="button" data-tab="scripts">מאגר תסריטים</button>
+      </nav>
+      <nav class="tools">
+        <button class="tab" type="button" data-tab="trends">מגמות</button>
+        <button class="tab" type="button" data-tab="content">תוכן</button>
         <button class="tab" type="button" data-tab="groups">קבוצות</button>
         <button class="tab" type="button" data-tab="calendar">לוח</button>
-        <button class="tab" type="button" data-tab="trends">מגמות</button>
-        <button class="tab" type="button" data-tab="bank">מאגר</button>
         <button class="tab" type="button" data-tab="internet">אינטרנט</button>
         <button class="tab" type="button" data-tab="results">תוצאות</button>
         <button class="tab" type="button" data-tab="people">מפעילים</button>

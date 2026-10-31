@@ -242,8 +242,21 @@ export function migrate(db: GrowthDb): void {
   if (entryColumns.length && !entryColumns.some((column) => str(column, "name") === "feed_id")) {
     db.exec("ALTER TABLE script_entries ADD COLUMN feed_id TEXT");
   }
+  ensureTextColumn(db, "script_entries", "presenter");
+  ensureTextColumn(db, "script_entries", "tone");
+  ensureTextColumn(db, "keyword_feeds", "presenter");
+  ensureTextColumn(db, "keyword_feeds", "tone");
+  ensureTextColumn(db, "script_runs", "presenter");
+  ensureTextColumn(db, "script_runs", "tone");
   migrateFacebookGroups(db);
   seedDirectories(db);
+}
+
+function ensureTextColumn(db: GrowthDb, table: string, column: string): void {
+  const columns = rows(db.prepare(`PRAGMA table_info(${table})`).all());
+  if (columns.length && !columns.some((item) => str(item, "name") === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
+  }
 }
 
 function migrateFacebookGroups(db: GrowthDb): void {
@@ -1192,6 +1205,8 @@ export type ScriptEntry = {
   language: string;
   destinationId: string | null;
   feedId: string | null;
+  presenter: string;
+  tone: string;
   enabled: boolean;
   lastRunAt: string | null;
   createdAt: string;
@@ -1207,6 +1222,8 @@ function mapScriptEntry(row: Row): ScriptEntry {
     language: str(row, "language"),
     destinationId: str(row, "destination_id") || null,
     feedId: str(row, "feed_id") || null,
+    presenter: str(row, "presenter"),
+    tone: str(row, "tone"),
     enabled: num(row, "enabled") === 1,
     lastRunAt: str(row, "last_run_at") || null,
     createdAt: str(row, "created_at"),
@@ -1229,23 +1246,23 @@ export function insertScriptEntry(
 ): ScriptEntry {
   const now = input.createdAt ?? new Date().toISOString();
   db.prepare(
-    `INSERT INTO script_entries (id, kind, title, body, language, destination_id, feed_id, enabled, last_run_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
-  ).run(input.id, input.kind, input.title, input.body, input.language, input.destinationId, input.feedId, input.enabled === false ? 0 : 1, now, now);
+    `INSERT INTO script_entries (id, kind, title, body, language, destination_id, feed_id, presenter, tone, enabled, last_run_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
+  ).run(input.id, input.kind, input.title, input.body, input.language, input.destinationId, input.feedId, input.presenter || "", input.tone || "", input.enabled === false ? 0 : 1, now, now);
   return getScriptEntry(db, input.id)!;
 }
 
 export function updateScriptEntry(
   db: GrowthDb,
   id: string,
-  patch: Partial<Pick<ScriptEntry, "kind" | "title" | "body" | "language" | "destinationId" | "enabled" | "lastRunAt">>
+  patch: Partial<Pick<ScriptEntry, "kind" | "title" | "body" | "language" | "destinationId" | "presenter" | "tone" | "enabled" | "lastRunAt">>
 ): ScriptEntry | null {
   const current = getScriptEntry(db, id);
   if (!current) return null;
   const next = { ...current, ...patch };
   db.prepare(
-    `UPDATE script_entries SET kind = ?, title = ?, body = ?, language = ?, destination_id = ?, enabled = ?, last_run_at = ?, updated_at = ? WHERE id = ?`
-  ).run(next.kind, next.title, next.body, next.language, next.destinationId, next.enabled ? 1 : 0, next.lastRunAt, new Date().toISOString(), id);
+    `UPDATE script_entries SET kind = ?, title = ?, body = ?, language = ?, destination_id = ?, presenter = ?, tone = ?, enabled = ?, last_run_at = ?, updated_at = ? WHERE id = ?`
+  ).run(next.kind, next.title, next.body, next.language, next.destinationId, next.presenter, next.tone, next.enabled ? 1 : 0, next.lastRunAt, new Date().toISOString(), id);
   return getScriptEntry(db, id);
 }
 
@@ -1283,6 +1300,8 @@ export type KeywordFeed = {
   language: string;
   destinationId: string;
   hours: number;
+  presenter: string;
+  tone: string;
   enabled: boolean;
   lastFilledAt: string | null;
   lastError: string | null;
@@ -1297,6 +1316,8 @@ function mapKeywordFeed(row: Row): KeywordFeed {
     language: str(row, "language"),
     destinationId: str(row, "destination_id"),
     hours: num(row, "hours"),
+    presenter: str(row, "presenter"),
+    tone: str(row, "tone"),
     enabled: num(row, "enabled") === 1,
     lastFilledAt: str(row, "last_filled_at") || null,
     lastError: str(row, "last_error") || null,
@@ -1317,23 +1338,23 @@ export function getKeywordFeed(db: GrowthDb, id: string): KeywordFeed | null {
 export function insertKeywordFeed(db: GrowthDb, input: Omit<KeywordFeed, "lastFilledAt" | "lastError" | "createdAt" | "updatedAt">): KeywordFeed {
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO keyword_feeds (id, query, language, destination_id, hours, enabled, last_filled_at, last_error, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`
-  ).run(input.id, input.query, input.language, input.destinationId, input.hours, input.enabled ? 1 : 0, now, now);
+    `INSERT INTO keyword_feeds (id, query, language, destination_id, hours, presenter, tone, enabled, last_filled_at, last_error, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`
+  ).run(input.id, input.query, input.language, input.destinationId, input.hours, input.presenter || "", input.tone || "", input.enabled ? 1 : 0, now, now);
   return getKeywordFeed(db, input.id)!;
 }
 
 export function updateKeywordFeed(
   db: GrowthDb,
   id: string,
-  patch: Partial<Pick<KeywordFeed, "query" | "language" | "destinationId" | "hours" | "enabled" | "lastFilledAt" | "lastError">>
+  patch: Partial<Pick<KeywordFeed, "query" | "language" | "destinationId" | "hours" | "presenter" | "tone" | "enabled" | "lastFilledAt" | "lastError">>
 ): KeywordFeed | null {
   const current = getKeywordFeed(db, id);
   if (!current) return null;
   const next = { ...current, ...patch };
   db.prepare(
-    `UPDATE keyword_feeds SET query = ?, language = ?, destination_id = ?, hours = ?, enabled = ?, last_filled_at = ?, last_error = ?, updated_at = ? WHERE id = ?`
-  ).run(next.query, next.language, next.destinationId, next.hours, next.enabled ? 1 : 0, next.lastFilledAt, next.lastError, new Date().toISOString(), id);
+    `UPDATE keyword_feeds SET query = ?, language = ?, destination_id = ?, hours = ?, presenter = ?, tone = ?, enabled = ?, last_filled_at = ?, last_error = ?, updated_at = ? WHERE id = ?`
+  ).run(next.query, next.language, next.destinationId, next.hours, next.presenter, next.tone, next.enabled ? 1 : 0, next.lastFilledAt, next.lastError, new Date().toISOString(), id);
   return getKeywordFeed(db, id);
 }
 
@@ -1373,6 +1394,8 @@ export type ScriptRun = {
   jobId: string | null;
   remoteUrl: string | null;
   error: string | null;
+  presenter: string;
+  tone: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -1391,6 +1414,8 @@ function mapScriptRun(row: Row): ScriptRun {
     jobId: str(row, "job_id") || null,
     remoteUrl: str(row, "remote_url") || null,
     error: str(row, "error") || null,
+    presenter: str(row, "presenter"),
+    tone: str(row, "tone"),
     createdAt: str(row, "created_at"),
     updatedAt: str(row, "updated_at")
   };
@@ -1460,13 +1485,15 @@ export function insertScriptRun(
     itemId?: string | null;
     runId?: string | null;
     error?: string | null;
+    presenter?: string | null;
+    tone?: string | null;
   }
 ): ScriptRun {
   const now = new Date().toISOString();
   db.prepare(
     `INSERT INTO script_runs (
-      id, entry_id, slot_key, status, title, language, destination_id, item_id, run_id, job_id, remote_url, error, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)`
+      id, entry_id, slot_key, status, title, language, destination_id, item_id, run_id, job_id, remote_url, error, presenter, tone, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)`
   ).run(
     input.id,
     input.entryId,
@@ -1478,6 +1505,8 @@ export function insertScriptRun(
     input.itemId ?? null,
     input.runId ?? null,
     input.error ?? null,
+    input.presenter ?? "",
+    input.tone ?? "",
     now,
     now
   );

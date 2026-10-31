@@ -14,6 +14,7 @@ import {
   type GrowthDb,
   type KeywordFeed
 } from "./db.js";
+import { castValue, PRESENTERS, TONES } from "./cast.js";
 import { textMatchesLanguage } from "./languageCopy.js";
 import { freshConnectionTokens } from "./publish.js";
 import { produceBankEntry, saveScriptEntry, type BankContext, type ScriptBankDeps } from "./scriptBank.js";
@@ -55,7 +56,7 @@ export function freshIdeas(titles: string[], used: string[], limit = 5): string[
 
 export function saveKeywordFeed(
   db: GrowthDb,
-  input: { id?: string; query?: string; language?: string; destinationId?: string | null; hours?: number; enabled?: boolean }
+  input: { id?: string; query?: string; language?: string; destinationId?: string | null; hours?: number; presenter?: string; tone?: string; enabled?: boolean }
 ): { feed: KeywordFeed | null; error: string | null } {
   const query = (input.query ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
   if (query.length < 2) return { feed: null, error: "כותבים מילת מפתח" };
@@ -63,16 +64,26 @@ export function saveKeywordFeed(
   if (!/^[a-z]{2}$/.test(language)) return { feed: null, error: "שפה חייבת להיות קוד בן שתי אותיות" };
   const hours = input.hours ?? 4;
   if (!(FEED_HOUR_OPTIONS as readonly number[]).includes(hours)) return { feed: null, error: "בחרו מרווח של 1, 2, 4, 6, 8, 12 או 24 שעות" };
+  const presenter = input.presenter === undefined ? undefined : castValue(input.presenter, PRESENTERS);
+  const tone = input.tone === undefined ? undefined : castValue(input.tone, TONES);
   const destinationId = input.destinationId?.trim() || "";
   const destination = destinationId ? getDestination(db, destinationId) : null;
   if (!destination || destination.network !== "youtube" || destination.kind !== "channel" || !destination.enabled) {
     return { feed: null, error: "בחרו ערוץ יוטיוב פעיל" };
   }
   if (input.id) {
-    const updated = updateKeywordFeed(db, input.id, { query, language, destinationId, hours, ...(typeof input.enabled === "boolean" ? { enabled: input.enabled } : {}) });
+    const updated = updateKeywordFeed(db, input.id, {
+      query,
+      language,
+      destinationId,
+      hours,
+      ...(presenter !== undefined ? { presenter } : {}),
+      ...(tone !== undefined ? { tone } : {}),
+      ...(typeof input.enabled === "boolean" ? { enabled: input.enabled } : {})
+    });
     return updated ? { feed: updated, error: null } : { feed: null, error: "מילת המפתח לא נמצאה" };
   }
-  return { feed: insertKeywordFeed(db, { id: nid(), query, language, destinationId, hours, enabled: input.enabled === true }), error: null };
+  return { feed: insertKeywordFeed(db, { id: nid(), query, language, destinationId, hours, presenter: presenter ?? "", tone: tone ?? "", enabled: input.enabled === true }), error: null };
 }
 
 export function keywordFeedView(db: GrowthDb): { feeds: KeywordFeed[] } {

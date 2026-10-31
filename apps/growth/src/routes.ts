@@ -576,20 +576,22 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
   });
 
   app.post("/api/script-bank/entries", async (request, reply) => {
-    const body = (request.body ?? {}) as { kind?: string; title?: string; body?: string; language?: string; destinationId?: string | null };
+    const body = (request.body ?? {}) as { kind?: string; title?: string; body?: string; language?: string; destinationId?: string | null; presenter?: string; tone?: string };
     const saved = saveScriptEntry(ctx.db, {
       kind: body.kind ?? "",
       title: body.title,
       body: body.body ?? "",
       language: body.language,
-      destinationId: body.destinationId
+      destinationId: body.destinationId,
+      presenter: body.presenter,
+      tone: body.tone
     });
     if (saved.error) return reply.code(400).send({ error: saved.error });
     return scriptBankView(ctx.db);
   });
 
   app.patch("/api/script-bank/entries/:id", async (request, reply) => {
-    const body = (request.body ?? {}) as { kind?: string; title?: string; body?: string; language?: string; destinationId?: string | null; enabled?: boolean };
+    const body = (request.body ?? {}) as { kind?: string; title?: string; body?: string; language?: string; destinationId?: string | null; presenter?: string; tone?: string; enabled?: boolean };
     const current = listScriptEntries(ctx.db).find((row) => row.id === (request.params as { id: string }).id);
     if (!current) return reply.code(404).send({ error: "הפריט לא נמצא" });
     const saved = saveScriptEntry(ctx.db, {
@@ -599,6 +601,8 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
       body: body.body ?? current.body,
       language: body.language ?? current.language,
       destinationId: body.destinationId === undefined ? current.destinationId : body.destinationId,
+      presenter: body.presenter === undefined ? current.presenter : body.presenter,
+      tone: body.tone === undefined ? current.tone : body.tone,
       enabled: body.enabled ?? current.enabled
     });
     if (saved.error) return reply.code(400).send({ error: saved.error });
@@ -620,14 +624,14 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
   });
 
   app.post("/api/keyword-feeds", async (request, reply) => {
-    const body = (request.body ?? {}) as { query?: string; language?: string; destinationId?: string | null; hours?: number; enabled?: boolean };
+    const body = (request.body ?? {}) as { query?: string; language?: string; destinationId?: string | null; hours?: number; presenter?: string; tone?: string; enabled?: boolean };
     const saved = saveKeywordFeed(ctx.db, body);
     if (saved.error || !saved.feed) return reply.code(400).send({ error: saved.error ?? "מילת המפתח לא נשמרה" });
     return { ...keywordFeedView(ctx.db), feed: saved.feed };
   });
 
   app.patch("/api/keyword-feeds/:id", async (request, reply) => {
-    const body = (request.body ?? {}) as { query?: string; language?: string; destinationId?: string | null; hours?: number; enabled?: boolean };
+    const body = (request.body ?? {}) as { query?: string; language?: string; destinationId?: string | null; hours?: number; presenter?: string; tone?: string; enabled?: boolean };
     const current = keywordFeedView(ctx.db).feeds.find((row) => row.id === (request.params as { id: string }).id);
     if (!current) return reply.code(404).send({ error: "מילת המפתח לא נמצאה" });
     const saved = saveKeywordFeed(ctx.db, {
@@ -636,6 +640,8 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
       language: body.language ?? current.language,
       destinationId: body.destinationId === undefined ? current.destinationId : body.destinationId,
       hours: body.hours ?? current.hours,
+      presenter: body.presenter === undefined ? current.presenter : body.presenter,
+      tone: body.tone === undefined ? current.tone : body.tone,
       enabled: body.enabled ?? current.enabled
     });
     if (saved.error) return reply.code(400).send({ error: saved.error });

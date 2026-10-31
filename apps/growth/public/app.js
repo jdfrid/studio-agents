@@ -30,12 +30,15 @@ async function refresh() {
 }
 
 function render() {
+  document.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
   if (tab === "content") renderContent();
   else if (tab === "accounts") renderAccounts();
   else if (tab === "groups") renderGroups();
   else if (tab === "calendar") renderCalendar();
   else if (tab === "trends") renderTrends();
-  else if (tab === "bank") renderScriptBank();
+  else if (tab === "own" || tab === "bank") renderOwn();
+  else if (tab === "keywords") renderKeywords();
+  else if (tab === "scripts") renderKeywordScripts();
   else if (tab === "internet") renderInternet();
   else if (tab === "results") renderResults();
   else renderPeople();
@@ -147,6 +150,38 @@ const NETWORK_LABELS = {
   telegram: "טלגרם",
   linkedin: "לינקדאין"
 };
+const NETWORK_UNIT = {
+  youtube: "ערוצים",
+  facebook: "עמודים",
+  instagram: "חשבונות",
+  tiktok: "חשבונות",
+  linkedin: "עמודים",
+  telegram: "ערוצים",
+  x: "חשבונות",
+  reddit: "קהילות"
+};
+
+function destinationCards() {
+  const grouped = new Map();
+  for (const row of state.destinations) {
+    if (!grouped.has(row.network)) grouped.set(row.network, []);
+    grouped.get(row.network).push(row);
+  }
+  return [...grouped.entries()].map(([network, rows]) => `<div class="card">
+    <h2>${esc(NETWORK_LABELS[network] || network)} — ${esc(NETWORK_UNIT[network] || "יעדים")}</h2>
+    <table>
+      <thead><tr><th>שם</th><th>מזהה</th><th>פעיל</th><th>אוטומטי</th></tr></thead>
+      <tbody>
+        ${rows.map((row) => `<tr>
+          <td>${esc(row.name)}</td>
+          <td>${esc(row.handle || row.externalId || "")}</td>
+          <td><input type="checkbox" data-flag="enabled" data-id="${row.id}" ${row.enabled ? "checked" : ""}></td>
+          <td><input type="checkbox" data-flag="autopilot" data-id="${row.id}" ${row.autopilot ? "checked" : ""}></td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>`).join("");
+}
 
 function renderAccounts() {
   const connectable = state.networks.filter((row) => row.oauth || row.network === "telegram");
@@ -172,19 +207,8 @@ function renderAccounts() {
         <button type="button" data-sync="${row.id}">רענון יעדים</button>
         <button type="button" data-drop="${row.id}">ניתוק</button></p>`).join("") || "<p>אין חשבונות</p>"}
     </div>
-    <div class="card">
-      <table>
-        <thead><tr><th>יעד</th><th>רשת</th><th>פעיל</th><th>אוטומטי</th></tr></thead>
-        <tbody>
-          ${state.destinations.map((row) => `<tr>
-            <td>${esc(row.name)}</td><td>${esc(row.network)}</td>
-            <td><input type="checkbox" data-flag="enabled" data-id="${row.id}" ${row.enabled ? "checked" : ""}></td>
-            <td><input type="checkbox" data-flag="autopilot" data-id="${row.id}" ${row.autopilot ? "checked" : ""}></td>
-          </tr>`).join("")}
-        </tbody>
-      </table>
-      <p class="muted">ברירת המחדל ידנית. אוטומטי מפרסם חריץ שמגיע לזמן בלי אישור נוסף. כיבוי יעד עוצר רק אותו.</p>
-    </div>
+    <p class="muted">לכל רשת מופיעים היעדים שלה: ערוץ, עמוד או חשבון. ברירת המחדל ידנית. אוטומטי מפרסם חריץ שמגיע לזמן בלי אישור נוסף. קבוצות לפרסום ידני נמצאות בלשונית קבוצות.</p>
+    ${destinationCards() || `<div class="card"><p>אחרי החיבור לחצו רענון יעדים כדי לראות ערוצים ועמודים.</p></div>`}
   `;
   panel.querySelectorAll("[data-connect]").forEach((button) => {
     button.onclick = () => run(async () => {
@@ -458,140 +482,92 @@ function madeLabel(row) {
   return `נוצר · שוב ב-${formatted}`;
 }
 
-function renderScriptBank() {
+const PRESENTER_OPTIONS = [["", "אוטומטי"], ["woman", "אישה"], ["man", "גבר"]];
+const TONE_OPTIONS = [["", "אוטומטי"], ["serious", "רציני"], ["playful", "היתולי"]];
+
+function choiceSelect(attr, id, value, options) {
+  return `<select data-${attr}="${id}">${options.map(([option, label]) => `<option value="${option}" ${value === option ? "selected" : ""}>${label}</option>`).join("")}</select>`;
+}
+
+function productionContext() {
   const bank = state.scriptBank || { enabled: false, hours: 4, destinationId: "", entries: [], runs: [] };
   const feeds = state.keywordFeeds?.feeds || [];
   const channels = state.destinations.filter((row) => row.network === "youtube" && row.kind === "channel" && row.enabled);
-  const options = (selected) => `<option value="">ערוץ ברירת המחדל</option>${channels.map((row) => `<option value="${esc(row.id)}" ${selected === row.id ? "selected" : ""}>${esc(channelLabel(row))}</option>`).join("")}`;
+  const options = (selected, blank) => `${blank ? `<option value="">${esc(blank)}</option>` : ""}${channels.map((row) => `<option value="${esc(row.id)}" ${selected === row.id ? "selected" : ""}>${esc(channelLabel(row))}</option>`).join("")}`;
   const nameOf = (id) => {
     const row = state.destinations.find((item) => item.id === id);
     return row ? channelLabel(row) : "ברירת המחדל";
   };
-  panel.innerHTML = `
-    <div class="card">
-      <p class="muted">כל פריט הוא מילות מפתח או תסריט. כל ${esc(bank.hours)} שעות, כשהמאגר פועל, נשלח הפריט הבא להפקה ועולה לערוץ שלו. פריט שכבר הפך לסרטון מסומן ולא נבחר שוב במשך שבוע. הרצה ידנית באמצע לא מחליפה את המשלוח לפי המרווח. הסרטון מקורי, 30 שניות, אנכי. כל סרטון משתמש בקרדיטים של חשבון הסטודיו.</p>
-      <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${channels.length ? "אפשר לבחור ערוץ מחובר." : "חברו ערוץ יוטיוב בלשונית חשבונות. ערוץ שלא חובר לא מופיע כאן."}</p>
-      <label><input id="bank-enabled" type="checkbox" ${bank.enabled ? "checked" : ""}> הפעלה אוטומטית</label>
-      <label>מרווח
-        <select id="bank-hours">
-          ${[1, 2, 4, 6, 8, 12, 24].map((hours) => `<option value="${hours}" ${Number(bank.hours) === hours ? "selected" : ""}>${hours} שעות</option>`).join("")}
-        </select>
-      </label>
-      <label>ערוץ ברירת מחדל
-        <select id="bank-destination">${options(bank.destinationId || "")}</select>
-      </label>
-      <div class="row">
-        <button class="primary" type="button" id="bank-save">שמירה</button>
-        <button type="button" id="bank-run">הפריט הבא עכשיו</button>
-      </div>
-    </div>
-    <div class="card">
-      <p class="muted">מילת מפתח לכל ערוץ. המערכת מחפשת נושאים, כותבת תסריטים מקוריים בשפה שנבחרה, וכשהשורה פעילה מפיצה סרטון לערוץ לפי המרווח שלה. כל ערוץ רץ בנפרד. הרצה ידנית באמצע לא מחליפה את המשלוח הקבוע.</p>
-      <label>מילת מפתח<input id="feed-query" dir="auto" placeholder="טיפים למטבח"></label>
-      <label>שפה
-        <select id="feed-language">
-          <option value="he">עברית</option>
-          <option value="en">English</option>
-        </select>
-      </label>
-      <label>ערוץ
-        <select id="feed-destination">${channels.length ? channels.map((row) => `<option value="${esc(row.id)}">${esc(channelLabel(row))}</option>`).join("") : `<option value="">אין ערוץ מחובר</option>`}</select>
-      </label>
-      <label>מרווח
-        <select id="feed-hours">
-          ${[1, 2, 4, 6, 8, 12, 24].map((hours) => `<option value="${hours}" ${hours === 4 ? "selected" : ""}>${hours} שעות</option>`).join("")}
-        </select>
-      </label>
-      <p class="row"><button class="primary" type="button" id="feed-add">הוספה ומילוי תסריטים</button></p>
-      <table>
-        <thead><tr><th>מילת מפתח</th><th>שפה</th><th>ערוץ</th><th>מרווח</th><th>פעיל</th><th></th></tr></thead>
-        <tbody>
-          ${feeds.map((row) => `<tr>
-            <td>${esc(row.query)}${row.lastError ? `<div class="error">${esc(row.lastError)}</div>` : ""}</td>
-            <td>${row.language === "en" ? "English" : "עברית"}</td>
-            <td>${esc(nameOf(row.destinationId))}</td>
-            <td>${esc(row.hours)} שעות</td>
-            <td><input type="checkbox" data-feed-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
-            <td>
-              <button type="button" data-feed-fill="${row.id}">מילוי</button>
-              <button type="button" data-feed-drop="${row.id}">מחיקה</button>
-            </td>
-          </tr>`).join("") || "<tr><td colspan='6'>אין מילות מפתח</td></tr>"}
-        </tbody>
-      </table>
-    </div>
-    <div class="card">
-      <label>סוג
-        <select id="bank-kind">
-          <option value="keywords">מילות מפתח</option>
-          <option value="script">תסריט</option>
-        </select>
-      </label>
-      <label>כותרת<input id="bank-title" dir="auto" maxlength="90" placeholder="הכותרת ביוטיוב, כמו שתיכתב. אפשר להשאיר ריק"></label>
-      <label>טקסט<textarea id="bank-body" dir="auto" placeholder="מילות מפתח מופרדות בפסיק, או תסריט מלא"></textarea></label>
-      <label>שפה
-        <select id="bank-language">
-          <option value="he">עברית</option>
-          <option value="en">English</option>
-        </select>
-      </label>
-      <label>ערוץ לפריט הזה
-        <select id="bank-entry-destination">${options("")}</select>
-      </label>
-      <p class="row"><button class="primary" type="button" id="bank-add">הוספה למאגר</button></p>
-    </div>
-    <div class="card">
-      <table>
-        <thead><tr><th>סוג</th><th>כותרת</th><th>טקסט</th><th>ערוץ</th><th>מצב</th><th>פעיל</th><th></th></tr></thead>
-        <tbody>
-          ${(bank.entries || []).map((row) => `<tr>
-            <td>${row.kind === "script" ? "תסריט" : "מילות מפתח"}</td>
-            <td><input data-bank-title="${row.id}" dir="auto" maxlength="90" value="${esc(row.title || "")}" placeholder="כותרת ביוטיוב"></td>
-            <td>${esc(row.body.slice(0, 120))}</td>
-            <td>${esc(nameOf(row.destinationId))}</td>
-            <td>${esc(madeLabel(row))}</td>
-            <td><input type="checkbox" data-bank-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
-            <td>
-              <button type="button" data-bank-run="${row.id}" ${entryCooling(row) ? "disabled" : ""}>הרצה</button>
-              <button type="button" data-bank-drop="${row.id}">מחיקה</button>
-            </td>
-          </tr>`).join("") || "<tr><td colspan='7'>אין פריטים במאגר</td></tr>"}
-        </tbody>
-      </table>
-    </div>
-    <div class="card">
-      <table>
-        <thead><tr><th>זמן</th><th>נושא</th><th>ערוץ</th><th>מצב</th><th>קישור</th></tr></thead>
-        <tbody>
-          ${(bank.runs || []).map((row) => `<tr>
-            <td>${esc((row.createdAt || "").replace("T", " ").slice(0, 16))}</td>
-            <td>${esc(row.title || "—")}</td>
-            <td>${esc(nameOf(row.destinationId))}</td>
-            <td>${esc(BANK_STATUS[row.status] || row.status)}${row.error ? `<div class="error">${esc(row.error)}</div>` : ""}</td>
-            <td>${row.remoteUrl ? `<a href="${esc(row.remoteUrl)}" target="_blank" rel="noreferrer">סרטון</a>` : ""}</td>
-          </tr>`).join("")}
-        </tbody>
-      </table>
-    </div>
-  `;
+  const feedOf = (id) => feeds.find((row) => row.id === id);
+  const feedIds = new Set((bank.entries || []).filter((row) => row.feedId).map((row) => row.id));
+  return { bank, feeds, channels, options, nameOf, feedOf, feedIds };
+}
+
+function entryRows(entries, ctx, withKeyword) {
+  return entries.map((row) => `<tr>
+    <td>${row.kind === "script" ? "תסריט" : "מילות מפתח"}</td>
+    ${withKeyword ? `<td>${esc(ctx.feedOf(row.feedId)?.query || "—")}</td>` : ""}
+    <td><input data-bank-title="${row.id}" dir="auto" maxlength="90" value="${esc(row.title || "")}" placeholder="כותרת ביוטיוב"></td>
+    <td>${esc(row.body.slice(0, 120))}</td>
+    <td>${esc(ctx.nameOf(row.destinationId))}</td>
+    <td>${choiceSelect("bank-presenter", row.id, row.presenter || "", PRESENTER_OPTIONS)}</td>
+    <td>${choiceSelect("bank-tone", row.id, row.tone || "", TONE_OPTIONS)}</td>
+    <td>${esc(madeLabel(row))}</td>
+    <td><input type="checkbox" data-bank-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
+    <td>
+      <button type="button" data-bank-run="${row.id}" ${entryCooling(row) ? "disabled" : ""}>הרצה</button>
+      <button type="button" data-bank-drop="${row.id}">מחיקה</button>
+    </td>
+  </tr>`).join("");
+}
+
+function runRows(runs, ctx) {
+  return runs.map((row) => `<tr>
+    <td>${esc((row.createdAt || "").replace("T", " ").slice(0, 16))}</td>
+    <td>${esc(row.title || "—")}</td>
+    <td>${esc(ctx.nameOf(row.destinationId))}</td>
+    <td>${esc(BANK_STATUS[row.status] || row.status)}${row.error ? `<div class="error">${esc(row.error)}</div>` : ""}</td>
+    <td>${row.remoteUrl ? `<a href="${esc(row.remoteUrl)}" target="_blank" rel="noreferrer">סרטון</a>` : ""}</td>
+  </tr>`).join("");
+}
+
+function bindProduction() {
   const settings = () => ({
     enabled: panel.querySelector("#bank-enabled").checked,
     hours: Number(panel.querySelector("#bank-hours").value),
     destinationId: panel.querySelector("#bank-destination").value || null
   });
-  panel.querySelector("#bank-save").onclick = () => run(() => api("/api/script-bank", { method: "PATCH", body: JSON.stringify(settings()) }));
-  panel.querySelector("#bank-run").onclick = () => run(async () => {
+  const save = panel.querySelector("#bank-save");
+  if (save) save.onclick = () => run(() => api("/api/script-bank", { method: "PATCH", body: JSON.stringify(settings()) }));
+  const runNext = panel.querySelector("#bank-run");
+  if (runNext) runNext.onclick = () => run(async () => {
     await api("/api/script-bank", { method: "PATCH", body: JSON.stringify(settings()) });
     return api("/api/script-bank/run", { method: "POST", body: "{}" });
   });
-  panel.querySelector("#feed-add").onclick = () => run(async () => {
+  const add = panel.querySelector("#bank-add");
+  if (add) add.onclick = () => run(() => api("/api/script-bank/entries", {
+    method: "POST",
+    body: JSON.stringify({
+      kind: panel.querySelector("#bank-kind").value,
+      title: panel.querySelector("#bank-title").value,
+      body: panel.querySelector("#bank-body").value,
+      language: panel.querySelector("#bank-language").value,
+      destinationId: panel.querySelector("#bank-entry-destination").value || null,
+      presenter: panel.querySelector("#bank-presenter").value,
+      tone: panel.querySelector("#bank-tone").value
+    })
+  }));
+  const feedAdd = panel.querySelector("#feed-add");
+  if (feedAdd) feedAdd.onclick = () => run(async () => {
     const created = await api("/api/keyword-feeds", {
       method: "POST",
       body: JSON.stringify({
         query: panel.querySelector("#feed-query").value,
         language: panel.querySelector("#feed-language").value,
         destinationId: panel.querySelector("#feed-destination").value || null,
-        hours: Number(panel.querySelector("#feed-hours").value)
+        hours: Number(panel.querySelector("#feed-hours").value),
+        presenter: panel.querySelector("#feed-presenter").value,
+        tone: panel.querySelector("#feed-tone").value
       })
     });
     try {
@@ -601,8 +577,17 @@ function renderScriptBank() {
       throw error;
     }
   });
+  panel.querySelectorAll("[data-open-tab]").forEach((button) => {
+    button.onclick = () => { tab = button.dataset.openTab; render(); };
+  });
   panel.querySelectorAll("[data-feed-enabled]").forEach((box) => {
     box.onchange = () => run(() => api(`/api/keyword-feeds/${box.dataset.feedEnabled}`, { method: "PATCH", body: JSON.stringify({ enabled: box.checked }) }));
+  });
+  panel.querySelectorAll("[data-feed-presenter]").forEach((select) => {
+    select.onchange = () => run(() => api(`/api/keyword-feeds/${select.dataset.feedPresenter}`, { method: "PATCH", body: JSON.stringify({ presenter: select.value }) }));
+  });
+  panel.querySelectorAll("[data-feed-tone]").forEach((select) => {
+    select.onchange = () => run(() => api(`/api/keyword-feeds/${select.dataset.feedTone}`, { method: "PATCH", body: JSON.stringify({ tone: select.value }) }));
   });
   panel.querySelectorAll("[data-feed-fill]").forEach((button) => {
     button.onclick = () => run(() => api(`/api/keyword-feeds/${button.dataset.feedFill}/fill`, { method: "POST", body: "{}" }));
@@ -610,18 +595,14 @@ function renderScriptBank() {
   panel.querySelectorAll("[data-feed-drop]").forEach((button) => {
     button.onclick = () => run(() => api(`/api/keyword-feeds/${button.dataset.feedDrop}`, { method: "DELETE" }));
   });
-  panel.querySelector("#bank-add").onclick = () => run(() => api("/api/script-bank/entries", {
-    method: "POST",
-    body: JSON.stringify({
-      kind: panel.querySelector("#bank-kind").value,
-      title: panel.querySelector("#bank-title").value,
-      body: panel.querySelector("#bank-body").value,
-      language: panel.querySelector("#bank-language").value,
-      destinationId: panel.querySelector("#bank-entry-destination").value || null
-    })
-  }));
   panel.querySelectorAll("[data-bank-title]").forEach((input) => {
     input.onchange = () => run(() => api(`/api/script-bank/entries/${input.dataset.bankTitle}`, { method: "PATCH", body: JSON.stringify({ title: input.value }) }));
+  });
+  panel.querySelectorAll("[data-bank-presenter]").forEach((select) => {
+    select.onchange = () => run(() => api(`/api/script-bank/entries/${select.dataset.bankPresenter}`, { method: "PATCH", body: JSON.stringify({ presenter: select.value }) }));
+  });
+  panel.querySelectorAll("[data-bank-tone]").forEach((select) => {
+    select.onchange = () => run(() => api(`/api/script-bank/entries/${select.dataset.bankTone}`, { method: "PATCH", body: JSON.stringify({ tone: select.value }) }));
   });
   panel.querySelectorAll("[data-bank-enabled]").forEach((box) => {
     box.onchange = () => run(() => api(`/api/script-bank/entries/${box.dataset.bankEnabled}`, { method: "PATCH", body: JSON.stringify({ enabled: box.checked }) }));
@@ -632,6 +613,147 @@ function renderScriptBank() {
   panel.querySelectorAll("[data-bank-drop]").forEach((button) => {
     button.onclick = () => run(() => api(`/api/script-bank/entries/${button.dataset.bankDrop}`, { method: "DELETE" }));
   });
+}
+
+function renderOwn() {
+  const ctx = productionContext();
+  const entries = (ctx.bank.entries || []).filter((row) => !row.feedId);
+  const runs = (ctx.bank.runs || []).filter((row) => !ctx.feedIds.has(row.entryId));
+  panel.innerHTML = `
+    <div class="card">
+      <h2>הפצת המותג</h2>
+      <p class="muted">תסריטים לפרסום של המערכת עצמה. כל ${esc(ctx.bank.hours)} שעות, כשההפעלה פועלת, נוצר סרטון מהפריט הבא ועולה לערוץ שלו. הרצה ידנית באמצע לא מחליפה את המועד. פריט שכבר הפך לסרטון לא נבחר שוב במשך שבוע.</p>
+      <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${ctx.channels.length ? "" : "חברו ערוץ יוטיוב בלשונית חשבונות."}</p>
+      <label><input id="bank-enabled" type="checkbox" ${ctx.bank.enabled ? "checked" : ""}> הפקה אוטומטית</label>
+      <label>מרווח
+        <select id="bank-hours">
+          ${[1, 2, 4, 6, 8, 12, 24].map((hours) => `<option value="${hours}" ${Number(ctx.bank.hours) === hours ? "selected" : ""}>${hours} שעות</option>`).join("")}
+        </select>
+      </label>
+      <label>ערוץ ברירת מחדל
+        <select id="bank-destination">${ctx.options(ctx.bank.destinationId || "", "ערוץ ברירת המחדל")}</select>
+      </label>
+      <div class="row">
+        <button class="primary" type="button" id="bank-save">שמירה</button>
+        <button type="button" id="bank-run">הפריט הבא עכשיו</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>תסריט חדש</h2>
+      <label>סוג
+        <select id="bank-kind">
+          <option value="script">תסריט</option>
+          <option value="keywords">מילות מפתח</option>
+        </select>
+      </label>
+      <label>כותרת<input id="bank-title" dir="auto" maxlength="90" placeholder="הכותרת ביוטיוב, כמו שתיכתב. אפשר להשאיר ריק"></label>
+      <label>טקסט<textarea id="bank-body" dir="auto" placeholder="תסריט מלא, או מילות מפתח מופרדות בפסיק"></textarea></label>
+      <label>שפה
+        <select id="bank-language">
+          <option value="he">עברית</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <label>ערוץ<select id="bank-entry-destination">${ctx.options("", "ערוץ ברירת המחדל")}</select></label>
+      <label>מגיש<select id="bank-presenter">${PRESENTER_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label>
+      <label>טון<select id="bank-tone">${TONE_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label>
+      <p class="muted">אם המגיש או הטון נשארים על אוטומטי, ההפקה בוחרת אישה או גבר, רציני או היתולי, בלי לחזור יותר מדי על אותו סוג.</p>
+      <p class="row"><button class="primary" type="button" id="bank-add">הוספה</button></p>
+    </div>
+    <div class="card">
+      <h2>תסריטים</h2>
+      <table>
+        <thead><tr><th>סוג</th><th>כותרת</th><th>טקסט</th><th>ערוץ</th><th>מגיש</th><th>טון</th><th>מצב</th><th>פעיל</th><th></th></tr></thead>
+        <tbody>${entryRows(entries, ctx, false) || "<tr><td colspan='9'>אין תסריטים להפצת המותג</td></tr>"}</tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>הפקות</h2>
+      <table>
+        <thead><tr><th>זמן</th><th>נושא</th><th>ערוץ</th><th>מצב</th><th>קישור</th></tr></thead>
+        <tbody>${runRows(runs, ctx) || "<tr><td colspan='5'>עדיין אין</td></tr>"}</tbody>
+      </table>
+    </div>
+  `;
+  bindProduction();
+}
+
+function renderKeywords() {
+  const ctx = productionContext();
+  const runs = (ctx.bank.runs || []).filter((row) => ctx.feedIds.has(row.entryId));
+  panel.innerHTML = `
+    <div class="card">
+      <h2>יצירה לפי מילת מפתח</h2>
+      <p class="muted">לכל מילת מפתח יש ערוץ ומרווח. המערכת כותבת תסריטים למאגר, מפיקה מהם סרטון ומפיצה לערוץ. הרצה ידנית באמצע לא מחליפה את המשלוח הקבוע.</p>
+      <label>מילת מפתח<input id="feed-query" dir="auto" placeholder="טיפים למטבח"></label>
+      <label>שפה
+        <select id="feed-language">
+          <option value="he">עברית</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <label>ערוץ
+        <select id="feed-destination">${ctx.channels.length ? ctx.channels.map((row) => `<option value="${esc(row.id)}">${esc(channelLabel(row))}</option>`).join("") : `<option value="">אין ערוץ מחובר</option>`}</select>
+      </label>
+      <label>מרווח
+        <select id="feed-hours">
+          ${[1, 2, 4, 6, 8, 12, 24].map((hours) => `<option value="${hours}" ${hours === 4 ? "selected" : ""}>${hours} שעות</option>`).join("")}
+        </select>
+      </label>
+      <label>מגיש<select id="feed-presenter">${PRESENTER_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label>
+      <label>טון<select id="feed-tone">${TONE_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label>
+      <p class="row"><button class="primary" type="button" id="feed-add">הוספה ומילוי תסריטים</button> <button type="button" data-open-tab="scripts">מאגר התסריטים</button></p>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>מילת מפתח</th><th>שפה</th><th>ערוץ</th><th>מרווח</th><th>מגיש</th><th>טון</th><th>תסריטים</th><th>פעיל</th><th></th></tr></thead>
+        <tbody>
+          ${ctx.feeds.map((row) => `<tr>
+            <td>${esc(row.query)}${row.lastError ? `<div class="error">${esc(row.lastError)}</div>` : ""}</td>
+            <td>${row.language === "en" ? "English" : "עברית"}</td>
+            <td>${esc(ctx.nameOf(row.destinationId))}</td>
+            <td>${esc(row.hours)} שעות</td>
+            <td>${choiceSelect("feed-presenter", row.id, row.presenter || "", PRESENTER_OPTIONS)}</td>
+            <td>${choiceSelect("feed-tone", row.id, row.tone || "", TONE_OPTIONS)}</td>
+            <td>${(ctx.bank.entries || []).filter((entry) => entry.feedId === row.id).length}</td>
+            <td><input type="checkbox" data-feed-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td>
+            <td>
+              <button type="button" data-feed-fill="${row.id}">מילוי</button>
+              <button type="button" data-feed-drop="${row.id}">מחיקה</button>
+            </td>
+          </tr>`).join("") || "<tr><td colspan='9'>אין מילות מפתח</td></tr>"}
+        </tbody>
+      </table>
+      <p class="muted">סימון פעיל מתזמן הפקה והפצה לערוץ של השורה. המילוי רק מוסיף תסריטים למאגר.</p>
+    </div>
+    <div class="card">
+      <h2>הפצות אחרונות</h2>
+      <table>
+        <thead><tr><th>זמן</th><th>נושא</th><th>ערוץ</th><th>מצב</th><th>קישור</th></tr></thead>
+        <tbody>${runRows(runs, ctx) || "<tr><td colspan='5'>עדיין אין</td></tr>"}</tbody>
+      </table>
+    </div>
+  `;
+  bindProduction();
+}
+
+function renderKeywordScripts() {
+  const ctx = productionContext();
+  const entries = (ctx.bank.entries || []).filter((row) => row.feedId);
+  panel.innerHTML = `
+    <div class="card">
+      <h2>מאגר תסריטים לפי מילות מפתח</h2>
+      <p class="muted">המאגר הזה עומד בפני עצמו. מילות המפתח כותבות לתוכו, וההפקה האוטומטית לוקחת ממנו את התסריט הבא. אפשר גם להריץ תסריט אחד מכאן.</p>
+      <p class="row"><button type="button" data-open-tab="keywords">חזרה למילות המפתח</button></p>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>סוג</th><th>מילת מפתח</th><th>כותרת</th><th>טקסט</th><th>ערוץ</th><th>מגיש</th><th>טון</th><th>מצב</th><th>פעיל</th><th></th></tr></thead>
+        <tbody>${entryRows(entries, ctx, true) || "<tr><td colspan='10'>אין תסריטים. מוסיפים מילת מפתח וממלאים.</td></tr>"}</tbody>
+      </table>
+    </div>
+  `;
+  bindProduction();
 }
 
 function renderCalendar() {

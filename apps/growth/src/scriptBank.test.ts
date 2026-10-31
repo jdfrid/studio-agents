@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { balancedPick } from "./cast.js";
 import { emptyCopy } from "./copy.js";
 import { listScriptRuns, openDb, upsertDestination, type GrowthDb } from "./db.js";
 import { publishCopy } from "./publish.js";
@@ -50,6 +51,14 @@ function channel(opened: GrowthDb, id: string, name: string): void {
 }
 
 describe("script bank", () => {
+  it("balances presenter and tone when they were not chosen", () => {
+    expect(balancedPick(["woman", "woman", "woman"], ["woman", "man"], () => 0.9)).toBe("man");
+    expect(balancedPick(["serious", "playful"], ["serious", "playful"], () => 0)).toBe("serious");
+    const brief = briefForEntry({ kind: "script", body: "פותחים את המקרר.\nסוגרים אותו.", language: "he", cast: { presenter: "woman", tone: "playful" } });
+    expect(String(brief.brief.instructions)).toContain("אישה");
+    expect(String(brief.brief.instructions)).toContain("היתולי");
+  });
+
   it("turns keywords into an original brief and keeps a saved script", () => {
     const keywords = briefForEntry({ kind: "keywords", body: "חיתוך בצל, סכין חדה", language: "he" });
     expect(keywords.brief.aspectRatio).toBe("9:16");

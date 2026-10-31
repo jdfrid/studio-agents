@@ -1,4 +1,5 @@
 import { slugify } from "./catalog.js";
+import { castInstruction, castValue, PRESENTERS, resolveCast, TONES } from "./cast.js";
 import { languageLock, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
 import { emptyCopy, type ItemCopy } from "./copy.js";
 import { nid } from "./crypto.js";
@@ -7,6 +8,7 @@ import {
   getDestination,
   getItem,
   getJob,
+  getKeywordFeed,
   getScriptEntry,
   getScriptRun,
   getSetting,
@@ -102,7 +104,7 @@ export function applyScriptBankSettings(
 
 export function saveScriptEntry(
   db: GrowthDb,
-  input: { id?: string; kind: string; title?: string; body: string; language?: string; destinationId?: string | null; feedId?: string | null; enabled?: boolean; createdAt?: string }
+  input: { id?: string; kind: string; title?: string; body: string; language?: string; destinationId?: string | null; feedId?: string | null; presenter?: string; tone?: string; enabled?: boolean; createdAt?: string }
 ): { entry: ScriptEntry | null; error: string | null } {
   const kind = input.kind === "script" ? "script" : input.kind === "keywords" ? "keywords" : null;
   if (!kind) return { entry: null, error: MSG_KIND };
@@ -112,6 +114,8 @@ export function saveScriptEntry(
   if (!/^[a-z]{2}$/.test(language)) return { entry: null, error: "שפה חייבת להיות קוד בן שתי אותיות" };
   const title = (input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 90);
   if (title && title.length < 2) return { entry: null, error: "הכותרת קצרה מדי" };
+  const presenter = input.presenter === undefined ? undefined : castValue(input.presenter, PRESENTERS);
+  const tone = input.tone === undefined ? undefined : castValue(input.tone, TONES);
   const destinationId = input.destinationId?.trim() || null;
   if (destinationId) {
     const row = getDestination(db, destinationId);
@@ -124,17 +128,19 @@ export function saveScriptEntry(
       body,
       language,
       destinationId,
+      ...(presenter !== undefined ? { presenter } : {}),
+      ...(tone !== undefined ? { tone } : {}),
       ...(typeof input.enabled === "boolean" ? { enabled: input.enabled } : {})
     });
     return updated ? { entry: updated, error: null } : { entry: null, error: "הפריט לא נמצא" };
   }
   return {
-    entry: insertScriptEntry(db, { id: nid(), kind, title, body, language, destinationId, feedId: input.feedId ?? null, enabled: input.enabled, createdAt: input.createdAt }),
+    entry: insertScriptEntry(db, { id: nid(), kind, title, body, language, destinationId, feedId: input.feedId ?? null, presenter: presenter ?? "", tone: tone ?? "", enabled: input.enabled, createdAt: input.createdAt }),
     error: null
   };
 }
 
-export function briefForEntry(input: { kind: "keywords" | "script"; body: string; language: string; title?: string | null }): {
+export function briefForEntry(input: { kind: "keywords" | "script"; body: string; language: string; title?: string | null; cast?: { presenter: "woman" | "man"; tone: "serious" | "playful" } | null }): {
   title: string;
   summary: string;
   description: string;
@@ -175,7 +181,7 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
         : "The entered text is source material in another language. Write a new video from it in English only. Do not copy another creator's video. No other channel names and no third-party logos. Clear hook in the first three seconds, vertical frame."))
     : (he
       ? "תוכן מקורי בלבד לפי מילות המפתח. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, קריינות קצרה, מסך אנכי."
-      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(input.language)}${given ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
+      : "Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, short narration, vertical frame.")} ${languageLock(input.language)}${input.cast ? ` ${castInstruction(input.cast, input.language)}` : ""}${given ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
   const tags = ["#Shorts", ...tokens(headline).slice(0, 3).map((token) => `#${token}`)];
   const description = `${summary.includes(headline) ? summary : `${headline}. ${summary}`}\n\n${tags.join(" ")}`;
   return {
@@ -197,7 +203,7 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
 }
 
 export function scriptBankView(db: GrowthDb): ScriptBankSettings & { entries: ScriptEntry[]; runs: ScriptRun[] } {
-  return { ...readScriptBankSettings(db), entries: listScriptEntries(db), runs: listScriptRuns(db, 20) };
+  return { ...readScriptBankSettings(db), entries: listScriptEntries(db), runs: listScriptRuns(db, 40) };
 }
 
 export async function advanceScriptBank(ctx: BankContext, deps: ScriptBankDeps = {}): Promise<void> {
@@ -254,10 +260,18 @@ function bankChannel(db: GrowthDb, entry: ScriptEntry, fallbackId: string | null
 
 export async function produceBankEntry(ctx: BankContext, entry: ScriptEntry, slot: string, deps: ScriptBankDeps): Promise<ScriptRun | null> {
   const settings = readScriptBankSettings(ctx.db);
-  const content = briefForEntry(entry);
+  const feed = entry.feedId ? getKeywordFeed(ctx.db, entry.feedId) : null;
+  const recent = listScriptRuns(ctx.db, 12);
+  const cast = resolveCast({
+    presenter: entry.presenter || feed?.presenter || "",
+    tone: entry.tone || feed?.tone || "",
+    recentPresenters: recent.map((run) => run.presenter),
+    recentTones: recent.map((run) => run.tone)
+  });
+  const content = briefForEntry({ ...entry, cast });
   const destination = bankChannel(ctx.db, entry, settings.destinationId);
-  if (!destination) return recordFailure(ctx.db, entry, slot, content.title, MSG_CHANNEL);
-  if (!deps.submitBrief && !process.env.REELMINO_SESSION?.trim()) return recordFailure(ctx.db, entry, slot, content.title, MSG_SESSION);
+  if (!destination) return recordFailure(ctx.db, entry, slot, content.title, MSG_CHANNEL, cast);
+  if (!deps.submitBrief && !process.env.REELMINO_SESSION?.trim()) return recordFailure(ctx.db, entry, slot, content.title, MSG_SESSION, cast);
   try {
     const item = insertItem(ctx.db, {
       id: nid(),
@@ -283,7 +297,9 @@ export async function produceBankEntry(ctx: BankContext, entry: ScriptEntry, slo
       title: content.title,
       language: entry.language,
       destinationId: destination.id,
-      itemId: item.id
+      itemId: item.id,
+      presenter: cast.presenter,
+      tone: cast.tone
     });
     try {
       const runId = await (deps.submitBrief ?? submitReelminoBrief)(content.brief);
@@ -300,7 +316,7 @@ export async function produceBankEntry(ctx: BankContext, entry: ScriptEntry, slo
   }
 }
 
-function recordFailure(db: GrowthDb, entry: ScriptEntry, slot: string, title: string, error: string): ScriptRun | null {
+function recordFailure(db: GrowthDb, entry: ScriptEntry, slot: string, title: string, error: string, cast?: { presenter: string; tone: string }): ScriptRun | null {
   try {
     return insertScriptRun(db, {
       id: nid(),
@@ -310,7 +326,9 @@ function recordFailure(db: GrowthDb, entry: ScriptEntry, slot: string, title: st
       title,
       language: entry.language,
       destinationId: entry.destinationId,
-      error
+      error,
+      presenter: cast?.presenter,
+      tone: cast?.tone
     });
   } catch (insertError) {
     if (isUnique(insertError)) return scriptRunBySlot(db, slot);
