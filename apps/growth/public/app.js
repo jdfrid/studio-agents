@@ -17,6 +17,27 @@ async function api(path, options = {}) {
   return data;
 }
 
+function localWhen(value) {
+  if (!value) return "";
+  const at = Date.parse(value);
+  if (!Number.isFinite(at)) return String(value).replace("T", " ").slice(0, 16);
+  return new Intl.DateTimeFormat("he-IL", {
+    timeZone: "Asia/Jerusalem",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).format(new Date(at));
+}
+
+function runError(error) {
+  if (!error) return "";
+  if (/502|503|504|Bad Gateway/.test(error)) return "מערכת ההפקה לא זמינה כרגע";
+  return error;
+}
+
 function esc(value) {
   return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
@@ -435,9 +456,9 @@ function renderTrends() {
         <thead><tr><th>זמן</th><th>נושא</th><th>מצב</th><th>קישור</th></tr></thead>
         <tbody>
           ${(trends.cycles || []).map((row) => `<tr>
-            <td>${esc((row.createdAt || "").replace("T", " ").slice(0, 16))}</td>
+            <td>${esc(localWhen(row.createdAt))}</td>
             <td>${esc(row.topic || "—")}${row.signal?.inspirationTitle ? `<div class="muted">אות: ${esc(row.signal.inspirationTitle)}</div>` : ""}</td>
-            <td>${esc(TREND_STATUS[row.status] || row.status)}${row.error ? `<div class="error">${esc(row.error)}</div>` : ""}</td>
+            <td>${esc(TREND_STATUS[row.status] || row.status)}${row.error ? `<div class="error">${esc(runError(row.error))}</div>` : ""}</td>
             <td>${row.remoteUrl ? `<a href="${esc(row.remoteUrl)}" target="_blank" rel="noreferrer">סרטון</a>` : ""}</td>
           </tr>`).join("")}
         </tbody>
@@ -539,10 +560,10 @@ function entryRows(entries, ctx, withKeyword) {
 
 function runRows(runs, ctx) {
   return runs.map((row) => `<tr>
-    <td>${esc((row.createdAt || "").replace("T", " ").slice(0, 16))}</td>
+    <td>${esc(localWhen(row.createdAt))}</td>
     <td>${esc(row.title || "—")}</td>
     <td>${esc(ctx.nameOf(row.destinationId))}</td>
-    <td>${esc(BANK_STATUS[row.status] || row.status)}${row.error ? `<div class="error">${esc(row.error)}</div>` : ""}</td>
+    <td>${esc(BANK_STATUS[row.status] || row.status)}${row.error ? `<div class="error">${esc(runError(row.error))}</div>` : ""}</td>
     <td>${row.remoteUrl ? `<a href="${esc(row.remoteUrl)}" target="_blank" rel="noreferrer">סרטון</a>` : ""}</td>
   </tr>`).join("");
 }
@@ -798,7 +819,7 @@ function renderCalendar() {
         <thead><tr><th>זמן</th><th>פריט</th><th>רשת</th><th>מצב</th><th></th></tr></thead>
         <tbody>
           ${state.slots.slice(0, 80).map((row) => `<tr>
-            <td>${esc(row.scheduledFor?.replace("T", " ").slice(0, 16))}</td>
+            <td>${esc(localWhen(row.scheduledFor))}</td>
             <td>${esc(row.itemTitle)}</td>
             <td>${esc(row.network)}${row.destinationName ? " · " + esc(row.destinationName) : ""}</td>
             <td>${esc(row.status)}${row.note ? " — " + esc(row.note) : ""}</td>
@@ -858,7 +879,7 @@ function renderResults() {
         <thead><tr><th>זמן</th><th>פריט</th><th>רשת</th><th>סטטוס</th><th>קישור</th><th>שגיאה</th><th></th></tr></thead>
         <tbody>
           ${state.jobs.map((row) => `<tr>
-            <td>${esc((row.publishedAt || row.createdAt || "").replace("T", " ").slice(0, 16))}</td>
+            <td>${esc(localWhen(row.publishedAt || row.createdAt))}</td>
             <td>${esc(row.itemTitle)}</td>
             <td>${esc(row.network)}${row.destinationName ? " · " + esc(row.destinationName) : ""}</td>
             <td>${esc(row.status)}</td>
