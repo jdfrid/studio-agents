@@ -12,12 +12,15 @@ type NakdanToken = {
   word?: unknown;
   sep?: unknown;
   options?: unknown;
+  /** Dicta sets this only when the top reading is reliable. */
+  fconfident?: unknown;
 };
 
 /**
- * Point Hebrew for the speech engine. A token is kept only when its letters
- * match the original; any rewritten word stays unpointed. A failed request
- * returns the original unpointed text.
+ * Point Hebrew for the speech engine. A token is kept only when Dicta is
+ * confident and its letters match the original. An unsure or rewritten word
+ * stays unpointed, because a guessed vowel point makes Gemini misread the word.
+ * A failed request returns the original unpointed text.
  */
 export async function pointHebrewForSpeech(
   text: string,
@@ -63,6 +66,7 @@ function pointedToken(token: unknown): string {
   const row = token as NakdanToken;
   const word = typeof row.word === "string" ? row.word : "";
   if (row.sep === true) return word;
+  if (row.fconfident !== true) return word;
   const top = Array.isArray(row.options) ? row.options.find((option) => typeof option === "string") : undefined;
   if (typeof top !== "string") return word;
   const vocalized = top.replace(/\|/g, "");

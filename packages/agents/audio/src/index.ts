@@ -363,7 +363,7 @@ async function spokenHebrew(language: string, text: string): Promise<string> {
 
 function hebrewDeliveryStyle(language: string, style?: string): string | undefined {
   const hint = language.trim().toLowerCase().startsWith("he")
-    ? "Modern Israeli Hebrew. Pronounce the vowel points. Do not translate or spell the words."
+    ? "Natural modern Israeli Hebrew. Do not translate or spell the words."
     : "";
   const joined = [hint, style?.trim()].filter(Boolean).join(" | ");
   return joined || undefined;

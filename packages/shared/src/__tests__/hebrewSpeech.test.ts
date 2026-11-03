@@ -6,9 +6,9 @@ describe("pointHebrewForSpeech", () => {
     const fetchImpl = async () =>
       new Response(
         JSON.stringify([
-          { word: "נחישות", options: ["נְחִישׁוּת"] },
+          { word: "נחישות", options: ["נְחִישׁוּת"], fconfident: true },
           { word: " ", sep: true },
-          { word: "אמיתית", options: ["אֲמִיתִּית"] }
+          { word: "אמיתית", options: ["אֲמִיתִּית"], fconfident: true }
         ]),
         { status: 200, headers: { "content-type": "application/json" } }
       );
@@ -29,6 +29,19 @@ describe("pointHebrewForSpeech", () => {
       );
     const pointed = await pointHebrewForSpeech("נחישות אמיתית", fetchImpl as typeof fetch);
     expect(pointed).toBe("נחישות אמיתית");
+  });
+
+  it("leaves a word unpointed when the vocalizer is not confident", async () => {
+    const fetchImpl = async () =>
+      new Response(
+        JSON.stringify([
+          { word: "אוכל", options: ["אֹוֽכֶל"], fconfident: false },
+          { word: " ", sep: true },
+          { word: "שף", options: ["שֵׁף"], fconfident: true }
+        ]),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    expect(await pointHebrewForSpeech("אוכל שף", fetchImpl as typeof fetch)).toBe("אוכל שֵׁף");
   });
 
   it("returns the original text when the vocalizer is down", async () => {
