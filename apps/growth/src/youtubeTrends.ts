@@ -1,6 +1,6 @@
 import { slugify } from "./catalog.js";
 import { chosenDuration, durationPhrase, taskDurationSeconds } from "./duration.js";
-import { languageLock, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
+import { languageLock, subscribeCue, subscribeCueNote, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
 import { emptyCopy, type ItemCopy } from "./copy.js";
 import { nid } from "./crypto.js";
 import {
@@ -246,7 +246,7 @@ export function contentForTrend(input: { topic: string; niche: string; language:
       : `\nSubject to cover, without copying this wording into the title or the description: ${input.topic}`;
   const instructions = `${he
     ? "תוכן מקורי בלבד. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים, בלי לוגואים של מותג אחר, ובלי לטעון שהסרטון שייך למישהו אחר. פתיח ברור בשלוש השניות הראשונות, קריינות קצרה, מסך אנכי."
-    : "Original content only. Do not copy another creator's video, script, title, or narration. No other channel names, no third-party logos, and no claim that this video belongs to someone else. Clear hook in the first three seconds, short narration, vertical frame."} ${languageLock(input.language)}${he ? ` אורך הסרטון שנקבע במשימה הוא ${form}. הקריינות והמהלך ממלאים את כל האורך.` : ` The video length set for this task is ${form}. Narration and story fill that full length.`}`;
+    : "Original content only. Do not copy another creator's video, script, title, or narration. No other channel names, no third-party logos, and no claim that this video belongs to someone else. Clear hook in the first three seconds, short narration, vertical frame."} ${languageLock(input.language)}${he ? ` אורך הסרטון שנקבע במשימה הוא ${form}. הקריינות והמהלך ממלאים את כל האורך.` : ` The video length set for this task is ${form}. Narration and story fill that full length.`} ${subscribeCueNote(input.language)}`;
   const tags = [...(durationSeconds <= 180 ? ["#Shorts"] : []), ...tokens(title).slice(0, 3).map((token) => `#${token}`)];
   const description = `${he ? `${title}. סרטון קצר ומקורי עם טיפ אחד ליישום.` : `${title}. An original short with one practical tip.`}\n\n${tags.join(" ")}`;
   return {
@@ -260,6 +260,7 @@ export function contentForTrend(input: { topic: string; niche: string; language:
       targetAudience: niche && textMatchesLanguage(niche, input.language) ? niche : (he ? (durationSeconds <= 180 ? "צופים בסרטונים קצרים ביוטיוב" : "צופים ביוטיוב") : (durationSeconds <= 180 ? "YouTube Shorts viewers" : "YouTube viewers")),
       language: input.language,
       durationSeconds,
+      branding: { slogan: subscribeCue(input.language) },
       aspectRatio: "9:16",
       budgetMode: true,
       approvalMode: "auto"

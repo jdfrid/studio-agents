@@ -1,7 +1,7 @@
 import { slugify } from "./catalog.js";
 import { castInstruction, castValue, PRESENTERS, resolveCast, TONES } from "./cast.js";
 import { chosenDuration, durationPhrase, taskDurationSeconds } from "./duration.js";
-import { languageLock, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
+import { languageLock, subscribeCue, subscribeCueNote, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
 import { emptyCopy, type ItemCopy } from "./copy.js";
 import { nid } from "./crypto.js";
 import {
@@ -189,7 +189,7 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
         : "The entered text is source material in another language. Write a new video from it in English only. Do not copy another creator's video. No other channel names and no third-party logos. Clear hook in the first three seconds, vertical frame."))
     : (he
       ? `תוכן מקורי בלבד לפי מילות המפתח. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, ${shortForm ? "קריינות קצרה" : "קריינות שממלאת את האורך"}, מסך אנכי.`
-      : `Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, ${shortForm ? "short narration" : "narration that fills the full length"}, vertical frame.`)} ${languageLock(input.language)}${input.cast ? ` ${castInstruction(input.cast, input.language)}` : ""}${he ? ` אורך הסרטון שנקבע במשימה הוא ${form}. הקריינות והמהלך ממלאים את כל האורך.` : ` The video length set for this task is ${form}. Narration and story fill that full length.`}${given ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
+      : `Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, ${shortForm ? "short narration" : "narration that fills the full length"}, vertical frame.`)} ${languageLock(input.language)}${input.cast ? ` ${castInstruction(input.cast, input.language)}` : ""}${he ? ` אורך הסרטון שנקבע במשימה הוא ${form}. הקריינות והמהלך ממלאים את כל האורך.` : ` The video length set for this task is ${form}. Narration and story fill that full length.`} ${subscribeCueNote(input.language)}${given ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
   const tags = [...(durationSeconds <= 180 ? ["#Shorts"] : []), ...tokens(headline).slice(0, 3).map((token) => `#${token}`)];
   const description = `${summary.includes(headline) ? summary : `${headline}. ${summary}`}\n\n${tags.join(" ")}`;
   return {
@@ -203,6 +203,7 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
       targetAudience: he ? (durationSeconds <= 180 ? "צופים בסרטונים קצרים ביוטיוב" : "צופים ביוטיוב") : (durationSeconds <= 180 ? "YouTube Shorts viewers" : "YouTube viewers"),
       language: input.language,
       durationSeconds,
+      branding: { slogan: subscribeCue(input.language) },
       aspectRatio: "9:16",
       budgetMode: true,
       approvalMode: "auto"

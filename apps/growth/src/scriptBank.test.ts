@@ -63,6 +63,8 @@ describe("script bank", () => {
     const keywords = briefForEntry({ kind: "keywords", body: "חיתוך בצל, סכין חדה", language: "he" });
     expect(keywords.brief.aspectRatio).toBe("9:16");
     expect(keywords.brief.durationSeconds).toBe(30);
+    expect(keywords.brief.branding).toEqual({ slogan: "לחץ על הצטרפות לערוץ" });
+    expect(String(keywords.brief.instructions)).toContain("לחץ על הצטרפות לערוץ");
     const long = briefForEntry({ kind: "script", body: "פותחים את המקרר.\nסוגרים אותו.", language: "he", durationSeconds: 600 });
     expect(long.brief.durationSeconds).toBe(600);
     expect(long.description).not.toContain("#Shorts");
@@ -282,6 +284,12 @@ describe("script bank", () => {
     try {
       const page = await built.app.inject({ method: "GET", url: "/" });
       expect(page.body).toContain("מאגר");
+      const brand = await built.app.inject({ method: "GET", url: "/brand" });
+      expect(brand.statusCode).toBe(200);
+      expect(brand.body).toContain("הפצת המותג");
+      const scripts = await built.app.inject({ method: "GET", url: "/scripts" });
+      expect(scripts.body).toContain("מאגר תסריטים");
+      expect((await built.app.inject({ method: "GET", url: "/no-such-page" })).statusCode).toBe(404);
       const login = await built.app.inject({ method: "POST", url: "/api/login", payload: { password: "secret" } });
       const setCookie = login.headers["set-cookie"];
       const cookie = (Array.isArray(setCookie) ? setCookie[0] : setCookie)!.split(";")[0]!;

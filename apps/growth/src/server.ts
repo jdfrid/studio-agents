@@ -61,9 +61,13 @@ export async function buildApp(options: BuildOptions = {}) {
   const app = Fastify({ logger: false });
   await app.register(cookie, { secret: ctx.secret });
   await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } });
-  app.get("/", async (_request, reply) => {
-    reply.type("text/html").send(readFileSync(path.join(publicDir, "index.html")));
-  });
+  const sendConsole = async (_request: unknown, reply: { type: (value: string) => { send: (body: string) => unknown } }) => {
+    reply.type("text/html").send(readFileSync(path.join(publicDir, "index.html"), "utf8"));
+  };
+  app.get("/", sendConsole);
+  for (const pagePath of ["/accounts", "/brand", "/keywords", "/scripts", "/trends", "/content", "/groups", "/calendar", "/internet", "/results", "/people"]) {
+    app.get(pagePath, sendConsole);
+  }
   app.get("/app.js", async (_request, reply) => {
     reply.type("application/javascript").send(readFileSync(path.join(publicDir, "app.js")));
   });

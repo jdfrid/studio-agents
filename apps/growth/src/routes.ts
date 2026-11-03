@@ -512,10 +512,10 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
     const query = request.query as { code?: string; state?: string; error?: string; error_description?: string };
     try {
       const result = await finishOAuth({ db: ctx.db, key: ctx.key, secret: ctx.secret, query, redirectUri: redirectUri(ctx, network) });
-      return reply.redirect(`/?connected=${encodeURIComponent(result.network)}`);
+      return reply.redirect(`/accounts?connected=${encodeURIComponent(result.network)}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "oauth failed";
-      return reply.redirect(`/?oauth_error=${encodeURIComponent(message)}`);
+      return reply.redirect(`/accounts?oauth_error=${encodeURIComponent(message)}`);
     }
   });
 

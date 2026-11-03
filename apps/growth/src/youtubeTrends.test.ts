@@ -102,6 +102,7 @@ describe("youtube trend loop", () => {
     expect(content.brief.aspectRatio).toBe("9:16");
     expect(content.brief.approvalMode).toBe("auto");
     expect(content.brief.durationSeconds).toBe(30);
+    expect(content.brief.branding).toEqual({ slogan: "לחץ על הצטרפות לערוץ" });
     const long = contentForTrend({ topic: label, niche: "", language: "he", durationSeconds: 600 });
     expect(long.brief.durationSeconds).toBe(600);
     expect(long.description).not.toContain("#Shorts");

@@ -2,9 +2,51 @@ const loginForm = document.querySelector("#login");
 const appEl = document.querySelector("#app");
 const panel = document.querySelector("#panel");
 const banner = document.querySelector("#banner");
+const PAGES = {
+  accounts: "/accounts",
+  own: "/brand",
+  keywords: "/keywords",
+  scripts: "/scripts",
+  trends: "/trends",
+  content: "/content",
+  groups: "/groups",
+  calendar: "/calendar",
+  internet: "/internet",
+  results: "/results",
+  people: "/people"
+};
+
 let state = null;
-let tab = "content";
+let tab = "own";
 let selected = null;
+
+function pageFromLocation() {
+  const path = location.pathname.replace(/\/$/, "") || "/";
+  const match = Object.entries(PAGES).find(([, pagePath]) => pagePath === path);
+  if (match) return match[0];
+  const params = new URLSearchParams(location.search);
+  if (params.get("connected") || params.get("oauth_error")) return "accounts";
+  return "own";
+}
+
+function applyLocation() {
+  tab = pageFromLocation();
+  const next = PAGES[tab];
+  const path = location.pathname.replace(/\/$/, "") || "/";
+  if (path !== next) history.replaceState({ page: tab }, "", next + location.search);
+}
+
+function rememberPage(id) {
+  tab = PAGES[id] ? id : "own";
+  if (location.pathname !== PAGES[tab]) history.pushState({ page: tab }, "", PAGES[tab]);
+}
+
+function openPage(id) {
+  rememberPage(id);
+  banner.textContent = "";
+  banner.className = "muted";
+  if (state) render();
+}
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -51,7 +93,9 @@ async function refresh() {
 }
 
 function render() {
-  document.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
+  document.querySelectorAll("#pages a").forEach((link) => link.classList.toggle("active", link.dataset.page === tab));
+  const label = document.querySelector(`#pages a[data-page="${tab}"]`)?.textContent || "";
+  document.title = label ? `${label} — Reelmino` : "Reelmino — שיווק אורגני";
   if (tab === "content") renderContent();
   else if (tab === "accounts") renderAccounts();
   else if (tab === "groups") renderGroups();
@@ -113,7 +157,7 @@ function renderContent() {
   const toGroups = panel.querySelector("#to-groups");
   if (toGroups) toGroups.onclick = () => run(async () => {
     await api(`/api/items/${item.id}/groups`, { method: "POST", body: "{}" });
-    tab = "groups";
+    rememberPage("groups");
   });
   panel.querySelectorAll("[data-export]").forEach((button) => {
     button.onclick = () => run(async () => {
@@ -228,7 +272,7 @@ function renderAccounts() {
         <button type="button" data-sync="${row.id}">רענון יעדים</button>
         <button type="button" data-drop="${row.id}">ניתוק</button></p>`).join("") || "<p>אין חשבונות</p>"}
     </div>
-    <p class="muted">לכל רשת מופיעים היעדים שלה: ערוץ, עמוד או חשבון. ברירת המחדל ידנית. אוטומטי מפרסם חריץ שמגיע לזמן בלי אישור נוסף. קבוצות לפרסום ידני נמצאות בלשונית קבוצות.</p>
+    <p class="muted">לכל רשת מופיעים היעדים שלה: ערוץ, עמוד או חשבון. ברירת המחדל ידנית. אוטומטי מפרסם חריץ שמגיע לזמן בלי אישור נוסף. קבוצות לפרסום ידני נמצאות בעמוד קבוצות.</p>
     ${destinationCards() || `<div class="card"><p>אחרי החיבור לחצו רענון יעדים כדי לראות ערוצים ועמודים.</p></div>`}
   `;
   panel.querySelectorAll("[data-connect]").forEach((button) => {
@@ -421,7 +465,7 @@ function renderTrends() {
   panel.innerHTML = `
     <div class="card">
       <p class="muted">כל ${esc(trends.hours)} שעות המערכת קוראת מה תופס צפיות ביוטיוב ומה כבר עבד בערוץ, מכינה סרטון מקורי באורך שנבחר כאן, שולחת אותו להפקה, ומעלה אותו לערוץ. הסרטון לא מעתיק סרטון של יוצר אחר. כל סרטון משתמש בקרדיטים של חשבון הסטודיו. לכל ערוץ יש תקרה של 16 העלאות ביום.</p>
-      <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${channels.length ? "ערוץ יוטיוב מחובר." : "חברו ערוץ יוטיוב בלשונית חשבונות."}</p>
+      <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${channels.length ? "ערוץ יוטיוב מחובר." : "חברו ערוץ יוטיוב בעמוד חשבונות."}</p>
       <label><input id="trend-enabled" type="checkbox" ${trends.enabled ? "checked" : ""}> הפעלה אוטומטית</label>
       <label>מרווח
         <select id="trend-hours">
@@ -617,7 +661,7 @@ function bindProduction() {
     }
   });
   panel.querySelectorAll("[data-open-tab]").forEach((button) => {
-    button.onclick = () => { tab = button.dataset.openTab; render(); };
+    button.onclick = () => openPage(button.dataset.openTab);
   });
   panel.querySelectorAll("[data-feed-enabled]").forEach((box) => {
     box.onchange = () => run(() => api(`/api/keyword-feeds/${box.dataset.feedEnabled}`, { method: "PATCH", body: JSON.stringify({ enabled: box.checked }) }));
@@ -668,7 +712,7 @@ function renderOwn() {
     <div class="card">
       <h2>הפצת המותג</h2>
       <p class="muted">תסריטים לפרסום של המערכת עצמה. כל ${esc(ctx.bank.hours)} שעות, כשההפעלה פועלת, נוצר סרטון מהפריט הבא ועולה לערוץ שלו. הרצה ידנית באמצע לא מחליפה את המועד. פריט שכבר הפך לסרטון לא נבחר שוב במשך שבוע. לכל ערוץ יש תקרה של 16 העלאות ביום.</p>
-      <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${ctx.channels.length ? "" : "חברו ערוץ יוטיוב בלשונית חשבונות."}</p>
+      <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} ${ctx.channels.length ? "" : "חברו ערוץ יוטיוב בעמוד חשבונות."}</p>
       <label><input id="bank-enabled" type="checkbox" ${ctx.bank.enabled ? "checked" : ""}> הפקה אוטומטית</label>
       <label>מרווח
         <select id="bank-hours">
@@ -894,7 +938,7 @@ function renderResults() {
   panel.querySelectorAll("[data-to-groups]").forEach((button) => {
     button.onclick = () => run(async () => {
       await api(`/api/jobs/${button.dataset.toGroups}/groups`, { method: "POST", body: "{}" });
-      tab = "groups";
+      rememberPage("groups");
     });
   });
   panel.querySelectorAll("[data-retry-job]").forEach((button) => {
@@ -945,8 +989,16 @@ async function run(action) {
   }
 }
 
-document.querySelectorAll(".tab").forEach((button) => {
-  button.onclick = () => { tab = button.dataset.tab; render(); };
+applyLocation();
+document.querySelectorAll("#pages a").forEach((link) => {
+  link.onclick = (event) => {
+    event.preventDefault();
+    openPage(link.dataset.page);
+  };
+});
+window.addEventListener("popstate", () => {
+  tab = pageFromLocation();
+  if (state) render();
 });
 document.querySelector("#logout").onclick = () => run(async () => { await api("/api/logout", { method: "POST", body: "{}" }); location.reload(); });
 loginForm.onsubmit = async (event) => {

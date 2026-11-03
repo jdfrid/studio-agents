@@ -14,6 +14,18 @@ export function titleInLanguage(source: string, language: string): string {
   return language.toLowerCase().startsWith("he") ? "מה כדאי לדעת עכשיו" : "What matters now";
 }
 
+/** On-screen and spoken subscribe line for the end of a YouTube video. */
+export function subscribeCue(language: string): string {
+  return language.toLowerCase().startsWith("he") ? "לחץ על הצטרפות לערוץ" : "Click Subscribe";
+}
+
+export function subscribeCueNote(language: string): string {
+  const line = subscribeCue(language);
+  return language.toLowerCase().startsWith("he")
+    ? `בכרטיס הסיום מופיע על המסך ונאמר: ${line}. לא לשים את זה בפתיח.`
+    : `The end card shows and says: ${line}. Do not put that in the opening.`;
+}
+
 export function languageLock(language: string): string {
   return language.toLowerCase().startsWith("he")
     ? "הכותרת, התיאור, הקריינות וכל טקסט על המסך בעברית בלבד. לא משאירים כותרת או תיאור בשפה אחרת."

@@ -12,11 +12,19 @@
     header { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
     h1 { font-size: 1.4rem; margin: 0; }
     .muted { color: #4d635c; font-size: 0.92rem; }
-    nav { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
-    button, .tab { background: white; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.45rem 0.7rem; cursor: pointer; }
-    button.primary, .tab.active { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+    #shell { display: grid; grid-template-columns: 12rem 1fr; gap: 1rem; align-items: start; }
+    #pages { display: flex; flex-direction: column; gap: 0.35rem; position: sticky; top: 0.75rem; }
+    #pages .nav-label { margin: 0.7rem 0 0; font-size: 0.75rem; color: #4d635c; }
+    #pages a { display: block; text-decoration: none; background: white; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.45rem 0.7rem; }
+    #pages a.active { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+    button { background: white; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.45rem 0.7rem; cursor: pointer; }
+    button.primary { background: var(--ink); color: var(--lime); border-color: var(--ink); }
     h2 { font-size: 1.05rem; margin: 0.2rem 0 0.5rem; }
-    nav.tools { padding-top: 0; }
+    @media (max-width: 800px) {
+      #shell { grid-template-columns: 1fr; }
+      #pages { position: static; flex-direction: row; flex-wrap: wrap; }
+      #pages .nav-label { width: 100%; }
+    }
     button.warn { background: #fff; }
     .card { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 0.9rem; margin: 0.6rem 0; }
     label { display: block; font-size: 0.85rem; margin-top: 0.55rem; }
@@ -50,23 +58,27 @@
       <p id="login-error" class="error"></p>
     </form>
     <section id="app" class="hidden">
-      <nav>
-        <button class="tab" type="button" data-tab="accounts">חשבונות</button>
-        <button class="tab" type="button" data-tab="own">הפצת המותג</button>
-        <button class="tab" type="button" data-tab="keywords">מילות מפתח</button>
-        <button class="tab" type="button" data-tab="scripts">מאגר תסריטים</button>
-      </nav>
-      <nav class="tools">
-        <button class="tab" type="button" data-tab="trends">מגמות</button>
-        <button class="tab" type="button" data-tab="content">תוכן</button>
-        <button class="tab" type="button" data-tab="groups">קבוצות</button>
-        <button class="tab" type="button" data-tab="calendar">לוח</button>
-        <button class="tab" type="button" data-tab="internet">אינטרנט</button>
-        <button class="tab" type="button" data-tab="results">תוצאות</button>
-        <button class="tab" type="button" data-tab="people">מפעילים</button>
-      </nav>
-      <p id="banner" class="muted"></p>
-      <div id="panel"></div>
+      <div id="shell">
+        <nav id="pages" aria-label="עמודים">
+          <p class="nav-label">עבודה</p>
+          <a href="/accounts" data-page="accounts">חשבונות</a>
+          <a href="/brand" data-page="own">הפצת המותג</a>
+          <a href="/keywords" data-page="keywords">מילות מפתח</a>
+          <a href="/scripts" data-page="scripts">מאגר תסריטים</a>
+          <p class="nav-label">עוד</p>
+          <a href="/trends" data-page="trends">מגמות</a>
+          <a href="/content" data-page="content">תוכן</a>
+          <a href="/groups" data-page="groups">קבוצות</a>
+          <a href="/calendar" data-page="calendar">לוח</a>
+          <a href="/internet" data-page="internet">אינטרנט</a>
+          <a href="/results" data-page="results">תוצאות</a>
+          <a href="/people" data-page="people">מפעילים</a>
+        </nav>
+        <div>
+          <p id="banner" class="muted"></p>
+          <div id="panel"></div>
+        </div>
+      </div>
     </section>
   </main>
   <script src="/app.js"></script>
