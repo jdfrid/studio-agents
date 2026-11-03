@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { authLoginUrl } from "./api.js";
+import { LaunchOffer } from "./LaunchOffer.js";
 import { useModalFocus } from "./useModalFocus.js";
 
 export function LoginDialog({
@@ -55,6 +56,7 @@ export function LoginDialog({
         <p className="eyebrow">{t("auth.eyebrow")}</p>
         <h2 id="login-title">{t("auth.title")}</h2>
         <p className="muted">{t("auth.lead")}</p>
+        {codeSent ? null : <LaunchOffer compact />}
         <form
           className="login-form"
           onSubmit={(event) => {

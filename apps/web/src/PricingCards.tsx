@@ -8,6 +8,7 @@ import {
   type UserView
 } from "@studio/shared";
 import { canCheckoutPlan } from "./checkoutPlans.js";
+import { LaunchOffer } from "./LaunchOffer.js";
 
 const PLAN_ORDER: CheckoutPlanId[] = ["payg", "starter", "business"];
 
@@ -33,6 +34,7 @@ export function PricingCards({
 
   return (
     <>
+      <LaunchOffer />
       <div className="pricing-cards">
         {PLAN_ORDER.map((plan) => {
           const featured = plan === "business";

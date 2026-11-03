@@ -13,6 +13,12 @@ export const resources = {
         loading: "טוען את טופס התשלום...",
         completed: "התשלום התקבל! הקרדיטים יתווספו לחשבון שלך בעוד רגע."
       },
+      launch: {
+        badge: "השקה",
+        single: "סרטון בודד = $3",
+        monthly: "לחודש: 30 סרטונים = $75",
+        yearly: "לחודש בתשלום שנתי = $600"
+      },
       auth: {
         eyebrow: "חשבון",
         title: "מכאן מתחיל הסיפור.",
@@ -159,7 +165,7 @@ export const resources = {
         plans: {
           eyebrow: "מחירון ברור",
           title: "קרדיטים, לא הפתעות",
-          lead: "סרטון עד 30 שניות עולה 40 קרדיטים. סנכרון שפתיים מוסיף 20. המנויים נותנים 30 סרטונים בכל חודש, במחיר נמוך יותר לסרטון.",
+          lead: "סרטון עד 30 שניות עולה 40 קרדיטים. סנכרון שפתיים מוסיף 20. המנויים נותנים 30 סרטונים בכל חודש.",
           popular: "המשתלם ביותר",
           vat: "המחירים בדולר ארה״ב. מס מקומי עשוי להתווסף בעמוד התשלום, לפי המדינה.",
           payg: {
@@ -189,7 +195,7 @@ export const resources = {
             credits: "{{count}} קרדיטים בכל חודש, 12 חודשים",
             videos: "{{count}} סרטונים בכל חודש, עד 30 שניות כל אחד",
             flow: "כל הפורמטים, תבניות מותג וסנכרון שפתיים כשיש קרדיטים",
-            extra: "עלות אפקטיבית כ־{{price}} לסרטון · חוסכים $200 לעומת החודשי",
+            extra: "עלות אפקטיבית כ־{{price}} לסרטון · חוסכים $300 לעומת החודשי",
             cta: "בחרו מנוי שנתי"
           },
           auto: {
@@ -429,6 +435,12 @@ export const resources = {
         loading: "Loading the payment form...",
         completed: "Payment received! Credits will be added to your account in a moment."
       },
+      launch: {
+        badge: "Launch",
+        single: "Single video = $3",
+        monthly: "Monthly: 30 videos = $75",
+        yearly: "Monthly, paid yearly = $600"
+      },
       auth: {
         eyebrow: "Account",
         title: "Your story starts here.",
@@ -575,7 +587,7 @@ export const resources = {
         plans: {
           eyebrow: "Clear pricing",
           title: "Credits, not surprises",
-          lead: "A video of up to 30 seconds costs 40 credits. Lip-sync adds 20. Subscriptions give you 30 videos every month at a lower price per video.",
+          lead: "A video of up to 30 seconds costs 40 credits. Lip-sync adds 20. Subscriptions include 30 videos every month.",
           popular: "Best value",
           vat: "Prices are shown in US dollars. Local tax may be added at checkout depending on your country.",
           payg: {
@@ -605,7 +617,7 @@ export const resources = {
             credits: "{{count}} credits every month, for 12 months",
             videos: "{{count}} videos every month, up to 30 seconds each",
             flow: "All formats, brand templates, and lip-sync when you have credits",
-            extra: "Effective cost about {{price}} per video · save $200 vs. monthly",
+            extra: "Effective cost about {{price}} per video · save $300 vs. monthly",
             cta: "Choose Yearly"
           },
           auto: {

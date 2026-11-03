@@ -113,11 +113,11 @@ export const siteResources = {
       commercial: {
         eyebrow: "מסחרי",
         title: "תנאים מסחריים",
-        updated: "עודכן: 13 באוקטובר 2026. תנאים אלה משלימים את תנאי השימוש לגבי מחיר, קרדיטים והחזרים.",
+        updated: "עודכן: 30 באוקטובר 2026. תנאים אלה משלימים את תנאי השימוש לגבי מחיר, קרדיטים והחזרים.",
         sections: [
           {
             title: "מחירון",
-            body: "סרטון בודד: $5 חד־פעמי עבור 40 קרדיטים (סרטון אחד עד 30 שניות). מנוי חודשי: $100 לחודש עבור 1,200 קרדיטים בכל חודש (30 סרטונים עד 30 שניות). מנוי שנתי: $1,000 בתשלום אחד לשנה, ו־1,200 קרדיטים מתווספים בכל אחד מ־12 החודשים (30 סרטונים בחודש). המחירים בדולר ארה״ב; מס מקומי עשוי להתווסף בעמוד התשלום, לפי המדינה."
+            body: "לרגל ההשקה. סרטון בודד: $3 חד־פעמי עבור 40 קרדיטים (סרטון אחד עד 30 שניות). מנוי חודשי: $75 לחודש עבור 1,200 קרדיטים בכל חודש (30 סרטונים עד 30 שניות). מנוי שנתי: $600 בתשלום אחד לשנה, ו־1,200 קרדיטים מתווספים בכל אחד מ־12 החודשים (30 סרטונים בחודש). המחירים בדולר ארה״ב; מס מקומי עשוי להתווסף בעמוד התשלום, לפי המדינה."
           },
           {
             title: "רכישה מקוונת",
@@ -253,11 +253,11 @@ export const siteResources = {
       commercial: {
         eyebrow: "Commercial",
         title: "Commercial terms",
-        updated: "Updated 13 October 2026. These terms complement the terms of use for price, credits, and refunds.",
+        updated: "Updated 30 October 2026. These terms complement the terms of use for price, credits, and refunds.",
         sections: [
           {
             title: "List prices",
-            body: "Single video: $5 one-time for 40 credits (one video of up to 30 seconds). Monthly: $100 per month for 1,200 credits every month (30 videos of up to 30 seconds). Yearly: $1,000 paid once a year, with 1,200 credits added in each of the 12 months (30 videos a month). Prices are in US dollars; local tax may be added at checkout depending on your country."
+            body: "Launch pricing. Single video: $3 one-time for 40 credits (one video of up to 30 seconds). Monthly: $75 per month for 1,200 credits every month (30 videos of up to 30 seconds). Yearly: $600 paid once a year, with 1,200 credits added in each of the 12 months (30 videos a month). Prices are in US dollars; local tax may be added at checkout depending on your country."
           },
           {
             title: "Online checkout",

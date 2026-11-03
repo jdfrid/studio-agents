@@ -46,16 +46,16 @@ describe("credit catalog", () => {
     expect(BUSINESS_CREDITS).toBe(30 * CREDIT_NEW_VIDEO);
     expect(CHECKOUT_PLANS.payg.priceNis).toBe(PAYG_PRICE_NIS);
     expect(CHECKOUT_PLANS.payg.priceUsd).toBe(PAYG_PRICE_USD);
-    expect(PAYG_PRICE_USD).toBe(5);
-    expect(CHECKOUT_PLANS.starter).toMatchObject({ priceUsd: 100, interval: "month", equivalentVideos: 30 });
-    expect(CHECKOUT_PLANS.business).toMatchObject({ priceUsd: 1000, interval: "year", equivalentVideos: 30 });
+    expect(PAYG_PRICE_USD).toBe(3);
+    expect(CHECKOUT_PLANS.starter).toMatchObject({ priceUsd: 75, interval: "month", equivalentVideos: 30 });
+    expect(CHECKOUT_PLANS.business).toMatchObject({ priceUsd: 600, interval: "year", equivalentVideos: 30 });
   });
 
   it("sells every checkout in USD and prices per video by the full paid period", () => {
     expect(checkoutCurrencyFromLocale("he")).toBe("usd");
     expect(checkoutCurrencyFromLocale("en")).toBe("usd");
-    expect(formatCheckoutPrice("payg", "usd")).toBe("$5");
-    expect(formatEffectivePerVideo("starter", "usd")).toBe("$3.33");
-    expect(formatEffectivePerVideo("business", "usd")).toBe("$2.78");
+    expect(formatCheckoutPrice("payg", "usd")).toBe("$3");
+    expect(formatEffectivePerVideo("starter", "usd")).toBe("$2.50");
+    expect(formatEffectivePerVideo("business", "usd")).toBe("$1.67");
   });
 });

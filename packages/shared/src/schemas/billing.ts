@@ -37,17 +37,17 @@ export type BillingStatus = z.infer<typeof BillingStatusSchema>;
 const USD_TO_NIS_FOR_CATALOG = 3.7;
 const nis = (usd: number) => Math.round(usd * USD_TO_NIS_FOR_CATALOG);
 
-/** One video of up to 30 seconds (CREDIT_NEW_VIDEO). */
+/** One video of up to 30 seconds (CREDIT_NEW_VIDEO). Launch price. */
 export const PAYG_CREDITS = 40;
-export const PAYG_PRICE_USD = 5;
+export const PAYG_PRICE_USD = 3;
 export const PAYG_PRICE_NIS = nis(PAYG_PRICE_USD);
 /** "starter" = monthly plan: 30 videos per month. */
 export const STARTER_CREDITS = 1200;
-export const STARTER_PRICE_USD = 100;
+export const STARTER_PRICE_USD = 75;
 export const STARTER_PRICE_NIS = nis(STARTER_PRICE_USD);
 /** "business" = yearly plan, paid once a year; credits are granted per month (BUSINESS_CREDITS each month). */
 export const BUSINESS_CREDITS = 1200;
-export const BUSINESS_PRICE_USD = 1000;
+export const BUSINESS_PRICE_USD = 600;
 export const BUSINESS_PRICE_NIS = nis(BUSINESS_PRICE_USD);
 export const BUSINESS_GRANT_MONTHS = 12;
 /** Grandfathered monthly subscription variant: 30 videos per month. */
