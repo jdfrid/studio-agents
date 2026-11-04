@@ -61,7 +61,7 @@ export function saveKeywordFeed(
 ): { feed: KeywordFeed | null; error: string | null } {
   const query = (input.query ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
   if (query.length < 2) return { feed: null, error: "כותבים מילת מפתח" };
-  const language = (input.language ?? "he").trim().toLowerCase();
+  const language = (input.language ?? "en").trim().toLowerCase();
   if (!/^[a-z]{2}$/.test(language)) return { feed: null, error: "שפה חייבת להיות קוד בן שתי אותיות" };
   const hours = input.hours ?? 4;
   if (!(FEED_HOUR_OPTIONS as readonly number[]).includes(hours)) return { feed: null, error: "בחרו מרווח של 1, 2, 4, 6, 8, 12 או 24 שעות" };

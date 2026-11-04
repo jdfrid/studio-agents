@@ -76,6 +76,8 @@ import { nextMondayIso } from "./time.js";
 import { fillKeywordFeed, keywordFeedView, saveKeywordFeed } from "./keywordFeeds.js";
 import { applyScriptBankSettings, runScriptBankNow, runScriptEntry, saveScriptEntry, scriptBankView } from "./scriptBank.js";
 import { applyTrendSettings, readTrendSettings, runTrendNow } from "./youtubeTrends.js";
+import { applyBrandSettings, brandView, createBrandContent, createBrandVideo, moveBrandItem, publishNextBrand } from "./brandDistribution.js";
+import { addTextPost, deleteTextCampaign, fillTextCampaign, markTextPosted, saveTextCampaign, textView, writeTextPosts } from "./textPosts.js";
 
 export type AppCtx = DispatchContext & {
   db: GrowthDb;
@@ -164,7 +166,9 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
     groupPosts: groupPostsView(),
     youtubeTrends: { ...readTrendSettings(ctx.db), cycles: listTrendCycles(ctx.db, 12) },
     scriptBank: scriptBankView(ctx.db),
-    keywordFeeds: keywordFeedView(ctx.db)
+    keywordFeeds: keywordFeedView(ctx.db),
+    brand: brandView(ctx.db),
+    textPosts: textView(ctx.db)
   }));
 
   function groupPostsView() {
@@ -624,6 +628,94 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
       const message = error instanceof Error ? error.message : String(error);
       return reply.code(message.includes("כבר רץ") ? 409 : 400).send({ error: message });
     }
+  });
+
+  app.patch("/api/brand", async (request, reply) => {
+    const error = applyBrandSettings(ctx.db, (request.body ?? {}) as { enabled?: boolean; hours?: number; destinationId?: string | null });
+    if (error) return reply.code(400).send({ error });
+    return brandView(ctx.db);
+  });
+
+  app.post("/api/brand/order", async (request, reply) => {
+    const body = (request.body ?? {}) as { id?: string; direction?: number };
+    const direction = body.direction === -1 || body.direction === 1 ? body.direction : null;
+    if (!body.id || !direction) return reply.code(400).send({ error: "אי אפשר להזיז את הפריט" });
+    const error = moveBrandItem(ctx.db, body.id, direction);
+    if (error) return reply.code(400).send({ error });
+    return brandView(ctx.db);
+  });
+
+  app.post("/api/brand/videos", async (request, reply) => {
+    const created = await createBrandVideo(ctx.db, (request.body ?? {}) as { title?: string; body?: string; language?: string; durationSeconds?: number });
+    if (created.error || !created.item) return reply.code(400).send({ error: created.error ?? "הסרטון לא נוצר", ...brandView(ctx.db) });
+    return { ...brandView(ctx.db), item: created.item };
+  });
+
+  app.post("/api/brand/content", async (request, reply) => {
+    const created = createBrandContent(ctx.db, (request.body ?? {}) as { title?: string; summary?: string; youtube?: string; x?: string; linkedin?: string; language?: string });
+    if (created.error || !created.item) return reply.code(400).send({ error: created.error ?? "התוכן לא נשמר" });
+    return brandView(ctx.db);
+  });
+
+  app.post("/api/brand/run", async (_request, reply) => {
+    const error = await publishNextBrand(ctx.db, (item, destination) => runPublish({
+      db: ctx.db,
+      key: ctx.key,
+      mediaDir: ctx.mediaDir,
+      publicBase: ctx.publicBase,
+      item,
+      destination,
+      campaign: getSetting(ctx.db, "utm_campaign") ?? undefined
+    }));
+    if (error) return reply.code(400).send({ error });
+    return brandView(ctx.db);
+  });
+
+  app.post("/api/text-campaigns", async (request, reply) => {
+    const saved = saveTextCampaign(ctx.db, (request.body ?? {}) as { network?: string; query?: string; language?: string; destinationId?: string | null; hours?: number });
+    if (saved.error || !saved.campaign) return reply.code(400).send({ error: saved.error ?? "המשימה לא נשמרה" });
+    return { ...textView(ctx.db), campaign: saved.campaign };
+  });
+
+  app.patch("/api/text-campaigns/:id", async (request, reply) => {
+    const current = textView(ctx.db).campaigns.find((row) => row.id === (request.params as { id: string }).id);
+    if (!current) return reply.code(404).send({ error: "המשימה לא נמצאה" });
+    const body = (request.body ?? {}) as { query?: string; language?: string; destinationId?: string | null; hours?: number; enabled?: boolean };
+    const saved = saveTextCampaign(ctx.db, {
+      id: current.id,
+      network: current.network,
+      query: body.query ?? current.query,
+      language: body.language ?? current.language,
+      destinationId: body.destinationId === undefined ? current.destinationId : body.destinationId,
+      hours: body.hours ?? current.hours,
+      enabled: body.enabled ?? current.enabled
+    });
+    if (saved.error) return reply.code(400).send({ error: saved.error });
+    return textView(ctx.db);
+  });
+
+  app.delete("/api/text-campaigns/:id", async (request, reply) => {
+    if (!deleteTextCampaign(ctx.db, (request.params as { id: string }).id)) return reply.code(404).send({ error: "המשימה לא נמצאה" });
+    return textView(ctx.db);
+  });
+
+  app.post("/api/text-campaigns/:id/fill", async (request, reply) => {
+    const filled = await fillTextCampaign(ctx.db, (request.params as { id: string }).id, writeTextPosts);
+    if (filled.error && filled.added === 0) return reply.code(400).send({ error: filled.error, ...textView(ctx.db) });
+    return { ...textView(ctx.db), added: filled.added };
+  });
+
+  app.post("/api/text-campaigns/:id/posts", async (request, reply) => {
+    const campaign = textView(ctx.db).campaigns.find((row) => row.id === (request.params as { id: string }).id);
+    if (!campaign) return reply.code(404).send({ error: "המשימה לא נמצאה" });
+    const body = ((request.body ?? {}) as { body?: string }).body ?? "";
+    if (!addTextPost(ctx.db, campaign, body)) return reply.code(400).send({ error: "הטקסט קצר מדי" });
+    return textView(ctx.db);
+  });
+
+  app.post("/api/text-posts/:id/posted", async (request, reply) => {
+    markTextPosted(ctx.db, (request.params as { id: string }).id);
+    return textView(ctx.db);
   });
 
   app.post("/api/keyword-feeds", async (request, reply) => {

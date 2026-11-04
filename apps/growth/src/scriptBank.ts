@@ -264,7 +264,8 @@ function bankChannel(db: GrowthDb, entry: ScriptEntry, fallbackId: string | null
     if (chosen?.network === "youtube" && chosen.kind === "channel" && chosen.enabled) return chosen;
     return null;
   }
-  return destinationsForNetwork(db, "youtube").find((row) => row.enabled && row.kind === "channel") ?? null;
+  const channels = destinationsForNetwork(db, "youtube").filter((row) => row.enabled && row.kind === "channel");
+  return channels.find((row) => /kitchentips/i.test(`${row.handle ?? ""} ${row.name} ${row.url ?? ""}`)) ?? channels[0] ?? null;
 }
 
 export async function produceBankEntry(ctx: BankContext, entry: ScriptEntry, slot: string, deps: ScriptBankDeps): Promise<ScriptRun | null> {

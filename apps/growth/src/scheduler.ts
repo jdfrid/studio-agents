@@ -26,6 +26,8 @@ import { deliverDueGroupPosts } from "./groups.js";
 import { pollPublish, postDueFirstComments, runPublish } from "./publish.js";
 import { advanceKeywordFeeds } from "./keywordFeeds.js";
 import { advanceScriptBank } from "./scriptBank.js";
+import { advanceBrandDistribution } from "./brandDistribution.js";
+import { advanceTextCampaigns, writeTextPosts } from "./textPosts.js";
 import { advanceYoutubeTrends } from "./youtubeTrends.js";
 
 export type DispatchContext = {
@@ -169,6 +171,36 @@ export async function tick(ctx: DispatchContext): Promise<void> {
     await advanceScriptBank(ctx);
   } catch (error) {
     console.error("[growth] script bank failed", error);
+  }
+  try {
+    await advanceBrandDistribution(ctx.db, (item, destination) => runPublish({
+      db: ctx.db,
+      key: ctx.key,
+      mediaDir: ctx.mediaDir,
+      publicBase: ctx.publicBase,
+      item,
+      destination,
+      campaign: getSetting(ctx.db, "utm_campaign") ?? undefined
+    }));
+  } catch (error) {
+    console.error("[growth] brand distribution failed", error);
+  }
+  try {
+    await advanceTextCampaigns(
+      ctx.db,
+      async (item, destination) => runPublish({
+        db: ctx.db,
+        key: ctx.key,
+        mediaDir: ctx.mediaDir,
+        publicBase: ctx.publicBase,
+        item,
+        destination,
+        campaign: getSetting(ctx.db, "utm_campaign") ?? undefined
+      }),
+      writeTextPosts
+    );
+  } catch (error) {
+    console.error("[growth] text posts failed", error);
   }
 }
 

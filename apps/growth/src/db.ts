@@ -231,6 +231,33 @@ export function migrate(db: GrowthDb): void {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS script_runs_status ON script_runs(status, created_at);
+    CREATE TABLE IF NOT EXISTS text_campaigns (
+      id TEXT PRIMARY KEY,
+      network TEXT NOT NULL,
+      query TEXT NOT NULL,
+      language TEXT NOT NULL,
+      destination_id TEXT,
+      hours INTEGER NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      last_filled_at TEXT,
+      last_error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS text_posts (
+      id TEXT PRIMARY KEY,
+      campaign_id TEXT NOT NULL,
+      network TEXT NOT NULL,
+      body TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      slot_key TEXT UNIQUE,
+      remote_url TEXT,
+      error TEXT,
+      posted_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
   const sessionColumns = rows(db.prepare("PRAGMA table_info(sessions)").all());
   if (!sessionColumns.some((column) => str(column, "name") === "operator_id")) {
@@ -661,6 +688,17 @@ const JOB_SELECT = `SELECT jobs.*, items.title AS item_title, destinations.name 
 
 export function listJobs(db: GrowthDb): Job[] {
   return rows(db.prepare(`${JOB_SELECT} ORDER BY jobs.created_at DESC LIMIT 400`).all()).map(mapJob);
+}
+
+export function itemDelivered(db: GrowthDb, itemId: string, destinationId: string): boolean {
+  const row = db
+    .prepare(
+      `SELECT 1 AS n FROM jobs
+       WHERE item_id = ? AND destination_id = ? AND status IN ('published', 'uploading', 'processing')
+       LIMIT 1`
+    )
+    .get(itemId, destinationId) as Row | undefined;
+  return Boolean(row);
 }
 
 export function getJob(db: GrowthDb, id: string): Job | null {

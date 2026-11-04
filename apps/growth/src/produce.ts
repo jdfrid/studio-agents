@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { loadPromoPackages, type PromoPackage } from "./catalog.js";
+import { subscribeCue, subscribeCueNote } from "./languageCopy.js";
 import { nid } from "./crypto.js";
 import { getItem, listItems, updateItem, type GrowthDb, type Item } from "./db.js";
 
@@ -24,6 +25,8 @@ export function briefForPackage(pkg: PromoPackage): Record<string, unknown> {
     ].join("\n"),
     targetAudience: pkg.audience,
     language: "en",
+    instructions: `This video is only about Reelmino, the product in the package. ${subscribeCueNote("en")}`,
+    branding: { slogan: subscribeCue("en") },
     durationSeconds: scenes.length * SECONDS_PER_SCENE + END_CARD_SECONDS,
     aspectRatio: "9:16",
     budgetMode: true,

@@ -65,7 +65,7 @@ export async function buildApp(options: BuildOptions = {}) {
     reply.type("text/html").send(readFileSync(path.join(publicDir, "index.html"), "utf8"));
   };
   app.get("/", sendConsole);
-  for (const pagePath of ["/accounts", "/brand", "/keywords", "/scripts", "/trends", "/content", "/groups", "/calendar", "/internet", "/results", "/people"]) {
+  for (const pagePath of ["/accounts", "/brand", "/keywords", "/scripts", "/x", "/linkedin", "/trends", "/content", "/groups", "/calendar", "/internet", "/results", "/people"]) {
     app.get(pagePath, sendConsole);
   }
   app.get("/app.js", async (_request, reply) => {
