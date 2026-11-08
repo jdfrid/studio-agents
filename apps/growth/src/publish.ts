@@ -39,6 +39,7 @@ import {
   type Job
 } from "./db.js";
 import { createLinkedInAdapter, linkedinTokenExpired } from "./linkedin.js";
+import { applyVideoProfile } from "./channelProfile.js";
 import { applyLink, formatForNetwork, trackedLink } from "./utm.js";
 
 export function isProductNetwork(network: string): network is SocialNetwork {
@@ -223,13 +224,14 @@ export async function runPublish(input: {
     network: input.destination.network,
     status: "uploading"
   });
-  const { copy } = lockPublishCopy({
+  const locked = lockPublishCopy({
     db: input.db,
     job,
     item: input.item,
     network: input.destination.network,
     campaign: input.campaign
   });
+  const copy = input.destination.network === "youtube" ? applyVideoProfile(locked.copy, input.destination) : locked.copy;
   try {
     const adapter = publisher(input.destination.network);
     const tokens = await freshConnectionTokens(input.db, input.destination.connectionId, input.key, input.destination.network);

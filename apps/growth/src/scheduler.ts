@@ -23,7 +23,8 @@ import { sendGrowthMail } from "./mail.js";
 import { composeFreshCopy } from "./angles.js";
 import { applyLink, trackedLink } from "./utm.js";
 import { deliverDueGroupPosts } from "./groups.js";
-import { pollPublish, postDueFirstComments, runPublish } from "./publish.js";
+import { ensureYouTubeChannels } from "./channelProfile.js";
+import { freshConnectionTokens, pollPublish, postDueFirstComments, runPublish } from "./publish.js";
 import { advanceKeywordFeeds } from "./keywordFeeds.js";
 import { advanceScriptBank } from "./scriptBank.js";
 import { advanceBrandDistribution } from "./brandDistribution.js";
@@ -133,6 +134,11 @@ async function sendEmailSlot(ctx: DispatchContext, slot: Slot, itemId: string): 
 }
 
 export async function tick(ctx: DispatchContext): Promise<void> {
+  try {
+    await ensureYouTubeChannels(ctx.db, (connectionId) => freshConnectionTokens(ctx.db, connectionId, ctx.key, "youtube"));
+  } catch (error) {
+    console.error("[growth] channel profile failed", error);
+  }
   for (const slot of dueSlots(ctx.db, new Date().toISOString())) {
     try {
       await dispatchSlot(ctx, slot);

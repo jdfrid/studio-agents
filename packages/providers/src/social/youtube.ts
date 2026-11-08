@@ -30,6 +30,81 @@ async function youtubeJson<T>(tokens: SocialTokens, url: string): Promise<T> {
   });
 }
 
+const BRANDING_KEEP = [
+  "defaultTab",
+  "trackingAnalyticsAccountId",
+  "moderateComments",
+  "showRelatedChannels",
+  "showBrowseView",
+  "featuredChannelsTitle",
+  "featuredChannelsUrls",
+  "unsubscribedTrailer",
+  "profileColor",
+  "country",
+  "defaultLanguage"
+] as const;
+
+export function youtubeTags(tags: string[] | undefined): string[] {
+  const chosen: string[] = [];
+  let chars = 0;
+  for (const raw of tags ?? []) {
+    const tag = raw.replace(/^#/, "").replace(/["\n\r]/g, "").trim();
+    if (!tag) continue;
+    const next = chars + tag.length + (chosen.length ? 1 : 0);
+    if (chosen.length >= 30 || next > 500) break;
+    chosen.push(tag);
+    chars = next;
+  }
+  return chosen;
+}
+
+export function youtubeMetadata(input: {
+  title?: string;
+  body?: string;
+  fallbackDescription?: string;
+  hashtags?: string[];
+  isShort?: boolean;
+  categoryId?: string;
+  privacy?: string;
+  madeForKids?: boolean;
+  scheduleAt?: string;
+}): { snippet: Record<string, unknown>; status: Record<string, unknown> } {
+  let description = (input.body || input.fallbackDescription || "").trim();
+  if (input.isShort && !/#shorts/i.test(description)) description = `${description}\n\n#Shorts`.trim();
+  const snippet: Record<string, unknown> = {
+    title: (input.title || "Untitled").slice(0, 100),
+    description,
+    tags: youtubeTags(input.hashtags),
+    categoryId: input.categoryId || "22"
+  };
+  const status: Record<string, unknown> = {
+    privacyStatus: input.privacy ?? "public",
+    selfDeclaredMadeForKids: input.madeForKids === true
+  };
+  if (input.scheduleAt && status.privacyStatus !== "private") {
+    status.privacyStatus = "private";
+    status.publishAt = input.scheduleAt;
+  }
+  return { snippet, status };
+}
+
+export function channelBrandingUpdate(input: {
+  channelId: string;
+  description: string;
+  keywords: string;
+  existing?: Record<string, unknown>;
+}): { id: string; brandingSettings: { channel: Record<string, unknown> } } {
+  const channel: Record<string, unknown> = {
+    description: input.description.slice(0, 1000),
+    keywords: input.keywords.slice(0, 500)
+  };
+  for (const key of BRANDING_KEEP) {
+    const value = input.existing?.[key];
+    if (value !== undefined && value !== null && value !== "") channel[key] = value;
+  }
+  return { id: input.channelId, brandingSettings: { channel } };
+}
+
 export function createYoutubeAdapter(): NetworkAdapter {
   return {
     ...baseAdapter("youtube"),
@@ -143,27 +218,20 @@ export function createYoutubeAdapter(): NetworkAdapter {
     async publish(ctx: PublishContext): Promise<PublishHandle> {
       const video = ctx.media.find((item) => item.item.kind === "video");
       if (!video) throw new SocialApiError("youtube", "YouTube requires a video", 400, "validation");
-      const isShort = Boolean(ctx.preview.nativeCopy.isShort);
-      const title = (ctx.preview.nativeCopy.title || ctx.copy.title || "Untitled").slice(0, 100);
-      let description = ctx.preview.nativeCopy.description || ctx.preview.nativeCopy.caption || "";
-      if (isShort && !/#shorts/i.test(description)) description = `${description}\n\n#Shorts`.trim();
       const privacy = ctx.destination.config.privacy ?? (ctx.mode === "draft" ? "private" : "public");
-      const snippet: Record<string, unknown> = {
-        title,
-        description,
-        tags: ctx.copy.hashtags?.map((tag) => tag.replace(/^#/, "")).slice(0, 15),
-        categoryId: ctx.destination.config.categoryId || "22"
-      };
+      const { snippet, status } = youtubeMetadata({
+        title: ctx.preview.nativeCopy.title || ctx.copy.title,
+        body: ctx.copy.body,
+        fallbackDescription: ctx.preview.nativeCopy.description || ctx.preview.nativeCopy.caption,
+        hashtags: ctx.copy.hashtags,
+        isShort: Boolean(ctx.preview.nativeCopy.isShort),
+        categoryId: ctx.destination.kind === "playlist" ? undefined : ctx.destination.config.categoryId,
+        privacy,
+        madeForKids: ctx.destination.config.madeForKids === true,
+        scheduleAt: ctx.mode === "schedule" && ctx.scheduleAt ? ctx.scheduleAt.toISOString() : undefined
+      });
       if (ctx.destination.kind === "playlist") {
         snippet.channelId = ctx.destination.config.categoryId;
-      }
-      const status: Record<string, unknown> = {
-        privacyStatus: privacy,
-        selfDeclaredMadeForKids: ctx.destination.config.madeForKids === true
-      };
-      if (ctx.mode === "schedule" && ctx.scheduleAt && privacy !== "private") {
-        status.privacyStatus = "private";
-        status.publishAt = ctx.scheduleAt.toISOString();
       }
 
       const init = await socialRequest("youtube", "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", {

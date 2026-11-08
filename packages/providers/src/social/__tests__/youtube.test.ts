@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { createYoutubeAdapter } from "../youtube.js";
+import { channelBrandingUpdate, createYoutubeAdapter, youtubeMetadata } from "../youtube.js";
 
 describe("youtube adapter", () => {
   const prevId = process.env.GOOGLE_CLIENT_ID;
@@ -26,5 +26,33 @@ describe("youtube adapter", () => {
     });
     const params = new URL(authorizeUrl).searchParams;
     expect(params.get("prompt")).toBe("select_account consent");
+  });
+
+  it("keeps video keywords out of the description and on the tag list", () => {
+    const { snippet } = youtubeMetadata({
+      title: "Keep herbs alive",
+      body: "Store the stems in water.\n\nA kitchen tip made with Reelmino.",
+      hashtags: ["Reelmino", "video creation", "יצירת וידאו", "kitchen tips"],
+      isShort: true
+    });
+    expect(snippet.description).toContain("Store the stems in water.");
+    expect(snippet.description).toContain("#Shorts");
+    expect(snippet.description).not.toContain("#יצירת");
+    expect(snippet.tags).toContain("יצירת וידאו");
+    expect(snippet.tags).toContain("video creation");
+  });
+
+  it("writes the channel description and keywords without dropping the trailer", () => {
+    const payload = channelBrandingUpdate({
+      channelId: "UC1",
+      description: "Reelmino turns one sentence into a video.",
+      keywords: '"video creation" "יצירת וידאו"',
+      existing: { unsubscribedTrailer: "abc123", title: "Reelmino" }
+    });
+    expect(payload.id).toBe("UC1");
+    expect(payload.brandingSettings.channel.description).toContain("Reelmino");
+    expect(payload.brandingSettings.channel.keywords).toContain("יצירת וידאו");
+    expect(payload.brandingSettings.channel.unsubscribedTrailer).toBe("abc123");
+    expect(payload.brandingSettings.channel.title).toBeUndefined();
   });
 });
