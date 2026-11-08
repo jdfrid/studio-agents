@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { briefForBrandVideo, createBrandContent, moveBrandItem, nextBrandVideo, orderedBrandItems } from "./brandDistribution.js";
+import { advanceBrandDistribution, briefForBrandVideo, createBrandContent, moveBrandItem, nextBrandVideo, orderedBrandItems } from "./brandDistribution.js";
 import { emptyCopy } from "./copy.js";
-import { insertItem, insertJob, openDb, upsertDestination, type GrowthDb } from "./db.js";
+import { getSetting, insertConnection, insertItem, insertJob, openDb, setSetting, upsertDestination, type GrowthDb } from "./db.js";
 import { postsFromModel, saveTextCampaign, shapePost, textPrompt } from "./textPosts.js";
 
 const dbs: GrowthDb[] = [];
@@ -66,6 +66,41 @@ describe("brand distribution", () => {
     opened.prepare("UPDATE jobs SET created_at = ? WHERE id = ?").run("2026-11-01T00:00:00.000Z", "sent");
     expect(nextBrandVideo(opened, "brand", new Date("2026-11-08T08:00:00.000Z"))?.id).toBe("kit-10-late");
     expect(briefForBrandVideo({ title: "One sentence", body: "Show the product.", language: "en", durationSeconds: 30 }).branding).toEqual({ slogan: "Click Subscribe" });
+  });
+
+  it("holds the next video when the channel login has to be renewed", async () => {
+    const opened = db();
+    insertConnection(opened, {
+      id: "conn",
+      network: "youtube",
+      displayName: "Reelmino",
+      handle: "@reelminoapp",
+      externalUserId: "channel",
+      encryptedTokens: "stored",
+      status: "needs_reauth"
+    });
+    upsertDestination(opened, {
+      id: "brand",
+      connectionId: "conn",
+      network: "youtube",
+      kind: "channel",
+      externalId: "brand",
+      name: "Reelmino",
+      handle: "@reelminoapp",
+      url: "https://www.youtube.com/@reelminoapp",
+      config: {}
+    });
+    video(opened, "kit-00-hero-overview", "kit");
+    setSetting(opened, "brand_dist_enabled", "1");
+    setSetting(opened, "brand_dist_per_day", "6");
+    setSetting(opened, "brand_dist_destination", "brand");
+    let calls = 0;
+    await advanceBrandDistribution(opened, async () => {
+      calls += 1;
+      return { status: "published" };
+    });
+    expect(calls).toBe(0);
+    expect(getSetting(opened, "brand_dist_bucket")).toBeNull();
   });
 });
 

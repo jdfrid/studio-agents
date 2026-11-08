@@ -3,6 +3,7 @@ import { emptyCopy } from "./copy.js";
 import { nid } from "./crypto.js";
 import {
   destinationsForNetwork,
+  getConnection,
   getDestination,
   getItem,
   getSetting,
@@ -299,14 +300,24 @@ export async function advanceBrandDistribution(
   if (!settings.enabled) return;
   const destination = brandChannel(db, settings.destinationId);
   if (!destination) return;
+  const connection = getConnection(db, destination.connectionId);
+  if (!connection || connection.status === "needs_reauth" || connection.status === "revoked") return;
   const last = Number(getSetting(db, "brand_dist_bucket") ?? "");
   const span = Math.floor(DAY_MS / settings.perDay);
   const current = Math.floor(now.getTime() / span);
   if (Number.isFinite(last) && last >= current) return;
   const item = nextBrandVideo(db, destination.id);
   if (!item) return;
+  const outcome = await publish(item, destination);
+  if (authFailure(outcome)) return;
   setSetting(db, "brand_dist_bucket", String(current));
-  await publish(item, destination);
+}
+
+function authFailure(outcome: unknown): boolean {
+  if (!outcome || typeof outcome !== "object") return false;
+  const job = outcome as { status?: string; errorCode?: string | null; lastError?: string | null };
+  if (job.errorCode === "auth_expired") return true;
+  return job.status === "failed" && /invalid_grant|expired or revoked|token refresh failed/i.test(job.lastError ?? "");
 }
 
 export function brandItem(db: GrowthDb, id: string): Item | null {

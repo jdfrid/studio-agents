@@ -52,8 +52,9 @@ function publisher(network: string) {
 }
 
 function errorCodeOf(error: unknown): string {
-  if (error instanceof SocialApiError) return error.code;
   const message = error instanceof Error ? error.message : String(error);
+  if (/invalid_grant|invalid_token|expired or revoked|token refresh failed/i.test(message)) return "auth_expired";
+  if (error instanceof SocialApiError) return error.code;
   if (/unauthor|expired|401|403/i.test(message)) return "auth_expired";
   return "upload_failed";
 }
