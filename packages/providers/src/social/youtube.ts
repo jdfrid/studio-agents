@@ -301,7 +301,13 @@ export function createYoutubeAdapter(): NetworkAdapter {
         status: "published",
         remotePostId: videoId,
         remoteUrl: `https://youtu.be/${videoId}`,
-        nativePayload: { title, privacy, isShort, snippet, status }
+        nativePayload: {
+          title: snippet.title,
+          privacy: status.privacyStatus,
+          isShort: Boolean(ctx.preview.nativeCopy.isShort),
+          snippet,
+          status
+        }
       };
     }
   };
