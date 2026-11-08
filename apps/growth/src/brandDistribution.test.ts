@@ -62,6 +62,9 @@ describe("brand distribution", () => {
     expect(orderedBrandItems(opened)[0]?.id).toBe("kit-10-late");
     insertJob(opened, { id: "sent", itemId: "kit-10-late", destinationId: "brand", slotId: null, network: "youtube", status: "published" });
     expect(nextBrandVideo(opened, "brand")?.id).toBe("kit-2-early");
+    insertJob(opened, { id: "today", itemId: "kit-2-early", destinationId: "brand", slotId: null, network: "youtube", status: "published" });
+    opened.prepare("UPDATE jobs SET created_at = ? WHERE id = ?").run("2026-11-01T00:00:00.000Z", "sent");
+    expect(nextBrandVideo(opened, "brand", new Date("2026-11-08T08:00:00.000Z"))?.id).toBe("kit-10-late");
     expect(briefForBrandVideo({ title: "One sentence", body: "Show the product.", language: "en", durationSeconds: 30 }).branding).toEqual({ slogan: "Click Subscribe" });
   });
 });

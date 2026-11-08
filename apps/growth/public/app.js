@@ -720,16 +720,17 @@ function renderOwn() {
   panel.innerHTML = `
     <div class="card">
       <h2>הפצת המותג</h2>
-      <p class="muted">כאן רק חבילות וסרטונים על Reelmino עצמה. ההפצה שולחת את הסרטון הבא לפי הסדר שקבעתם, במרווח שנבחר. תסריטים של מילות מפתח לא שייכים לכאן.</p>
-      <p class="muted">${state.produceConfigured ? "ההפקה מחוברת." : "להפקה צריך REELMINO_SESSION."} לכל ערוץ יש תקרה של 16 העלאות ביום.</p>
+      <p class="muted">כאן רק חבילות וסרטונים על Reelmino עצמה. ההפצה שולחת אותם לפי הסדר, ${brand.perDay === 15 ? "15" : "6"} ביום, בלי לחזור על אותו סרטון באותו יום. היום עלו ${esc(brand.publishedToday || 0)}. תסריטים של מילות מפתח לא שייכים לכאן.</p>
+      <p class="muted">${brand.enabled ? "ההפצה האוטומטית פועלת." : "ההפצה האוטומטית כבויה, ולכן לא עולה כלום."} לכל ערוץ יש תקרה של 16 העלאות ביום.</p>
       <p class="row">
         <button type="button" id="import-kit">ייבוא החבילות המוכנות</button>
         <button type="button" id="pull-brand">משיכת סרטונים מוכנים</button>
       </p>
-      <label><input id="brand-enabled" type="checkbox" ${brand.enabled ? "checked" : ""}> הפצה לפי הסדר</label>
-      <label>מרווח
-        <select id="brand-hours">
-          ${[1, 2, 4, 6, 8, 12, 24].map((hours) => `<option value="${hours}" ${Number(brand.hours) === hours ? "selected" : ""}>${hours} שעות</option>`).join("")}
+      <label><input id="brand-enabled" type="checkbox" ${brand.enabled ? "checked" : ""}> הפצה אוטומטית</label>
+      <label>כמה ביום
+        <select id="brand-per-day">
+          <option value="6" ${Number(brand.perDay) !== 15 ? "selected" : ""}>6 סרטונים ביום</option>
+          <option value="15" ${Number(brand.perDay) === 15 ? "selected" : ""}>15 סרטונים ביום</option>
         </select>
       </label>
       <label>ערוץ
@@ -790,7 +791,7 @@ function renderOwn() {
     method: "PATCH",
     body: JSON.stringify({
       enabled: panel.querySelector("#brand-enabled").checked,
-      hours: Number(panel.querySelector("#brand-hours").value),
+      perDay: Number(panel.querySelector("#brand-per-day").value),
       destinationId: panel.querySelector("#brand-destination").value || null
     })
   }));

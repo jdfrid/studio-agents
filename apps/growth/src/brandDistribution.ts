@@ -7,7 +7,6 @@ import {
   getItem,
   getSetting,
   insertItem,
-  itemDelivered,
   listItems,
   setSetting,
   updateItem,
@@ -18,13 +17,15 @@ import {
 import { durationPhrase, taskDurationSeconds } from "./duration.js";
 import { subscribeCue, subscribeCueNote } from "./languageCopy.js";
 import { submitReelminoBrief } from "./produce.js";
+import { jerusalemDayStart } from "./youtubeQuota.js";
 
-const HOURS = [1, 2, 4, 6, 8, 12, 24] as const;
+const PER_DAY = [6, 15] as const;
 const ORDER_KEY = "brand_order";
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type BrandSettings = {
   enabled: boolean;
-  hours: number;
+  perDay: 6 | 15;
   destinationId: string | null;
 };
 
@@ -39,29 +40,51 @@ export type BrandRow = {
 };
 
 export function readBrandSettings(db: GrowthDb): BrandSettings {
-  const hoursRaw = Number(getSetting(db, "brand_dist_hours") ?? "4");
+  const perDayRaw = Number(getSetting(db, "brand_dist_per_day") ?? "6");
   return {
     enabled: getSetting(db, "brand_dist_enabled") === "1",
-    hours: (HOURS as readonly number[]).includes(hoursRaw) ? hoursRaw : 4,
+    perDay: perDayRaw === 15 ? 15 : 6,
     destinationId: getSetting(db, "brand_dist_destination")?.trim() || null
   };
 }
 
 export function applyBrandSettings(
   db: GrowthDb,
-  patch: Partial<{ enabled: boolean; hours: number; destinationId: string | null }>
+  patch: Partial<{ enabled: boolean; perDay: number; destinationId: string | null }>
 ): string | null {
-  if (patch.hours !== undefined && !(HOURS as readonly number[]).includes(patch.hours)) {
-    return "בחרו מרווח של 1, 2, 4, 6, 8, 12 או 24 שעות";
+  if (patch.perDay !== undefined && !(PER_DAY as readonly number[]).includes(patch.perDay)) {
+    return "בחרו 6 או 15 סרטונים ביום";
   }
   if (patch.destinationId) {
     const row = getDestination(db, patch.destinationId);
     if (!row || row.network !== "youtube" || row.kind !== "channel" || !row.enabled) return "בחרו ערוץ יוטיוב פעיל";
   }
   if (patch.enabled !== undefined) setSetting(db, "brand_dist_enabled", patch.enabled ? "1" : "0");
-  if (patch.hours !== undefined) setSetting(db, "brand_dist_hours", String(patch.hours));
+  if (patch.perDay !== undefined) setSetting(db, "brand_dist_per_day", String(patch.perDay));
   if (patch.destinationId !== undefined) setSetting(db, "brand_dist_destination", patch.destinationId ?? "");
   return null;
+}
+
+function lastDelivery(db: GrowthDb, itemId: string, destinationId: string): string | null {
+  const row = db
+    .prepare(
+      `SELECT MAX(created_at) AS at FROM jobs
+       WHERE item_id = ? AND destination_id = ? AND status IN ('published', 'uploading', 'processing')`
+    )
+    .get(itemId, destinationId) as { at?: string | null } | undefined;
+  return row?.at || null;
+}
+
+export function brandSentToday(db: GrowthDb, destinationId: string, now = new Date()): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM jobs j
+       JOIN items i ON i.id = j.item_id
+       WHERE j.destination_id = ? AND j.created_at >= ? AND j.status IN ('published', 'uploading', 'processing')
+       AND i.source IN ('kit', 'brand')`
+    )
+    .get(destinationId, jerusalemDayStart(now)) as { n?: number } | undefined;
+  return Number(row?.n ?? 0);
 }
 
 export function isBrandItem(item: Item): boolean {
@@ -122,24 +145,43 @@ export function brandChannel(db: GrowthDb, destinationId: string | null): Destin
   return brand ?? channels[0] ?? null;
 }
 
-export function brandView(db: GrowthDb): BrandSettings & { items: BrandRow[] } {
+export function brandView(db: GrowthDb, now = new Date()): BrandSettings & { publishedToday: number; items: BrandRow[] } {
   const settings = readBrandSettings(db);
+  const dayStart = Date.parse(jerusalemDayStart(now));
   return {
     ...settings,
-    items: orderedBrandItems(db).map((item) => ({
-      id: item.id,
-      title: item.title,
-      summary: item.summary,
-      source: item.source,
-      hasVideo: Boolean(item.mediaPath),
-      producing: Boolean(item.reelminoRunId && !item.mediaPath),
-      published: settings.destinationId ? itemDelivered(db, item.id, settings.destinationId) : false
-    }))
+    publishedToday: settings.destinationId ? brandSentToday(db, settings.destinationId, now) : 0,
+    items: orderedBrandItems(db).map((item) => {
+      const sentAt = settings.destinationId ? lastDelivery(db, item.id, settings.destinationId) : null;
+      return {
+        id: item.id,
+        title: item.title,
+        summary: item.summary,
+        source: item.source,
+        hasVideo: Boolean(item.mediaPath),
+        producing: Boolean(item.reelminoRunId && !item.mediaPath),
+        published: Boolean(sentAt && Date.parse(sentAt) >= dayStart)
+      };
+    })
   };
 }
 
-export function nextBrandVideo(db: GrowthDb, destinationId: string): Item | null {
-  return orderedBrandItems(db).find((item) => item.mediaPath && !itemDelivered(db, item.id, destinationId)) ?? null;
+export function nextBrandVideo(db: GrowthDb, destinationId: string, now = new Date()): Item | null {
+  const dayStart = Date.parse(jerusalemDayStart(now));
+  const waiting = orderedBrandItems(db).filter((item) => {
+    if (!item.mediaPath) return false;
+    const sentAt = lastDelivery(db, item.id, destinationId);
+    return !sentAt || Date.parse(sentAt) < dayStart;
+  });
+  waiting.sort((a, b) => {
+    const left = lastDelivery(db, a.id, destinationId);
+    const right = lastDelivery(db, b.id, destinationId);
+    if (!left && !right) return 0;
+    if (!left) return -1;
+    if (!right) return 1;
+    return Date.parse(left) - Date.parse(right);
+  });
+  return waiting[0] ?? null;
 }
 
 export function briefForBrandVideo(input: { title: string; body: string; language: string; durationSeconds: number }): Record<string, unknown> {
@@ -258,7 +300,7 @@ export async function advanceBrandDistribution(
   const destination = brandChannel(db, settings.destinationId);
   if (!destination) return;
   const last = Number(getSetting(db, "brand_dist_bucket") ?? "");
-  const span = settings.hours * 60 * 60 * 1000;
+  const span = Math.floor(DAY_MS / settings.perDay);
   const current = Math.floor(now.getTime() / span);
   if (Number.isFinite(last) && last >= current) return;
   const item = nextBrandVideo(db, destination.id);
