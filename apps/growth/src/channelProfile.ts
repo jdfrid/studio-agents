@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto";
 import { channelBrandingUpdate } from "@studio/providers";
 import type { PackageCopyInput } from "@studio/shared";
-import { destinationsForNetwork, getSetting, setSetting, type Destination, type GrowthDb } from "./db.js";
+import { destinationsForNetwork, getConnection, getSetting, setSetting, type Destination, type GrowthDb } from "./db.js";
 
 const TAG_LIMIT = 30;
 const TAG_CHARS = 500;
-const HOUR_MS = 60 * 60 * 1000;
 
 const BRAND_DESCRIPTION = [
   "Reelmino turns one sentence into a finished branded video for a small business. Write what the business wants to say, and Reelmino prepares the script, the scenes, and a video ad you can publish.",
@@ -207,6 +206,8 @@ async function ensureOne(
   destination: Destination,
   tokensFor: (connectionId: string) => Promise<{ accessToken: string }>
 ): Promise<void> {
+  const connection = getConnection(db, destination.connectionId);
+  if (!connection || connection.status === "needs_reauth" || connection.status === "revoked") return;
   const profile = profileFor(destination);
   const hash = profileHash(profile);
   const savedKey = `yt_channel_profile:${destination.id}`;
@@ -222,8 +223,13 @@ async function ensureOne(
     console.log(`[growth] channel profile updated ${destination.handle || destination.name}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const delay = /invalid_grant|expired or revoked|HTTP 401|HTTP 403/.test(message) ? 6 * HOUR_MS : 15 * 60 * 1000;
-    setSetting(db, waitKey, new Date(Date.now() + delay).toISOString());
+    const auth = /invalid_grant|expired or revoked|HTTP 401|HTTP 403/.test(message);
+    if (auth) {
+      db.prepare("UPDATE connections SET status = ?, updated_at = ? WHERE id = ?").run("needs_reauth", new Date().toISOString(), connection.id);
+      setSetting(db, waitKey, "");
+    } else {
+      setSetting(db, waitKey, new Date(Date.now() + 15 * 60 * 1000).toISOString());
+    }
     console.error(`[growth] channel profile ${destination.handle || destination.id} failed`, message.slice(0, 240));
   }
 }
