@@ -234,13 +234,15 @@ export function createYoutubeAdapter(): NetworkAdapter {
         snippet.channelId = ctx.destination.config.categoryId;
       }
 
+      const uploadName = video.filename || "video.mp4";
       const init = await socialRequest("youtube", "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", {
         method: "POST",
         headers: {
           authorization: `Bearer ${ctx.tokens.accessToken}`,
           "content-type": "application/json; charset=UTF-8",
           "x-upload-content-type": video.mimeType,
-          "x-upload-content-length": String(video.body.byteLength)
+          "x-upload-content-length": String(video.body.byteLength),
+          slug: encodeURIComponent(uploadName)
         },
         body: JSON.stringify({ snippet, status }),
         timeoutMs: 60_000
@@ -256,7 +258,8 @@ export function createYoutubeAdapter(): NetworkAdapter {
         headers: {
           authorization: `Bearer ${ctx.tokens.accessToken}`,
           "content-type": video.mimeType,
-          "content-length": String(video.body.byteLength)
+          "content-length": String(video.body.byteLength),
+          "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(uploadName)}`
         },
         body: video.body,
         timeoutMs: 10 * 60_000

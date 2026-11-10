@@ -42,6 +42,18 @@ describe("youtube adapter", () => {
     expect(snippet.tags).toContain("video creation");
   });
 
+  it("keeps a new upload private until the scheduled public time", () => {
+    const release = new Date("2026-11-10T12:00:00.000Z");
+    const { status } = youtubeMetadata({
+      title: "One sentence becomes a video",
+      body: "Write it once.",
+      privacy: "public",
+      scheduleAt: release.toISOString()
+    });
+    expect(status.privacyStatus).toBe("private");
+    expect(status.publishAt).toBe(release.toISOString());
+  });
+
   it("writes the channel description and keywords without dropping the trailer", () => {
     const payload = channelBrandingUpdate({
       channelId: "UC1",

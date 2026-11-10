@@ -260,7 +260,7 @@ function renderAccounts() {
       ${connectable.map((row) => {
         const name = NETWORK_LABELS[row.network] || row.network;
         if (row.network === "telegram") {
-          return `<p><strong>${esc(name)}</strong> — מדביקים למטה טוקן ומזהה ערוץ</p>`;
+          return `<p><strong>${esc(name)}</strong> — מדביקים למטה טוקן ומזהה ערוץ. כל סרטון שעולה ליוטיוב נשלח גם לערוץ הזה, עם אותה כותרת ואותו תיאור.</p>`;
         }
         if (!row.configured) {
           return `<p><strong>${esc(name)}</strong> — <span class="error">אין מפתח בשרת, אי אפשר לחבר עדיין</span></p>`;
@@ -268,8 +268,15 @@ function renderAccounts() {
         return `<p><strong>${esc(name)}</strong> — מוכן לחיבור <button class="primary" type="button" data-connect="${row.network}">חיבור ${esc(name)}</button></p>`;
       }).join("")}
       <label>טוקן בוט טלגרם<input id="tg-token" autocomplete="off"></label>
-      <label>מזהה צ'אט או @ערוץ<input id="tg-chat" placeholder="@reelmino"></label>
+      <label>מזהה צ'אט, @ערוץ או קישור הזמנה<input id="tg-chat" placeholder="https://t.me/+... או @channel"></label>
       <button class="primary" type="button" id="tg-save">חיבור טלגרם</button>
+    </div>
+    <div class="card">
+      <p>אחרי שסרטון עולה לערוץ הטלגרם, הוא מועתק רק לקבוצות של אותו נושא. סרטון מותג לקבוצות יצירת וידאו, וסרטון מטבח לקבוצות בישול. בערוץ הבוט צריך להיות מנהל עם הרשאת פרסום. בקבוצה מספיק שהוא חבר ושלחברים מותר לשלוח.</p>
+      <label>קבוצה או ערוץ<input id="tg-copy" placeholder="@group, https://t.me/group או https://t.me/c/..."></label>
+      <label>נושא<select id="tg-copy-topic"><option value="brand">יצירת וידאו</option><option value="kitchen">מטבח</option></select></label>
+      <button class="primary" type="button" id="tg-copy-add">העתקה לקבוצה הזו</button>
+      ${(state.settings.telegramCopies || []).map((id) => state.destinations.find((row) => row.id === id)).filter(Boolean).map((row) => `<p>${esc(row.name)} ${esc(row.handle || "")} · ${row.config && row.config.copyTopic === "kitchen" ? "מטבח" : "יצירת וידאו"} <button type="button" data-copy-drop="${row.id}">הסרה</button></p>`).join("") || "<p class=\"muted\">אין עדיין קבוצות</p>"}
     </div>
     <div class="card">
       ${state.connections.map((row) => `<p>${esc(row.network)} · ${esc(row.displayName)} · ${esc(row.status)}
@@ -295,6 +302,16 @@ function renderAccounts() {
     if (!token) throw new Error("מדביקים קודם את הטוקן מ-BotFather");
     if (!chatId) throw new Error("כותבים מזהה ערוץ, למשל @reelmino");
     await api("/api/connections/telegram", { method: "POST", body: JSON.stringify({ token, chatId }) });
+  });
+  const copyAdd = panel.querySelector("#tg-copy-add");
+  if (copyAdd) copyAdd.onclick = () => run(async () => {
+    const chat = panel.querySelector("#tg-copy").value.trim();
+    const topic = panel.querySelector("#tg-copy-topic").value;
+    if (!chat) throw new Error("כותבים @שם, קישור t.me/שם, או קישור t.me/c/ מהקבוצה");
+    await api("/api/telegram/copies", { method: "POST", body: JSON.stringify({ chat, topic }) });
+  });
+  panel.querySelectorAll("[data-copy-drop]").forEach((button) => {
+    button.onclick = () => run(() => api(`/api/telegram/copies/${button.dataset.copyDrop}`, { method: "DELETE" }));
   });
   panel.querySelectorAll("[data-sync]").forEach((button) => { button.onclick = () => run(() => api(`/api/connections/${button.dataset.sync}/sync`, { method: "POST", body: "{}" })); });
   panel.querySelectorAll("[data-drop]").forEach((button) => { button.onclick = () => run(() => api(`/api/connections/${button.dataset.drop}`, { method: "DELETE" })); });

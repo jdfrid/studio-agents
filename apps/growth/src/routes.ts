@@ -3,7 +3,8 @@ import "@fastify/multipart";
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { beginOAuth, connectTelegram, finishOAuth, growthOAuthRedirect, networkSetup, oauthNetworks, removeConnection, syncConnection } from "./accounts.js";
+import { addTelegramCopy, beginOAuth, connectTelegram, finishOAuth, growthOAuthRedirect, networkSetup, oauthNetworks, removeConnection, syncConnection } from "./accounts.js";
+import { forgetTelegramCopy, telegramCopyIds } from "./telegramMirror.js";
 import { importCalendar, importPromoKit, slugify } from "./catalog.js";
 import { composeFreshCopy } from "./angles.js";
 import { emptyCopy, EXPORT_NETWORKS, type ItemCopy } from "./copy.js";
@@ -151,7 +152,9 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
       emailAutopilot: flag(ctx.db, "email_autopilot"),
       siteAutopilot: flag(ctx.db, "site_autopilot"),
       utmCampaign: getSetting(ctx.db, "utm_campaign"),
-      startMonday: getSetting(ctx.db, "start_monday")
+      startMonday: getSetting(ctx.db, "start_monday"),
+      telegramHome: getSetting(ctx.db, "telegram_mirror_destination"),
+      telegramCopies: telegramCopyIds(ctx.db)
     },
     mailConfigured: Boolean(process.env.GROWTH_RESEND_API_KEY && process.env.GROWTH_MAIL_FROM && process.env.GROWTH_MAIL_TO),
     produceConfigured: Boolean(process.env.REELMINO_SESSION),
@@ -526,8 +529,27 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
   app.post("/api/connections/telegram", async (request, reply) => {
     const body = request.body as { token?: string; chatId?: string };
     if (!body.token?.trim()) return reply.code(400).send({ error: "token required" });
-    await connectTelegram(ctx.db, ctx.key, body.token.trim(), body.chatId?.trim());
+    try {
+      await connectTelegram(ctx.db, ctx.key, body.token.trim(), body.chatId?.trim());
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+    }
     return { ok: true, destinations: listDestinations(ctx.db) };
+  });
+
+  app.post("/api/telegram/copies", async (request, reply) => {
+    const body = request.body as { chat?: string; topic?: string };
+    try {
+      const channel = await addTelegramCopy(ctx.db, ctx.key, body.chat ?? "", body.topic ?? "");
+      return { ok: true, channel };
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.delete("/api/telegram/copies/:id", async (request) => {
+    forgetTelegramCopy(ctx.db, (request.params as { id: string }).id);
+    return { ok: true };
   });
 
   app.post("/api/connections/:id/sync", async (request) => {

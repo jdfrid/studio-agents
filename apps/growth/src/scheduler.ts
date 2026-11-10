@@ -29,6 +29,7 @@ import { advanceKeywordFeeds } from "./keywordFeeds.js";
 import { advanceScriptBank } from "./scriptBank.js";
 import { advanceBrandDistribution } from "./brandDistribution.js";
 import { advanceTextCampaigns, writeTextPosts } from "./textPosts.js";
+import { advanceTelegramMirror } from "./telegramMirror.js";
 import { advanceYoutubeTrends } from "./youtubeTrends.js";
 
 export type DispatchContext = {
@@ -207,6 +208,20 @@ export async function tick(ctx: DispatchContext): Promise<void> {
     );
   } catch (error) {
     console.error("[growth] text posts failed", error);
+  }
+  try {
+    await advanceTelegramMirror(ctx.db, (item, destination, copy) => runPublish({
+      db: ctx.db,
+      key: ctx.key,
+      mediaDir: ctx.mediaDir,
+      publicBase: ctx.publicBase,
+      item,
+      destination,
+      copy,
+      campaign: getSetting(ctx.db, "utm_campaign") ?? undefined
+    }));
+  } catch (error) {
+    console.error("[growth] telegram mirror failed", error);
   }
 }
 

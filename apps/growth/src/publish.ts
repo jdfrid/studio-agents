@@ -40,6 +40,8 @@ import {
 } from "./db.js";
 import { createLinkedInAdapter, linkedinTokenExpired } from "./linkedin.js";
 import { applyVideoProfile } from "./channelProfile.js";
+import { queueYouTubeMirror } from "./telegramMirror.js";
+import { prepareYouTubeListing, systemThumbnailBytes, youtubeFileName, youtubeReleaseAt } from "./youtubeListing.js";
 import { applyLink, formatForNetwork, trackedLink } from "./utm.js";
 
 export function isProductNetwork(network: string): network is SocialNetwork {
@@ -175,6 +177,36 @@ export function mediaOf(item: Item, mediaDir: string, publicBase: string): Publi
   ];
 }
 
+function youtubeDelivery(item: Item, copy: PackageCopyInput, destination: Destination, media: PublishMediaFile[]): {
+  copy: PackageCopyInput;
+  media: PublishMediaFile[];
+  cover?: PublishMediaFile;
+  scheduleAt: Date;
+} {
+  const prepared = prepareYouTubeListing(item, copy);
+  const listed = applyVideoProfile(prepared.copy, destination);
+  const filename = youtubeFileName(listed.title || item.title, prepared.keywords);
+  const nextMedia = media.map((file) =>
+    file.item.kind === "video" ? { ...file, filename, item: { ...file.item, filename } } : file
+  );
+  const thumb = systemThumbnailBytes();
+  const cover = thumb
+    ? {
+        item: {
+          kind: "image" as const,
+          gcsPath: "local:reelmino-system.png",
+          mimeType: thumb.mimeType,
+          filename: thumb.filename,
+          sizeBytes: thumb.body.byteLength
+        },
+        body: thumb.body,
+        mimeType: thumb.mimeType,
+        filename: thumb.filename
+      }
+    : undefined;
+  return { copy: listed, media: nextMedia, cover, scheduleAt: youtubeReleaseAt() };
+}
+
 export async function freshConnectionTokens(db: GrowthDb, connectionId: string, key: Buffer, network: string): Promise<SocialTokens> {
   const connection = getConnection(db, connectionId);
   if (!connection || connection.status === "revoked") throw new Error("connection is not active");
@@ -199,6 +231,7 @@ export async function runPublish(input: {
   destination: Destination;
   slotId?: string | null;
   campaign?: string;
+  copy?: PackageCopyInput;
 }): Promise<Job> {
   if (input.destination.network === "youtube" && youtubeUploadBlock(input.db, input.destination.id)) {
     const stopped = insertJob(input.db, {
@@ -231,12 +264,24 @@ export async function runPublish(input: {
     network: input.destination.network,
     campaign: input.campaign
   });
-  const copy = input.destination.network === "youtube" ? applyVideoProfile(locked.copy, input.destination) : locked.copy;
+  let copy = input.copy ?? locked.copy;
+  if (input.copy) {
+    const saved = getJob(input.db, job.id);
+    updateJob(input.db, job.id, {
+      handle: {
+        ...(saved?.handle ?? {}),
+        caption: { angleKind: "outcome", frame: 0, title: input.copy.title ?? "", body: input.copy.body ?? "" }
+      }
+    });
+  }
   try {
     const adapter = publisher(input.destination.network);
     const tokens = await freshConnectionTokens(input.db, input.destination.connectionId, input.key, input.destination.network);
     const config = publishConfig(input.destination.network, input.destination.config, copy.link);
-    const media = mediaOf(input.item, input.mediaDir, input.publicBase);
+    const loaded = mediaOf(input.item, input.mediaDir, input.publicBase);
+    const delivery = input.destination.network === "youtube" ? youtubeDelivery(input.item, copy, input.destination, loaded) : null;
+    if (delivery) copy = delivery.copy;
+    const media = delivery?.media ?? loaded;
     const preview = adapter.preview(
       media.map((file) => file.item),
       copy,
@@ -263,7 +308,9 @@ export async function runPublish(input: {
       copy,
       preview,
       media,
-      mode: "now"
+      cover: delivery?.cover,
+      scheduleAt: delivery?.scheduleAt,
+      mode: delivery ? "schedule" : "now"
     });
     return applyResult(input.db, job.id, result, { copy, config, network: input.destination.network });
   } catch (error) {
@@ -299,13 +346,15 @@ function applyResult(
     }
   }
   if (result.status === "processing") {
-    return updateJob(db, jobId, {
+    const processing = updateJob(db, jobId, {
       status: "processing",
       remotePostId: result.remotePostId ?? null,
       remoteUrl: result.remoteUrl ?? null,
       handle,
       attempts: (current?.attempts ?? 0) + 1
     })!;
+    if (extras?.network === "youtube") queueYouTubeMirror(db, current?.status, result.status, processing.itemId);
+    return processing;
   }
   const job = updateJob(db, jobId, {
     status: result.status === "draft" ? "draft" : "published",
@@ -316,6 +365,7 @@ function applyResult(
     lastError: result.status === "draft" ? "Waiting in the network inbox. Finish it in the app." : null,
     attempts: (current?.attempts ?? 0) + 1
   })!;
+  if (extras?.network === "youtube") queueYouTubeMirror(db, current?.status, result.status, job.itemId);
   if (job.status === "published") queueGroupPosts(db, { itemId: job.itemId, jobId: job.id, network: job.network }, nid);
   return job;
 }
@@ -390,18 +440,22 @@ export async function retryPublish(input: {
   if (!destination || !item) return { job, error: "no_destination" };
   updateJob(input.db, job.id, { status: "uploading", lastError: null, errorCode: null });
   const current = getJob(input.db, job.id) ?? job;
-  const { copy } = lockPublishCopy({
+  const lockedCopy = lockPublishCopy({
     db: input.db,
     job: current,
     item,
     network: destination.network,
     campaign: input.campaign
   });
+  let copy = lockedCopy.copy;
   try {
     const adapter = publisher(destination.network);
     const tokens = await freshConnectionTokens(input.db, destination.connectionId, input.key, destination.network);
     const config = publishConfig(destination.network, destination.config, copy.link);
-    const media = mediaOf(item, input.mediaDir, input.publicBase);
+    const loaded = mediaOf(item, input.mediaDir, input.publicBase);
+    const delivery = destination.network === "youtube" ? youtubeDelivery(item, copy, destination, loaded) : null;
+    if (delivery) copy = delivery.copy;
+    const media = delivery?.media ?? loaded;
     const preview = adapter.preview(
       media.map((file) => file.item),
       copy,
@@ -430,7 +484,9 @@ export async function retryPublish(input: {
       copy,
       preview,
       media,
-      mode: "now"
+      cover: delivery?.cover,
+      scheduleAt: delivery?.scheduleAt,
+      mode: delivery ? "schedule" : "now"
     });
     return { job: applyResult(input.db, job.id, result, { copy, config, network: destination.network }) };
   } catch (error) {

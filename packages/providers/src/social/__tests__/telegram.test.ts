@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { createTelegramAdapter } from "../telegram.js";
+import { createTelegramAdapter, telegramMessageLink } from "../telegram.js";
 import * as http from "../http.js";
 
 vi.mock("../http.js", async () => {
@@ -33,6 +33,8 @@ describe("telegram adapter", () => {
       media: [],
       mode: "now"
     });
+    expect(telegramMessageLink({ externalId: "-100555", handle: null }, 7)).toBe("https://t.me/c/555/7");
+    expect(telegramMessageLink({ externalId: "-100555", handle: "@reelmino" }, 7)).toBe("https://t.me/reelmino/7");
     expect(result.status).toBe("published");
     expect(result.remotePostId).toBe("7");
     expect(socialJson).toHaveBeenCalled();

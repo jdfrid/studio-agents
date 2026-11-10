@@ -293,7 +293,7 @@ export async function produceBankEntry(ctx: BankContext, entry: ScriptEntry, slo
       title: content.title,
       summary: content.summary,
       language: entry.language,
-      copy: bankCopy(content.title, content.description),
+      copy: bankCopy(content.title, content.description, textMatchesLanguage(entry.body, entry.language) ? entry.body : ""),
       mediaPath: null,
       mediaMime: null,
       mediaKind: null,
@@ -431,11 +431,11 @@ async function finishPublish(ctx: BankContext, run: ScriptRun, deps: ScriptBankD
   updateScriptRun(ctx.db, run.id, { status: "publishing", jobId: result.id, remoteUrl: result.remoteUrl ?? null, error: null });
 }
 
-function bankCopy(title: string, description: string): ItemCopy {
+function bankCopy(title: string, description: string, script = ""): ItemCopy {
   const copy = emptyCopy();
   copy.hashtags = ["Shorts", ...tokens(title).slice(0, 4)];
   copy.youtube = { title: title.slice(0, 90), body: description };
-  copy.article = { title, description, body: description };
+  copy.article = { title, description, body: script.trim() || description };
   return copy;
 }
 

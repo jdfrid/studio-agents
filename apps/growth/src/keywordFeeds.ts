@@ -217,7 +217,7 @@ async function writeScripts(input: { query: string; language: string; ideas: str
   const shape = input.durationSeconds <= 30
     ? "Each script is 4 to 6 short narration lines about one practical tip."
     : `Each script fills about ${minutes} minute${minutes === 1 ? "" : "s"} (${input.durationSeconds} seconds): ${minutes * 8 - 2} to ${minutes * 8 + 4} narration lines, with a beginning, a middle, and an ending.`;
-  const system = `You write original vertical YouTube scripts of ${input.durationSeconds} seconds. The title and the script must be entirely in ${languageName}. Do not copy another creator's title, script, or wording. ${shape}`;
+  const system = `You write original vertical YouTube scripts of ${input.durationSeconds} seconds. The title and the script must be entirely in ${languageName}. The title is something a person would click: a concrete result, with the keyword in it, under 70 characters. Do not promise anything the script does not show. Do not copy another creator's title, script, or wording. ${shape}`;
   const user = `Keyword: ${input.query}\nCover these subjects without copying their wording:\n${input.ideas.map((idea) => `- ${idea}`).join("\n")}\nReturn JSON {"items":[{"title":"","script":""}]} with up to ${BATCH} items.`;
   const raw = process.env.GEMINI_API_KEY?.trim()
     ? await gemini(system, user)

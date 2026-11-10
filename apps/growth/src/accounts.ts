@@ -2,11 +2,13 @@ import { getNetworkAdapter, randomPkce, type SocialTokens } from "@studio/provid
 import { networkAuthConfigured, type SocialNetwork } from "@studio/shared";
 import { createLinkedInAdapter } from "./linkedin.js";
 import { isProductNetwork, mergePageTokens, publicConfig } from "./publish.js";
+import { copyTopic, isTelegramInvite, normalizeTelegramChat, rememberTelegramCopy, rememberTelegramMirror, skippedTelegramCopy, TELEGRAM_MIRROR_DESTINATION, telegramCanPost, telegramCopyAddress, type CopyTopic } from "./telegramMirror.js";
 import { decryptJson, encryptJson, nid, signPayload, verifyPayload } from "./crypto.js";
 import {
   deleteConnection,
   destinationsForNetwork,
   getConnection,
+  getSetting,
   insertConnection,
   listConnections,
   updateConnectionTokens,
@@ -135,11 +137,93 @@ export async function connectTelegram(db: GrowthDb, key: Buffer, token: string, 
   if (!adapter.identify) throw new Error("telegram identify missing");
   const identity = await adapter.identify(tokens);
   let drafts = (await adapter.listDestinations(tokens)) as Draft[];
+  let linkedId = "";
   if (chatId && adapter.resolveDestination) {
-    const resolved = await adapter.resolveDestination(tokens, chatId);
-    if (resolved) drafts = [...drafts.filter((row) => row.externalId !== resolved.externalId), resolved];
+    const hint = normalizeTelegramChat(chatId);
+    try {
+      const resolved = await adapter.resolveDestination(tokens, hint);
+      if (resolved) {
+        const withLink = resolved.url || !isTelegramInvite(chatId) ? resolved : { ...resolved, url: chatId.trim() };
+        linkedId = withLink.externalId;
+        drafts = [...drafts.filter((row) => row.externalId !== withLink.externalId), withLink];
+      }
+    } catch (error) {
+      if (isTelegramInvite(chatId)) {
+        throw new Error("הבוט עדיין לא בתוך הערוץ. הוסיפו אותו כמנהל עם הרשאת פרסום, ואז לחצו חיבור שוב עם אותו קישור.");
+      }
+      throw error;
+    }
   }
   await saveConnection(db, key, "telegram", identity, tokens, drafts);
+  if (linkedId) rememberTelegramMirror(db, linkedId);
+}
+
+async function telegramBotCall<T>(token: string, method: string, body: Record<string, unknown>): Promise<T> {
+  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000)
+  });
+  const data = (await response.json()) as { ok: boolean; result?: T; description?: string };
+  if (!data.ok || data.result === undefined) throw new Error(data.description ?? `telegram ${method} failed`);
+  return data.result;
+}
+
+/** Adds a public group or channel that receives a copy of matching videos after the home post. */
+export async function addTelegramCopy(
+  db: GrowthDb,
+  key: Buffer,
+  chat: string,
+  topicInput: string
+): Promise<{ id: string; name: string; handle: string | null; topic: CopyTopic }> {
+  const topic = copyTopic(topicInput);
+  if (!topic) throw new Error("בוחרים נושא: יצירת וידאו או מטבח");
+  const address = telegramCopyAddress(chat);
+  if (!address) throw new Error("כותבים @שם, קישור t.me/שם, או קישור t.me/c/ מהקבוצה");
+  if (skippedTelegramCopy(address)) throw new Error("המקום הזה מוכר פרסום או סגור לחברים. לא מעתיקים אליו.");
+  if (!getSetting(db, TELEGRAM_MIRROR_DESTINATION)?.trim()) throw new Error("חברו קודם את ערוץ הטלגרם שאליו עולים הסרטונים");
+  const connection = listConnections(db).find((row) => row.network === "telegram" && row.status === "active");
+  if (!connection) throw new Error("חברו קודם בוט טלגרם");
+  const tokens = decryptJson<SocialTokens>(connection.encryptedTokens, key);
+  const adapter = getNetworkAdapter("telegram");
+  if (!adapter.resolveDestination) throw new Error("telegram resolve missing");
+  let resolved;
+  try {
+    resolved = await adapter.resolveDestination(tokens, address);
+  } catch {
+    throw new Error("הבוט עדיין לא בתוך הקבוצה. הוסיפו אותו כחבר, ובערוץ כמנהל עם הרשאת פרסום, ואז שמרו שוב.");
+  }
+  if (!resolved) throw new Error("הבוט עדיין לא בתוך הקבוצה. הוסיפו אותו כחבר, ובערוץ כמנהל עם הרשאת פרסום, ואז שמרו שוב.");
+  if (resolved.handle && skippedTelegramCopy(resolved.handle)) throw new Error("המקום הזה מוכר פרסום או סגור לחברים. לא מעתיקים אליו.");
+  const token = tokens.botToken || tokens.accessToken || "";
+  const member = await telegramBotCall<{ status: string; can_post_messages?: boolean; can_send_messages?: boolean }>(token, "getChatMember", {
+    chat_id: resolved.externalId,
+    user_id: Number(token.split(":")[0])
+  });
+  if (!telegramCanPost(resolved.kind, member)) {
+    throw new Error(
+      resolved.kind === "channel"
+        ? "הבוט צריך להיות מנהל בערוץ, עם הרשאת פרסום"
+        : "הבוט צריך להיות חבר בקבוצה, ושלחברים מותר לשלוח הודעות"
+    );
+  }
+  const previous = destinationsForNetwork(db, "telegram").find((row) => row.externalId === resolved.externalId);
+  upsertDestination(db, {
+    id: nid(),
+    connectionId: connection.id,
+    network: "telegram",
+    kind: resolved.kind,
+    externalId: resolved.externalId,
+    name: resolved.name,
+    handle: resolved.handle ?? null,
+    url: resolved.url ?? (resolved.handle ? `https://t.me/${resolved.handle.replace(/^@/, "")}` : `https://t.me/c/${resolved.externalId.replace(/^-100/, "")}`),
+    config: { ...(previous?.config ?? {}), copyTopic: topic }
+  });
+  rememberTelegramCopy(db, resolved.externalId);
+  const saved = destinationsForNetwork(db, "telegram").find((row) => row.externalId === resolved.externalId);
+  if (!saved) throw new Error("הקבוצה לא נשמרה");
+  return { id: saved.id, name: saved.name, handle: saved.handle, topic };
 }
 
 export async function syncConnection(db: GrowthDb, key: Buffer, connectionId: string, chatId?: string): Promise<number> {
@@ -148,9 +232,13 @@ export async function syncConnection(db: GrowthDb, key: Buffer, connectionId: st
   const tokens = decryptJson<SocialTokens>(connection.encryptedTokens, key);
   const adapter = adapterFor(connection.network);
   let drafts = (await adapter.listDestinations(tokens)) as Draft[];
+  let linkedId = "";
   if (chatId && "resolveDestination" in adapter && adapter.resolveDestination) {
-    const resolved = await adapter.resolveDestination(tokens, chatId);
-    if (resolved) drafts = [...drafts.filter((row) => row.externalId !== resolved.externalId), resolved];
+    const resolved = await adapter.resolveDestination(tokens, connection.network === "telegram" ? normalizeTelegramChat(chatId) : chatId);
+    if (resolved) {
+      linkedId = resolved.externalId;
+      drafts = [...drafts.filter((row) => row.externalId !== resolved.externalId), resolved];
+    }
   }
   const merged = mergePageTokens(tokens, connection.network, drafts);
   updateConnectionTokens(db, connection.id, encryptJson(merged, key), "active");
@@ -167,6 +255,7 @@ export async function syncConnection(db: GrowthDb, key: Buffer, connectionId: st
       config: publicConfig(draft.config)
     });
   }
+  if (connection.network === "telegram" && linkedId) rememberTelegramMirror(db, linkedId);
   return destinationsForNetwork(db, connection.network).length;
 }
 

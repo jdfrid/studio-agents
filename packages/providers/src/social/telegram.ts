@@ -30,6 +30,13 @@ async function telegramCall<T>(tokens: SocialTokens, method: string, body?: unkn
   return data.result;
 }
 
+export function telegramMessageLink(input: { externalId: string; handle?: string | null }, messageId: number): string | undefined {
+  const handle = input.handle?.replace(/^@/, "").trim();
+  if (handle) return `https://t.me/${handle}/${messageId}`;
+  if (input.externalId.startsWith("-100")) return `https://t.me/c/${input.externalId.slice(4)}/${messageId}`;
+  return undefined;
+}
+
 function destinationFromChat(chat: {
   id: number | string;
   type?: string;
@@ -115,7 +122,7 @@ export function createTelegramAdapter(): NetworkAdapter {
         return {
           status: "published",
           remotePostId: String(sent.result.message_id),
-          remoteUrl: ctx.destination.handle ? `https://t.me/${ctx.destination.handle.replace(/^@/, "")}/${sent.result.message_id}` : undefined,
+          remoteUrl: telegramMessageLink(ctx.destination, sent.result.message_id),
           nativePayload: { method: "sendVideo", chatId, caption }
         };
       }
