@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiDelete, apiGet, apiPost, mediaUrl } from "./api.js";
+import { useAuth } from "./AuthContext.js";
 import { StageOutputView, SignedMedia } from "./StageOutputs.js";
 import { StageProgressClock } from "./StageProgressClock.js";
 import { VisualCorrectionsPanel } from "./VisualCorrectionsPanel.js";
@@ -36,6 +37,7 @@ export function RunView({
   onDistribute,
   canDistribute,
   onOpenRun,
+  onContact,
   fromAutomation
 }: {
   runId: string;
@@ -45,9 +47,11 @@ export function RunView({
   onDistribute?: () => void;
   canDistribute?: boolean;
   onOpenRun?: (id: string) => void;
+  onContact?: () => void;
   fromAutomation?: boolean;
 }) {
   const { t, i18n } = useTranslation("run");
+  const { refresh: refreshUser } = useAuth();
   const [run, setRun] = useState<ProjectRunView | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactRow[]>([]);
   const [error, setError] = useState("");
@@ -56,6 +60,7 @@ export function RunView({
   const [sceneEditorOpen, setSceneEditorOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const seenStatus = useRef<string | null>(null);
+  const creditedFailure = useRef(false);
 
   async function refresh() {
     try {
@@ -83,6 +88,7 @@ export function RunView({
 
   useEffect(() => {
     seenStatus.current = null;
+    creditedFailure.current = false;
     setRun(null);
     void refresh();
     const timer = window.setInterval(() => void refresh(), 4000);
@@ -93,6 +99,10 @@ export function RunView({
     if (!run) return;
     if (becameReady(seenStatus.current, run.status)) playReadyBeep();
     seenStatus.current = run.status;
+    if (run.status === "FAILED" && run.failureFreeVideoGranted && !creditedFailure.current) {
+      creditedFailure.current = true;
+      void refreshUser();
+    }
   }, [run]);
 
   useEffect(() => {
@@ -195,8 +205,22 @@ export function RunView({
 
       {isFailed ? (
         <section className="run-failure-banner" role="alert">
-          <h2>{t("run.assemblyFailed")}</h2>
-          <p>{t("run.assemblyFailedHelp")}</p>
+          {run.failureFreeVideoGranted ? (
+            <>
+              <h2>{t("run.failureFreeTitle")}</h2>
+              <p>{t("run.failureFreeBody")}</p>
+              {onContact ? (
+                <button type="button" className="button-secondary" onClick={onContact}>
+                  {t("run.failureFreeContact")}
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <h2>{t("run.assemblyFailed")}</h2>
+              <p>{t("run.assemblyFailedHelp")}</p>
+            </>
+          )}
           <div className="stage-actions">
             {run.stages.find((stage) => stage.status === "FAILED") ? (
               <button

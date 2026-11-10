@@ -6,7 +6,7 @@ import {
   toBrandTemplateView,
   upsertDiscoveredProducts
 } from "@studio/infra-prisma";
-import { assertCanStartRun, creditCostForNewRun, InsufficientCreditsError } from "@studio/billing";
+import { assertCanStartRun, quoteNewRun, InsufficientCreditsError } from "@studio/billing";
 import { briefModerationParts, ContentModerationError, moderateUserText } from "@studio/providers";
 import { createRun } from "../runService.js";
 import { buildAutomationBrief } from "./brief.js";
@@ -181,9 +181,9 @@ async function finishProduce(
     attachments
   });
 
-  const cost = await creditCostForNewRun(campaign.userId);
+  const quote = await quoteNewRun(campaign.userId);
   try {
-    await assertCanStartRun(campaign.userId, cost);
+    await assertCanStartRun(campaign.userId, quote.cost);
   } catch (error) {
     const message = error instanceof InsufficientCreditsError ? error.message : "insufficient_credits";
     await prisma.automationJob.update({
@@ -227,7 +227,9 @@ async function finishProduce(
     run = await createRun({
       brief,
       userId: campaign.userId,
-      creditCost: cost,
+      creditCost: quote.cost,
+      useGoodwill: quote.useGoodwill,
+      paidCost: quote.paidCost,
       automationJobId: jobId
     });
   } catch (error) {

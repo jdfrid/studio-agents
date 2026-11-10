@@ -450,6 +450,9 @@ importers:
 
   packages/orchestrator:
     dependencies:
+      '@studio/auth':
+        specifier: workspace:*
+        version: link:../auth
       '@studio/automation':
         specifier: workspace:*
         version: link:../automation

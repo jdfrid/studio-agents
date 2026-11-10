@@ -13,6 +13,7 @@ import {
   creditCostForVideo
 } from "@studio/shared";
 import { enabledCheckoutPlans, enabledCheckoutPlansByCurrency, isCheckoutEnabled } from "./payments.js";
+import { quoteNewRunCost, type NewRunQuote } from "./freeVideoQuote.js";
 
 export class InsufficientCreditsError extends Error {
   readonly required: number;
@@ -70,12 +71,26 @@ export async function getFreeVideosRemaining(userId: string): Promise<number> {
   return Math.max(0, allowance - used);
 }
 
+export async function quoteNewRun(
+  userId: string,
+  options?: { preferLipSync?: boolean }
+): Promise<NewRunQuote> {
+  const [welcomeRemaining, user] = await Promise.all([
+    getFreeVideosRemaining(userId),
+    prisma.user.findUnique({ where: { id: userId }, select: { goodwillFreeVideos: true } })
+  ]);
+  return quoteNewRunCost({
+    welcomeRemaining,
+    goodwillFreeVideos: user?.goodwillFreeVideos ?? 0,
+    paidCost: creditCostForVideo(options)
+  });
+}
+
 export async function creditCostForNewRun(
   userId: string,
   options?: { preferLipSync?: boolean }
 ): Promise<number> {
-  const freeRemaining = await getFreeVideosRemaining(userId);
-  return freeRemaining > 0 ? 0 : creditCostForVideo(options);
+  return (await quoteNewRun(userId, options)).cost;
 }
 
 export async function getCreateVideoEligibility(userId: string): Promise<{
@@ -86,10 +101,12 @@ export async function getCreateVideoEligibility(userId: string): Promise<{
   checkoutPlans: ReturnType<typeof enabledCheckoutPlans>;
   checkoutPlansByCurrency: ReturnType<typeof enabledCheckoutPlansByCurrency>;
 }> {
-  const [credits, freeVideosRemaining] = await Promise.all([
+  const [credits, welcomeRemaining, user] = await Promise.all([
     getCreditBalance(userId),
-    getFreeVideosRemaining(userId)
+    getFreeVideosRemaining(userId),
+    prisma.user.findUnique({ where: { id: userId }, select: { goodwillFreeVideos: true } })
   ]);
+  const freeVideosRemaining = welcomeRemaining + (user?.goodwillFreeVideos ?? 0);
   const canCreateVideo = freeVideosRemaining > 0 || credits >= CREDIT_NEW_VIDEO;
   const checkoutPlansByCurrency = enabledCheckoutPlansByCurrency();
   return {

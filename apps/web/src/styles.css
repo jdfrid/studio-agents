@@ -3140,6 +3140,13 @@ a { color: inherit; }
   border-radius: 16px;
   background: var(--white);
 }
+.run-failure-banner {
+  border-color: #f0c4c4;
+  background: linear-gradient(180deg, #fff6f6 0%, #fff 70%);
+}
+.run-failure-banner h2 { margin: 0 0 8px; }
+.run-failure-banner .button-secondary { margin-top: 8px; }
+.failure-free-note { display: block; margin-top: 4px; color: #9f1239; font-weight: 700; }
 .proposal-scene-list { display: grid; gap: 10px; margin: 0 0 18px; }
 .proposal-scene-card {
   padding: 14px;

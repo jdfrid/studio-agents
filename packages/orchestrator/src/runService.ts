@@ -26,6 +26,9 @@ export async function createRun(input: {
   userId?: string;
   skipCreditCheck?: boolean;
   creditCost?: number;
+  /** Spend one goodwill free video. If none remain, charge paidCost instead. */
+  useGoodwill?: boolean;
+  paidCost?: number;
   parentRunId?: string;
   automationJobId?: string;
 }): Promise<ProjectRunView> {
@@ -69,7 +72,15 @@ export async function createRun(input: {
 
   if (input.userId && !input.skipCreditCheck) {
     const { reserveCredits } = await import("@studio/billing");
-    await reserveCredits(input.userId, run.id, input.creditCost ?? CREDIT_NEW_VIDEO);
+    let cost = input.creditCost ?? CREDIT_NEW_VIDEO;
+    if (input.useGoodwill && cost <= 0) {
+      const taken = await prisma.user.updateMany({
+        where: { id: input.userId, goodwillFreeVideos: { gt: 0 } },
+        data: { goodwillFreeVideos: { decrement: 1 } }
+      });
+      if (taken.count === 0) cost = input.paidCost ?? CREDIT_NEW_VIDEO;
+    }
+    await reserveCredits(input.userId, run.id, cost);
   }
 
   await audit(tenantId, "run_created", "ProjectRun", run.id, { brief, userId: input.userId });
@@ -690,6 +701,12 @@ export async function setRunStatus(
     await releaseCredits(runId).catch(() => undefined);
     await syncAutomationJobFromRun(runId, "failed").catch(() => undefined);
   }
+  if (status === "FAILED") {
+    const { compensateFailedProduction } = await import("./failureCompensation.js");
+    await compensateFailedProduction(runId).catch((error) => {
+      console.error("[failure-compensation]", error instanceof Error ? error.message : error);
+    });
+  }
 }
 
 async function syncAutomationJobFromRun(runId: string, status: "ready" | "failed"): Promise<void> {
@@ -778,6 +795,10 @@ function toView(run: {
     approvalMode: (run.approvalMode as ApprovalMode) ?? undefined,
     parentRunId: "parentRunId" in run ? ((run as { parentRunId?: string | null }).parentRunId ?? null) : null,
     isCorrectionRun: "isCorrectionRun" in run ? Boolean((run as { isCorrectionRun?: boolean }).isCorrectionRun) : false,
+    failureFreeVideoGranted:
+      "failureFreeVideoGranted" in run
+        ? Boolean((run as { failureFreeVideoGranted?: boolean }).failureFreeVideoGranted)
+        : false,
     automationJobId:
       "automationJobId" in run ? ((run as { automationJobId?: string | null }).automationJobId ?? null) : null,
     createdAt: run.createdAt.toISOString(),

@@ -13,6 +13,7 @@ type RunSummary = {
   status: string;
   currentStage: string | null;
   updatedAt: string;
+  failureFreeVideoGranted?: boolean;
 };
 
 type DashFilter = "all" | "drafts" | "running" | "ready" | "action";
@@ -278,6 +279,9 @@ export function Dashboard({
                       {r.currentStage ? ` · ${t("dashboard.stage", { stage: r.currentStage })}` : ""}
                       {` · ${cardAction(r.status)}`}
                     </small>
+                    {r.status === "FAILED" && r.failureFreeVideoGranted ? (
+                      <small className="failure-free-note">{t("dashboard.failureFreeNote")}</small>
+                    ) : null}
                   </span>
                 </button>
                 <div className="run-card-actions">

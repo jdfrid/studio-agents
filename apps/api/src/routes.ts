@@ -76,7 +76,7 @@ import {
 } from "@studio/auth";
 import {
   assertCanStartRun,
-  creditCostForNewRun,
+  quoteNewRun,
   createCheckout,
   getBillingStatus,
   isCheckoutEnabled,
@@ -477,9 +477,9 @@ export async function registerRoutes(app: FastifyInstance) {
       const body = CreateRunRequestSchema.parse(request.body);
       const userId = request.user!.sub;
       const preferLipSync = briefRequestsLipSync(body.brief);
-      const cost = await creditCostForNewRun(userId, { preferLipSync });
+      const quote = await quoteNewRun(userId, { preferLipSync });
       try {
-        await assertCanStartRun(userId, cost);
+        await assertCanStartRun(userId, quote.cost);
       } catch (err) {
         if (err instanceof InsufficientCreditsError) {
           reply.code(402);
@@ -550,7 +550,9 @@ export async function registerRoutes(app: FastifyInstance) {
       const view = await createRun({
         brief,
         userId,
-        creditCost: cost,
+        creditCost: quote.cost,
+        useGoodwill: quote.useGoodwill,
+        paidCost: quote.paidCost,
         parentRunId: body.parentRunId
       });
       reply.code(201);
@@ -568,7 +570,8 @@ export async function registerRoutes(app: FastifyInstance) {
         status: r.status,
         currentStage: r.currentStage,
         title: (r.brief as { title?: string })?.title ?? "(ללא כותרת)",
-        updatedAt: r.updatedAt.toISOString()
+        updatedAt: r.updatedAt.toISOString(),
+        failureFreeVideoGranted: r.failureFreeVideoGranted
       }));
     });
 

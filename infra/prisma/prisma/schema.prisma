@@ -111,6 +111,8 @@ model User {
   tenantId  String   @unique
   /// Per-user free video quota. null = use platform freeVideosPerUser; 0 = none; N = N free runs.
   freeVideosLimit Int?
+  /// Extra free videos granted after a production failed before a finished video.
+  goodwillFreeVideos Int @default(0)
   lastLoginAt DateTime?
   lastLoginIp String?
   createdAt DateTime @default(now())
@@ -349,6 +351,8 @@ model ProjectRun {
   isCorrectionRun Boolean     @default(false)
   parentRunId    String?
   creditReserved Float        @default(0)
+  /// One complimentary video was added because this run failed before a finished video.
+  failureFreeVideoGranted Boolean @default(false)
   automationJobId String?     @unique
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

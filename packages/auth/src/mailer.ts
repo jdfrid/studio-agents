@@ -89,6 +89,18 @@ export async function sendOtpEmail(to: string, code: string, locale: "he" | "en"
   await sendMail({ to, subject, text, html });
 }
 
+export function failureAlertEmail(): string {
+  return process.env.FAILURE_ALERT_EMAIL?.trim() || "jdfrid@gmail.com";
+}
+
+export async function sendProductionFailureEmail(input: { subject: string; text: string }): Promise<void> {
+  await sendMail({
+    to: failureAlertEmail(),
+    subject: input.subject,
+    text: input.text
+  });
+}
+
 export async function sendContactInquiryEmail(input: {
   name: string;
   email: string;

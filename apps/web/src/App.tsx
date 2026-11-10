@@ -380,6 +380,7 @@ function AppShell() {
             canDistribute={user.role === "ADMIN"}
             onDistribute={() => navigate({ view: "distribution", runId: runId })}
             onOpenRun={(id) => navigate({ view: "run", runId: id, fromAutomation })}
+            onContact={() => navigate({ view: "contact", runId: null })}
             fromAutomation={fromAutomation}
           />
         ) : null}
