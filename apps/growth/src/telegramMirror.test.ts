@@ -382,7 +382,7 @@ describe("telegram mirror", () => {
     expect(seen).toEqual(["home", "private"]);
   });
 
-  it("waits until the YouTube link is public, then posts the link with the description", async () => {
+  it("posts to Telegram at once, while the YouTube video is still private", async () => {
     const opened = db();
     upsertDestination(opened, {
       id: "tg",
@@ -423,18 +423,6 @@ describe("telegram mirror", () => {
     });
     queueYouTubeMirror(opened, "uploading", "published", "held");
     const seen: string[] = [];
-    await advanceTelegramMirror(opened, async (_item, _destination, text) => {
-      seen.push(text.body);
-      return { status: "published" };
-    });
-    expect(seen).toEqual([]);
-    updateJob(opened, "yt-held", {
-      remoteUrl: "https://youtu.be/abc123",
-      handle: {
-        snippet: { title: "Click this", description: "The useful part." },
-        status: { privacyStatus: "public", publishAt: "2020-01-01T00:00:00.000Z" }
-      }
-    });
     await advanceTelegramMirror(opened, async (_item, _destination, text) => {
       seen.push(text.body);
       return { status: "published" };

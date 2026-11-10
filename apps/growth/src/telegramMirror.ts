@@ -184,13 +184,6 @@ function youtubeJob(db: GrowthDb, itemId: string) {
   );
 }
 
-/** A scheduled upload stays off Telegram until YouTube makes the link public. */
-export function youtubeLinkReady(db: GrowthDb, itemId: string, now = Date.now()): boolean {
-  const status = youtubeJob(db, itemId)?.handle.status as { publishAt?: unknown } | undefined;
-  const at = typeof status?.publishAt === "string" ? Date.parse(status.publishAt) : NaN;
-  return !Number.isFinite(at) || at <= now;
-}
-
 function youtubeText(db: GrowthDb, item: Item): { title: string; description: string; link: string } {
   const job = youtubeJob(db, item.id);
   const link = job?.remoteUrl?.trim() || "";
@@ -265,10 +258,6 @@ export async function advanceTelegramMirror(
   const item = getItem(db, task.itemId);
   if (!destination?.enabled || destination.network !== "telegram" || !item?.mediaPath) {
     writeQueue(db, rest);
-    return;
-  }
-  if (!youtubeLinkReady(db, task.itemId)) {
-    writeQueue(db, [...rest, task]);
     return;
   }
   if (itemDelivered(db, task.itemId, destination.id)) {
