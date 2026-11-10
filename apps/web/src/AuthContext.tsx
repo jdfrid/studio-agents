@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useTranslation } from "react-i18next";
 import { apiPost, apiGet } from "./api.js";
 import { LoginDialog } from "./LoginDialog.js";
+import { clearPendingOtp, readPendingOtp, writePendingOtp } from "./pendingOtp.js";
 import type { UserView } from "@studio/shared";
 
 type AuthState = {
@@ -77,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError("");
     try {
       await apiPost("/auth/email/start", { email, password, locale: i18n.resolvedLanguage });
+      writePendingOtp(email);
       setPendingEmail(email);
       setCodeSent(true);
     } catch (err) {
@@ -91,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError("");
     try {
       const me = await apiPost<UserView>("/auth/email/verify", { email: pendingEmail || email, code });
+      clearPendingOtp();
       setUser(me);
       closeLogin();
     } catch (err) {
@@ -107,6 +110,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refresh,
         login: () => {
           setError("");
+          const pending = readPendingOtp();
+          if (pending) {
+            setPendingEmail(pending.email);
+            setCodeSent(true);
+          } else {
+            setCodeSent(false);
+            setPendingEmail("");
+          }
           setLoginOpen(true);
         },
         logout
@@ -118,11 +129,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         busy={busy}
         error={error}
         codeSent={codeSent}
+        pendingEmail={pendingEmail}
         onClose={closeLogin}
         onStart={startEmail}
         onVerify={verifyEmail}
         onBack={() => {
+          clearPendingOtp();
           setCodeSent(false);
+          setPendingEmail("");
+          setError("");
+        }}
+        onHaveCode={(email) => {
+          writePendingOtp(email);
+          setPendingEmail(email);
+          setCodeSent(true);
           setError("");
         }}
       />
