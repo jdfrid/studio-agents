@@ -194,6 +194,13 @@ services:
       TIKTOK_CLIENT_KEY: ${TIKTOK_CLIENT_KEY:-}
       TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET:-}
       TIKTOK_DIRECT_POST: ${TIKTOK_DIRECT_POST:-0}
+      MAIL_FROM: "${MAIL_FROM:-Reelmino <info@reelmino.com>}"
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      FAILURE_ALERT_EMAIL: ${FAILURE_ALERT_EMAIL:-jdfrid@gmail.com}
     volumes:
       - ${GCS_CREDENTIALS_FILE:?Set GCS_CREDENTIALS_FILE to the service account JSON path on the host}:/run/secrets/gcs-key.json:ro
     depends_on:
