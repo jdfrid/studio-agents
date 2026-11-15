@@ -21,7 +21,7 @@ describe("resolveRenderProfile", () => {
     try {
       const profile = getRenderProfile("heygen-video");
       expect(profile.provider).toBe("heygen");
-      expect(profile.capabilities.nativeAudio).toBe(true);
+      expect(profile.capabilities.nativeAudio).toBe(false);
       expect(profile.capabilities.maxClipSeconds).toBe(15);
       expect(profileVideoPerSecondUsd(profile)).toBe(heygenVideoPerSecondUsd());
       expect(defaultRenderProfileId()).toBe("heygen-video");

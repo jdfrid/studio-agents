@@ -291,10 +291,8 @@ export function resolveHeygenVideoResolution(): "480p" | "768p" | "2k" {
 
 export function buildHeygenVideoPrompt(req: VideoBeatRequest): string {
   const motion = req.prompt?.trim() || "A clear, natural scene with one subject and a locked or barely moving camera.";
-  const narration = req.narrationText?.trim();
-  const audio = narration
-    ? `Audio: the speaker says exactly: "${narration}". Matching room tone and sound effects. No music.`
-    : "Audio: natural room tone and matching sound effects. No dialogue. No music.";
+  // The studio records the narration and mixes it afterwards. HeyGen speech rewrites Hebrew.
+  const audio = "Audio: natural room tone and matching sound effects. No dialogue. No narration. No music.";
   return `${motion}\n\n${audio}`.slice(0, 32_000);
 }
 

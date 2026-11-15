@@ -29,7 +29,8 @@ describe("HeyGen Video request builder", () => {
     expect(body.model).toBe("heygen-video-1");
     expect(body.mode).toBe("text_to_video");
     expect(body.aspect_ratio).toBe("9:16");
-    expect(String(body.prompt)).toContain("הבוקר מתחיל כאן");
+    expect(String(body.prompt)).not.toContain("הבוקר מתחיל כאן");
+    expect(String(body.prompt)).toContain("No dialogue");
     expect(body.image).toBeUndefined();
   });
 

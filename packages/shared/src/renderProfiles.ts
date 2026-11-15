@@ -70,7 +70,8 @@ export const RENDER_PROFILES: Record<RenderProfileId, RenderProfile> = {
     capabilities: {
       referenceImage: true,
       extend: false,
-      nativeAudio: true,
+      // HeyGen's own speech mangles Hebrew and rewrites lines. The studio voice is mixed on top.
+      nativeAudio: false,
       maxClipSeconds: 15,
       beatSeconds: HEYGEN_VIDEO_BEAT_SECONDS
     }
