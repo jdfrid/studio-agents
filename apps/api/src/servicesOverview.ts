@@ -8,9 +8,13 @@ import {
 } from "@studio/providers";
 import {
   listRenderProfiles,
+  meterVideos,
   profileVideoPerSecondUsd,
   resolveRenderProfile,
-  videoModelDisplay
+  STANDARD_VIDEO_SECONDS,
+  usdPerSecondForProvider,
+  videoModelDisplay,
+  type CapacityKind
 } from "@studio/shared";
 
 type UsageWindow = { operations: number; costUsd: number; costNis: number };
@@ -150,7 +154,8 @@ export async function getAdminServicesOverview() {
       details,
       billingUrl: row?.billingUrl ?? officialBillingUrl(entry.provider),
       usedByActiveVideoModel: entry.provider === activeVideoProvider || entry.provider === "gemini",
-      usage: round(usageByProvider.get(entry.provider) ?? emptyBucket())
+      usage: round(usageByProvider.get(entry.provider) ?? emptyBucket()),
+      ...serviceMeter(entry.provider, row?.lastValue ?? null, row?.unit ?? null, activeVideoProvider)
     };
   });
 
@@ -167,7 +172,8 @@ export async function getAdminServicesOverview() {
       model: videoModelDisplay(profile, effectiveGemini.video),
       perSecondUsd: profileVideoPerSecondUsd(profile),
       active: profile.id === activeProfile.id,
-      available: provider === "gemini" ? geminiConfigured : configuredProviders.has(provider)
+      available: provider === "gemini" ? geminiConfigured : configuredProviders.has(provider),
+      videosRemaining: videosLeftOnProvider(services, provider, profileVideoPerSecondUsd(profile))
     };
   });
 
@@ -191,9 +197,26 @@ export async function getAdminServicesOverview() {
 
   const runsToday = Object.fromEntries(runGroups.map((g) => [g.status, g._count._all]));
 
+  const activeService = services.find((service) => service.provider === activeVideoProvider);
+  const activeMeter = meterVideos({
+    balance: activeService?.balance ?? null,
+    unit: activeService?.unit ?? null,
+    usdPerSecond: profileVideoPerSecondUsd(activeProfile)
+  });
+
   return {
     generatedAt: now.toISOString(),
     activeRenderProfile: { id: activeProfile.id, label: activeProfile.labelHe ?? activeProfile.label },
+    production: {
+      videoSeconds: STANDARD_VIDEO_SECONDS,
+      provider: activeVideoProvider,
+      providerName: activeService?.displayName ?? activeVideoProvider,
+      videosRemaining: activeMeter.videosRemaining,
+      costPerVideoUsd: activeMeter.costPerVideoUsd,
+      kind: activeMeter.kind,
+      blocked: activeMeter.videosRemaining === 0,
+      billingUrl: activeService?.billingUrl ?? officialBillingUrl(activeVideoProvider)
+    },
     totals: round(total),
     runsToday,
     services,
@@ -201,4 +224,42 @@ export async function getAdminServicesOverview() {
     aiModels,
     models
   };
+}
+
+function serviceMeter(
+  provider: string,
+  balance: number | null,
+  unit: string | null,
+  activeVideoProvider: string
+): {
+  capacityKind: CapacityKind;
+  videosRemaining: number | null;
+  costPerVideoUsd: number | null;
+  videoSeconds: number;
+  capacityUsesActiveModel: boolean;
+  requiredForActiveVideo: boolean;
+} {
+  const rate = usdPerSecondForProvider(provider);
+  const meter = meterVideos({ balance, unit, usdPerSecond: rate.usdPerSecond });
+  return {
+    capacityKind: meter.kind,
+    videosRemaining: meter.videosRemaining,
+    costPerVideoUsd: meter.costPerVideoUsd,
+    videoSeconds: meter.videoSeconds,
+    capacityUsesActiveModel: rate.activeModel,
+    requiredForActiveVideo: provider === activeVideoProvider || provider === "gemini"
+  };
+}
+
+function videosLeftOnProvider(
+  services: Array<{ provider: string; balance: number | null; unit: string | null }>,
+  provider: string,
+  usdPerSecond: number
+): number | null {
+  const row = services.find((service) => service.provider === provider);
+  return meterVideos({
+    balance: row?.balance ?? null,
+    unit: row?.unit ?? null,
+    usdPerSecond
+  }).videosRemaining;
 }

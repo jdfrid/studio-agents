@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.10.1",
+    "@studio/auth": "workspace:*",
     "@studio/billing": "workspace:*",
     "@studio/infra-prisma": "workspace:^",
     "@studio/shared": "workspace:*",

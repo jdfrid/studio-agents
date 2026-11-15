@@ -23,6 +23,7 @@ export * from "./logger.js";
 export * from "./budget.js";
 export * from "./localization.js";
 export * from "./renderProfiles.js";
+export * from "./serviceCapacity.js";
 export * from "./creativeOptions.js";
 export * from "./filmStyleLibrary.js";
 export * from "./voiceCatalog.js";

@@ -26,11 +26,27 @@ type ServiceRow = {
   billingUrl: string | null;
   usedByActiveVideoModel: boolean;
   usage: UsageBucket;
+  capacityKind: "videos" | "narration" | "unknown" | "not_metered";
+  videosRemaining: number | null;
+  costPerVideoUsd: number | null;
+  videoSeconds: number;
+  capacityUsesActiveModel: boolean;
+  requiredForActiveVideo: boolean;
 };
 
 type ServicesOverview = {
   generatedAt: string;
   activeRenderProfile: { id: string; label: string };
+  production: {
+    videoSeconds: number;
+    provider: string;
+    providerName: string;
+    videosRemaining: number | null;
+    costPerVideoUsd: number | null;
+    kind: "videos" | "narration" | "unknown" | "not_metered";
+    blocked: boolean;
+    billingUrl: string | null;
+  };
   totals: UsageBucket;
   runsToday: Record<string, number>;
   services: ServiceRow[];
@@ -42,6 +58,7 @@ type ServicesOverview = {
     perSecondUsd: number;
     active: boolean;
     available: boolean;
+    videosRemaining: number | null;
   }>;
   aiModels: Array<{ role: string; label: string; provider: string; model: string }>;
   models: Array<{ key: string; provider: string; activityType: string; model: string; usage: UsageBucket }>;
@@ -89,6 +106,20 @@ function balanceTone(row: ServiceRow): string {
   if (row.balance <= 0) return "bad";
   if (row.unit?.toUpperCase() === "USD" && row.balance < 5) return "warn";
   return "ok";
+}
+
+function capacityLine(row: ServiceRow): string {
+  const seconds = row.videoSeconds || 30;
+  if (row.capacityKind === "videos" && row.videosRemaining !== null) {
+    const basis = row.capacityUsesActiveModel ? "לפי המודל הפעיל" : "לפי המודל הזול של הספק";
+    const cost = row.costPerVideoUsd !== null ? ` בעלות $${row.costPerVideoUsd.toFixed(2)}` : "";
+    return `${basis}: עוד ${row.videosRemaining.toLocaleString("he-IL")} סרטונים של ${seconds} שניות${cost}`;
+  }
+  if (row.capacityKind === "narration" && row.videosRemaining !== null) {
+    return `עוד ${row.videosRemaining.toLocaleString("he-IL")} סרטונים עם קריינות משוכפלת, כ-450 תווים לסרטון של ${seconds} שניות`;
+  }
+  if (row.capacityKind === "not_metered") return "היתרה לא בדולרים, אי אפשר לחשב כמה סרטונים נשארו";
+  return "אין קריאת יתרה — אי אפשר לדעת כמה סרטונים נשארו";
 }
 
 function extraDetails(row: ServiceRow): string[] {
@@ -175,10 +206,11 @@ export function ServicesPanel() {
         </button>
       </header>
       {error ? <p className="error-inline">{error}</p> : null}
+      <ProductionBanner production={data.production} services={paid} />
       {problems.length ? (
         <p className="services-alert" role="alert">
           שימו לב: {problems.map((p) => p.displayName).join(", ")} — יתרה נמוכה או תקלה. יצירת סרטונים חדשים שתלויים בהם
-          נחסמת ומוצגת ללקוח הודעת עומס.
+          נחסמת, והתראה נשלחת למייל.
         </p>
       ) : null}
 
@@ -218,6 +250,7 @@ export function ServicesPanel() {
               <th>מזהה</th>
               <th>$ לשנייה</th>
               <th>סרטון 30 ש׳ (וידאו)</th>
+              <th>סרטונים שנשארו</th>
               <th>זמין</th>
             </tr>
           </thead>
@@ -231,6 +264,7 @@ export function ServicesPanel() {
                 <td className="mono">{m.model}</td>
                 <td>${m.perSecondUsd.toFixed(3)}</td>
                 <td>${(m.perSecondUsd * 30).toFixed(2)}</td>
+                <td>{m.videosRemaining === null ? <span className="muted">אין יתרה לקריאה</span> : m.videosRemaining.toLocaleString("he-IL")}</td>
                 <td>{m.available ? "✓" : <span className="muted">אין מפתח</span>}</td>
               </tr>
             ))}
@@ -290,6 +324,48 @@ export function ServicesPanel() {
   );
 }
 
+function ProductionBanner({
+  production,
+  services
+}: {
+  production: ServicesOverview["production"];
+  services: ServiceRow[];
+}) {
+  const tone = production.blocked ? "bad" : production.videosRemaining !== null && production.videosRemaining <= 3 ? "warn" : production.videosRemaining === null ? "warn" : "ok";
+  const title =
+    production.videosRemaining === null
+      ? `אי אפשר לחשב כמה סרטונים נשארו ב-${production.providerName}`
+      : production.blocked
+        ? "אי אפשר להפיק סרטון נוסף"
+        : `אפשר להפיק עוד ${production.videosRemaining.toLocaleString("he-IL")} סרטונים`;
+  const cost =
+    production.costPerVideoUsd !== null ? ` עלות הווידאו לסרטון: $${production.costPerVideoUsd.toFixed(2)}.` : "";
+  const unread = services.filter((service) => service.requiredForActiveVideo && service.capacityKind === "unknown");
+  return (
+    <section className={`capacity-banner tone-${tone}`} role="status">
+      <h3>{title}</h3>
+      <p>
+        המודל הפעיל הוא {production.providerName}. כל מספר כאן הוא לסרטון של {production.videoSeconds} שניות.{cost} כשאין
+        כיסוי לסרטון כזה נשלחת התראה למייל, כדי שלקוח לא ייעצר בלי שנדע.
+      </p>
+      {unread.length ? (
+        <p>
+          אין קריאת יתרה ב-{unread.map((service) => service.displayName).join(", ")}. אי אפשר לדעת מראש אם ההפקה תיעצר שם.
+        </p>
+      ) : null}
+      <div className="capacity-links">
+        {services
+          .filter((service) => service.billingUrl && (service.requiredForActiveVideo || service.capacityKind === "narration"))
+          .map((service) => (
+            <a key={service.provider} className="service-pay" href={service.billingUrl ?? "#"} target="_blank" rel="noreferrer">
+              הוספת תשלום — {service.company}
+            </a>
+          ))}
+      </div>
+    </section>
+  );
+}
+
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <article className="kpi-card">
@@ -302,22 +378,25 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
 
 function ServiceCard({ row, now }: { row: ServiceRow; now: number }) {
   const status = STATUS_LABELS[row.status] ?? { label: row.status, tone: "warn" };
-  const tone = balanceTone(row);
+  const stopped = row.videosRemaining === 0;
+  const tone = stopped ? "bad" : balanceTone(row);
+  const cardTone = stopped ? "bad" : status.tone;
   const extras = extraDetails(row);
   const paid = row.category === "PAID_PROVIDER";
   return (
-    <article className={`service-card tone-${status.tone}`}>
+    <article className={`service-card tone-${cardTone}`}>
       <header>
         <div>
           <strong>{row.displayName}</strong>
           <small className="muted">{row.capability}</small>
         </div>
-        <span className={`service-status tone-${status.tone}`}>{status.label}</span>
+        <span className={`service-status tone-${cardTone}`}>{stopped ? "אי אפשר להפיק" : status.label}</span>
       </header>
       {paid ? (
         <div className="service-balance">
           <small className="muted">יתרה</small>
           <strong className={tone ? `tone-${tone}` : ""}>{formatBalance(row.balance, row.unit)}</strong>
+          <small className={row.videosRemaining === 0 ? "tone-bad" : "muted"}>{capacityLine(row)}</small>
           {row.balance === null && row.balanceNote ? <small className="muted">{row.balanceNote}</small> : null}
         </div>
       ) : null}
@@ -352,8 +431,8 @@ function ServiceCard({ row, now }: { row: ServiceRow; now: number }) {
         <small className="muted">{timeAgo(row.lastCheckedAt, now)}</small>
         {row.usedByActiveVideoModel && paid ? <span className="badge">בשימוש בהפקה</span> : null}
         {row.billingUrl ? (
-          <a href={row.billingUrl} target="_blank" rel="noreferrer">
-            חיוב / טעינה ↗
+          <a className="service-pay" href={row.billingUrl} target="_blank" rel="noreferrer">
+            הוספת תשלום
           </a>
         ) : null}
       </footer>

@@ -278,6 +278,21 @@ main.layout-log { grid-template-columns: 1fr; }
 }
 @keyframes live-pulse { 50% { opacity: 0.3; } }
 .services-alert { background: #3a1616; border: 1px solid #6a1d1d; color: #ffb3b3; border-radius: 8px; padding: 10px 12px; margin: 0; }
+.capacity-banner { display: grid; gap: 8px; border-radius: 12px; padding: 14px 16px; border: 1px solid #2a3041; background: #151a23; }
+.capacity-banner h3 { margin: 0; font-size: 1.25rem; }
+.capacity-banner p { margin: 0; line-height: 1.45; }
+.capacity-banner.tone-ok { border-color: #1a5a3b; }
+.capacity-banner.tone-ok h3 { color: #7af0bf; }
+.capacity-banner.tone-warn { border-color: #604414; background: #2a2112; }
+.capacity-banner.tone-warn h3 { color: #ffd07a; }
+.capacity-banner.tone-bad { border-color: #6a1d1d; background: #3a1616; }
+.capacity-banner.tone-bad h3 { color: #ffb3b3; }
+.capacity-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.service-pay {
+  display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 12px;
+  background: #3b6ef0; color: #fff; text-decoration: none; font-weight: 700; font-size: 0.82rem;
+}
+.service-card footer .service-pay { margin-inline-start: auto; }
 .service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .service-grid-compact { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .service-card {

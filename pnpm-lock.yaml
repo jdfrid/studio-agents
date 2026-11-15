@@ -483,6 +483,9 @@ importers:
       '@google-cloud/storage':
         specifier: ^7.10.1
         version: 7.21.0
+      '@studio/auth':
+        specifier: workspace:*
+        version: link:../auth
       '@studio/billing':
         specifier: workspace:*
         version: link:../billing

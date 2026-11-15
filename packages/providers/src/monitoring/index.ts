@@ -7,6 +7,12 @@ import {
   type ProviderMetricType
 } from "@studio/infra-prisma";
 import { checkGcsBucket } from "../gcs.js";
+import {
+  capacityAlertCopy,
+  capacityStopsProduction,
+  meterVideos,
+  usdPerSecondForProvider
+} from "@studio/shared";
 
 export interface ProviderReading {
   provider: string;
@@ -275,7 +281,8 @@ function alertTitle(provider: string, severity: ProviderAlertSeverity): string {
   return `${providerNameHe(provider)} — ${level}`;
 }
 
-function alertMessage(provider: string, severity: ProviderAlertSeverity, code: string): string {
+function alertMessage(provider: string, severity: ProviderAlertSeverity, code: string, custom?: string): string {
+  if (code === "cannot_produce" && custom) return custom;
   if (severity === "RECOVERY") return `${providerNameHe(provider)} חזר לפעילות תקינה.`;
   if (code === "upload_permission_denied") return "אין הרשאה להעלות קבצים לדלי האחסון שהוגדר.";
   if (code === "not_configured") return "השירות לא הוגדר.";
@@ -338,6 +345,48 @@ async function sendPushForAlert(alertId: string): Promise<void> {
   ]);
 }
 
+async function sendCapacityEmail(subject: string, text: string): Promise<void> {
+  const { sendProductionFailureEmail } = await import("@studio/auth");
+  await sendProductionFailureEmail({ subject, text });
+}
+
+function capacityNotice(reading: ProviderReading): { subject: string; text: string } | null {
+  const rate = usdPerSecondForProvider(reading.provider);
+  const meter = meterVideos({
+    balance: reading.value,
+    unit: reading.unit ?? null,
+    usdPerSecond: rate.usdPerSecond
+  });
+  const billingFailure = reading.errorCode === "http_402" || reading.errorCode === "billing_failure";
+  const required = rate.activeModel || reading.provider === "gemini";
+  const depleted =
+    reading.value !== null &&
+    reading.value <= 0 &&
+    (reading.metricType === "BALANCE" || reading.metricType === "QUOTA");
+  if (
+    !depleted &&
+    !capacityStopsProduction({
+      kind: meter.kind,
+      videosRemaining: meter.videosRemaining,
+      billingFailure,
+      requiredForActiveVideo: required
+    })
+  ) {
+    return null;
+  }
+  const balanceLabel = reading.value === null ? "" : `${reading.value} ${reading.unit ?? ""}`.trim();
+  return capacityAlertCopy({
+    providerName: providerNameHe(reading.provider),
+    videosRemaining: depleted ? 0 : meter.videosRemaining,
+    videoSeconds: meter.videoSeconds,
+    costPerVideoUsd: meter.costPerVideoUsd,
+    balanceLabel,
+    billingUrl: reading.billingUrl ?? officialBillingUrl(reading.provider),
+    billingFailure: billingFailure || depleted,
+    adminUrl: process.env.ADMIN_URL?.trim() || "https://admin.reelmino.com"
+  });
+}
+
 async function upsertAlert(input: {
   monitorId: string;
   provider: string;
@@ -345,6 +394,7 @@ async function upsertAlert(input: {
   code: string;
   message: string;
   sourceEvent: string;
+  emailSubject?: string;
 }) {
   const now = new Date();
   const key = fingerprint(input.provider, input.code);
@@ -364,7 +414,7 @@ async function upsertAlert(input: {
       status: input.severity === "RECOVERY" ? "RESOLVED" : "OPEN",
       fingerprint: key,
       title: alertTitle(input.provider, input.severity),
-      message: alertMessage(input.provider, input.severity, input.code),
+      message: alertMessage(input.provider, input.severity, input.code, input.message),
       recommendedAction: recommendedAction(input.provider, input.severity, input.code),
       sourceEvent: input.sourceEvent,
       metadata: { technicalMessage: redact(input.message), errorCode: input.code }
@@ -378,20 +428,33 @@ async function upsertAlert(input: {
       acknowledgedById: null,
       occurrenceCount: { increment: 1 },
       title: alertTitle(input.provider, input.severity),
-      message: alertMessage(input.provider, input.severity, input.code),
+      message: alertMessage(input.provider, input.severity, input.code, input.message),
       recommendedAction: recommendedAction(input.provider, input.severity, input.code),
       metadata: { technicalMessage: redact(input.message), errorCode: input.code },
       sourceEvent: input.sourceEvent,
       ...(shouldPush ? { pushSentAt: null } : {})
     }
   });
-  if (shouldPush) await sendPushForAlert(alert.id).catch(() => undefined);
+  if (shouldPush) {
+    await sendPushForAlert(alert.id).catch(() => undefined);
+    if (input.emailSubject) {
+      await sendCapacityEmail(input.emailSubject, alert.message).catch((error) => {
+        console.error("capacity alert email failed", error);
+      });
+      await prisma.providerAlert.update({ where: { id: alert.id }, data: { pushSentAt: new Date() } });
+    }
+  }
   return alert;
 }
 
 async function recoverAlerts(monitorId: string, provider: string) {
   const open = await prisma.providerAlert.findMany({
-    where: { monitorId, status: { in: ["OPEN", "ACKNOWLEDGED"] }, severity: { in: ["WARNING", "CRITICAL"] } }
+    where: {
+      monitorId,
+      status: { in: ["OPEN", "ACKNOWLEDGED"] },
+      severity: { in: ["WARNING", "CRITICAL"] },
+      sourceEvent: { not: "capacity" }
+    }
   });
   if (!open.length) return;
   await prisma.providerAlert.updateMany({
@@ -478,6 +541,23 @@ export async function persistProviderReading(reading: ProviderReading) {
       }
     })
   ]);
+  const notice = capacityNotice(reading);
+  if (notice) {
+    await upsertAlert({
+      monitorId: monitor.id,
+      provider: reading.provider,
+      severity: "CRITICAL",
+      code: "cannot_produce",
+      message: notice.text,
+      sourceEvent: "capacity",
+      emailSubject: notice.subject
+    });
+  } else {
+    await prisma.providerAlert.updateMany({
+      where: { monitorId: monitor.id, sourceEvent: "capacity", status: { in: ["OPEN", "ACKNOWLEDGED"] } },
+      data: { status: "RESOLVED", resolvedAt: new Date() }
+    });
+  }
   const severity = severityForReading(reading, {
     warning: monitor.warningThreshold,
     critical: monitor.criticalThreshold
