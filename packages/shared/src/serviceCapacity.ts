@@ -92,6 +92,37 @@ export function capacityStopsProduction(input: {
   return input.videosRemaining <= LOW_VIDEO_WARNING;
 }
 
+export type ProductionBlockReason = "not_configured" | "no_funds" | "auth" | "billing_failure";
+
+/** What the customer sees, and what the operator is mailed, when a new video is refused. */
+export function productionBlockedNotice(input: {
+  modelLabel: string;
+  providerName: string;
+  reason: ProductionBlockReason;
+  adminUrl?: string | null;
+}): { subject: string; text: string; customerHe: string } {
+  const why =
+    input.reason === "not_configured"
+      ? `${input.providerName} לא מחובר, ולכן אי אפשר להפיק סרטון במודל הזה.`
+      : input.reason === "no_funds"
+        ? `ל-${input.providerName} אין יתרה שמספיקה לסרטון נוסף.`
+        : input.reason === "auth"
+          ? `החיבור ל-${input.providerName} נדחה.`
+          : `החיוב של ${input.providerName} נכשל.`;
+  const adminUrl = input.adminUrl?.trim() || "https://admin.reelmino.com";
+  return {
+    subject: `אי אפשר להפיק סרטון: ${input.modelLabel}`,
+    text: [
+      "לקוח ניסה ליצור סרטון ונעצר.",
+      `המודל הפעיל: ${input.modelLabel}.`,
+      why,
+      "זו לא תקלת עומס. המתנה של כמה דקות לא תפתור את זה.",
+      `הגדרות המודל: ${adminUrl}`
+    ].join("\n"),
+    customerHe: `אי אפשר להפיק סרטון במודל הנוכחי (${input.modelLabel}). ${why} זו לא תקלת עומס, ולא חויבתם.`
+  };
+}
+
 export function capacityAlertCopy(input: {
   providerName: string;
   videosRemaining: number | null;

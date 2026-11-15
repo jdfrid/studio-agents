@@ -11,6 +11,8 @@ import {
   capacityAlertCopy,
   capacityStopsProduction,
   meterVideos,
+  productionBlockedNotice,
+  resolveRenderProfile,
   usdPerSecondForProvider
 } from "@studio/shared";
 
@@ -359,6 +361,20 @@ function capacityNotice(reading: ProviderReading): { subject: string; text: stri
   });
   const billingFailure = reading.errorCode === "http_402" || reading.errorCode === "billing_failure";
   const required = rate.activeModel || reading.provider === "gemini";
+  const missingKey =
+    required &&
+    (reading.source === "not_configured" ||
+      reading.source === "optional_not_configured" ||
+      reading.operationalStatus === "NOT_CONFIGURED");
+  if (missingKey) {
+    const active = resolveRenderProfile();
+    return productionBlockedNotice({
+      modelLabel: active.labelHe || active.label,
+      providerName: providerNameHe(reading.provider),
+      reason: "not_configured",
+      adminUrl: process.env.ADMIN_URL?.trim() || "https://admin.reelmino.com"
+    });
+  }
   const depleted =
     reading.value !== null &&
     reading.value <= 0 &&

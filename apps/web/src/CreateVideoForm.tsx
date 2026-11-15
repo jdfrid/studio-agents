@@ -39,7 +39,9 @@ import {
   type RemixKeptAttachment,
   CREDIT_LIP_SYNC_SURCHARGE,
   CREDIT_NEW_VIDEO,
-  creditCostForVideo
+  creditCostForVideo,
+  isRenderProfileId,
+  renderProfileLabel
 } from "@studio/shared";
 
 const VIDEO_GOALS = ["product", "service", "brand", "social", "explainer", "event", "other"] as const;
@@ -753,17 +755,37 @@ export function CreateVideoForm({
       storageRemove("reelmino:create-draft", "prompt2spot:create-draft");
       onCreated(run);
     } catch (err) {
-      const e = err as Error & { code?: string };
+      const e = err as Error & { code?: string; details?: { reason?: string; profile?: string } };
       if (e.code === "insufficient_credits") {
         onNeedCredits();
         return;
       }
+      if (e.code === "service_unavailable" || e.code === "service_busy") {
+        const profile = e.details?.profile;
+        const reasonKey =
+          e.details?.reason === "no_funds"
+            ? "serviceNoFunds"
+            : e.details?.reason === "auth"
+              ? "serviceAuth"
+              : e.details?.reason === "billing_failure"
+                ? "serviceBilling"
+                : e.details?.reason === "not_configured"
+                  ? "serviceNotConfigured"
+                  : "";
+        setError(
+          profile && isRenderProfileId(profile) && reasonKey
+            ? t("validation.serviceUnavailable", {
+                model: renderProfileLabel(profile, uiLocale === "en" ? "en" : "he"),
+                reason: t(`validation.${reasonKey}`)
+              })
+            : t("validation.serviceBusy")
+        );
+        return;
+      }
       setError(
-        e.code === "service_busy"
-          ? t("validation.serviceBusy")
-          : e.code === "validation_error"
-            ? t("validation.server", { detail: e.message.replace(/^Invalid request:\s*/i, "") })
-            : e.message
+        e.code === "validation_error"
+          ? t("validation.server", { detail: e.message.replace(/^Invalid request:\s*/i, "") })
+          : e.message
       );
     } finally {
       setBusy(false);

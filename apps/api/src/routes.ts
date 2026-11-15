@@ -59,7 +59,9 @@ import {
   buildProductionCostConfig,
   estimateRunCost,
   geminiVoiceNameFromCreative,
+  getRenderProfile,
   listRenderProfiles,
+  productionBlockedNotice,
   profileToProductionCostConfig,
   resolveRenderProfile
 } from "@studio/shared";
@@ -110,9 +112,11 @@ import {
   clearServiceCapacityCache,
   getProviderInventory,
   officialBillingUrl,
-  pollProviderMonitors
+  pollProviderMonitors,
+  providerNameHe
 } from "@studio/providers";
 import { predictRenderProfileId } from "@studio/shared";
+import { notifyProductionBlocked } from "./productionBlockNotice.js";
 import { getAdminServicesOverview } from "./servicesOverview.js";
 import { registerMediaProxy } from "./mediaProxy.js";
 import { registerDistributionRoutes } from "./distributionRoutes.js";
@@ -506,9 +510,30 @@ export async function registerRoutes(app: FastifyInstance) {
         capacityRequirementsForRun(predictedProfile, incomingBrief.durationSeconds ?? 30)
       ).catch(() => ({ ok: true, blocked: [] }));
       if (!capacity.ok) {
+        const block = capacity.blocked[0];
         request.log.warn({ blocked: capacity.blocked, profile: predictedProfile }, "run blocked: provider capacity");
+        const reason = block?.reason ?? "not_configured";
+        const profile = getRenderProfile(predictedProfile);
+        const notice = productionBlockedNotice({
+          modelLabel: profile.labelHe || profile.label,
+          providerName: providerNameHe(block?.provider ?? ""),
+          reason,
+          adminUrl: process.env.ADMIN_URL
+        });
+        if (block) {
+          void notifyProductionBlocked({
+            profileId: predictedProfile,
+            provider: block.provider,
+            reason: block.reason
+          }).catch((err) => request.log.warn({ err }, "production block email failed"));
+        }
         reply.code(503);
-        return { error: "service_busy", code: "service_busy" };
+        return {
+          error: "service_unavailable",
+          code: "service_unavailable",
+          message: notice.customerHe,
+          details: { reason, provider: block?.provider ?? "", profile: predictedProfile }
+        };
       }
       if (body.parentRunId) {
         const allowedPaths = await reusableGcsPathsForRun(body.parentRunId, userId);

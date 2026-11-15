@@ -156,15 +156,30 @@ function Kpi({ label, value }: { label: string; value: string }) {
   );
 }
 
+const MODEL_ACCESS_KEY: Record<string, string> = {
+  runway: "RUNWAYML_API_SECRET",
+  heygen: "HEYGEN_API_KEY",
+  fal: "FAL_API_KEY",
+  gemini: "מפתח Gemini"
+};
+
 export function AdminSettingsPanel() {
   const [settings, setSettings] = useState<PlatformSettingsView | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [modelAccess, setModelAccess] = useState<Record<string, { available: boolean; provider: string }>>({});
 
   useEffect(() => {
     void apiGet<PlatformSettingsView>("/admin/settings")
       .then(setSettings)
       .catch(() => setSettings(null));
+    void apiGet<{ videoModels: Array<{ id: string; available: boolean; provider: string }> }>("/admin/services")
+      .then((overview) =>
+        setModelAccess(
+          Object.fromEntries(overview.videoModels.map((model) => [model.id, { available: model.available, provider: model.provider }]))
+        )
+      )
+      .catch(() => undefined);
   }, []);
 
   async function save() {
@@ -194,6 +209,8 @@ export function AdminSettingsPanel() {
   if (!settings) return <p className="muted">טוען הגדרות…</p>;
 
   const profiles = listRenderProfiles();
+  const selectedAccess = modelAccess[settings.defaultRenderProfile];
+  const missingAccessKey = selectedAccess ? MODEL_ACCESS_KEY[selectedAccess.provider] : undefined;
 
   return (
     <section className="admin-settings">
@@ -221,6 +238,12 @@ export function AdminSettingsPanel() {
         </select>
       </label>
       <p className="muted">הלקוחות לא בוחרים מודל — כל סרטון חדש משתמש בפרופיל הזה.</p>
+      {selectedAccess?.available === false ? (
+        <p className="error-inline">
+          המודל הזה לא מחובר
+          {missingAccessKey ? ` (חסר ${missingAccessKey})` : ""}. לקוח שינסה ליצור סרטון ייעצר. זו לא תקלת עומס.
+        </p>
+      ) : null}
 
       <fieldset className="settings-models">
         <legend>מודלי Gemini (ריק = מ-.env)</legend>

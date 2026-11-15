@@ -4,6 +4,7 @@ import {
   geminiModels,
   getProviderInventory,
   officialBillingUrl,
+  providerNameHe,
   videoProviderForProfile
 } from "@studio/providers";
 import {
@@ -203,6 +204,7 @@ export async function getAdminServicesOverview() {
     unit: activeService?.unit ?? null,
     usdPerSecond: profileVideoPerSecondUsd(activeProfile)
   });
+  const missingAccess = activeService?.configured !== true;
 
   return {
     generatedAt: now.toISOString(),
@@ -210,11 +212,12 @@ export async function getAdminServicesOverview() {
     production: {
       videoSeconds: STANDARD_VIDEO_SECONDS,
       provider: activeVideoProvider,
-      providerName: activeService?.displayName ?? activeVideoProvider,
+      providerName: activeService?.displayName ?? providerNameHe(activeVideoProvider),
       videosRemaining: activeMeter.videosRemaining,
       costPerVideoUsd: activeMeter.costPerVideoUsd,
       kind: activeMeter.kind,
-      blocked: activeMeter.videosRemaining === 0,
+      blocked: activeMeter.videosRemaining === 0 || missingAccess,
+      missingAccess,
       billingUrl: activeService?.billingUrl ?? officialBillingUrl(activeVideoProvider)
     },
     totals: round(total),

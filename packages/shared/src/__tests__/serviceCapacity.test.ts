@@ -3,7 +3,8 @@ import {
   capacityAlertCopy,
   capacityStopsProduction,
   meterVideos,
-  NARRATION_CHARS_PER_STANDARD_VIDEO
+  NARRATION_CHARS_PER_STANDARD_VIDEO,
+  productionBlockedNotice
 } from "../serviceCapacity.js";
 
 describe("meterVideos", () => {
@@ -55,5 +56,19 @@ describe("meterVideos", () => {
     expect(alert.subject).toContain("אי אפשר להפיק");
     expect(alert.text).toContain("https://app.heygen.com/settings/billing");
     expect(alert.text).toContain("30");
+  });
+
+  it("tells the customer the model is disconnected instead of blaming load", () => {
+    const notice = productionBlockedNotice({
+      modelLabel: "Runway — Grok Imagine 1.5 Lite",
+      providerName: "Runway",
+      reason: "not_configured",
+      adminUrl: "https://admin.reelmino.com"
+    });
+    expect(notice.customerHe).toContain("Runway — Grok Imagine 1.5 Lite");
+    expect(notice.customerHe).toContain("לא מחובר");
+    expect(notice.customerHe).toContain("לא תקלת עומס");
+    expect(notice.text).toContain("https://admin.reelmino.com");
+    expect(notice.subject).toContain("אי אפשר להפיק");
   });
 });

@@ -45,6 +45,7 @@ type ServicesOverview = {
     costPerVideoUsd: number | null;
     kind: "videos" | "narration" | "unknown" | "not_metered";
     blocked: boolean;
+    missingAccess: boolean;
     billingUrl: string | null;
   };
   totals: UsageBucket;
@@ -331,9 +332,10 @@ function ProductionBanner({
   production: ServicesOverview["production"];
   services: ServiceRow[];
 }) {
-  const tone = production.blocked ? "bad" : production.videosRemaining !== null && production.videosRemaining <= 3 ? "warn" : production.videosRemaining === null ? "warn" : "ok";
-  const title =
-    production.videosRemaining === null
+  const tone = production.missingAccess || production.blocked ? "bad" : production.videosRemaining !== null && production.videosRemaining <= 3 ? "warn" : production.videosRemaining === null ? "warn" : "ok";
+  const title = production.missingAccess
+    ? `אי אפשר להפיק סרטון — ${production.providerName} לא מחובר`
+    : production.videosRemaining === null
       ? `אי אפשר לחשב כמה סרטונים נשארו ב-${production.providerName}`
       : production.blocked
         ? "אי אפשר להפיק סרטון נוסף"
@@ -344,10 +346,17 @@ function ProductionBanner({
   return (
     <section className={`capacity-banner tone-${tone}`} role="status">
       <h3>{title}</h3>
-      <p>
-        המודל הפעיל הוא {production.providerName}. כל מספר כאן הוא לסרטון של {production.videoSeconds} שניות.{cost} כשאין
-        כיסוי לסרטון כזה נשלחת התראה למייל, כדי שלקוח לא ייעצר בלי שנדע.
-      </p>
+      {production.missingAccess ? (
+        <p>
+          המודל הפעיל דורש את {production.providerName}, ואין לו פרטי גישה בשרת. לקוח שמנסה ליצור סרטון נעצר. זו לא תקלת
+          עומס, והמתנה לא תפתור את זה. נשלחת על כך התראה למייל.
+        </p>
+      ) : (
+        <p>
+          המודל הפעיל הוא {production.providerName}. כל מספר כאן הוא לסרטון של {production.videoSeconds} שניות.{cost}{" "}
+          כשאין כיסוי לסרטון כזה נשלחת התראה למייל, כדי שלקוח לא ייעצר בלי שנדע.
+        </p>
+      )}
       {unread.length ? (
         <p>
           אין קריאת יתרה ב-{unread.map((service) => service.displayName).join(", ")}. אי אפשר לדעת מראש אם ההפקה תיעצר שם.
