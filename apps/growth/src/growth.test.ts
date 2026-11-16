@@ -212,7 +212,7 @@ describe("growth console", () => {
     expect(html).toContain("A &amp; B");
     expect(html).toContain("<p>&lt;script&gt;</p>");
     expect(html).not.toContain("<p><script></p>");
-    expect(html).toContain("googletagmanager.com/gtag/js?id=G-JX95ZGHQ6Z");
+    expect(html).toContain("googletagmanager.com/gtm.js?id=GTM-PZC7RWBD");
     const written = writeLearnSite({
       publicDir,
       origin: "https://reelmino.com",

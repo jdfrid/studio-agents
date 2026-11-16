@@ -12,15 +12,14 @@ export function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
-const GOOGLE_TAG = `<!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-JX95ZGHQ6Z"></script>
+const GOOGLE_TAG = `<!-- Google Tag Manager -->
+  <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PZC7RWBD"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-
-    gtag('config', 'G-JX95ZGHQ6Z');
   </script>`;
+const GOOGLE_TAG_NOSCRIPT = `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PZC7RWBD" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`;
 
 export type LearnArticle = {
   slug: string;
@@ -56,6 +55,7 @@ export function renderArticle(article: LearnArticle, pageUrl: string): string {
   </style>
 </head>
 <body>
+  ${GOOGLE_TAG_NOSCRIPT}
   <p><a href="https://reelmino.com/">Reelmino</a></p>
   <h1>${escapeHtml(article.title)}</h1>
   ${paragraphs}
@@ -79,6 +79,7 @@ export function renderLearnIndex(articles: LearnArticle[], origin: string): stri
   <link rel="canonical" href="${escapeHtml(`${origin}/learn/`)}">
 </head>
 <body>
+  ${GOOGLE_TAG_NOSCRIPT}
   <p><a href="https://reelmino.com/">Reelmino</a></p>
   <h1>Learn</h1>
   <ul>
