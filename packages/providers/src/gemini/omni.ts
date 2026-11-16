@@ -1,15 +1,8 @@
 import type { ProviderCredentialView } from "@studio/shared";
 import { AgentError, ProviderError } from "@studio/shared";
 import { httpJson } from "../http.js";
-import {
-  DEFAULT_GEMINI_VIDEO_MODEL,
-  GEMINI_VIDEO_FALLBACK_MODEL,
-  geminiModels,
-  geminiUrl,
-  isGeminiOmniModelId
-} from "./common.js";
+import { activeGeminiOmniModelId, geminiModels, geminiUrl } from "./common.js";
 import type { GeminiInlineMedia, GeminiVeoHooks, GeminiVeoOperation, GeminiVeoRequest } from "./video.js";
-import { geminiGenerateVeoVideo } from "./video.js";
 
 type OmniContent = {
   type?: string;
@@ -29,17 +22,13 @@ export type GeminiOmniInteraction = {
   error?: { message?: string } | string;
 };
 
-/**
- * Generate through the Interactions API. Unsupported/unavailable Preview access
- * falls back to Veo Fast without changing explicit legacy Veo profiles.
- */
+/** Generate through the Interactions API. A retired Omni id is replaced with the current model. */
 export async function geminiGenerateOmniVideo(
   provider: ProviderCredentialView,
   req: GeminiVeoRequest,
   hooks: GeminiVeoHooks = {}
 ): Promise<GeminiVeoOperation> {
-  const configured = geminiModels(provider).video;
-  const model = isGeminiOmniModelId(configured) ? configured : DEFAULT_GEMINI_VIDEO_MODEL;
+  const model = activeGeminiOmniModelId(geminiModels(provider).video);
 
   if (provider.config.mock === true || process.env.GEMINI_MOCK === "1") {
     await reportOmniUsage(hooks, req, model, 0);
@@ -53,32 +42,21 @@ export async function geminiGenerateOmniVideo(
   }
 
   const startedAt = Date.now();
-  try {
-    const interaction = await httpJson<GeminiOmniInteraction>(geminiUrl(provider, "interactions"), {
-      method: "POST",
-      body: buildOmniRequest(req, model),
-      timeoutMs: Number(provider.config.videoTimeoutSeconds ?? 900) * 1000
+  const interaction = await httpJson<GeminiOmniInteraction>(geminiUrl(provider, "interactions"), {
+    method: "POST",
+    body: buildOmniRequest(req, model),
+    timeoutMs: Number(provider.config.videoTimeoutSeconds ?? 900) * 1000
+  });
+  const result = normalizeOmniInteraction(interaction, model);
+  await hooks.onPoll?.(result);
+  if (result.status !== "completed" || !result.videoBytes) {
+    throw new ProviderError(`Gemini Omni interaction failed: ${result.error ?? "no video payload"}`, {
+      provider: "gemini",
+      metadata: { model, interactionId: result.operationName }
     });
-    const result = normalizeOmniInteraction(interaction, model);
-    await hooks.onPoll?.(result);
-    if (result.status !== "completed" || !result.videoBytes) {
-      throw new ProviderError(`Gemini Omni interaction failed: ${result.error ?? "no video payload"}`, {
-        provider: "gemini",
-        metadata: { model, interactionId: result.operationName }
-      });
-    }
-    await reportOmniUsage(hooks, req, result.model, Date.now() - startedAt, result.operationName);
-    return result;
-  } catch (error) {
-    if (!isOmniFallbackError(error)) throw error;
-    await hooks.onPoll?.({
-      operationName: `fallback:${req.sceneId}`,
-      model,
-      status: "failed",
-      error: `Omni unavailable or unsupported; falling back to ${GEMINI_VIDEO_FALLBACK_MODEL}`
-    });
-    return geminiGenerateVeoVideo(provider, { ...req, modelOverride: GEMINI_VIDEO_FALLBACK_MODEL }, hooks);
   }
+  await reportOmniUsage(hooks, req, result.model, Date.now() - startedAt, result.operationName);
+  return result;
 }
 
 export function buildOmniRequest(req: GeminiVeoRequest, model: string): Record<string, unknown> {

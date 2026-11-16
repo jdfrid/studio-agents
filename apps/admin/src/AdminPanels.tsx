@@ -283,11 +283,11 @@ export function AdminSettingsPanel() {
           וידאו (Gemini Omni / Veo)
           <input
             value={settings.geminiVideoModel ?? ""}
-            placeholder="gemini-omni-1.1-flash-preview"
+            placeholder="gemini-omni-1.2-flash"
             onChange={(e) => setSettings({ ...settings, geminiVideoModel: e.target.value || null })}
           />
           <small className="muted">
-            מזהה וידאו של Google: Gemini Omni 1.1 Flash (Preview) או Veo. ספקי Wan/Kling/Hailuo נבחרים ב«מודל
+            מזהה וידאו של Google: Gemini Omni 1.2 Flash או Veo. ספקי Wan/Kling/Hailuo נבחרים ב«מודל
             רינדור ללקוחות» למעלה (דורש FAL_API_KEY). HeyGen Video דורש HEYGEN_API_KEY. Runway דורש RUNWAYML_API_SECRET.
           </small>
         </label>

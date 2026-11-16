@@ -463,7 +463,7 @@ export function videoModelDisplay(
   if (p.provider === "heygen") return HEYGEN_LIPSYNC_MODEL;
   if (p.provider === "omni") {
     const configured = geminiVideoModel ?? process.env.GEMINI_VIDEO_MODEL;
-    return configured?.toLowerCase().includes("omni") ? configured : "gemini-omni-1.1-flash-preview";
+    return configured?.toLowerCase().includes("omni") ? configured : "gemini-omni-1.2-flash";
   }
   const configured = geminiVideoModel ?? process.env.GEMINI_VIDEO_MODEL;
   return configured?.toLowerCase().includes("veo") ? configured : "veo-3.1-fast-generate-preview";

@@ -10,8 +10,9 @@ export interface GeminiModelConfig {
   video: string;
 }
 
-export const DEFAULT_GEMINI_VIDEO_MODEL = "gemini-omni-1.1-flash-preview";
+export const DEFAULT_GEMINI_VIDEO_MODEL = "gemini-omni-1.2-flash";
 export const GEMINI_VIDEO_FALLBACK_MODEL = "veo-3.1-fast-generate-preview";
+const RETIRED_GEMINI_OMNI_MODEL = "gemini-omni-1.1-flash-preview";
 
 export function geminiApiKey(provider?: ProviderCredentialView | null): string {
   const key = provider?.secret ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
@@ -87,7 +88,16 @@ export function isValidGeminiVideoModelId(model: string): boolean {
 }
 
 export function isGeminiOmniModelId(model: string): boolean {
-  return /^gemini-omni(?:-[\w.]+)*-flash-preview$/i.test(model.trim());
+  return /^gemini-omni(?:-[\w.]+)*-flash(?:-preview)?$/i.test(model.trim());
+}
+
+/** Google retired the 1.1 preview id. A saved or env value of that id uses the current Omni model. */
+export function activeGeminiOmniModelId(model: string | null | undefined): string {
+  const trimmed = model?.trim() ?? "";
+  if (!isGeminiOmniModelId(trimmed) || trimmed.toLowerCase() === RETIRED_GEMINI_OMNI_MODEL) {
+    return DEFAULT_GEMINI_VIDEO_MODEL;
+  }
+  return trimmed;
 }
 
 export function isGeminiVeoModelId(model: string): boolean {

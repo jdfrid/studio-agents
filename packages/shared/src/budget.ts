@@ -281,7 +281,7 @@ export function estimateRunCost(
   config?: Partial<ProductionCostConfig>
 ): RunCostEstimate {
   const budget = input.budgetMode;
-  const videoModel = config?.videoModel ?? process.env.GEMINI_VIDEO_MODEL ?? "gemini-omni-1.1-flash-preview";
+  const videoModel = config?.videoModel ?? process.env.GEMINI_VIDEO_MODEL ?? "gemini-omni-1.2-flash";
   const usdToIls = config?.usdToIls ?? DEFAULT_USD_TO_ILS;
   const generateAudio = config?.veoGenerateAudio ?? veoGenerateAudio();
   const inferredProfileId =

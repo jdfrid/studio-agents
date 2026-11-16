@@ -106,7 +106,7 @@ describe("Gemini Omni Interactions adapter", () => {
         }
       }
     );
-    expect(result.model).toBe("gemini-omni-1.1-flash-preview");
-    expect(models).toEqual(["gemini-omni-1.1-flash-preview"]);
+    expect(result.model).toBe("gemini-omni-1.2-flash");
+    expect(models).toEqual(["gemini-omni-1.2-flash"]);
   });
 });
