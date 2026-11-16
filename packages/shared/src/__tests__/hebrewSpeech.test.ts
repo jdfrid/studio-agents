@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { hebrewLetterSkeleton, pointHebrewForSpeech } from "../hebrewSpeech.js";
+import { hebrewLetterSkeleton, pointHebrewForSpeech, stripUnspokenAddresses } from "../hebrewSpeech.js";
+
+describe("stripUnspokenAddresses", () => {
+  it("removes a website so the voice does not read it", () => {
+    expect(stripUnspokenAddresses("reelmino.com!")).toBe("");
+    expect(stripUnspokenAddresses("עקבו אחרינו ב-reelmino.com")).toBe("עקבו אחרינו ב");
+    expect(stripUnspokenAddresses("לפני הבחירות, כל פוליטיקאי נזכר")).toBe("לפני הבחירות, כל פוליטיקאי נזכר");
+    expect(stripUnspokenAddresses("https://reelmino.com/runs/abc")).toBe("");
+    expect(stripUnspokenAddresses("info@reelmino.com")).toBe("");
+  });
+});
 
 describe("pointHebrewForSpeech", () => {
   it("keeps vowel points only when the letters are unchanged", async () => {

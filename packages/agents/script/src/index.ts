@@ -16,6 +16,7 @@ import {
   isCorporateProductFilm,
   isProductAdBrief,
   narrationCharLimitForBucket,
+  stripUnspokenAddresses,
   normalizeContentLanguage,
   planSceneLayout,
   presenterCastInstruction,
@@ -136,7 +137,7 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       lipSyncMode
         ? "Pace gestures to the line: open with attention, hold product/gesture mid-line, end with a clear hold — avoid frantic action that fights the voiceover."
         : "Pace gestures to the silent beat: face camera / look at product, natural blinks, hold product mid-beat — avoid frantic action.",
-      "Do not add title_card scenes: a branded end card with the call to action is appended automatically after the last scene. Put the call to action in the last beat's narration instead.",
+      "Do not add title_card scenes: a branded end card is appended automatically and already shows the website as writing. Put the spoken call to action in the last beat's narration. Never put a website, domain, or email in narration — it is shown on screen and must not be spoken.",
       "Every scene uses sceneKind=beat. Keep dubbing lines short, conversational, and timed to the beat.",
       "DIALOGUE DUBBING (mandatory when cast has 2+ speaking characters): alternate speakers across consecutive beat scenes.",
       "Set speaker to \"a\" or \"b\" and speakerName to the character's short name from characterBible.",
@@ -364,13 +365,14 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
       // Title cards are FFmpeg-only; skip in continuous extend chains.
       const resolvedKind = extendMode ? "beat" : scene.sceneKind === "title_card" ? "title_card" : "beat";
       const narrationRaw = resolvedKind === "title_card" ? (scene.narration ?? "").trim() : (scene.narration ?? "");
-      const narration =
+      const narration = stripUnspokenAddresses(
         resolvedKind === "title_card"
           ? narrationRaw.slice(0, narrationLimit)
           : trimNarration(
               stripSpeakerPrefix(narrationRaw),
               narrationCharLimitForBucket(extendMode || beatI2vMode ? clipSeconds : Number(durationBucket))
-            );
+            )
+      );
       const speakerRaw = String((scene as { speaker?: string }).speaker ?? "").toLowerCase();
       const dialogueCast = Boolean(hasCastPhotos && castPhotoCount >= 2);
       const speaker =

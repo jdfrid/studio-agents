@@ -13,6 +13,7 @@ import {
   pointHebrewForSpeech,
   ProviderError,
   stripNiqqud,
+  stripUnspokenAddresses,
   type Agent,
   type AudioInput,
   type AudioOutput
@@ -85,6 +86,18 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           continue;
         }
         const spoken = await spokenHebrew(input.language, scene.narration);
+        if (!/[\p{L}\p{N}]/u.test(spoken)) {
+          perScene.push({
+            sceneId: scene.sceneId,
+            voiceArtifactId: null,
+            voiceGcsPath: null,
+            voiceDurationSeconds: null,
+            provider: null,
+            model: null,
+            voiceError: null
+          });
+          continue;
+        }
         const deliveryStyle = hebrewDeliveryStyle(input.language, input.voiceStyle);
         try {
           let audio: SpeechResult;
@@ -356,8 +369,9 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
 };
 
 async function spokenHebrew(language: string, text: string): Promise<string> {
-  const plain = stripNiqqud(text);
+  const plain = stripUnspokenAddresses(stripNiqqud(text));
   if (!language.trim().toLowerCase().startsWith("he")) return plain;
+  if (!/[\u05D0-\u05EA]/.test(plain)) return plain;
   return pointHebrewForSpeech(plain);
 }
 

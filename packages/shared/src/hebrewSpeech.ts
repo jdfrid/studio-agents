@@ -8,6 +8,24 @@ export function hebrewLetterSkeleton(text: string): string {
   return stripNiqqud(text).replace(/[^\u05D0-\u05EA]/g, "");
 }
 
+const UNSPOKEN_ADDRESS =
+  /(?:https?:\/\/|www\.)[^\s<>"']+|[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?)*\.(?:com|net|org|io|ai|app|co(?:\.[a-z]{2})?|il|tv|me|info|biz|dev|xyz)\b|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gi;
+
+/**
+ * A website or email is shown on screen. The speech engine must not read it,
+ * because Latin addresses come out as broken Hebrew.
+ */
+export function stripUnspokenAddresses(text: string): string {
+  const stripped = text
+    .replace(UNSPOKEN_ADDRESS, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;:!?…])/g, "$1")
+    .replace(/^[^\p{L}\p{N}]+/u, "")
+    .replace(/[^\p{L}\p{N}]+$/u, "")
+    .trim();
+  return stripped;
+}
+
 type NakdanToken = {
   word?: unknown;
   sep?: unknown;

@@ -427,8 +427,8 @@ export const briefAgent: Agent<BriefInput, BriefOutput> = {
 
     const endCardCredit =
       resolvedLanguage === "he" || resolvedLanguage === "yi"
-        ? "בכרטיס הסיום יש לציין reelmino.com"
-        : "End card must credit reelmino.com";
+        ? "בכרטיס הסיום מופיע reelmino.com ככתוב. אין לומר את הכתובת בדיבוב."
+        : "The end card shows reelmino.com as writing. Do not speak the address.";
     const brandNameConstraint =
       businessName && (resolvedLanguage === "he" || resolvedLanguage === "yi")
         ? `שם העסק לשימוש עקבי בדיבוב וב-CTA: ${businessName}`
