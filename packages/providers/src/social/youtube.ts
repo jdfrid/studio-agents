@@ -102,12 +102,12 @@ export function channelBrandingUpdate(input: {
     description: input.description.slice(0, 1000),
     keywords: input.keywords.slice(0, 500)
   };
-  if (input.defaultLanguage) channel.defaultLanguage = input.defaultLanguage;
-  if (input.unsubscribedTrailer) channel.unsubscribedTrailer = input.unsubscribedTrailer;
   for (const key of BRANDING_KEEP) {
     const value = input.existing?.[key];
     if (value !== undefined && value !== null && value !== "") channel[key] = value;
   }
+  if (input.defaultLanguage) channel.defaultLanguage = input.defaultLanguage;
+  if (input.unsubscribedTrailer) channel.unsubscribedTrailer = input.unsubscribedTrailer;
   return { id: input.channelId, brandingSettings: { channel } };
 }
 

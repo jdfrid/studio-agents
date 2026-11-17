@@ -4,7 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDb, upsertDestination, insertItem, insertJob, type GrowthDb } from "./db.js";
 import { emptyCopy } from "./copy.js";
-import { judgeTitleWithModel, mp4DurationSeconds, readShortsDailyCap, recentChannelPosts } from "./shortsGate.js";
+import { judgeTitleWithModel, mp4DurationSeconds, readShortsDailyCap, recentChannelPosts, reviewYoutubeShort } from "./shortsGate.js";
+import { longFormPackage } from "./subscriberGrowth.js";
 import { runScriptEntry, saveScriptEntry } from "./scriptBank.js";
 
 const dirs: string[] = [];
@@ -93,6 +94,61 @@ describe("shorts publish gate", () => {
     expect(rendered).toBe(false);
     expect(run.status).toBe("failed");
     expect(run.error).toMatch(/Daily cap/);
+  });
+
+  it("lets a weekly product video through the long-form gate", async () => {
+    const opened = db();
+    upsertDestination(opened.db, {
+      id: "product",
+      connectionId: "conn",
+      network: "youtube",
+      kind: "channel",
+      externalId: "UC3iee8PYICmnfO5s8viJgkQ",
+      name: "Reelmino",
+      handle: "@reelminoapp",
+      url: "https://www.youtube.com/channel/UC3iee8PYICmnfO5s8viJgkQ",
+      config: {}
+    });
+    const pack = longFormPackage({ kind: "product", topic: "a bakery", parts: ["Type one sentence", "Apply the brand", "Publish the video"] });
+    const copy = emptyCopy();
+    copy.article = { title: pack.title, description: pack.description, body: pack.script };
+    copy.youtube = { title: pack.title, body: pack.description };
+    const item = insertItem(opened.db, {
+      id: "weekly",
+      slug: "weekly",
+      source: "longform",
+      title: pack.title,
+      summary: pack.title,
+      language: "en",
+      copy,
+      mediaPath: null,
+      mediaMime: null,
+      mediaKind: null,
+      mediaWidth: null,
+      mediaHeight: null,
+      mediaDurationMs: 240_000,
+      reelminoRunId: null
+    });
+    const verdict = await reviewYoutubeShort({
+      db: opened.db,
+      item,
+      destination: {
+        id: "product",
+        connectionId: "conn",
+        network: "youtube",
+        kind: "channel",
+        externalId: "UC3iee8PYICmnfO5s8viJgkQ",
+        name: "Reelmino",
+        handle: "@reelminoapp",
+        url: "https://www.youtube.com/channel/UC3iee8PYICmnfO5s8viJgkQ",
+        config: {},
+        autopilot: true,
+        enabled: true,
+        createdAt: "2026-11-17T00:00:00.000Z"
+      },
+      copy: { title: pack.title, body: pack.description, hashtags: ["shorts"], language: "en" }
+    });
+    expect(verdict.decision).toBe("publish");
   });
 
   it("does not treat the upload that is in progress as its own duplicate", () => {

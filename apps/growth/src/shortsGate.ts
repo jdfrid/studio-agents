@@ -121,8 +121,25 @@ export async function reviewYoutubeShort(input: {
   const measured = input.media ? mp4DurationSeconds(input.media) : null;
   const metadata = input.item.mediaDurationMs ? input.item.mediaDurationMs / 1000 : null;
   const durationSeconds = measured ?? metadata;
-  const channel: ShortsChannelKind = channelKind(input.destination) === "kitchen" ? "kitchen" : "product";
   const script = input.item.copy.article?.body || input.item.summary || "";
+  if (input.item.source === "longform") {
+    const { evaluateLongForm } = await import("./subscriberGrowth.js");
+    const gate = evaluateLongForm({
+      title: input.copy.title || input.item.title,
+      description: input.copy.body || "",
+      script,
+      durationSeconds: durationSeconds && durationSeconds > 60 ? durationSeconds : 240
+    });
+    return {
+      decision: gate.ok ? "publish" : "block",
+      code: gate.ok ? "ok" : "shorts_quality",
+      reasons: gate.reasons,
+      title: (input.copy.title || input.item.title).slice(0, 100),
+      description: input.copy.body || "",
+      hashtags: input.copy.hashtags ?? []
+    };
+  }
+  const channel: ShortsChannelKind = channelKind(input.destination) === "kitchen" ? "kitchen" : "product";
   const titleVerdict = await judgeTitleWithModel({
     title: input.copy.title || input.item.title,
     script,
@@ -138,7 +155,7 @@ export async function reviewYoutubeShort(input: {
     durationSeconds,
     hashtags: input.copy.hashtags,
     channel,
-    requireProductDemo: isReelminoProductChannel(input.destination),
+    requireProductDemo: input.item.source !== "longform" && isReelminoProductChannel(input.destination),
     recent: recentChannelPosts(input.db, input.destination.id, now, input.exceptJobId),
     publishedToday: countShortsToday(input.db, input.destination.id, now, input.exceptJobId),
     dailyCap: readShortsDailyCap(input.db),

@@ -166,7 +166,8 @@ export function sundaySlot(now: Date, timeZone: string, hour = 18, minute = 0): 
   };
 }
 
-export function longFormDecision(now: Date, slot: { at: Date; leadAt: Date; graceEnd: Date }, status: string | null): "wait" | "start" | "skip" {
+export function longFormDecision(now: Date, slot: { at: Date; leadAt: Date; graceEnd: Date }, status: string | null): "wait" | "start" | "skip" | "retry" {
+  if (status === "upload_failed") return now.getTime() <= slot.graceEnd.getTime() ? "retry" : "wait";
   if (status === "published" || status === "publishing" || status === "skipped" || status === "producing") return "wait";
   if (now.getTime() < slot.leadAt.getTime()) return "wait";
   if (now.getTime() > slot.graceEnd.getTime()) return status ? "wait" : "skip";
@@ -244,12 +245,151 @@ export async function advanceSubscriberGrowth(ctx: RunContext, deps: SubscriberD
   for (const destination of channels) {
     const kind = scheduledChannel(destination);
     if (!kind) continue;
-    if (growthFlag("SHORTS_TOPIC_DEMAND")) await refreshDemand(ctx.db, kind, deps, now, log);
-    if (growthFlag("SHORTS_WEIGHT_TUNING")) await refreshWeights(ctx.db, destination, kind, deps, now, log);
-    if (growthFlag("SHORTS_PLAYLISTS")) await ensurePlaylists(ctx.db, destination, kind, deps, log);
-    if (growthFlag("SHORTS_LONGFORM")) await advanceLongForm(ctx, destination, kind, now, deps, log);
-    if (growthFlag("SHORTS_COMMENT_REPLIES")) await replyToComments(ctx.db, destination, kind === "product", now, deps, log);
-    if (growthFlag("SHORTS_CROSSPOST")) await crossPostRecent(ctx.db, destination, deps, log);
+    const bound = await bindLiveYoutube(ctx, destination, deps, log);
+    if (growthFlag("SHORTS_TOPIC_DEMAND")) await refreshDemand(ctx.db, kind, bound, now, log);
+    if (growthFlag("SHORTS_WEIGHT_TUNING")) await refreshWeights(ctx.db, destination, kind, bound, now, log);
+    if (growthFlag("SHORTS_PLAYLISTS")) await ensurePlaylists(ctx.db, destination, kind, bound, log);
+    if (growthFlag("SHORTS_LONGFORM")) await advanceLongForm(ctx, destination, kind, now, bound, log);
+    if (growthFlag("SHORTS_COMMENT_REPLIES")) await replyToComments(ctx.db, destination, kind === "product", now, bound, log);
+    if (growthFlag("SHORTS_CROSSPOST")) await crossPostRecent(ctx.db, destination, bound, log);
+  }
+}
+
+async function bindLiveYoutube(ctx: RunContext, destination: Destination, deps: SubscriberDeps, log: (message: string) => void): Promise<SubscriberDeps> {
+  const needsLive = !deps.listPlaylists || !deps.listComments || !deps.analytics || !deps.signals || !deps.reply || !deps.llm;
+  if (!needsLive) return deps;
+  let token = "";
+  if (!deps.listPlaylists || !deps.listComments || !deps.analytics || !deps.signals || !deps.reply) {
+    try {
+      token = (await freshConnectionTokens(ctx.db, destination.connectionId, ctx.key, "youtube")).accessToken;
+    } catch (error) {
+      log(`${destination.id} youtube token unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  const live = token ? liveYoutube(token) : null;
+  return {
+    ...deps,
+    signals: deps.signals ?? (live ? () => live.signals() : async () => []),
+    analytics: deps.analytics ?? (live ? (channelId) => live.analytics(channelId) : undefined),
+    listPlaylists: deps.listPlaylists ?? (live ? () => live.listPlaylists() : undefined),
+    createPlaylist: deps.createPlaylist ?? (live ? (_channelId, spec) => live.createPlaylist(spec) : undefined),
+    addToPlaylist: deps.addToPlaylist ?? (live ? (playlistId, videoId) => live.addVideo(playlistId, videoId) : undefined),
+    listUploads: deps.listUploads ?? (live ? () => live.listUploads() : undefined),
+    listComments: deps.listComments ?? (live ? () => live.listComments(destination.externalId) : undefined),
+    reply: deps.reply ?? (live ? (commentId, text) => live.reply(commentId, text) : undefined),
+    llm: deps.llm ?? ((comment, product) => draftReply(comment, product))
+  };
+}
+
+function liveYoutube(token: string) {
+  const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  return {
+    async signals(): Promise<string[]> {
+      const response = await fetch("https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&maxResults=15&regionCode=US", { headers });
+      if (!response.ok) return [];
+      const data = (await response.json()) as { items?: Array<{ snippet?: { title?: string } }> };
+      return (data.items ?? []).map((item) => item.snippet?.title ?? "").filter(Boolean);
+    },
+    async analytics(channelId: string) {
+      const end = new Date().toISOString().slice(0, 10);
+      const start = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const url = `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==${encodeURIComponent(channelId)}&startDate=${start}&endDate=${end}&metrics=views,averageViewPercentage,subscribersGained&dimensions=video&sort=-views&maxResults=20`;
+      const response = await fetch(url, { headers });
+      if (!response.ok) return [];
+      const data = (await response.json()) as { rows?: Array<[string, number, number, number]> };
+      return (data.rows ?? []).map((row) => ({ videoId: row[0], views: row[1], viewRatio: row[2], subs: row[3] }));
+    },
+    async listPlaylists() {
+      const response = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50", { headers });
+      if (!response.ok) return [];
+      const data = (await response.json()) as { items?: Array<{ id?: string; snippet?: { title?: string } }> };
+      return (data.items ?? []).map((item) => ({ id: item.id ?? "", title: item.snippet?.title ?? "" })).filter((item) => item.id);
+    },
+    async createPlaylist(spec: PlaylistSpec) {
+      const response = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,status", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ snippet: { title: spec.title, description: spec.description }, status: { privacyStatus: "public" } })
+      });
+      if (!response.ok) throw new Error(`playlist create ${response.status}`);
+      const data = (await response.json()) as { id?: string };
+      if (!data.id) throw new Error("playlist create returned no id");
+      return data.id;
+    },
+    async addVideo(playlistId: string, videoId: string) {
+      await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ snippet: { playlistId, resourceId: { kind: "youtube#video", videoId } } })
+      });
+    },
+    async listUploads() {
+      const channel = await fetch("https://www.googleapis.com/youtube/v3/channels?part=contentDetails&mine=true", { headers });
+      if (!channel.ok) return [];
+      const channelData = (await channel.json()) as { items?: Array<{ contentDetails?: { relatedPlaylists?: { uploads?: string } } }> };
+      const uploads = channelData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+      if (!uploads) return [];
+      const list = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${encodeURIComponent(uploads)}&maxResults=50`, { headers });
+      if (!list.ok) return [];
+      const data = (await list.json()) as { items?: Array<{ snippet?: { title?: string; resourceId?: { videoId?: string } } }> };
+      return (data.items ?? []).map((item) => ({ id: item.snippet?.resourceId?.videoId ?? "", title: item.snippet?.title ?? "" })).filter((item) => item.id);
+    },
+    async listComments(channelId: string): Promise<GrowthComment[]> {
+      const response = await fetch(`https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&allThreadsRelatedToChannelId=${encodeURIComponent(channelId)}&maxResults=20`, { headers });
+      if (!response.ok) return [];
+      const data = (await response.json()) as { items?: Array<{ id?: string; snippet?: { totalReplyCount?: number; topLevelComment?: { id?: string; snippet?: { textDisplay?: string; videoId?: string } } } }> };
+      return (data.items ?? []).map((item) => ({
+        id: item.snippet?.topLevelComment?.id ?? item.id ?? "",
+        threadId: item.id ?? "",
+        text: item.snippet?.topLevelComment?.snippet?.textDisplay ?? "",
+        videoId: item.snippet?.topLevelComment?.snippet?.videoId ?? "",
+        replyCount: item.snippet?.totalReplyCount ?? 0
+      })).filter((item) => item.id);
+    },
+    async reply(commentId: string, text: string) {
+      const response = await fetch("https://www.googleapis.com/youtube/v3/comments?part=snippet", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ snippet: { parentId: commentId, textOriginal: text.slice(0, 200) } })
+      });
+      if (!response.ok) throw new Error(`comment reply ${response.status}`);
+    }
+  };
+}
+
+async function draftReply(comment: string, product: boolean): Promise<string | null> {
+  const gemini = process.env.GEMINI_API_KEY?.trim();
+  const openai = process.env.OPENAI_API_KEY?.trim();
+  if (!gemini && !openai) return null;
+  const system = `Reply as the channel in the commenter's language. At most 180 characters. Helpful, no links${product ? " except https://reelmino.com when they ask how to try it" : ""}. End with one short question.`;
+  try {
+    if (gemini) {
+      const model = process.env.GEMINI_TEXT_MODEL?.trim() || "gemini-2.0-flash";
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(gemini)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [{ text: comment.slice(0, 1000) }] }]
+        })
+      });
+      if (!response.ok) return null;
+      const data = (await response.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+      return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+    }
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { authorization: `Bearer ${openai}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-4o-mini",
+        messages: [{ role: "system", content: system }, { role: "user", content: comment.slice(0, 1000) }]
+      })
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    return data.choices?.[0]?.message?.content ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -360,6 +500,10 @@ async function advanceLongForm(
     await pullLongForm(ctx, destination, key, row.run_id, row.item_id, slot.at, now, deps, log);
     return;
   }
+  if (row?.status === "upload_failed" && row.item_id && longFormDecision(now, slot, row.status) === "retry") {
+    await publishLongItem(ctx, destination, key, row.item_id, slot.at, now, deps, log);
+    return;
+  }
   const decision = longFormDecision(now, slot, row?.status ?? null);
   if (decision === "wait") return;
   if (decision === "skip") {
@@ -455,14 +599,66 @@ async function pullLongForm(
         destination,
         publishAt: when
       });
+  if (result.status === "failed") {
+    ctx.db.prepare("UPDATE shorts_slots SET status = 'upload_failed', job_id = ?, error = ?, updated_at = ? WHERE slot_key = ?").run(
+      result.id,
+      "upload failed",
+      now.toISOString(),
+      key
+    );
+    log(`${key} long-form upload failed and will be retried`);
+    return;
+  }
   if (result.remoteUrl) setSetting(ctx.db, `longform_url:${destination.id}`, result.remoteUrl);
-  ctx.db.prepare("UPDATE shorts_slots SET status = ?, job_id = ?, updated_at = ? WHERE slot_key = ?").run(
+  ctx.db.prepare("UPDATE shorts_slots SET status = ?, job_id = ?, error = NULL, updated_at = ? WHERE slot_key = ?").run(
     result.status === "published" || result.status === "draft" ? "published" : "publishing",
     result.id,
     now.toISOString(),
     key
   );
   log(`${key} long-form uploaded`);
+}
+
+async function publishLongItem(
+  ctx: RunContext,
+  destination: Destination,
+  key: string,
+  itemId: string,
+  publishAt: Date,
+  now: Date,
+  deps: SubscriberDeps,
+  log: (message: string) => void
+): Promise<void> {
+  const item = getItem(ctx.db, itemId);
+  if (!item?.mediaPath) return;
+  const when = publishAt.getTime() > now.getTime() + 60_000 ? publishAt : null;
+  const result = deps.publishLong
+    ? await deps.publishLong(itemId, destination, when)
+    : await runPublish({
+        db: ctx.db,
+        key: ctx.key,
+        mediaDir: ctx.mediaDir,
+        publicBase: ctx.publicBase,
+        item,
+        destination,
+        publishAt: when
+      });
+  if (result.status === "failed") {
+    ctx.db.prepare("UPDATE shorts_slots SET status = 'upload_failed', error = ?, updated_at = ? WHERE slot_key = ?").run(
+      "upload failed",
+      now.toISOString(),
+      key
+    );
+    log(`${key} long-form upload failed and will be retried`);
+    return;
+  }
+  if (result.remoteUrl) setSetting(ctx.db, `longform_url:${destination.id}`, result.remoteUrl);
+  ctx.db.prepare("UPDATE shorts_slots SET status = ?, job_id = ?, error = NULL, updated_at = ? WHERE slot_key = ?").run(
+    result.status === "published" || result.status === "draft" ? "published" : "publishing",
+    result.id,
+    now.toISOString(),
+    key
+  );
 }
 
 async function replyToComments(

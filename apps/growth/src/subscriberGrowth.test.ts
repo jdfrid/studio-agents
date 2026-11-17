@@ -57,6 +57,7 @@ describe("subscriber growth", () => {
     expect(longFormDecision(new Date(sunday.leadAt.getTime() + 60_000), sunday, null)).toBe("start");
     expect(longFormDecision(new Date(sunday.graceEnd.getTime() + 60_000), sunday, null)).toBe("skip");
     expect(longFormDecision(sunday.at, sunday, "published")).toBe("wait");
+    expect(longFormDecision(sunday.at, sunday, "upload_failed")).toBe("retry");
   });
 
   it("replies only to real comments, once, and caps the length", () => {

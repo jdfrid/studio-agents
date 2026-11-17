@@ -76,6 +76,16 @@ describe("youtube adapter", () => {
     expect(payload.brandingSettings.channel.description).toContain("Reelmino");
     expect(payload.brandingSettings.channel.keywords).toContain("יצירת וידאו");
     expect(payload.brandingSettings.channel.unsubscribedTrailer).toBe("abc123");
+    const replaced = channelBrandingUpdate({
+      channelId: "UC1",
+      description: "English kitchen hacks.",
+      keywords: "herbs",
+      defaultLanguage: "en",
+      unsubscribedTrailer: "newTrailer",
+      existing: { defaultLanguage: "he", unsubscribedTrailer: "oldTrailer" }
+    });
+    expect(replaced.brandingSettings.channel.defaultLanguage).toBe("en");
+    expect(replaced.brandingSettings.channel.unsubscribedTrailer).toBe("newTrailer");
     expect(payload.brandingSettings.channel.title).toBeUndefined();
   });
 });
