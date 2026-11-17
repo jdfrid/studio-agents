@@ -41,3 +41,4 @@ export * from "./veoPrompt.js";
 export * from "./social/index.js";
 export * from "./schemas/automation.js";
 export * from "./brand.js";
+export * from "./shortsGrowth.js";

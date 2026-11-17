@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { channelBrandingUpdate } from "@studio/providers";
-import type { PackageCopyInput } from "@studio/shared";
+import { filterShortsHashtags, type PackageCopyInput } from "@studio/shared";
 import { destinationsForNetwork, getConnection, getSetting, setSetting, type Destination, type GrowthDb } from "./db.js";
 
 const TAG_LIMIT = 30;
@@ -120,17 +120,6 @@ export function profileFor(destination: ChannelRef): ChannelProfile {
     : { kind, description: BRAND_DESCRIPTION, keywords: keywordField(BRAND_KEYWORDS), videoTags: BRAND_TAGS };
 }
 
-function footerLine(kind: ChannelKind, hebrew: boolean): string {
-  if (kind === "kitchen") {
-    return hebrew
-      ? "טיפ למטבח שנוצר ב-Reelmino. יצירת וידאו: משפט אחד הופך לסרטון ממותג לעסק."
-      : "A kitchen tip made with Reelmino. Video creation for a small business: one sentence becomes a branded video.";
-  }
-  return hebrew
-    ? "Reelmino: יצירת וידאו לעסק. משפט אחד הופך לסרטון ממותג שאפשר לפרסם."
-    : "Reelmino: video creation for a small business. One sentence becomes a branded video you can publish.";
-}
-
 export function mergeTags(primary: string[], extra: string[]): string[] {
   const seen = new Set<string>();
   const tags: string[] = [];
@@ -152,12 +141,20 @@ export function mergeTags(primary: string[], extra: string[]): string[] {
 export function applyVideoProfile(copy: PackageCopyInput, destination: ChannelRef): PackageCopyInput {
   const profile = profileFor(destination);
   const hebrew = (copy.language ?? "").toLowerCase().startsWith("he");
-  const line = footerLine(profile.kind, hebrew);
-  let body = (copy.body ?? "").trim();
-  if (line && !body.includes(line)) body = body ? `${body}\n\n${line}` : line;
-  if (!/reelmino\.com/i.test(body)) body = `${body}\nhttps://reelmino.com`;
+  const language = copy.language ?? (hebrew ? "he" : "en");
+  let body = (copy.body ?? "").replace(/a vertical video that follows the saved script\.?/gi, "").trim();
+  if (profile.kind === "kitchen") {
+    body = body.replace(/https?:\/\/(?:www\.)?reelmino\.com\/?\s*/gi, "").trim();
+    const mention = hebrew ? "נוצר עם Reelmino." : "Made with Reelmino.";
+    if (!/reelmino/i.test(body)) body = body ? `${body}\n\n${mention}` : mention;
+  } else if (!/reelmino\.com/i.test(body)) {
+    const mention = hebrew
+      ? "Reelmino הופך משפט אחד לסרטון ממותג.\nhttps://reelmino.com"
+      : "Reelmino turns one sentence into a branded video.\nhttps://reelmino.com";
+    body = body ? `${body}\n\n${mention}` : mention;
+  }
   const own = [...(copy.hashtags ?? []), ...(body.match(/#([\p{L}\p{N}_]+)/gu) ?? []).map((tag) => tag.slice(1))];
-  return { ...copy, body: body.trim(), hashtags: mergeTags(profile.videoTags, own) };
+  return { ...copy, body: body.trim(), hashtags: filterShortsHashtags(own, language) };
 }
 
 function profileHash(profile: ChannelProfile): string {

@@ -25,6 +25,7 @@ import {
   resolveRenderProfile,
   sanitizeVeoPromptForExternalAudio,
   stripNiqqud,
+  shortsNarrationRules,
   storySecondsForBrief,
   usesBeatLayoutProvider,
   usesLipSyncVideoProvider,
@@ -221,6 +222,9 @@ export const scriptAgent: Agent<ScriptInput, ScriptOutput> = {
           ? "Narration must be short punchy lines that fit each 10s beat."
           : "Narration must be ultra-short punchy lines (~12 words max for 4s clips)."
       );
+    }
+    if (brief.durationSeconds <= 25) {
+      systemParts.push(shortsNarrationRules());
     }
     const system = systemParts.join(" ");
 

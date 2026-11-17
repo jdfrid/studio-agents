@@ -715,7 +715,7 @@ export function countYoutubeUploadAttempts(db: GrowthDb, destinationId: string, 
     .prepare(
       `SELECT COUNT(*) AS n FROM jobs
        WHERE network = 'youtube' AND destination_id = ? AND created_at >= ?
-       AND COALESCE(error_code, '') != 'daily_upload_limit'`
+       AND COALESCE(error_code, '') NOT IN ('daily_upload_limit', 'shorts_quality', 'shorts_review', 'shorts_daily_cap')`
     )
     .get(destinationId, sinceIso) as Row | undefined;
   return row ? num(row, "n") : 0;

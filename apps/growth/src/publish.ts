@@ -41,6 +41,7 @@ import {
 import { createLinkedInAdapter, linkedinTokenExpired } from "./linkedin.js";
 import { applyVideoProfile } from "./channelProfile.js";
 import { queueYouTubeMirror } from "./telegramMirror.js";
+import { reviewYoutubeShort } from "./shortsGate.js";
 import { prepareYouTubeListing, systemThumbnailBytes, youtubeFileName, youtubeReleaseAt } from "./youtubeListing.js";
 import { applyLink, formatForNetwork, trackedLink } from "./utm.js";
 
@@ -282,6 +283,25 @@ export async function runPublish(input: {
     const delivery = input.destination.network === "youtube" ? youtubeDelivery(input.item, copy, input.destination, loaded) : null;
     if (delivery) copy = delivery.copy;
     const media = delivery?.media ?? loaded;
+    if (input.destination.network === "youtube") {
+      const verdict = await reviewYoutubeShort({
+        db: input.db,
+        item: input.item,
+        destination: input.destination,
+        copy,
+        media: media.find((file) => file.item.kind === "video")?.body ?? null,
+        exceptJobId: job.id
+      });
+      if (verdict.decision !== "publish") {
+        return updateJob(input.db, job.id, {
+          status: "failed",
+          lastError: verdict.reasons.join(" "),
+          errorCode: verdict.code,
+          attempts: 1
+        })!;
+      }
+      copy = { ...copy, title: verdict.title, body: verdict.description, hashtags: verdict.hashtags };
+    }
     const preview = adapter.preview(
       media.map((file) => file.item),
       copy,
@@ -456,6 +476,27 @@ export async function retryPublish(input: {
     const delivery = destination.network === "youtube" ? youtubeDelivery(item, copy, destination, loaded) : null;
     if (delivery) copy = delivery.copy;
     const media = delivery?.media ?? loaded;
+    if (destination.network === "youtube") {
+      const verdict = await reviewYoutubeShort({
+        db: input.db,
+        item,
+        destination,
+        copy,
+        media: media.find((file) => file.item.kind === "video")?.body ?? null,
+        exceptJobId: job.id
+      });
+      if (verdict.decision !== "publish") {
+        return {
+          job: updateJob(input.db, job.id, {
+            status: "failed",
+            lastError: verdict.reasons.join(" "),
+            errorCode: verdict.code,
+            attempts: job.attempts + 1
+          })
+        };
+      }
+      copy = { ...copy, title: verdict.title, body: verdict.description, hashtags: verdict.hashtags };
+    }
     const preview = adapter.preview(
       media.map((file) => file.item),
       copy,

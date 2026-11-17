@@ -15,6 +15,7 @@ import {
   type GrowthDb,
   type Item
 } from "./db.js";
+import { followCta, shortsBriefSeconds, shortsProductionNotes } from "@studio/shared";
 import { durationPhrase, taskDurationSeconds } from "./duration.js";
 import { subscribeCue, subscribeCueNote } from "./languageCopy.js";
 import { submitReelminoBrief } from "./produce.js";
@@ -187,18 +188,21 @@ export function nextBrandVideo(db: GrowthDb, destinationId: string, now = new Da
 
 export function briefForBrandVideo(input: { title: string; body: string; language: string; durationSeconds: number }): Record<string, unknown> {
   const he = input.language.startsWith("he");
-  const form = durationPhrase(input.durationSeconds, input.language);
+  const growthShort = input.durationSeconds <= 30;
+  const durationSeconds = growthShort ? shortsBriefSeconds(input.durationSeconds) : input.durationSeconds;
+  const form = durationPhrase(durationSeconds, input.language);
   const title = input.title.trim();
+  const ending = growthShort ? shortsProductionNotes({ kind: "product", language: input.language }) : subscribeCueNote(input.language);
   return {
     title,
     sourceText: input.body.trim(),
     instructions: he
-      ? `הסרטון הוא רק על Reelmino, המערכת שהופכת משפט אחד לסרטון ממותג לעסק. לא מדברים על נושאים אחרים. אורך הסרטון הוא ${form}. ${subscribeCueNote(input.language)} כותרת הסרטון ביוטיוב היא בדיוק: ${title}`
-      : `This video is only about Reelmino, the product that turns one sentence into a finished branded business video. Do not cover any other subject. The video length is ${form}. ${subscribeCueNote(input.language)} The YouTube title is exactly: ${title}`,
+      ? `הסרטון הוא רק על Reelmino, המערכת שהופכת משפט אחד לסרטון ממותג לעסק. פותחים על המודעה המוכנה או על הדמות המדברת, לא על רשימת פיצ'רים. לא מדברים על נושאים אחרים. אורך הסרטון הוא ${form}. ${ending} כותרת הסרטון ביוטיוב היא בדיוק: ${title}`
+      : `This video is only about Reelmino, the product that turns one sentence into a finished branded business video. Open on the finished ad or the talking mascot, not on a feature list. Do not cover any other subject. The video length is ${form}. ${ending} The YouTube title is exactly: ${title}`,
     targetAudience: he ? "בעלי עסקים" : "small business owners",
     language: input.language,
-    durationSeconds: input.durationSeconds,
-    branding: { slogan: subscribeCue(input.language) },
+    durationSeconds,
+    branding: { slogan: growthShort ? followCta(input.language) : subscribeCue(input.language) },
     aspectRatio: "9:16",
     budgetMode: true,
     approvalMode: "auto"

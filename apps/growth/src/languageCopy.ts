@@ -1,3 +1,5 @@
+import { fitTitle } from "@studio/shared";
+
 const HEBREW = /\p{Script=Hebrew}/gu;
 const LATIN = /\p{Script=Latin}/gu;
 
@@ -9,9 +11,9 @@ export function textMatchesLanguage(text: string, language: string): boolean {
 }
 
 export function titleInLanguage(source: string, language: string): string {
-  const cleaned = source.replace(/[,\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
-  if (cleaned && textMatchesLanguage(cleaned, language)) return cleaned;
-  return language.toLowerCase().startsWith("he") ? "מה כדאי לדעת עכשיו" : "What matters now";
+  const cleaned = source.replace(/[,\n]+/g, " ").replace(/\s+/g, " ").trim();
+  if (cleaned && textMatchesLanguage(cleaned, language)) return fitTitle(cleaned);
+  return "";
 }
 
 /** On-screen and spoken subscribe line for the end of a YouTube video. */

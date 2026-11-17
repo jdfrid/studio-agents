@@ -62,9 +62,9 @@ describe("script bank", () => {
   it("turns keywords into an original brief and keeps a saved script", () => {
     const keywords = briefForEntry({ kind: "keywords", body: "חיתוך בצל, סכין חדה", language: "he" });
     expect(keywords.brief.aspectRatio).toBe("9:16");
-    expect(keywords.brief.durationSeconds).toBe(30);
-    expect(keywords.brief.branding).toEqual({ slogan: "לחץ על הצטרפות לערוץ" });
-    expect(String(keywords.brief.instructions)).toContain("לחץ על הצטרפות לערוץ");
+    expect(keywords.brief.durationSeconds).toBe(20);
+    expect(keywords.brief.branding).toEqual({ slogan: "עקבו לטיפ אחד ביום" });
+    expect(String(keywords.brief.instructions)).toContain("עקבו לטיפ אחד ביום");
     const long = briefForEntry({ kind: "script", body: "פותחים את המקרר.\nסוגרים אותו.", language: "he", durationSeconds: 600 });
     expect(long.brief.durationSeconds).toBe(600);
     expect(long.description).not.toContain("#Shorts");
@@ -81,7 +81,7 @@ describe("script bank", () => {
     expect(String(foreign.brief.instructions)).toContain("בעברית בלבד");
     expect(String(foreign.brief.sourceText)).toContain("onion cutting");
     const english = briefForEntry({ kind: "keywords", body: "חיתוך בצל", language: "en" });
-    expect(english.title).toBe("What matters now");
+    expect(english.title).toBe("");
     expect(english.description).not.toMatch(/\p{Script=Hebrew}/u);
     const titled = briefForEntry({ kind: "keywords", body: "onion cutting", language: "he", title: "איך חותכים בצל" });
     expect(titled.title).toBe("איך חותכים בצל");
@@ -90,7 +90,7 @@ describe("script bank", () => {
     expect(titled.description).not.toMatch(/onion/);
     expect(String(titled.brief.instructions)).toContain("איך חותכים בצל");
     const kept = briefForEntry({ kind: "script", body: "איך חותכים בצל עם פחות דמעות?\nחותכים את השורש.", language: "en" });
-    expect(kept.title).toBe("What matters now");
+    expect(kept.title).toBe("");
     expect(kept.brief.language).toBe("en");
     expect(kept.title).not.toMatch(/\p{Script=Hebrew}/u);
     expect(kept.description).not.toMatch(/\p{Script=Hebrew}/u);

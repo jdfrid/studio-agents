@@ -65,7 +65,7 @@ describe("brand distribution", () => {
     insertJob(opened, { id: "today", itemId: "kit-2-early", destinationId: "brand", slotId: null, network: "youtube", status: "published" });
     opened.prepare("UPDATE jobs SET created_at = ? WHERE id = ?").run("2026-11-01T00:00:00.000Z", "sent");
     expect(nextBrandVideo(opened, "brand", new Date("2026-11-08T08:00:00.000Z"))?.id).toBe("kit-10-late");
-    expect(briefForBrandVideo({ title: "One sentence", body: "Show the product.", language: "en", durationSeconds: 30 }).branding).toEqual({ slogan: "Click Subscribe" });
+    expect(briefForBrandVideo({ title: "One sentence", body: "Show the product.", language: "en", durationSeconds: 30 }).branding).toEqual({ slogan: "Follow for one fix a day" });
   });
 
   it("holds the next video when the channel login has to be renewed", async () => {

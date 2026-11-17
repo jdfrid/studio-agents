@@ -1,6 +1,9 @@
+import { evaluateShortsGate, filterShortsHashtags, fitTitle, followCta, nextSeriesTopic, shortsBriefSeconds, shortsProductionNotes, type ShortsChannelKind } from "@studio/shared";
 import { slugify } from "./catalog.js";
+import { channelKind } from "./channelProfile.js";
 import { chosenDuration, durationPhrase, taskDurationSeconds } from "./duration.js";
 import { languageLock, subscribeCue, subscribeCueNote, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
+import { countShortsToday, readShortsDailyCap, recentChannelPosts } from "./shortsGate.js";
 import { emptyCopy, type ItemCopy } from "./copy.js";
 import { nid } from "./crypto.js";
 import {
@@ -92,7 +95,7 @@ export type TrendDeps = {
   pollAfterMs?: number;
   client?: YoutubeTrendClient;
   submitBrief?: (brief: Record<string, unknown>) => Promise<string>;
-  downloadFinal?: (runId: string, mediaDir: string) => Promise<{ filename: string } | null>;
+  downloadFinal?: (runId: string, mediaDir: string) => Promise<{ filename: string; narration?: string } | null>;
   publish?: (itemId: string, destination: Destination) => Promise<TrendPublishResult>;
 };
 
@@ -223,14 +226,16 @@ export function pickTopic(input: {
   };
 }
 
-export function contentForTrend(input: { topic: string; niche: string; language: string; durationSeconds?: number }): {
+export function contentForTrend(input: { topic: string; niche: string; language: string; durationSeconds?: number; channel?: ShortsChannelKind; hook?: string; angle?: string }): {
   title: string;
   summary: string;
   description: string;
   brief: Record<string, unknown>;
 } {
   const he = input.language.startsWith("he");
-  const durationSeconds = chosenDuration(input.durationSeconds);
+  const requested = chosenDuration(input.durationSeconds);
+  const growthShort = requested <= 30;
+  const durationSeconds = growthShort ? shortsBriefSeconds(requested) : requested;
   const form = durationPhrase(durationSeconds, input.language);
   const shortForm = durationSeconds <= 60;
   const niche = input.niche.trim();
@@ -244,11 +249,18 @@ export function contentForTrend(input: { topic: string; niche: string; language:
     : he
       ? `\nהנושא לכיסוי, בלי להעתיק את הניסוח לכותרת או לתיאור: ${input.topic}`
       : `\nSubject to cover, without copying this wording into the title or the description: ${input.topic}`;
+  const ending = growthShort
+    ? shortsProductionNotes({ kind: input.channel ?? "product", language: input.language, hook: input.hook, angle: input.angle })
+    : subscribeCueNote(input.language);
   const instructions = `${he
     ? "תוכן מקורי בלבד. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים, בלי לוגואים של מותג אחר, ובלי לטעון שהסרטון שייך למישהו אחר. פתיח ברור בשלוש השניות הראשונות, קריינות קצרה, מסך אנכי."
-    : "Original content only. Do not copy another creator's video, script, title, or narration. No other channel names, no third-party logos, and no claim that this video belongs to someone else. Clear hook in the first three seconds, short narration, vertical frame."} ${languageLock(input.language)}${he ? ` אורך הסרטון שנקבע במשימה הוא ${form}. הקריינות והמהלך ממלאים את כל האורך.` : ` The video length set for this task is ${form}. Narration and story fill that full length.`} ${subscribeCueNote(input.language)}`;
-  const tags = [...(durationSeconds <= 180 ? ["#Shorts"] : []), ...tokens(title).slice(0, 3).map((token) => `#${token}`)];
-  const description = `${he ? `${title}. סרטון קצר ומקורי עם טיפ אחד ליישום.` : `${title}. An original short with one practical tip.`}\n\n${tags.join(" ")}`;
+    : "Original content only. Do not copy another creator's video, script, title, or narration. No other channel names, no third-party logos, and no claim that this video belongs to someone else. Clear hook in the first three seconds, short narration, vertical frame."} ${languageLock(input.language)}${he ? ` אורך הסרטון שנקבע במשימה הוא ${form}. הקריינות והמהלך ממלאים את כל האורך.` : ` The video length set for this task is ${form}. Narration and story fill that full length.`} ${ending}`;
+  const tags = filterShortsHashtags([...(durationSeconds <= 180 ? ["Shorts"] : []), ...tokens(title)], input.language, {
+    shorts: durationSeconds <= 180
+  }).map((token) =>
+    token.toLowerCase() === "shorts" ? "#Shorts" : `#${token}`
+  );
+  const description = `${he ? `${title ? `${title}. ` : ""}סרטון קצר ומקורי עם טיפ אחד ליישום.` : `${title ? `${title}. ` : ""}An original short with one practical tip.`}\n\n${tags.join(" ")}`.trim();
   return {
     title,
     summary,
@@ -260,7 +272,7 @@ export function contentForTrend(input: { topic: string; niche: string; language:
       targetAudience: niche && textMatchesLanguage(niche, input.language) ? niche : (he ? (durationSeconds <= 180 ? "צופים בסרטונים קצרים ביוטיוב" : "צופים ביוטיוב") : (durationSeconds <= 180 ? "YouTube Shorts viewers" : "YouTube viewers")),
       language: input.language,
       durationSeconds,
-      branding: { slogan: subscribeCue(input.language) },
+      branding: { slogan: growthShort ? followCta(input.language) : subscribeCue(input.language) },
       aspectRatio: "9:16",
       budgetMode: true,
       approvalMode: "auto"
@@ -395,10 +407,10 @@ function recentMemory(db: GrowthDb): { tokens: string[][]; videoIds: string[] } 
   return { tokens: tokensets, videoIds };
 }
 
-function trendItemCopy(title: string, description: string): ItemCopy {
+function trendItemCopy(title: string, description: string, language: string): ItemCopy {
   const copy = emptyCopy();
-  copy.hashtags = ["Shorts", ...tokens(title).slice(0, 4)];
-  copy.youtube = { title: title.slice(0, 90), body: description };
+  copy.hashtags = filterShortsHashtags(["Shorts", ...tokens(title)], language);
+  copy.youtube = { title: fitTitle(title), body: description };
   copy.article = { title, description, body: description };
   return copy;
 }
@@ -501,41 +513,67 @@ async function senseAndSubmit(ctx: TrendContext, cycle: TrendCycle, deps: TrendD
       ownChannel: destination.name,
       now
     });
-    if (!picked) {
+    const kind: ShortsChannelKind = channelKind(destination) === "kitchen" ? "kitchen" : "product";
+    const language = current.language || settings.language;
+    const recentTitles = listTrendCycles(ctx.db, 20).map((row) => row.topic).filter((value): value is string => Boolean(value));
+    const series = picked ? null : nextSeriesTopic({ kind, language, recentTitles });
+    if (!picked && !series) {
       updateTrendCycle(ctx.db, current.id, { status: "skipped", error: MSG_TOPIC, signal: { chartSize: chart.length, channelSize: channel.length } });
       return;
     }
+    const topic = picked?.topic || series?.title || "";
     const content = contentForTrend({
-      topic: picked.topic,
+      topic,
       niche: current.niche || settings.niche,
-      language: current.language || settings.language,
-      durationSeconds: settings.durationSeconds
+      language,
+      durationSeconds: settings.durationSeconds,
+      channel: kind,
+      hook: series?.hook,
+      angle: series?.angle
     });
+    const gateNow = deps.now ?? new Date();
+    const planned = evaluateShortsGate({
+      mode: "plan",
+      title: content.title,
+      description: content.description,
+      script: "",
+      language,
+      durationSeconds: Number(content.brief.durationSeconds) || undefined,
+      channel: kind,
+      recent: recentChannelPosts(ctx.db, destination.id, gateNow),
+      publishedToday: countShortsToday(ctx.db, destination.id, gateNow),
+      dailyCap: readShortsDailyCap(ctx.db)
+    });
+    if (planned.decision !== "publish") {
+      fail(ctx.db, current.id, planned.reasons.join(" "));
+      return;
+    }
     const item = insertItem(ctx.db, {
       id: nid(),
       slug: slugify(`trend-${current.slotKey}`),
       source: "youtube-trend",
       title: content.title,
       summary: content.summary,
-      language: current.language || settings.language,
-      copy: trendItemCopy(content.title, content.description),
+      language,
+      copy: trendItemCopy(content.title, content.description, language),
       mediaPath: null,
       mediaMime: null,
       mediaKind: null,
       mediaWidth: null,
       mediaHeight: null,
-      mediaDurationMs: Number(content.brief.durationSeconds) * 1000 || 30_000,
+      mediaDurationMs: Number(content.brief.durationSeconds) * 1000 || 20_000,
       reelminoRunId: null
     });
     current =
       updateTrendCycle(ctx.db, current.id, {
-        topic: picked.topic,
-        score: picked.score,
+        topic,
+        score: picked?.score ?? 0,
         itemId: item.id,
         signal: {
-          tokens: picked.tokens,
-          inspirationVideoId: picked.videoId,
-          inspirationTitle: picked.inspirationTitle,
+          tokens: picked?.tokens ?? tokens(topic),
+          inspirationVideoId: picked?.videoId ?? series?.id ?? "",
+          inspirationTitle: picked?.inspirationTitle ?? series?.title ?? topic,
+          seriesId: series?.id ?? "",
           taste: [...taste.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
           chartSize: chart.length,
           channelSize: channel.length,
@@ -566,13 +604,17 @@ async function pullAndPublish(ctx: TrendContext, cycle: TrendCycle, deps: TrendD
     return;
   }
   const item = getItem(ctx.db, cycle.itemId);
+  const copy = file.narration && item
+    ? { ...item.copy, article: { ...item.copy.article, body: file.narration } }
+    : undefined;
   updateItem(ctx.db, cycle.itemId, {
     mediaPath: file.filename,
     mediaMime: "video/mp4",
     mediaKind: "video",
     mediaWidth: 1080,
     mediaHeight: 1920,
-    mediaDurationMs: item?.mediaDurationMs || 30_000
+    mediaDurationMs: item?.mediaDurationMs || 20_000,
+    ...(copy ? { copy } : {})
   });
   const publishing = updateTrendCycle(ctx.db, cycle.id, { status: "publishing", error: null });
   if (publishing) await finishPublish(ctx, publishing, deps);
