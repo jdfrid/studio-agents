@@ -281,6 +281,19 @@ export function migrate(db: GrowthDb): void {
   migrateFacebookGroups(db);
   seedDirectories(db);
   db.exec(`
+    CREATE TABLE IF NOT EXISTS growth_replies (
+      comment_id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS growth_crossposts (
+      job_id TEXT NOT NULL,
+      network TEXT NOT NULL,
+      status TEXT NOT NULL,
+      detail TEXT,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (job_id, network)
+    );
     CREATE TABLE IF NOT EXISTS shorts_slots (
       slot_key TEXT PRIMARY KEY,
       destination_id TEXT NOT NULL,

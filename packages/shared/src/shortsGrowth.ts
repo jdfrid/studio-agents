@@ -275,12 +275,15 @@ export function matchProductDemo(text: string): { featureId: string; businessId:
 export function nextProductDemo(input: {
   recent: Array<{ featureId?: string; businessId?: string; title?: string; script?: string }>;
   salt?: number;
+  multipliers?: Record<string, number>;
 }): ProductDemo | null {
   const recentPairs = input.recent.map((item) => item.featureId && item.businessId
     ? { featureId: item.featureId, businessId: item.businessId }
     : matchProductDemo(`${item.title ?? ""}\n${item.script ?? ""}`)).filter((item): item is { featureId: string; businessId: string } => Boolean(item));
   const last = recentPairs[0];
-  const ranked = [...PRODUCT_FEATURES].sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id));
+  const ranked = [...PRODUCT_FEATURES]
+    .map((feature) => ({ ...feature, weight: feature.weight * boundedMultiplier(input.multipliers?.[feature.id]) }))
+    .sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id));
   const features = ranked.filter((feature) => feature.id !== last?.featureId);
   const pool = features.length ? features : ranked;
   for (const feature of pool) {
@@ -301,6 +304,11 @@ export function nextProductDemo(input: {
 
 function longestAlias(feature: ProductFeature): number {
   return feature.aliases.reduce((max, alias) => Math.max(max, alias.length), 0);
+}
+
+function boundedMultiplier(value: number | undefined): number {
+  if (value == null || !Number.isFinite(value)) return 1;
+  return Math.min(2, Math.max(0.5, value));
 }
 
 /** Map the old 30-second short option onto the 20-second target. Longer cuts stay as chosen. */
@@ -485,10 +493,13 @@ export function nextSeriesTopic(input: {
   language: string;
   recentTitles: string[];
   salt?: number;
+  multipliers?: Record<string, number>;
 }): { id: string; title: string; hook: string; angle: string } | null {
   const hebrew = input.language.toLowerCase().startsWith("he");
   const lang = hebrew ? "he" : "en";
-  const ranked = [...shortsChannelTopics(input.kind)].sort((a, b) => b.weight - a.weight);
+  const ranked = [...shortsChannelTopics(input.kind)]
+    .map((topic) => ({ ...topic, weight: topic.weight * boundedMultiplier(input.multipliers?.[topic.id]) }))
+    .sort((a, b) => b.weight - a.weight);
   const fresh = ranked.find((topic) => {
     const title = topic.titles[lang];
     return !input.recentTitles.some((recent) => tokenSimilarity(title, recent) >= 0.6);

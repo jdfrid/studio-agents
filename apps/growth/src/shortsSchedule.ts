@@ -154,9 +154,15 @@ export function briefForScheduledShort(input: {
   recentTitles: string[];
   recentDemos?: Array<{ featureId?: string; businessId?: string; title?: string; script?: string }>;
   salt?: number;
+  demandPhrase?: string;
+  multipliers?: Record<string, number>;
 }): { title: string; summary: string; description: string; brief: Record<string, unknown>; demo?: ProductDemo } | null {
   if (input.kind === "product") {
-    const demo = nextProductDemo({ recent: input.recentDemos ?? input.recentTitles.map((title) => ({ title })), salt: input.salt });
+    const demo = nextProductDemo({
+      recent: input.recentDemos ?? input.recentTitles.map((title) => ({ title })),
+      salt: input.salt,
+      multipliers: input.multipliers
+    });
     if (!demo) return null;
     const content = contentForTrend({
       topic: demo.title,
@@ -183,11 +189,27 @@ export function briefForScheduledShort(input: {
     content.brief.approvalMode = "auto";
     return { ...content, demo };
   }
+  const demand = input.demandPhrase?.trim();
+  if (demand && !input.recentTitles.some((title) => title.toLowerCase().includes(demand.toLowerCase().slice(0, 18)))) {
+    const content = contentForTrend({
+      topic: demand,
+      niche: "home cooking, food storage, kitchen layout",
+      language: "en",
+      durationSeconds: 20,
+      channel: "kitchen",
+      hook: `Stop losing ${demand}.`,
+      angle: demand
+    });
+    content.brief.instructions = `${String(content.brief.instructions ?? "")} This channel is kitchen tips. Do not mention the product pitch, trailers, or third-party characters and logos.`;
+    content.brief.approvalMode = "auto";
+    return content;
+  }
   const series = nextSeriesTopic({
     kind: input.kind,
     language: "en",
     recentTitles: input.recentTitles,
-    salt: input.salt ?? input.recentTitles.length
+    salt: input.salt ?? input.recentTitles.length,
+    multipliers: input.multipliers
   });
   if (!series) return null;
   const content = contentForTrend({
@@ -360,7 +382,9 @@ async function startAttempt(
     kind: input.kind,
     recentTitles: recent,
     recentDemos: posts,
-    salt: attempts
+    salt: attempts,
+    demandPhrase: input.kind === "kitchen" ? readDemandPhrase(ctx.db, "kitchen") : undefined,
+    multipliers: readWeightMap(ctx.db, input.kind)
   });
   let gateError = "";
   if (built) {
@@ -502,6 +526,28 @@ async function postDemoComment(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log(deps, `product comment failed: ${message}. Pinning remains a Studio step.`);
+  }
+}
+
+function readWeightMap(db: GrowthDb, kind: string): Record<string, number> {
+  const raw = getSetting(db, `weights:${kind}`);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, number>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function readDemandPhrase(db: GrowthDb, kind: string): string | undefined {
+  const raw = getSetting(db, `demand:${kind}`);
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as Array<{ phrase?: string }>;
+    return parsed.find((item) => item.phrase?.trim())?.phrase;
+  } catch {
+    return undefined;
   }
 }
 

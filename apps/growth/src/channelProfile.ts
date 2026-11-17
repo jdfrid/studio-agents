@@ -7,15 +7,13 @@ const TAG_LIMIT = 30;
 const TAG_CHARS = 500;
 
 const BRAND_DESCRIPTION = [
-  "Reelmino turns one sentence into a finished branded video for a small business. Write what the business wants to say, and Reelmino prepares the script, the scenes, and a video ad you can publish.",
-  "Reelmino הופכת משפט אחד לסרטון ממותג לעסק. כותבים מה העסק רוצה להגיד, והמערכת מכינה תסריט, סצנות וסרטון מוכן לפרסום. יצירת וידאו, מודעות וידאו וסרטונים קצרים לעסקים.",
+  "AI business video from one sentence. Type what the business wants to say and Reelmino makes a branded video ad you can publish.",
   "https://reelmino.com"
 ].join("\n\n");
 
 const KITCHEN_DESCRIPTION = [
-  "Original kitchen tips for home cooks: food storage, prep, layout, and everyday cooking. Each video is one practical idea.",
-  "הסרטונים האלה נוצרים ב-Reelmino, המערכת שהופכת משפט אחד לסרטון. יצירת וידאו, טיפים למטבח וסרטונים קצרים.",
-  "https://reelmino.com"
+  "English kitchen hacks for home cooks: keep food fresh, store it properly, and fix the layout. One practical idea in every video.",
+  "Made with Reelmino."
 ].join("\n\n");
 
 const PRODUCT_KEYWORDS = [
@@ -171,12 +169,14 @@ async function readBranding(accessToken: string, channelId: string): Promise<Rec
   return data.items?.[0]?.brandingSettings?.channel ?? {};
 }
 
-export async function writeChannelBranding(accessToken: string, channelId: string, profile: ChannelProfile): Promise<void> {
+export async function writeChannelBranding(accessToken: string, channelId: string, profile: ChannelProfile, trailer?: string): Promise<void> {
   const existing = await readBranding(accessToken, channelId);
   const payload = channelBrandingUpdate({
     channelId,
     description: profile.description,
     keywords: profile.keywords,
+    defaultLanguage: "en",
+    ...(trailer ? { unsubscribedTrailer: trailer } : {}),
     existing
   });
   const response = await fetch("https://www.googleapis.com/youtube/v3/channels?part=brandingSettings", {
@@ -206,7 +206,8 @@ async function ensureOne(
   const connection = getConnection(db, destination.connectionId);
   if (!connection || connection.status === "needs_reauth" || connection.status === "revoked") return;
   const profile = profileFor(destination);
-  const hash = profileHash(profile);
+  const trailer = process.env[channelKind(destination) === "kitchen" ? "SHORTS_TRAILER_KITCHEN" : "SHORTS_TRAILER_REELMINO"]?.trim() || "";
+  const hash = `${profileHash(profile)}:${trailer}`;
   const savedKey = `yt_channel_profile:${destination.id}`;
   if (getSetting(db, savedKey) === hash) return;
   const waitKey = `yt_channel_profile_wait:${destination.id}`;
@@ -214,7 +215,7 @@ async function ensureOne(
   if (wait && Date.parse(wait) > Date.now()) return;
   try {
     const tokens = await tokensFor(destination.connectionId);
-    await writeChannelBranding(tokens.accessToken, destination.externalId, profile);
+    await writeChannelBranding(tokens.accessToken, destination.externalId, profile, trailer || undefined);
     setSetting(db, savedKey, hash);
     setSetting(db, waitKey, "");
     console.log(`[growth] channel profile updated ${destination.handle || destination.name}`);

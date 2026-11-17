@@ -26,6 +26,7 @@ import { deliverDueGroupPosts } from "./groups.js";
 import { ensureYouTubeChannels } from "./channelProfile.js";
 import { freshConnectionTokens, pollPublish, postDueFirstComments, runPublish } from "./publish.js";
 import { advanceShortsSchedule } from "./shortsSchedule.js";
+import { advanceSubscriberGrowth } from "./subscriberGrowth.js";
 import { advanceTextCampaigns, writeTextPosts } from "./textPosts.js";
 import { advanceTelegramMirror } from "./telegramMirror.js";
 
@@ -165,6 +166,11 @@ export async function tick(ctx: DispatchContext): Promise<void> {
     await advanceShortsSchedule(ctx);
   } catch (error) {
     console.error("[growth] shorts schedule failed", error);
+  }
+  try {
+    await advanceSubscriberGrowth(ctx);
+  } catch (error) {
+    console.error("[growth] subscriber growth failed", error);
   }
   try {
     await advanceTextCampaigns(

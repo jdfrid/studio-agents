@@ -99,3 +99,42 @@ Times are wall-clock in `SHORTS_TIMEZONE` (default `Asia/Jerusalem`). Generation
 | `SHORTS_DAILY_CAP` | Max uploads per channel per Jerusalem day. `0` pauses the channel. |
 
 Change a time by setting the env var and restarting the growth process. No database edit is required. Example: `SHORTS_SCHEDULE_KITCHEN=14:30,18:30,22:30`.
+
+## Subscriber automation
+
+These jobs run on the same 30-second tick as the Shorts clock. Each one is on unless the env var is `0`, `false`, `off`, or `no`. None of them add Shorts beyond the fixed schedule. The old trend and keyword loops are only a topic source.
+
+| Env | Default | What it does |
+| --- | --- | --- |
+| `SHORTS_PLAYLISTS` | on | Creates topic playlists and adds every new Short. Backfills existing public uploads once. |
+| `SHORTS_LONGFORM` | on | Sunday 18:00 Asia/Jerusalem, one 3–6 minute 16:9 video per channel. Private upload with `publishAt`. |
+| `SHORTS_COMMENT_REPLIES` | on | Every 2 hours, one reply per genuine thread. Cap 30 replies per channel per day. |
+| `SHORTS_CHANNEL_SEO` | on | Channel description, keywords, and English as the default language. Applied by the existing channel-profile pass. |
+| `SHORTS_TOPIC_DEMAND` | on | Once a day, ranks search titles and offers the top fresh one to the next kitchen slot. |
+| `SHORTS_WEIGHT_TUNING` | on | Once a week, moves topic and feature weights between 0.5× and 2× from Analytics. |
+| `SHORTS_CROSSPOST` | on | After a Short is public, posts the caption only where credentials exist. Otherwise it skips. |
+
+Kitchen playlists are produce, herbs, storage, cleaning, and cooking hacks. Product playlists are one per feature plus `Reelmino for <business>`.
+
+The weekly kitchen video is “N tricks to &lt;topic&gt;” with chapters. The product video is a walkthrough of one feature. The long-form gate requires a search title, at least three chapters, no greeting, and the word “subscribe” in the middle and at the end. Each later Short description links that long video.
+
+Comment replies are at most 200 characters, in the comment’s language, and end with a question. Spam, abuse, complaints, and political or sensitive comments are logged and not answered. The only link allowed is `reelmino.com`, and only on the product channel when the person asks how to try it. Replied comment ids are stored so a thread is answered once.
+
+YouTube’s API can set `unsubscribedTrailer` only when you pass a video id. Set `SHORTS_TRAILER_KITCHEN` and `SHORTS_TRAILER_REELMINO` to those ids. There is no API to upload a trailer file by itself. If the env vars are empty, the current trailer is left as it is.
+
+### One-time re-consent
+
+New YouTube connects request `youtube.force-ssl` (comments and playlists) and `yt-analytics.readonly` (the weekly weight pass). A token saved before this change will not have those scopes. Disconnect the YouTube account in the growth console and connect it again, then accept every permission. Until you do, comments, playlists, and analytics calls fail and are logged. Uploads keep working on the old scopes.
+
+### Cross-post accounts
+
+The owner’s Buffer organization “My Organization” currently has one channel: Pinterest profile `jdfrid` (`6aef9d87e29c69a1719a31cf`). There is no TikTok, Instagram, or Facebook channel there yet.
+
+| Env | Required for |
+| --- | --- |
+| `BUFFER_ACCESS_TOKEN` and `BUFFER_CHANNEL_ID` | A Buffer post. Use `6aef9d87e29c69a1719a31cf` for the connected Pinterest profile. Pinterest may reject a video-only Short; the error is logged and the YouTube upload still stands. |
+| `FACEBOOK_PAGE_ID` and `FACEBOOK_PAGE_TOKEN` | A Facebook Page feed post that includes the YouTube link. This is not a native Reel file upload. |
+| `INSTAGRAM_ACCOUNT_ID` and `INSTAGRAM_ACCESS_TOKEN` | Reserved. Reels need a public video URL, so the job is skipped even when the ids are set. |
+| `TIKTOK_ACCESS_TOKEN` | Reserved. Chunked TikTok upload is not sent from this host, so the job is skipped when the token is set. |
+
+Caption for every cross-post: the Short title, then “Full channel on YouTube”, then the channel URL.

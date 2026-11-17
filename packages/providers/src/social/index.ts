@@ -4,7 +4,7 @@ export * from "./http.js";
 export * from "./registry.js";
 export { randomPkce } from "./x.js";
 export { createTelegramAdapter } from "./telegram.js";
-export { channelBrandingUpdate, createYoutubeAdapter, postYoutubeComment, youtubeCommentThreadBody, youtubeMetadata, youtubeTags } from "./youtube.js";
+export { channelBrandingUpdate, createYoutubeAdapter, postYoutubeComment, youtubeCommentThreadBody, youtubePlaylistBody, youtubePlaylistItemBody, youtubeReplyBody, youtubeMetadata, youtubeTags } from "./youtube.js";
 export { createFacebookAdapter } from "./facebook.js";
 export { createInstagramAdapter } from "./instagram.js";
 export { createXAdapter } from "./x.js";

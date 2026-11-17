@@ -9,7 +9,7 @@ describe("channel profiles", () => {
       expect(profile.description.length).toBeLessThanOrEqual(1000);
       expect(profile.keywords.length).toBeLessThanOrEqual(500);
       expect(profile.description).toContain("Reelmino");
-      expect(profile.description).toContain("יצירת וידאו");
+      expect(profile.description).not.toMatch(/visit our website/i);
       expect(profile.keywords).toContain('"video creation"');
       expect(profile.keywords).toContain('"יצירת וידאו"');
       expect(profile.videoTags).toContain("video creation");

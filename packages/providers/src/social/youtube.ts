@@ -14,7 +14,9 @@ import { SocialApiError, socialJson, socialRequest } from "./http.js";
 const YOUTUBE_SCOPES = [
   "https://www.googleapis.com/auth/youtube.upload",
   "https://www.googleapis.com/auth/youtube.readonly",
-  "https://www.googleapis.com/auth/youtube"
+  "https://www.googleapis.com/auth/youtube",
+  "https://www.googleapis.com/auth/youtube.force-ssl",
+  "https://www.googleapis.com/auth/yt-analytics.readonly"
 ];
 
 export function youtubeClient(): { id: string; secret: string } {
@@ -92,12 +94,16 @@ export function channelBrandingUpdate(input: {
   channelId: string;
   description: string;
   keywords: string;
+  defaultLanguage?: string;
+  unsubscribedTrailer?: string;
   existing?: Record<string, unknown>;
 }): { id: string; brandingSettings: { channel: Record<string, unknown> } } {
   const channel: Record<string, unknown> = {
     description: input.description.slice(0, 1000),
     keywords: input.keywords.slice(0, 500)
   };
+  if (input.defaultLanguage) channel.defaultLanguage = input.defaultLanguage;
+  if (input.unsubscribedTrailer) channel.unsubscribedTrailer = input.unsubscribedTrailer;
   for (const key of BRANDING_KEEP) {
     const value = input.existing?.[key];
     if (value !== undefined && value !== null && value !== "") channel[key] = value;
@@ -115,6 +121,18 @@ export function youtubeCommentThreadBody(videoId: string, text: string): {
       topLevelComment: { snippet: { textOriginal: text } }
     }
   };
+}
+
+export function youtubeReplyBody(parentId: string, text: string): { snippet: { parentId: string; textOriginal: string } } {
+  return { snippet: { parentId, textOriginal: text.slice(0, 200) } };
+}
+
+export function youtubePlaylistBody(title: string, description: string): { snippet: { title: string; description: string }; status: { privacyStatus: string } } {
+  return { snippet: { title: title.slice(0, 150), description: description.slice(0, 5000) }, status: { privacyStatus: "public" } };
+}
+
+export function youtubePlaylistItemBody(playlistId: string, videoId: string): { snippet: { playlistId: string; resourceId: { kind: string; videoId: string } } } {
+  return { snippet: { playlistId, resourceId: { kind: "youtube#video", videoId } } };
 }
 
 export async function postYoutubeComment(accessToken: string, videoId: string, text: string): Promise<string> {
@@ -252,6 +270,7 @@ export function createYoutubeAdapter(): NetworkAdapter {
         madeForKids: ctx.destination.config.madeForKids === true,
         scheduleAt: ctx.mode === "schedule" && ctx.scheduleAt ? ctx.scheduleAt.toISOString() : undefined
       });
+      if (ctx.copy.language) snippet.defaultLanguage = ctx.copy.language.toLowerCase().startsWith("he") ? "he" : "en";
       if (ctx.destination.kind === "playlist") {
         snippet.channelId = ctx.destination.config.categoryId;
       }

@@ -27,6 +27,7 @@ import {
   getDestination,
   getItem,
   getJob,
+  getSetting,
   getSlot,
   insertJob,
   listJobs,
@@ -39,7 +40,7 @@ import {
   type Job
 } from "./db.js";
 import { createLinkedInAdapter, linkedinTokenExpired } from "./linkedin.js";
-import { applyVideoProfile } from "./channelProfile.js";
+import { applyVideoProfile, channelKind } from "./channelProfile.js";
 import { queueYouTubeMirror } from "./telegramMirror.js";
 import { reviewYoutubeShort } from "./shortsGate.js";
 import { prepareYouTubeListing, systemThumbnailBytes, youtubeFileName, youtubeReleaseAt } from "./youtubeListing.js";
@@ -71,6 +72,24 @@ function publishConfig(network: string, raw: unknown, link?: string) {
     firstComment: parsed.firstComment?.trim() || link,
     firstCommentDelayMinutes: parsed.firstCommentDelayMinutes ?? 2,
     linkInFirstComment: true
+  };
+}
+
+function attachLongForm(
+  db: GrowthDb,
+  item: Item,
+  destination: Destination,
+  copy: PackageCopyInput
+): { copy: PackageCopyInput; config: Record<string, unknown> } {
+  let body = copy.body ?? "";
+  if (destination.network === "youtube" && item.source !== "longform") {
+    const url = getSetting(db, `longform_url:${destination.id}`);
+    if (url && !body.includes(url)) body = `${body}\n\nFull video: ${url}`.trim();
+  }
+  const categoryId = destination.network === "youtube" ? (channelKind(destination) === "kitchen" ? "26" : "22") : undefined;
+  return {
+    copy: { ...copy, body },
+    config: categoryId ? { categoryId } : {}
   };
 }
 
@@ -311,6 +330,9 @@ export async function runPublish(input: {
         })!;
       }
       copy = { ...copy, title: verdict.title, body: verdict.description, hashtags: verdict.hashtags };
+      const linked = attachLongForm(input.db, input.item, input.destination, copy);
+      copy = linked.copy;
+      Object.assign(config, linked.config);
     }
     const preview = adapter.preview(
       media.map((file) => file.item),
@@ -506,6 +528,9 @@ export async function retryPublish(input: {
         };
       }
       copy = { ...copy, title: verdict.title, body: verdict.description, hashtags: verdict.hashtags };
+      const linked = attachLongForm(input.db, item, destination, copy);
+      copy = linked.copy;
+      Object.assign(config, linked.config);
     }
     const preview = adapter.preview(
       media.map((file) => file.item),

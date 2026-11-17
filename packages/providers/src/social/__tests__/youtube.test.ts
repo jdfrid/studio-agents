@@ -26,6 +26,8 @@ describe("youtube adapter", () => {
     });
     const params = new URL(authorizeUrl).searchParams;
     expect(params.get("prompt")).toBe("select_account consent");
+    expect(params.get("scope")).toContain("youtube.force-ssl");
+    expect(params.get("scope")).toContain("yt-analytics.readonly");
   });
 
   it("keeps video keywords out of the description and on the tag list", () => {
