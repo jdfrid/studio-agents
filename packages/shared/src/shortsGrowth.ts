@@ -508,7 +508,7 @@ export function evaluateShortsGate(input: ShortsGateInput): ShortsGateResult {
   if (input.titleVerdict) {
     if (!input.titleVerdict.matches) reasons.push(`Title does not match the video: ${input.titleVerdict.reason}.`);
   } else if (script && wordsOf(script).length >= 4) {
-    const overlap = titleOverlap(title, `${script}\n${description}`);
+    const overlap = titleOverlap(title, script);
     if (overlap < 0.2) reasons.push("Title does not describe the script.");
     else if (overlap < 0.34) review = "Title only partly matches the script and needs a look before it publishes.";
   }

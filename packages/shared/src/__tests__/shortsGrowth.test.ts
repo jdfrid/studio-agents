@@ -157,6 +157,13 @@ describe("shorts quality gate", () => {
     });
     expect(weak.decision).toBe("review");
     expect(weak.reasons[0]).toMatch(/Needs approval/);
+    const listingOnly = gate({
+      title: "How to store cut onions",
+      description: "How to store cut onions. Keep the cut face in a jar.",
+      script: herbScript
+    });
+    expect(listingOnly.decision).toBe("block");
+    expect(listingOnly.reasons.join(" ")).toMatch(/does not describe the script/i);
     const judged = gate({ titleVerdict: { matches: false, reason: "The title is about onions and the film is about herbs" } });
     expect(judged.decision).toBe("block");
     expect(judged.reasons.join(" ")).toMatch(/onions/);

@@ -37,7 +37,12 @@ export function countShortsToday(db: GrowthDb, destinationId: string, now = new 
   return Number(row?.n ?? 0);
 }
 
-export function recentChannelPosts(db: GrowthDb, destinationId: string, now = new Date()): Array<{ title: string; script: string }> {
+export function recentChannelPosts(
+  db: GrowthDb,
+  destinationId: string,
+  now = new Date(),
+  exceptJobId?: string
+): Array<{ title: string; script: string }> {
   const since = new Date(now.getTime() - 14 * DAY_MS).toISOString();
   const rows = db
     .prepare(
@@ -45,9 +50,10 @@ export function recentChannelPosts(db: GrowthDb, destinationId: string, now = ne
        FROM jobs JOIN items ON items.id = jobs.item_id
        WHERE jobs.network = 'youtube' AND jobs.destination_id = ? AND jobs.created_at >= ?
        AND jobs.status IN ('published', 'processing', 'uploading', 'draft')
+       AND jobs.id != ?
        ORDER BY jobs.created_at DESC LIMIT 40`
     )
-    .all(destinationId, since) as Array<{ title?: string; copy_json?: string; handle_json?: string }>;
+    .all(destinationId, since, exceptJobId ?? "") as Array<{ title?: string; copy_json?: string; handle_json?: string }>;
   return rows.map((row) => {
     const handle = parseJson(row.handle_json);
     const copy = parseJson(row.copy_json);
@@ -132,7 +138,7 @@ export async function reviewYoutubeShort(input: {
     durationSeconds,
     hashtags: input.copy.hashtags,
     channel,
-    recent: recentChannelPosts(input.db, input.destination.id, now),
+    recent: recentChannelPosts(input.db, input.destination.id, now, input.exceptJobId),
     publishedToday: countShortsToday(input.db, input.destination.id, now, input.exceptJobId),
     dailyCap: readShortsDailyCap(input.db),
     titleVerdict

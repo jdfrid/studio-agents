@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDb, upsertDestination, insertItem, insertJob, type GrowthDb } from "./db.js";
 import { emptyCopy } from "./copy.js";
-import { judgeTitleWithModel, mp4DurationSeconds, readShortsDailyCap } from "./shortsGate.js";
+import { judgeTitleWithModel, mp4DurationSeconds, readShortsDailyCap, recentChannelPosts } from "./shortsGate.js";
 import { runScriptEntry, saveScriptEntry } from "./scriptBank.js";
 
 const dirs: string[] = [];
@@ -93,6 +93,64 @@ describe("shorts publish gate", () => {
     expect(rendered).toBe(false);
     expect(run.status).toBe("failed");
     expect(run.error).toMatch(/Daily cap/);
+  });
+
+  it("does not treat the upload that is in progress as its own duplicate", () => {
+    const opened = db();
+    upsertDestination(opened.db, {
+      id: "kitchen",
+      connectionId: "conn",
+      network: "youtube",
+      kind: "channel",
+      externalId: "kitchen",
+      name: "Kitchen Tips",
+      handle: "@KitchenTips-Reelmino",
+      url: "https://www.youtube.com/@KitchenTips-Reelmino",
+      config: {}
+    });
+    const item = insertItem(opened.db, {
+      id: "herbs",
+      slug: "herbs",
+      source: "script-bank",
+      title: "How to keep fresh herbs alive for weeks",
+      summary: "Herbs",
+      language: "en",
+      copy: {
+        ...emptyCopy(),
+        article: {
+          title: "How to keep fresh herbs alive for weeks",
+          description: "Stand the stems in water.",
+          body: "Stop letting fresh herbs turn to mush.\nStand the stems in water.\nStop letting fresh herbs turn to mush."
+        }
+      },
+      mediaPath: null,
+      mediaMime: null,
+      mediaKind: null,
+      mediaWidth: null,
+      mediaHeight: null,
+      mediaDurationMs: 18_000,
+      reelminoRunId: null
+    });
+    insertJob(opened.db, {
+      id: "current",
+      itemId: item.id,
+      destinationId: "kitchen",
+      slotId: null,
+      network: "youtube",
+      status: "uploading"
+    });
+    insertJob(opened.db, {
+      id: "older",
+      itemId: item.id,
+      destinationId: "kitchen",
+      slotId: null,
+      network: "youtube",
+      status: "published"
+    });
+    expect(recentChannelPosts(opened.db, "kitchen", new Date(), "current").map((post) => post.title)).toEqual([
+      "How to keep fresh herbs alive for weeks"
+    ]);
+    expect(recentChannelPosts(opened.db, "kitchen").map((post) => post.title)).toHaveLength(2);
   });
 
   it("asks the title model only when that check is turned on", async () => {
