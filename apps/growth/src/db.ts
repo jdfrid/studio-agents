@@ -280,6 +280,22 @@ export function migrate(db: GrowthDb): void {
   ensureIntColumn(db, "keyword_feeds", "duration_seconds", 30);
   migrateFacebookGroups(db);
   seedDirectories(db);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS shorts_slots (
+      slot_key TEXT PRIMARY KEY,
+      destination_id TEXT NOT NULL,
+      publish_at TEXT NOT NULL,
+      status TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      title TEXT,
+      item_id TEXT,
+      run_id TEXT,
+      job_id TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
 }
 
 function ensureTextColumn(db: GrowthDb, table: string, column: string): void {

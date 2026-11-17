@@ -178,11 +178,18 @@ export function mediaOf(item: Item, mediaDir: string, publicBase: string): Publi
   ];
 }
 
-function youtubeDelivery(item: Item, copy: PackageCopyInput, destination: Destination, media: PublishMediaFile[]): {
+function youtubeDelivery(
+  item: Item,
+  copy: PackageCopyInput,
+  destination: Destination,
+  media: PublishMediaFile[],
+  publishAt?: Date | null
+): {
   copy: PackageCopyInput;
   media: PublishMediaFile[];
   cover?: PublishMediaFile;
-  scheduleAt: Date;
+  /** Null publishes now. Undefined keeps the two-hour private hold. */
+  scheduleAt: Date | null;
 } {
   const prepared = prepareYouTubeListing(item, copy);
   const listed = applyVideoProfile(prepared.copy, destination);
@@ -205,7 +212,8 @@ function youtubeDelivery(item: Item, copy: PackageCopyInput, destination: Destin
         filename: thumb.filename
       }
     : undefined;
-  return { copy: listed, media: nextMedia, cover, scheduleAt: youtubeReleaseAt() };
+  const scheduleAt = publishAt === undefined ? youtubeReleaseAt() : publishAt;
+  return { copy: listed, media: nextMedia, cover, scheduleAt };
 }
 
 export async function freshConnectionTokens(db: GrowthDb, connectionId: string, key: Buffer, network: string): Promise<SocialTokens> {
@@ -233,6 +241,8 @@ export async function runPublish(input: {
   slotId?: string | null;
   campaign?: string;
   copy?: PackageCopyInput;
+  /** YouTube publish time. Null publishes now. Omit for the two-hour private hold. */
+  publishAt?: Date | null;
 }): Promise<Job> {
   if (input.destination.network === "youtube" && youtubeUploadBlock(input.db, input.destination.id)) {
     const stopped = insertJob(input.db, {
@@ -280,7 +290,7 @@ export async function runPublish(input: {
     const tokens = await freshConnectionTokens(input.db, input.destination.connectionId, input.key, input.destination.network);
     const config = publishConfig(input.destination.network, input.destination.config, copy.link);
     const loaded = mediaOf(input.item, input.mediaDir, input.publicBase);
-    const delivery = input.destination.network === "youtube" ? youtubeDelivery(input.item, copy, input.destination, loaded) : null;
+    const delivery = input.destination.network === "youtube" ? youtubeDelivery(input.item, copy, input.destination, loaded, input.publishAt) : null;
     if (delivery) copy = delivery.copy;
     const media = delivery?.media ?? loaded;
     if (input.destination.network === "youtube") {
@@ -329,8 +339,8 @@ export async function runPublish(input: {
       preview,
       media,
       cover: delivery?.cover,
-      scheduleAt: delivery?.scheduleAt,
-      mode: delivery ? "schedule" : "now"
+      scheduleAt: delivery?.scheduleAt ?? undefined,
+      mode: delivery?.scheduleAt ? "schedule" : "now"
     });
     return applyResult(input.db, job.id, result, { copy, config, network: input.destination.network });
   } catch (error) {
@@ -526,8 +536,8 @@ export async function retryPublish(input: {
       preview,
       media,
       cover: delivery?.cover,
-      scheduleAt: delivery?.scheduleAt,
-      mode: delivery ? "schedule" : "now"
+      scheduleAt: delivery?.scheduleAt ?? undefined,
+      mode: delivery?.scheduleAt ? "schedule" : "now"
     });
     return { job: applyResult(input.db, job.id, result, { copy, config, network: destination.network }) };
   } catch (error) {

@@ -66,3 +66,28 @@ Nothing is required for the defaults.
 `shorts_daily_cap` is a row in the growth `settings` table. The YouTube safety cap of 16 uploads per channel per Jerusalem day is still there and still wins if it is hit first.
 
 The rendered voiceover is checked when the script artifact comes back with the video. Until that artifact exists, a keyword-only item is gated on its title, description, duplicate history, and the daily cap. The brief still tells the script stage to open on the hook and to loop the last line.
+
+## Fixed schedule
+
+The growth process used to wake every 30 seconds and run four independent loops: YouTube trends, the script bank, keyword feeds, and brand distribution. Each loop had its own hour window, so a channel could publish a burst of near-duplicate Shorts. Those four loops are no longer started by the timer.
+
+`advanceShortsSchedule` is now the only automatic YouTube Shorts producer. It still runs inside that same 30-second tick. Every new Short from the clock is built with the growth template and cannot upload unless the quality gate accepts it. Manual console actions (script bank, trends, brand, and the publish button) also go through `runPublish`, so a YouTube upload still cannot skip the gate.
+
+Times are wall-clock in `SHORTS_TIMEZONE` (default `Asia/Jerusalem`). Generation starts `SHORTS_LEAD_MINUTES` before the slot (default 90). As soon as the file is ready, YouTube receives it as a private video with `publishAt` set to the slot. One row per slot is stored in `shorts_slots`. A slot that is already past, and was never started, is marked skipped and is not made up later. A render that was already started is allowed to finish. If the gate rejects a take, the slot is regenerated up to two more times (three tries total) and then skipped. `SHORTS_DAILY_CAP=0` pauses that channel.
+
+| Channel | id | Default times |
+| --- | --- | --- |
+| @KitchenTips-Reelmino | `UCsKPN8oZJOPM4KJC4bN_ANw` | 15:00, 19:00, 23:00 |
+| @reelminoapp | `UC3iee8PYICmnfO5s8viJgkQ` | 16:00, 21:00 |
+
+15:00 / 19:00 / 23:00 Jerusalem is 08:00 / 12:00 / 16:00 US Eastern while Israel is on standard time.
+
+| Env | Meaning |
+| --- | --- |
+| `SHORTS_SCHEDULE_KITCHEN` | Comma-separated `HH:MM` list. Empty uses the kitchen default. |
+| `SHORTS_SCHEDULE_REELMINO` | Same for the product channel. |
+| `SHORTS_TIMEZONE` | IANA zone. Invalid values fall back to `Asia/Jerusalem`. |
+| `SHORTS_LEAD_MINUTES` | How early to start the render. Default 90. |
+| `SHORTS_DAILY_CAP` | Max uploads per channel per Jerusalem day. `0` pauses the channel. |
+
+Change a time by setting the env var and restarting the growth process. No database edit is required. Example: `SHORTS_SCHEDULE_KITCHEN=14:30,18:30,22:30`.
