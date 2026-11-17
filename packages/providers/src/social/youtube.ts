@@ -105,6 +105,28 @@ export function channelBrandingUpdate(input: {
   return { id: input.channelId, brandingSettings: { channel } };
 }
 
+/** commentThreads.insert body. YouTube's Data API can post this comment; it cannot pin it. */
+export function youtubeCommentThreadBody(videoId: string, text: string): {
+  snippet: { videoId: string; topLevelComment: { snippet: { textOriginal: string } } };
+} {
+  return {
+    snippet: {
+      videoId,
+      topLevelComment: { snippet: { textOriginal: text } }
+    }
+  };
+}
+
+export async function postYoutubeComment(accessToken: string, videoId: string, text: string): Promise<string> {
+  const payload = await socialJson<{ id?: string }>("youtube", "https://www.googleapis.com/youtube/v3/commentThreads?part=snippet", {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: youtubeCommentThreadBody(videoId, text)
+  });
+  if (!payload.id) throw new SocialApiError("youtube", "YouTube comment returned no id", 502, "comment_failed");
+  return payload.id;
+}
+
 export function createYoutubeAdapter(): NetworkAdapter {
   return {
     ...baseAdapter("youtube"),
@@ -312,6 +334,10 @@ export function createYoutubeAdapter(): NetworkAdapter {
           status
         }
       };
+    },
+    async commentOnPost(input) {
+      const commentId = await postYoutubeComment(input.tokens.accessToken, input.remotePostId, input.text);
+      return { commentId };
     }
   };
 }

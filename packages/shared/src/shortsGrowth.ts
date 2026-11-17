@@ -9,6 +9,8 @@ export const SHORTS_MIN_SECONDS = 15;
 export const SHORTS_HARD_MAX_SECONDS = 25;
 export const SHORTS_DEFAULT_DAILY_CAP = 3;
 export const SHORTS_DUPLICATE_DAYS = 14;
+export const PRODUCT_FEATURE_WINDOW_DAYS = 7;
+export const PRODUCT_DEMO_CTA = "Try it with your sentence - link in pinned comment.";
 export const SHORTS_TITLE_MAX = 60;
 
 export type ShortsChannelKind = "kitchen" | "product";
@@ -32,10 +34,12 @@ export type ShortsGateInput = {
   language: string;
   durationSeconds?: number | null;
   hashtags?: string[];
-  recent?: Array<{ title: string; script?: string }>;
+  recent?: Array<{ title: string; script?: string; featureId?: string; businessId?: string; publishedAt?: string }>;
   publishedToday?: number;
   dailyCap?: number;
   channel?: ShortsChannelKind;
+  /** Product-channel feature demo rules. Kitchen and other channels leave this off. */
+  requireProductDemo?: boolean;
   /** Optional model verdict. The offline overlap check runs when this is omitted. */
   titleVerdict?: { matches: boolean; reason: string } | null;
 };
@@ -148,47 +152,65 @@ export const KITCHEN_TOPICS: SeriesTopic[] = [
   }
 ];
 
-export const PRODUCT_TOPICS: SeriesTopic[] = [
-  {
-    id: "one-sentence",
-    weight: 5,
-    titles: { en: "I made this ad from one sentence", he: "הכנתי את המודעה הזאת ממשפט אחד" },
-    hooks: {
-      en: "I made this ad from one sentence.",
-      he: "הכנתי את המודעה הזאת ממשפט אחד."
-    },
-    angles: {
-      en: ["Show the finished ad first, then the sentence that created it.", "Show the posted cut, then the single line that started it."],
-      he: ["מראים קודם את המודעה המוכנה, ואז את המשפט שיצר אותה.", "מראים קודם את הסרטון שעלה, ואז את השורה שהתחילה אותו."]
-    }
-  },
-  {
-    id: "mascot",
-    weight: 4,
-    titles: { en: "This mascot talks from one sentence", he: "הדמות הזאת מדברת ממשפט אחד" },
-    hooks: {
-      en: "This mascot is talking because I typed one sentence.",
-      he: "הדמות הזאת מדברת כי כתבתי משפט אחד."
-    },
-    angles: {
-      en: ["Open on the mascot mid-line, then show the sentence.", "Open on the finished face, then the one line that cast it."],
-      he: ["פותחים על הדמות באמצע משפט, ואז מראים את השורה.", "פותחים על הפנים המוכנות, ואז על השורה שיצרה אותן."]
-    }
-  },
-  {
-    id: "before-after",
-    weight: 4,
-    titles: { en: "One sentence became this business video", he: "משפט אחד הפך לסרטון העסק הזה" },
-    hooks: {
-      en: "This is the video. The brief was one sentence.",
-      he: "זה הסרטון. הבריף היה משפט אחד."
-    },
-    angles: {
-      en: ["Play the finished spot, then flash the sentence.", "Show the brand colors landing on the finished cut."],
-      he: ["מנגנים את הסרטון המוכן, ואז את המשפט.", "מראים את צבעי המותג על הסרטון המוכן."]
-    }
-  }
+export type ProductFeature = {
+  id: string;
+  weight: number;
+  name: string;
+  aliases: string[];
+  title: string;
+};
+
+export type ProductBusiness = {
+  id: string;
+  label: string;
+  prompt: string;
+};
+
+export const PRODUCT_FEATURES: ProductFeature[] = [
+  { id: "branding", weight: 5, name: "automatic branding", aliases: ["automatic branding", "brand colors"], title: "Brand a {business} video from a logo" },
+  { id: "one-sentence", weight: 5, name: "one sentence to full video", aliases: ["one sentence to full video", "one sentence"], title: "Turn one sentence into a {business} video" },
+  { id: "aspect", weight: 4, name: "aspect-ratio switch", aliases: ["aspect-ratio switch", "aspect ratio"], title: "A {business} video in 9:16 and 16:9" },
+  { id: "multilingual", weight: 4, name: "multilingual voiceover", aliases: ["multilingual voiceover", "several languages"], title: "A {business} video in several languages" },
+  { id: "templates", weight: 4, name: "business templates", aliases: ["business templates", "business template"], title: "A {business} video template from one line" },
+  { id: "before-after", weight: 3, name: "before and after", aliases: ["before and after", "plain text"], title: "Plain text versus a finished {business} video" },
+  { id: "speed", weight: 5, name: "sixty second ad", aliases: ["60 seconds", "sixty second"], title: "AI video ad for a {business} in 60 seconds" }
 ];
+
+export const PRODUCT_BUSINESSES: ProductBusiness[] = [
+  { id: "bakery", label: "bakery", prompt: "Bakery in Tel Aviv, weekend sale 20% off." },
+  { id: "restaurant", label: "restaurant", prompt: "Family restaurant, Tuesday pasta night, kids eat free." },
+  { id: "real-estate", label: "real estate", prompt: "Two-bedroom apartment for sale, sea view, open house Sunday." },
+  { id: "gym", label: "gym", prompt: "Neighborhood gym, first month half off for new members." },
+  { id: "salon", label: "salon", prompt: "Hair salon, balayage special this week, book online." },
+  { id: "ecommerce", label: "online shop", prompt: "Online shop, linen shirts, free shipping over fifty dollars." }
+];
+
+export type ProductDemo = {
+  featureId: string;
+  featureName: string;
+  businessId: string;
+  businessLabel: string;
+  prompt: string;
+  title: string;
+  script: string;
+  description: string;
+  comment: string;
+};
+
+export const PRODUCT_TOPICS: SeriesTopic[] = PRODUCT_FEATURES.map((feature) => {
+  const sample = PRODUCT_BUSINESSES[0]!;
+  const title = feature.title.replace("{business}", sample.label);
+  return {
+    id: feature.id,
+    weight: feature.weight,
+    titles: { en: title, he: title },
+    hooks: { en: sample.prompt, he: sample.prompt },
+    angles: {
+      en: [`Show ${feature.name} for a ${sample.label}.`],
+      he: [`Show ${feature.name} for a ${sample.label}.`]
+    }
+  };
+});
 
 export function shortsNarrationRules(): string {
   return [
@@ -204,6 +226,81 @@ export function shortsNarrationRules(): string {
 
 export function followCta(language: string): string {
   return language.toLowerCase().startsWith("he") ? "עקבו לטיפ אחד ביום" : "Follow for one fix a day";
+}
+
+export function productDemoComment(promptOrScript: string): string {
+  const prompt = promptOrScript.split(/\n+/).map((line) => line.trim()).find(Boolean) ?? promptOrScript.trim();
+  return `${prompt}\nhttps://reelmino.com`;
+}
+
+export function buildProductDemo(feature: ProductFeature, business: ProductBusiness): ProductDemo {
+  const title = fitTitle(feature.title.replaceAll("{business}", business.label));
+  const prompt = business.prompt.endsWith(".") ? business.prompt : `${business.prompt}.`;
+  const script = [
+    prompt,
+    `${title}.`,
+    `Reelmino runs ${feature.name} for this ${business.label}.`,
+    `The finished ${business.label} video plays with the brand on it.`,
+    PRODUCT_DEMO_CTA,
+    prompt
+  ].join("\n");
+  const description = [
+    `${feature.name[0]?.toUpperCase()}${feature.name.slice(1)} for a ${business.label}: ${prompt}`,
+    "https://reelmino.com",
+    filterShortsHashtags([feature.id, business.id, business.label, "ai", "videoad"], "en").map((tag) => `#${tag}`).join(" ")
+  ].join("\n\n");
+  return {
+    featureId: feature.id,
+    featureName: feature.name,
+    businessId: business.id,
+    businessLabel: business.label,
+    prompt,
+    title,
+    script,
+    description,
+    comment: productDemoComment(prompt)
+  };
+}
+
+export function matchProductDemo(text: string): { featureId: string; businessId: string } | null {
+  const haystack = text.toLowerCase();
+  const feature = [...PRODUCT_FEATURES].sort((a, b) => longestAlias(b) - longestAlias(a)).find((item) =>
+    item.aliases.some((alias) => haystack.includes(alias.toLowerCase()))
+  );
+  const business = PRODUCT_BUSINESSES.find((item) => haystack.includes(item.label.toLowerCase()) || haystack.includes(item.prompt.toLowerCase().replace(/\.$/, "")));
+  if (!feature || !business) return null;
+  return { featureId: feature.id, businessId: business.id };
+}
+
+export function nextProductDemo(input: {
+  recent: Array<{ featureId?: string; businessId?: string; title?: string; script?: string }>;
+  salt?: number;
+}): ProductDemo | null {
+  const recentPairs = input.recent.map((item) => item.featureId && item.businessId
+    ? { featureId: item.featureId, businessId: item.businessId }
+    : matchProductDemo(`${item.title ?? ""}\n${item.script ?? ""}`)).filter((item): item is { featureId: string; businessId: string } => Boolean(item));
+  const last = recentPairs[0];
+  const ranked = [...PRODUCT_FEATURES].sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id));
+  const features = ranked.filter((feature) => feature.id !== last?.featureId);
+  const pool = features.length ? features : ranked;
+  for (const feature of pool) {
+    const businesses = PRODUCT_BUSINESSES.filter((business) => {
+      if (business.id === last?.businessId) return false;
+      return !recentPairs.some((pair) => pair.featureId === feature.id && pair.businessId === business.id);
+    });
+    const choices = businesses.length ? businesses : PRODUCT_BUSINESSES.filter((business) => business.id !== last?.businessId);
+    if (!choices.length) continue;
+    const business = choices[(input.salt ?? 0) % choices.length] ?? choices[0];
+    if (!business) continue;
+    const demo = buildProductDemo(feature, business);
+    if (demo.title.length > SHORTS_TITLE_MAX) continue;
+    return demo;
+  }
+  return null;
+}
+
+function longestAlias(feature: ProductFeature): number {
+  return feature.aliases.reduce((max, alias) => Math.max(max, alias.length), 0);
 }
 
 /** Map the old 30-second short option onto the 20-second target. Longer cuts stay as chosen. */
@@ -375,7 +472,7 @@ export function shortsProductionNotes(input: {
       : "Kitchen hook: Stop, then the bad outcome, or Your item dies in a few days because."
     : hebrew
       ? "פתיח למוצר: קודם המודעה המוכנה או הדמות המדברת, ואז הכנתי את זה ממשפט אחד."
-      : "Product hook: show the finished ad or the talking mascot first, then say you made it from one sentence.";
+      : "Product demo: 0-1.5s show the exact one sentence being typed, bold text, no logo and no greeting. 1.5-8s a fast Reelmino screen, progress and branding. 8-17s the finished business video. Last 2s say exactly: Try it with your sentence - link in pinned comment. Then cut back to the prompt so it loops. Name the feature and one real business. No trailers and no third-party characters.";
   const given = [
     input.hook ? (hebrew ? `שורת הפתיחה המדוברת: ${input.hook}` : `Spoken opening line: ${input.hook}`) : "",
     input.angle ? (hebrew ? `הזווית החדשה: ${input.angle}` : `New angle: ${input.angle}`) : ""
@@ -503,6 +600,28 @@ export function evaluateShortsGate(input: ShortsGateInput): ShortsGateResult {
   }
   const duplicate = isNearDuplicate({ title, script, recent: input.recent ?? [] });
   if (duplicate.match) reasons.push(`Near-duplicate of a Short from the last 14 days: ${duplicate.title}.`);
+  if (input.requireProductDemo && script) {
+    const named = PRODUCT_FEATURES.some((feature) => feature.aliases.some((alias) => script.toLowerCase().includes(alias.toLowerCase())));
+    const business = PRODUCT_BUSINESSES.some((item) => script.toLowerCase().includes(item.label.toLowerCase()));
+    if (!named) reasons.push("Script does not name a product feature.");
+    if (!business) reasons.push("Script has no concrete business example.");
+    if (!/try it with your sentence/i.test(script) || !/pinned comment/i.test(script)) {
+      reasons.push("Script is missing the pinned-comment call to action.");
+    }
+    const featurePair = matchProductDemo(script);
+    const pairDuplicate = featurePair
+      ? (input.recent ?? []).find((item) => {
+          const matched = item.featureId && item.businessId
+            ? { featureId: item.featureId, businessId: item.businessId }
+            : matchProductDemo(`${item.title}\n${item.script ?? ""}`);
+          if (!matched || matched.featureId !== featurePair.featureId || matched.businessId !== featurePair.businessId) return false;
+          if (!item.publishedAt) return true;
+          const age = Date.now() - Date.parse(item.publishedAt);
+          return Number.isFinite(age) && age >= 0 && age <= PRODUCT_FEATURE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+        })
+      : undefined;
+    if (pairDuplicate) reasons.push(`Same feature and business type in the last 7 days: ${pairDuplicate.title}.`);
+  }
 
   let review = "";
   if (input.titleVerdict) {

@@ -42,18 +42,18 @@ export function recentChannelPosts(
   destinationId: string,
   now = new Date(),
   exceptJobId?: string
-): Array<{ title: string; script: string }> {
+): Array<{ title: string; script: string; publishedAt: string }> {
   const since = new Date(now.getTime() - 14 * DAY_MS).toISOString();
   const rows = db
     .prepare(
-      `SELECT items.title AS title, items.copy_json AS copy_json, jobs.handle_json AS handle_json
+      `SELECT items.title AS title, items.copy_json AS copy_json, jobs.handle_json AS handle_json, jobs.created_at AS created_at
        FROM jobs JOIN items ON items.id = jobs.item_id
        WHERE jobs.network = 'youtube' AND jobs.destination_id = ? AND jobs.created_at >= ?
        AND jobs.status IN ('published', 'processing', 'uploading', 'draft')
        AND jobs.id != ?
        ORDER BY jobs.created_at DESC LIMIT 40`
     )
-    .all(destinationId, since, exceptJobId ?? "") as Array<{ title?: string; copy_json?: string; handle_json?: string }>;
+    .all(destinationId, since, exceptJobId ?? "") as Array<{ title?: string; copy_json?: string; handle_json?: string; created_at?: string }>;
   return rows.map((row) => {
     const handle = parseJson(row.handle_json);
     const copy = parseJson(row.copy_json);
@@ -62,7 +62,7 @@ export function recentChannelPosts(
     const article = record(copy.article);
     const title = stringValue(snippet.title) || stringValue(caption.title) || row.title || "";
     const script = stringValue(article.body) || stringValue(article.description) || "";
-    return { title, script };
+    return { title, script, publishedAt: row.created_at || "" };
   });
 }
 
@@ -138,11 +138,17 @@ export async function reviewYoutubeShort(input: {
     durationSeconds,
     hashtags: input.copy.hashtags,
     channel,
+    requireProductDemo: isReelminoProductChannel(input.destination),
     recent: recentChannelPosts(input.db, input.destination.id, now, input.exceptJobId),
     publishedToday: countShortsToday(input.db, input.destination.id, now, input.exceptJobId),
     dailyCap: readShortsDailyCap(input.db),
     titleVerdict
   });
+}
+
+function isReelminoProductChannel(destination: { externalId?: string | null; handle?: string | null; name?: string | null; url?: string | null }): boolean {
+  const blob = `${destination.externalId ?? ""} ${destination.handle ?? ""} ${destination.name ?? ""} ${destination.url ?? ""}`;
+  return blob.includes("UC3iee8PYICmnfO5s8viJgkQ") || /reelminoapp/i.test(blob);
 }
 
 function llmEnabled(): boolean {

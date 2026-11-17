@@ -214,4 +214,36 @@ describe("shorts schedule", () => {
     const skipped = retry.db.prepare("SELECT status FROM shorts_slots WHERE slot_key LIKE '%16:00'").get() as { status: string };
     expect(skipped.status).toBe("skipped");
   });
+
+  it("asks YouTube to post the example prompt after a product upload", async () => {
+    rememberEnv();
+    delete process.env.SHORTS_SCHEDULE_REELMINO;
+    delete process.env.SHORTS_DAILY_CAP;
+    const opened = db();
+    channel(opened.db, "product", "reelminoapp", REELMINO_CHANNEL_ID);
+    const comments: string[] = [];
+    await advanceShortsSchedule(
+      { db: opened.db, key: Buffer.alloc(32), mediaDir: opened.dir, publicBase: "http://127.0.0.1:4180" },
+      {
+        now: at("2026-11-17", "15:00"),
+        submitBrief: async () => "run-product",
+        downloadFinal: async () => null,
+        log: () => undefined
+      }
+    );
+    await advanceShortsSchedule(
+      { db: opened.db, key: Buffer.alloc(32), mediaDir: opened.dir, publicBase: "http://127.0.0.1:4180" },
+      {
+        now: at("2026-11-17", "15:10"),
+        submitBrief: async () => "run-again",
+        downloadFinal: async () => ({ filename: "ready.mp4" }),
+        publish: async () => ({ id: "job-product", status: "published", remotePostId: "vid123", remoteUrl: "https://youtu.be/vid123" }),
+        comment: async (_videoId, text) => { comments.push(text); },
+        log: () => undefined
+      }
+    );
+    expect(comments).toHaveLength(1);
+    expect(comments[0]).toContain("https://reelmino.com");
+    expect(comments[0]).toMatch(/Bakery in Tel Aviv|Family restaurant|apartment|gym|salon|Online shop/);
+  });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { channelBrandingUpdate, createYoutubeAdapter, youtubeMetadata } from "../youtube.js";
+import { channelBrandingUpdate, createYoutubeAdapter, youtubeCommentThreadBody, youtubeMetadata } from "../youtube.js";
 
 describe("youtube adapter", () => {
   const prevId = process.env.GOOGLE_CLIENT_ID;
@@ -52,6 +52,15 @@ describe("youtube adapter", () => {
     });
     expect(status.privacyStatus).toBe("private");
     expect(status.publishAt).toBe(release.toISOString());
+  });
+
+  it("posts a top-level comment with the example prompt and does not claim the comment is pinned", () => {
+    expect(youtubeCommentThreadBody("abc123", "Bakery in Tel Aviv, weekend sale 20% off.\nhttps://reelmino.com")).toEqual({
+      snippet: {
+        videoId: "abc123",
+        topLevelComment: { snippet: { textOriginal: "Bakery in Tel Aviv, weekend sale 20% off.\nhttps://reelmino.com" } }
+      }
+    });
   });
 
   it("writes the channel description and keywords without dropping the trailer", () => {

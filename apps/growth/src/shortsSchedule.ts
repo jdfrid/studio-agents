@@ -1,4 +1,4 @@
-import { evaluateShortsGate, nextSeriesTopic } from "@studio/shared";
+import { evaluateShortsGate, nextProductDemo, nextSeriesTopic, productDemoComment, type ProductDemo } from "@studio/shared";
 import { slugify } from "./catalog.js";
 import { emptyCopy } from "./copy.js";
 import { nid } from "./crypto.js";
@@ -60,7 +60,8 @@ export type ScheduleDeps = {
     itemId: string,
     destination: Destination,
     publishAt: Date | null
-  ) => Promise<{ id: string; status: string; lastError?: string | null; errorCode?: string | null; remoteUrl?: string | null }>;
+  ) => Promise<{ id: string; status: string; lastError?: string | null; errorCode?: string | null; remoteUrl?: string | null; remotePostId?: string | null }>;
+  comment?: (videoId: string, text: string) => Promise<void>;
   log?: (message: string) => void;
 };
 
@@ -151,8 +152,37 @@ export function decideSlot(input: {
 export function briefForScheduledShort(input: {
   kind: ScheduleKind;
   recentTitles: string[];
+  recentDemos?: Array<{ featureId?: string; businessId?: string; title?: string; script?: string }>;
   salt?: number;
-}): { title: string; summary: string; description: string; brief: Record<string, unknown> } | null {
+}): { title: string; summary: string; description: string; brief: Record<string, unknown>; demo?: ProductDemo } | null {
+  if (input.kind === "product") {
+    const demo = nextProductDemo({ recent: input.recentDemos ?? input.recentTitles.map((title) => ({ title })), salt: input.salt });
+    if (!demo) return null;
+    const content = contentForTrend({
+      topic: demo.title,
+      niche: "small business owners",
+      language: "en",
+      durationSeconds: 20,
+      channel: "product",
+      hook: demo.prompt,
+      angle: demo.featureName
+    });
+    content.title = demo.title;
+    content.summary = `${demo.featureName} for a ${demo.businessLabel}.`;
+    content.description = demo.description;
+    content.brief.title = demo.title;
+    content.brief.sourceText = demo.script;
+    content.brief.instructions = `${String(content.brief.instructions ?? "")} Follow the source text as the narration. ${demo.script} This channel is the product channel. Do not make a kitchen, recipe, or food-storage video. No trailers, no third-party characters, and no logos you do not own.`;
+    content.brief.resultSegment = {
+      source: "veo-stand-in",
+      examplePrompt: demo.prompt,
+      featureId: demo.featureId,
+      businessId: demo.businessId,
+      swapLater: true
+    };
+    content.brief.approvalMode = "auto";
+    return { ...content, demo };
+  }
   const series = nextSeriesTopic({
     kind: input.kind,
     language: "en",
@@ -162,17 +192,14 @@ export function briefForScheduledShort(input: {
   if (!series) return null;
   const content = contentForTrend({
     topic: series.title,
-    niche: input.kind === "kitchen" ? "home cooking, food storage, kitchen layout" : "small business video",
+    niche: "home cooking, food storage, kitchen layout",
     language: "en",
     durationSeconds: 20,
-    channel: input.kind,
+    channel: "kitchen",
     hook: series.hook,
     angle: series.angle
   });
-  const guard = input.kind === "product"
-    ? " This channel is the product channel. Do not make a kitchen, recipe, or food-storage video. No trailers, no third-party characters, and no logos you do not own."
-    : " This channel is kitchen tips. Do not mention the product pitch, trailers, or third-party characters and logos.";
-  content.brief.instructions = `${String(content.brief.instructions ?? "")}${guard}`;
+  content.brief.instructions = `${String(content.brief.instructions ?? "")} This channel is kitchen tips. Do not mention the product pitch, trailers, or third-party characters and logos.`;
   content.brief.approvalMode = "auto";
   return content;
 }
@@ -296,6 +323,7 @@ async function runSlot(
     jobId: result.id,
     error: null
   });
+  if (input.kind === "product") await postDemoComment(ctx, deps, input.destination, result.remotePostId, item.copy.article.body || row.title);
 }
 
 async function startAttempt(
@@ -326,14 +354,17 @@ async function startAttempt(
     log(deps, `${input.key} skipped after ${existing?.attempts ?? SHORTS_MAX_ATTEMPTS} attempts`);
     return;
   }
-  const recent = [
-    ...recentChannelPosts(ctx.db, input.destination.id).map((post) => post.title),
-    ...recentSlotTitles(ctx.db, input.destination.id)
-  ];
-  let built = briefForScheduledShort({ kind: input.kind, recentTitles: recent, salt: attempts });
+  const posts = recentChannelPosts(ctx.db, input.destination.id);
+  const recent = [...posts.map((post) => post.title), ...recentSlotTitles(ctx.db, input.destination.id)];
+  let built = briefForScheduledShort({
+    kind: input.kind,
+    recentTitles: recent,
+    recentDemos: posts,
+    salt: attempts
+  });
   let gateError = "";
   if (built) {
-    const script = [String(built.brief.sourceText ?? ""), built.summary].join("\n");
+    const script = String(built.brief.sourceText ?? built.summary);
     const gate = evaluateShortsGate({
       mode: "plan",
       title: built.title,
@@ -342,7 +373,8 @@ async function startAttempt(
       language: "en",
       durationSeconds: 20,
       channel: input.kind,
-      recent: recentChannelPosts(ctx.db, input.destination.id),
+      requireProductDemo: input.kind === "product",
+      recent: posts,
       publishedToday: countShortsToday(ctx.db, input.destination.id),
       dailyCap: readShortsDailyCap(ctx.db)
     });
@@ -380,7 +412,7 @@ async function startAttempt(
     title: built.title,
     summary: built.summary,
     language: "en",
-    copy: scheduleCopy(built.title, built.description),
+    copy: scheduleCopy(built.title, built.description, String(built.brief.sourceText ?? built.summary)),
     mediaPath: null,
     mediaMime: null,
     mediaKind: null,
@@ -437,11 +469,40 @@ function withNarration(db: GrowthDb, itemId: string, narration: string) {
   return copy;
 }
 
-function scheduleCopy(title: string, description: string) {
+function scheduleCopy(title: string, description: string, script = "") {
   const copy = emptyCopy();
   copy.youtube = { title, body: description };
-  copy.article = { title, description, body: description };
+  copy.article = { title, description, body: script || description };
   return copy;
+}
+
+async function postDemoComment(
+  ctx: ScheduleContext,
+  deps: ScheduleDeps,
+  destination: Destination,
+  videoId: string | null | undefined,
+  fallbackPrompt: string
+): Promise<void> {
+  const itemScript = fallbackPrompt;
+  const text = productDemoComment(itemScript);
+  if (!videoId) {
+    log(deps, "product comment waiting for a YouTube video id. Pinning is not available in the YouTube API.");
+    return;
+  }
+  try {
+    if (deps.comment) {
+      await deps.comment(videoId, text);
+      return;
+    }
+    const { freshConnectionTokens } = await import("./publish.js");
+    const { postYoutubeComment } = await import("@studio/providers");
+    const tokens = await freshConnectionTokens(ctx.db, destination.connectionId, ctx.key, "youtube");
+    await postYoutubeComment(tokens.accessToken, videoId, text);
+    log(deps, `${videoId} comment posted. YouTube's API cannot pin it; pin that comment in Studio.`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(deps, `product comment failed: ${message}. Pinning remains a Studio step.`);
+  }
 }
 
 function recentSlotTitles(db: GrowthDb, destinationId: string): string[] {

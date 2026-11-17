@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   applyPronunciationLexicon,
+  buildProductDemo,
   evaluateShortsGate,
   filterShortsHashtags,
   fitTitle,
   followCta,
   isGenericTitle,
   narrationFromScriptJson,
+  nextProductDemo,
   nextSeriesTopic,
+  PRODUCT_BUSINESSES,
+  PRODUCT_FEATURES,
   shortsBriefSeconds,
   shortsDescription,
   shortsProductionNotes,
@@ -167,5 +171,82 @@ describe("shorts quality gate", () => {
     const judged = gate({ titleVerdict: { matches: false, reason: "The title is about onions and the film is about herbs" } });
     expect(judged.decision).toBe("block");
     expect(judged.reasons.join(" ")).toMatch(/onions/);
+  });
+});
+
+describe("product feature demos", () => {
+  it("rotates features and business types", () => {
+    const first = nextProductDemo({ recent: [], salt: 0 });
+    expect(first?.featureId).toBe("branding");
+    expect(first?.businessId).toBe("bakery");
+    expect(first?.title.length).toBeLessThanOrEqual(60);
+    expect(first?.script.startsWith(first.prompt)).toBe(true);
+    expect(first?.script).toContain(first?.featureName);
+    expect(first?.comment).toContain("https://reelmino.com");
+    expect(first?.comment).toContain("Bakery in Tel Aviv");
+    const second = nextProductDemo({
+      recent: [{ featureId: first?.featureId, businessId: first?.businessId, title: first?.title }],
+      salt: 0
+    });
+    expect(second?.featureId).not.toBe(first?.featureId);
+    expect(second?.businessId).not.toBe(first?.businessId);
+    const repeated = nextProductDemo({
+      recent: PRODUCT_FEATURES.flatMap((feature) => PRODUCT_BUSINESSES.map((business) => ({ featureId: feature.id, businessId: business.id }))),
+      salt: 1
+    });
+    expect(repeated?.businessId).not.toBe("bakery");
+  });
+
+  it("rejects a product short that is generic and a repeat of the same business", () => {
+    const demo = buildProductDemo(PRODUCT_FEATURES[0]!, PRODUCT_BUSINESSES[0]!);
+    const ready = gate({
+      channel: "product",
+      requireProductDemo: true,
+      title: demo.title,
+      description: demo.description,
+      script: demo.script
+    });
+    expect(ready.decision).toBe("publish");
+    expect(ready.description).toContain("https://reelmino.com");
+    const unnamed = gate({
+      channel: "product",
+      requireProductDemo: true,
+      title: demo.title,
+      script: "A nice video for a bakery.\nTry it with your sentence - link in pinned comment.\nA nice video for a bakery."
+    });
+    expect(unnamed.reasons.join(" ")).toMatch(/feature/i);
+    const noBusiness = gate({
+      channel: "product",
+      requireProductDemo: true,
+      title: "Turn one sentence into a branded video",
+      script: "Reelmino runs one sentence to full video.\nTry it with your sentence - link in pinned comment."
+    });
+    expect(noBusiness.reasons.join(" ")).toMatch(/business/i);
+    const noCta = gate({
+      channel: "product",
+      requireProductDemo: true,
+      title: demo.title,
+      script: `Bakery in Tel Aviv, weekend sale 20% off.\nReelmino runs automatic branding for this bakery.`
+    });
+    expect(noCta.reasons.join(" ")).toMatch(/pinned-comment/i);
+    const dup = gate({
+      channel: "product",
+      requireProductDemo: true,
+      title: "Brand a gym video from a logo",
+      description: demo.description,
+      script: buildProductDemo(PRODUCT_FEATURES[0]!, PRODUCT_BUSINESSES[3]!).script,
+      recent: [{ title: demo.title, script: demo.script, featureId: "branding", businessId: "bakery", publishedAt: new Date().toISOString() }, { title: "Brand a gym video from a logo", script: buildProductDemo(PRODUCT_FEATURES[0]!, PRODUCT_BUSINESSES[3]!).script, featureId: "branding", businessId: "gym", publishedAt: new Date().toISOString() }]
+    });
+    expect(dup.reasons.join(" ")).toMatch(/last 7 days/i);
+    const old = gate({
+      channel: "product",
+      requireProductDemo: true,
+      title: demo.title,
+      description: demo.description,
+      script: demo.script,
+      recent: [{ title: "older bakery", script: demo.script, featureId: "branding", businessId: "bakery", publishedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString() }]
+    });
+    expect(old.reasons.join(" ")).not.toMatch(/last 7 days/i);
+    expect(gate({ script: herbScript }).decision).toBe("publish");
   });
 });
