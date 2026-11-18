@@ -112,7 +112,7 @@ These jobs run on the same 30-second tick as the Shorts clock. Each one is on un
 | `SHORTS_CHANNEL_SEO` | on | Channel description, keywords, and English as the default language. Applied by the existing channel-profile pass. |
 | `SHORTS_TOPIC_DEMAND` | on | Once a day, ranks search titles and offers the top fresh one to the next kitchen slot. |
 | `SHORTS_WEIGHT_TUNING` | on | Once a week, moves topic and feature weights between 0.5× and 2× from Analytics. |
-| `SHORTS_CROSSPOST` | on | After a Short is public, posts the caption only where credentials exist. Otherwise it skips. |
+| `SHORTS_CROSSPOST` | on | After a Short’s YouTube `publishAt` time, uploads the same mp4 through Zernio to TikTok and X. Skips when `ZERNIO_API_KEY` is empty. |
 
 Kitchen playlists are produce, herbs, storage, cleaning, and cooking hacks. Product playlists are one per feature plus `Reelmino for <business>`.
 
@@ -128,13 +128,22 @@ New YouTube connects request `youtube.force-ssl` (comments and playlists) and `y
 
 ### Cross-post accounts
 
-The owner’s Buffer organization “My Organization” currently has one channel: Pinterest profile `jdfrid` (`6aef9d87e29c69a1719a31cf`). There is no TikTok, Instagram, or Facebook channel there yet.
+Cross-posts go through Zernio (`https://zernio.com`). The growth process uploads the rendered mp4 to Zernio’s media endpoint (or sends an `https` media path when the file is already a public URL) and publishes a native TikTok video and an X video post. This runs only after the Short’s YouTube slot time. A Zernio failure is logged and retried; the YouTube upload is left as it is.
 
-| Env | Required for |
-| --- | --- |
-| `BUFFER_ACCESS_TOKEN` and `BUFFER_CHANNEL_ID` | A Buffer post. Use `6aef9d87e29c69a1719a31cf` for the connected Pinterest profile. Pinterest may reject a video-only Short; the error is logged and the YouTube upload still stands. |
-| `FACEBOOK_PAGE_ID` and `FACEBOOK_PAGE_TOKEN` | A Facebook Page feed post that includes the YouTube link. This is not a native Reel file upload. |
-| `INSTAGRAM_ACCOUNT_ID` and `INSTAGRAM_ACCESS_TOKEN` | Reserved. Reels need a public video URL, so the job is skipped even when the ids are set. |
-| `TIKTOK_ACCESS_TOKEN` | Reserved. Chunked TikTok upload is not sent from this host, so the job is skipped when the token is set. |
+Connected accounts: TikTok `user811120410700` (`6afd5d11e23b7dac9dfd7e84`) and X `@reelmino2026` (`6afd5d2a030baa4c27c55943`). Add later platforms in `ZERNIO_ACCOUNTS` as `telegram:<accountId>`, `instagram:<accountId>`, or `facebook:<accountId>`. The API name for X is `twitter`; `x:` in the env value is accepted.
 
-Caption for every cross-post: the Short title, then “Full channel on YouTube”, then the channel URL.
+| Env | Default | What it does |
+| --- | --- | --- |
+| `ZERNIO_API_KEY` | empty | Required. When empty, the cross-post step logs nothing and posts nowhere. |
+| `ZERNIO_ACCOUNTS` | `tiktok:6afd5d11e23b7dac9dfd7e84,x:6afd5d2a030baa4c27c55943` | Comma-separated `platform:accountId`. |
+| `ZERNIO_DAILY_CAP` | `3` | How many Shorts, across both YouTube channels, may be cross-posted per Jerusalem day. |
+| `ZERNIO_MIN_GAP_HOURS` | `2` | Minimum time between cross-posts. |
+| `ZERNIO_SLOT_PREFER` | `even:kitchen,odd:product` | Even schedule slots prefer the kitchen channel. Odd slots prefer the product channel. |
+
+Each video is posted once per platform. The Zernio post id is stored in `growth_crossposts`. A failed platform waits 2 minutes, then 8, 32, and up to 2 hours, and stops after 5 attempts. The weekly weight pass also reads Zernio analytics for posts sent through the API and writes the view and like totals to the growth log.
+
+Caption: the Short title, then 2–3 hashtags, then `More on YouTube: <channel URL>`. X captions stay within 280 characters.
+
+Set the key on the Hetzner growth host, not on Render. The file is `infra/hetzner/.env` on that server (the copy of `infra/hetzner/env.example`). `infra/hetzner/docker-compose.yml` passes `ZERNIO_API_KEY` into the `growth` container. After editing the file, run `bash infra/hetzner/deploy.sh` from the repo on the server so the container restarts with the new value.
+
+If `ZERNIO_API_KEY` is empty and the older Buffer or Facebook Page tokens are set, the previous caption-only post still runs. It does not upload the mp4.

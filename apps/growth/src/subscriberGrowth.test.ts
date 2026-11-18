@@ -76,7 +76,7 @@ describe("subscriber growth", () => {
     expect(tuneMultiplier({ views: 10, viewRatio: 10, subs: 0, medianViews: 100 })).toBeGreaterThanOrEqual(0.5);
     expect(tuneMultiplier({ views: 10_000, viewRatio: 100, subs: 5, medianViews: 10 })).toBeLessThanOrEqual(2);
     expect(rankDemand(["Keep herbs alive", "Keep herbs alive", "Crisp lettuce"]).map((item) => item.phrase)[0]).toBe("Keep herbs alive");
-    expect(crossPostCaption("Keep herbs alive", "https://www.youtube.com/channel/UCsKPN8oZJOPM4KJC4bN_ANw")).toContain("Full channel on YouTube");
+    expect(crossPostCaption("Keep herbs alive", "https://www.youtube.com/channel/UCsKPN8oZJOPM4KJC4bN_ANw")).toContain("More on YouTube: https://www.youtube.com/channel/UCsKPN8oZJOPM4KJC4bN_ANw");
     expect(crossPostTargets()).toEqual({ buffer: false, tiktok: false, instagram: false, facebook: false });
   });
 

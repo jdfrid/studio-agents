@@ -5,6 +5,9 @@ import { emptyCopy } from "./copy.js";
 import { freshConnectionTokens, runPublish } from "./publish.js";
 import { downloadReelminoFinal, submitReelminoBrief } from "./produce.js";
 import { KITCHEN_CHANNEL_ID, REELMINO_CHANNEL_ID, scheduledChannel } from "./shortsSchedule.js";
+import { advanceZernioCrossPosts, crossPostCaption, logZernioAnalytics, zernioApiKey } from "./zernio.js";
+
+export { crossPostCaption };
 
 export const COMMENT_DAILY_CAP = 30;
 export const COMMENT_SCAN_MS = 2 * 60 * 60 * 1000;
@@ -55,10 +58,6 @@ export function playlistsForProduct(featureId: string, businessId: string): Play
       description: `How a ${business.label} can turn one sentence into a branded video with Reelmino.`
     }
   ];
-}
-
-export function crossPostCaption(title: string, channelUrl: string): string {
-  return `${title.trim()}\n\nFull channel on YouTube\n${channelUrl}`.trim();
 }
 
 export function crossPostTargets(): { buffer: boolean; tiktok: boolean; instagram: boolean; facebook: boolean } {
@@ -251,8 +250,12 @@ export async function advanceSubscriberGrowth(ctx: RunContext, deps: SubscriberD
     if (growthFlag("SHORTS_PLAYLISTS")) await ensurePlaylists(ctx.db, destination, kind, bound, log);
     if (growthFlag("SHORTS_LONGFORM")) await advanceLongForm(ctx, destination, kind, now, bound, log);
     if (growthFlag("SHORTS_COMMENT_REPLIES")) await replyToComments(ctx.db, destination, kind === "product", now, bound, log);
-    if (growthFlag("SHORTS_CROSSPOST")) await crossPostRecent(ctx.db, destination, bound, log);
+    if (growthFlag("SHORTS_CROSSPOST") && !zernioApiKey()) await crossPostRecent(ctx.db, destination, bound, log);
   }
+  if (growthFlag("SHORTS_CROSSPOST") && zernioApiKey()) {
+    await advanceZernioCrossPosts(ctx.db, { now, mediaDir: ctx.mediaDir, log });
+  }
+  if (growthFlag("SHORTS_WEIGHT_TUNING")) await logZernioAnalytics(ctx.db, now, log);
 }
 
 async function bindLiveYoutube(ctx: RunContext, destination: Destination, deps: SubscriberDeps, log: (message: string) => void): Promise<SubscriberDeps> {

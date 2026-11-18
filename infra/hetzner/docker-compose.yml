@@ -247,6 +247,11 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_TEXT_MODEL: ${GEMINI_TEXT_MODEL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ZERNIO_API_KEY: ${ZERNIO_API_KEY:-}
+      ZERNIO_ACCOUNTS: ${ZERNIO_ACCOUNTS:-}
+      ZERNIO_DAILY_CAP: ${ZERNIO_DAILY_CAP:-3}
+      ZERNIO_MIN_GAP_HOURS: ${ZERNIO_MIN_GAP_HOURS:-2}
+      ZERNIO_SLOT_PREFER: ${ZERNIO_SLOT_PREFER:-}
       GROWTH_WEB_PUBLIC: /srv/site
     volumes:
       - growth_data:/app/apps/growth/data
