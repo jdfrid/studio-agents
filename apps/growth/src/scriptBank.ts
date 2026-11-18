@@ -1,7 +1,10 @@
+import { evaluateShortsGate, filterShortsHashtags, fitTitle, followCta, shortsBriefSeconds, shortsProductionNotes, type ShortsChannelKind } from "@studio/shared";
 import { slugify } from "./catalog.js";
 import { castInstruction, castValue, PRESENTERS, resolveCast, TONES } from "./cast.js";
 import { chosenDuration, durationPhrase, taskDurationSeconds } from "./duration.js";
 import { languageLock, subscribeCue, subscribeCueNote, textMatchesLanguage, titleInLanguage } from "./languageCopy.js";
+import { channelKind } from "./channelProfile.js";
+import { countShortsToday, readShortsDailyCap, recentChannelPosts } from "./shortsGate.js";
 import { emptyCopy, type ItemCopy } from "./copy.js";
 import { nid } from "./crypto.js";
 import {
@@ -145,7 +148,7 @@ export function saveScriptEntry(
   };
 }
 
-export function briefForEntry(input: { kind: "keywords" | "script"; body: string; language: string; title?: string | null; durationSeconds?: number; cast?: { presenter: "woman" | "man"; tone: "serious" | "playful" } | null }): {
+export function briefForEntry(input: { kind: "keywords" | "script"; body: string; language: string; title?: string | null; durationSeconds?: number; channel?: ShortsChannelKind; cast?: { presenter: "woman" | "man"; tone: "serious" | "playful" } | null }): {
   title: string;
   summary: string;
   description: string;
@@ -159,12 +162,20 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
   const headline = givenOk ? given : spoken;
   const title = given || headline;
   const ownWords = textMatchesLanguage(input.body, input.language);
-  const durationSeconds = chosenDuration(input.durationSeconds);
+  const requested = chosenDuration(input.durationSeconds);
+  const growthShort = requested <= 30;
+  const durationSeconds = growthShort ? shortsBriefSeconds(requested) : requested;
   const form = durationPhrase(durationSeconds, input.language);
   const shortForm = durationSeconds <= 60;
+  const spokenSentences = input.body
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line && textMatchesLanguage(line, input.language))
+    .slice(0, 2)
+    .map((line) => (/[.!?]$/.test(line) ? line : `${line}.`));
   const summary = input.kind === "script"
-    ? (he ? "סרטון אנכי לפי התסריט שנשמר במאגר." : "A vertical video that follows the saved script.")
-    : ownWords
+    ? (spokenSentences.join(" ") || (he ? "טיפ אחד שאפשר ליישם היום." : "One fix you can use today."))
+    : ownWords && headline
       ? (he
         ? `סרטון מקורי${shortForm ? " קצר" : ""} על ${headline}. מסבירים את הנושא בפשטות ונותנים טיפ אחד שאפשר ליישם מיד.`
         : `An original ${shortForm ? "short" : "video"} about ${headline}. Explain the subject plainly and give one tip people can use immediately.`)
@@ -179,6 +190,8 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
     : he
       ? `\nהטקסט הבא הוא חומר גלם בלבד. מפיקים ממנו סרטון בעברית, בלי להשאיר את הניסוח המקורי ${keepOut}:\n${input.body.trim()}`
       : `\nThe text below is source material only. Produce the video in English, and do not keep its original wording in ${keepOut}:\n${input.body.trim()}`;
+  const channel = input.channel ?? "kitchen";
+  const ending = growthShort ? shortsProductionNotes({ kind: channel, language: input.language }) : subscribeCueNote(input.language);
   const instructions = `${input.kind === "script"
     ? (ownWords
       ? (he
@@ -189,9 +202,14 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
         : "The entered text is source material in another language. Write a new video from it in English only. Do not copy another creator's video. No other channel names and no third-party logos. Clear hook in the first three seconds, vertical frame."))
     : (he
       ? `תוכן מקורי בלבד לפי מילות המפתח. אסור להעתיק סרטון, תסריט, כותרת או קריינות של יוצר אחר. בלי שמות ערוצים ובלי לוגואים של מותג אחר. פתיח ברור בשלוש השניות הראשונות, ${shortForm ? "קריינות קצרה" : "קריינות שממלאת את האורך"}, מסך אנכי.`
-      : `Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, ${shortForm ? "short narration" : "narration that fills the full length"}, vertical frame.`)} ${languageLock(input.language)}${input.cast ? ` ${castInstruction(input.cast, input.language)}` : ""}${he ? ` אורך הסרטון שנקבע במשימה הוא ${form}. הקריינות והמהלך ממלאים את כל האורך.` : ` The video length set for this task is ${form}. Narration and story fill that full length.`} ${subscribeCueNote(input.language)}${given ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
-  const tags = [...(durationSeconds <= 180 ? ["#Shorts"] : []), ...tokens(headline).slice(0, 3).map((token) => `#${token}`)];
-  const description = `${summary.includes(headline) ? summary : `${headline}. ${summary}`}\n\n${tags.join(" ")}`;
+      : `Original content only, based on the keywords. Do not copy another creator's video, script, title, or narration. No other channel names and no third-party logos. Clear hook in the first three seconds, ${shortForm ? "short narration" : "narration that fills the full length"}, vertical frame.`)} ${languageLock(input.language)}${input.cast ? ` ${castInstruction(input.cast, input.language)}` : ""}${he ? ` אורך הסרטון שנקבע במשימה הוא ${form}. הקריינות והמהלך ממלאים את כל האורך.` : ` The video length set for this task is ${form}. Narration and story fill that full length.`} ${ending}${given ? (he ? ` כותרת הסרטון ביוטיוב היא בדיוק: ${given}` : ` The YouTube title is exactly: ${given}`) : ""}`;
+  const tags = filterShortsHashtags([...(durationSeconds <= 180 ? ["Shorts"] : []), ...tokens(headline)], input.language, {
+    shorts: durationSeconds <= 180
+  }).map((token) =>
+    token.toLowerCase() === "shorts" ? "#Shorts" : `#${token}`
+  );
+  const lead = headline && textMatchesLanguage(headline, input.language) && !summary.includes(headline) ? `${headline}. ` : "";
+  const description = `${lead}${summary}\n\n${tags.join(" ")}`.trim();
   return {
     title,
     summary,
@@ -203,7 +221,7 @@ export function briefForEntry(input: { kind: "keywords" | "script"; body: string
       targetAudience: he ? (durationSeconds <= 180 ? "צופים בסרטונים קצרים ביוטיוב" : "צופים ביוטיוב") : (durationSeconds <= 180 ? "YouTube Shorts viewers" : "YouTube viewers"),
       language: input.language,
       durationSeconds,
-      branding: { slogan: subscribeCue(input.language) },
+      branding: { slogan: growthShort ? followCta(input.language) : subscribeCue(input.language) },
       aspectRatio: "9:16",
       budgetMode: true,
       approvalMode: "auto"
@@ -279,11 +297,26 @@ export async function produceBankEntry(ctx: BankContext, entry: ScriptEntry, slo
     recentTones: recent.map((run) => run.tone)
   });
   const durationSeconds = chosenDuration(feed?.durationSeconds ?? entry.durationSeconds);
-  const content = briefForEntry({ ...entry, cast, durationSeconds });
   const destination = bankChannel(ctx.db, entry, settings.destinationId);
+  const channel: ShortsChannelKind = destination && channelKind(destination) === "kitchen" ? "kitchen" : "product";
+  const content = briefForEntry({ ...entry, cast, durationSeconds, channel });
   if (!destination) return recordFailure(ctx.db, entry, slot, content.title, MSG_CHANNEL, cast);
   const daily = youtubeUploadBlock(ctx.db, destination.id, deps.now);
   if (daily) return recordFailure(ctx.db, entry, slot, content.title, daily, cast);
+  const now = deps.now ?? new Date();
+  const planned = evaluateShortsGate({
+    mode: "plan",
+    title: content.title,
+    description: content.description,
+    script: entry.kind === "script" ? entry.body : "",
+    language: entry.language,
+    durationSeconds: Number(content.brief.durationSeconds) || shortsBriefSeconds(durationSeconds),
+    channel,
+    recent: recentChannelPosts(ctx.db, destination.id, now),
+    publishedToday: countShortsToday(ctx.db, destination.id, now),
+    dailyCap: readShortsDailyCap(ctx.db)
+  });
+  if (planned.decision !== "publish") return recordFailure(ctx.db, entry, slot, content.title, planned.reasons.join(" "), cast);
   if (!deps.submitBrief && !process.env.REELMINO_SESSION?.trim()) return recordFailure(ctx.db, entry, slot, content.title, MSG_SESSION, cast);
   try {
     const item = insertItem(ctx.db, {
@@ -293,7 +326,7 @@ export async function produceBankEntry(ctx: BankContext, entry: ScriptEntry, slo
       title: content.title,
       summary: content.summary,
       language: entry.language,
-      copy: bankCopy(content.title, content.description, textMatchesLanguage(entry.body, entry.language) ? entry.body : ""),
+      copy: bankCopy(content.title, content.description, entry.language, textMatchesLanguage(entry.body, entry.language) ? entry.body : ""),
       mediaPath: null,
       mediaMime: null,
       mediaKind: null,
@@ -374,13 +407,17 @@ async function pullAndPublish(ctx: BankContext, run: ScriptRun, deps: ScriptBank
     return;
   }
   const item = getItem(ctx.db, run.itemId);
+  const copy = file.narration && item
+    ? { ...item.copy, article: { ...item.copy.article, body: file.narration } }
+    : undefined;
   updateItem(ctx.db, run.itemId, {
     mediaPath: file.filename,
     mediaMime: "video/mp4",
     mediaKind: "video",
     mediaWidth: 1080,
     mediaHeight: 1920,
-    mediaDurationMs: item?.mediaDurationMs || 30_000
+    mediaDurationMs: item?.mediaDurationMs || 20_000,
+    ...(copy ? { copy } : {})
   });
   const publishing = updateScriptRun(ctx.db, run.id, { status: "publishing", error: null });
   if (publishing) await finishPublish(ctx, publishing, deps);
@@ -431,10 +468,10 @@ async function finishPublish(ctx: BankContext, run: ScriptRun, deps: ScriptBankD
   updateScriptRun(ctx.db, run.id, { status: "publishing", jobId: result.id, remoteUrl: result.remoteUrl ?? null, error: null });
 }
 
-function bankCopy(title: string, description: string, script = ""): ItemCopy {
+function bankCopy(title: string, description: string, language = "en", script = ""): ItemCopy {
   const copy = emptyCopy();
-  copy.hashtags = ["Shorts", ...tokens(title).slice(0, 4)];
-  copy.youtube = { title: title.slice(0, 90), body: description };
+  copy.hashtags = filterShortsHashtags(["Shorts", ...tokens(title)], language);
+  copy.youtube = { title: fitTitle(title), body: description };
   copy.article = { title, description, body: script.trim() || description };
   return copy;
 }

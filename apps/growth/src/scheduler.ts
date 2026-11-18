@@ -25,12 +25,10 @@ import { applyLink, trackedLink } from "./utm.js";
 import { deliverDueGroupPosts } from "./groups.js";
 import { ensureYouTubeChannels } from "./channelProfile.js";
 import { freshConnectionTokens, pollPublish, postDueFirstComments, runPublish } from "./publish.js";
-import { advanceKeywordFeeds } from "./keywordFeeds.js";
-import { advanceScriptBank } from "./scriptBank.js";
-import { advanceBrandDistribution } from "./brandDistribution.js";
+import { advanceShortsSchedule } from "./shortsSchedule.js";
+import { advanceSubscriberGrowth } from "./subscriberGrowth.js";
 import { advanceTextCampaigns, writeTextPosts } from "./textPosts.js";
 import { advanceTelegramMirror } from "./telegramMirror.js";
-import { advanceYoutubeTrends } from "./youtubeTrends.js";
 
 export type DispatchContext = {
   db: GrowthDb;
@@ -165,32 +163,14 @@ export async function tick(ctx: DispatchContext): Promise<void> {
     console.error("[growth] first comment failed", error);
   }
   try {
-    await advanceYoutubeTrends(ctx);
+    await advanceShortsSchedule(ctx);
   } catch (error) {
-    console.error("[growth] youtube trends failed", error);
+    console.error("[growth] shorts schedule failed", error);
   }
   try {
-    await advanceKeywordFeeds(ctx);
+    await advanceSubscriberGrowth(ctx);
   } catch (error) {
-    console.error("[growth] keyword feeds failed", error);
-  }
-  try {
-    await advanceScriptBank(ctx);
-  } catch (error) {
-    console.error("[growth] script bank failed", error);
-  }
-  try {
-    await advanceBrandDistribution(ctx.db, (item, destination) => runPublish({
-      db: ctx.db,
-      key: ctx.key,
-      mediaDir: ctx.mediaDir,
-      publicBase: ctx.publicBase,
-      item,
-      destination,
-      campaign: getSetting(ctx.db, "utm_campaign") ?? undefined
-    }));
-  } catch (error) {
-    console.error("[growth] brand distribution failed", error);
+    console.error("[growth] subscriber growth failed", error);
   }
   try {
     await advanceTextCampaigns(

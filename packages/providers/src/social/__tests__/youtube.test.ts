@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { channelBrandingUpdate, createYoutubeAdapter, youtubeMetadata } from "../youtube.js";
+import { channelBrandingUpdate, createYoutubeAdapter, youtubeCommentThreadBody, youtubeMetadata } from "../youtube.js";
 
 describe("youtube adapter", () => {
   const prevId = process.env.GOOGLE_CLIENT_ID;
@@ -26,6 +26,8 @@ describe("youtube adapter", () => {
     });
     const params = new URL(authorizeUrl).searchParams;
     expect(params.get("prompt")).toBe("select_account consent");
+    expect(params.get("scope")).toContain("youtube.force-ssl");
+    expect(params.get("scope")).toContain("yt-analytics.readonly");
   });
 
   it("keeps video keywords out of the description and on the tag list", () => {
@@ -54,6 +56,15 @@ describe("youtube adapter", () => {
     expect(status.publishAt).toBe(release.toISOString());
   });
 
+  it("posts a top-level comment with the example prompt and does not claim the comment is pinned", () => {
+    expect(youtubeCommentThreadBody("abc123", "Bakery in Tel Aviv, weekend sale 20% off.\nhttps://reelmino.com")).toEqual({
+      snippet: {
+        videoId: "abc123",
+        topLevelComment: { snippet: { textOriginal: "Bakery in Tel Aviv, weekend sale 20% off.\nhttps://reelmino.com" } }
+      }
+    });
+  });
+
   it("writes the channel description and keywords without dropping the trailer", () => {
     const payload = channelBrandingUpdate({
       channelId: "UC1",
@@ -65,6 +76,16 @@ describe("youtube adapter", () => {
     expect(payload.brandingSettings.channel.description).toContain("Reelmino");
     expect(payload.brandingSettings.channel.keywords).toContain("יצירת וידאו");
     expect(payload.brandingSettings.channel.unsubscribedTrailer).toBe("abc123");
+    const replaced = channelBrandingUpdate({
+      channelId: "UC1",
+      description: "English kitchen hacks.",
+      keywords: "herbs",
+      defaultLanguage: "en",
+      unsubscribedTrailer: "newTrailer",
+      existing: { defaultLanguage: "he", unsubscribedTrailer: "oldTrailer" }
+    });
+    expect(replaced.brandingSettings.channel.defaultLanguage).toBe("en");
+    expect(replaced.brandingSettings.channel.unsubscribedTrailer).toBe("newTrailer");
     expect(payload.brandingSettings.channel.title).toBeUndefined();
   });
 });

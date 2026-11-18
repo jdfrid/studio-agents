@@ -14,6 +14,7 @@ import {
   ProviderError,
   stripNiqqud,
   stripUnspokenAddresses,
+  withPronunciation,
   type Agent,
   type AudioInput,
   type AudioOutput
@@ -85,7 +86,8 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           });
           continue;
         }
-        const spoken = await spokenHebrew(input.language, scene.narration);
+        const spokenLine = withPronunciation(await spokenHebrew(input.language, scene.narration), input.language);
+        const spoken = spokenLine.text;
         if (!/[\p{L}\p{N}]/u.test(spoken)) {
           perScene.push({
             sceneId: scene.sceneId,
@@ -98,7 +100,7 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
           });
           continue;
         }
-        const deliveryStyle = hebrewDeliveryStyle(input.language, input.voiceStyle);
+        const deliveryStyle = [spokenLine.style, hebrewDeliveryStyle(input.language, input.voiceStyle)].filter(Boolean).join(" | ") || undefined;
         try {
           let audio: SpeechResult;
           if (useClonedVoice && elevenApiKey && clonedVoiceId) {
@@ -297,8 +299,9 @@ export const audioAgent: Agent<AudioInput, AudioOutput> = {
       const brandLine = input.brandEndNarration?.trim();
       if (brandLine && !useClonedVoice && defaultTts?.type === "GEMINI") {
         try {
-          const brandSpoken = await spokenHebrew(input.language, brandLine);
-          const brandStyle = hebrewDeliveryStyle(input.language, input.voiceStyle);
+          const brandLineSpoken = withPronunciation(await spokenHebrew(input.language, brandLine), input.language);
+          const brandSpoken = brandLineSpoken.text;
+          const brandStyle = [brandLineSpoken.style, hebrewDeliveryStyle(input.language, input.voiceStyle)].filter(Boolean).join(" | ") || undefined;
           const audio = applyVoicePitchShift(
             await geminiSynthesizeSpeech(
               defaultTts,

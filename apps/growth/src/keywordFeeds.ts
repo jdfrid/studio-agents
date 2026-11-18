@@ -215,9 +215,9 @@ async function writeScripts(input: { query: string; language: string; ideas: str
   const languageName = input.language.startsWith("he") ? "Hebrew" : "English";
   const minutes = Math.max(1, Math.round(input.durationSeconds / 60));
   const shape = input.durationSeconds <= 30
-    ? "Each script is 4 to 6 short narration lines about one practical tip."
+    ? "Each script is one idea for a 15 to 20 second Short, hard maximum 25 seconds. The first line is a concrete problem, such as Stop and the bad outcome, or the finished result. Then two or three short steps. The last line repeats the first line so the video loops. Complete sentences only. No greeting and no visit-our-website line."
     : `Each script fills about ${minutes} minute${minutes === 1 ? "" : "s"} (${input.durationSeconds} seconds): ${minutes * 8 - 2} to ${minutes * 8 + 4} narration lines, with a beginning, a middle, and an ending.`;
-  const system = `You write original vertical YouTube scripts of ${input.durationSeconds} seconds. The title and the script must be entirely in ${languageName}. The title is something a person would click: a concrete result, with the keyword in it, under 70 characters. Do not promise anything the script does not show. Do not copy another creator's title, script, or wording. ${shape}`;
+  const system = `You write original vertical YouTube scripts of ${input.durationSeconds <= 30 ? 20 : input.durationSeconds} seconds. The title and the script must be entirely in ${languageName}. The title is the exact search phrase a person would type, it describes what the script shows, and it is under 60 characters. Do not promise anything the script does not show. Do not copy another creator's title, script, or wording. ${shape}`;
   const user = `Keyword: ${input.query}\nCover these subjects without copying their wording:\n${input.ideas.map((idea) => `- ${idea}`).join("\n")}\nReturn JSON {"items":[{"title":"","script":""}]} with up to ${BATCH} items.`;
   const raw = process.env.GEMINI_API_KEY?.trim()
     ? await gemini(system, user)

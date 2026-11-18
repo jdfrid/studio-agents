@@ -280,6 +280,35 @@ export function migrate(db: GrowthDb): void {
   ensureIntColumn(db, "keyword_feeds", "duration_seconds", 30);
   migrateFacebookGroups(db);
   seedDirectories(db);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS growth_replies (
+      comment_id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS growth_crossposts (
+      job_id TEXT NOT NULL,
+      network TEXT NOT NULL,
+      status TEXT NOT NULL,
+      detail TEXT,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (job_id, network)
+    );
+    CREATE TABLE IF NOT EXISTS shorts_slots (
+      slot_key TEXT PRIMARY KEY,
+      destination_id TEXT NOT NULL,
+      publish_at TEXT NOT NULL,
+      status TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      title TEXT,
+      item_id TEXT,
+      run_id TEXT,
+      job_id TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
 }
 
 function ensureTextColumn(db: GrowthDb, table: string, column: string): void {
@@ -715,7 +744,7 @@ export function countYoutubeUploadAttempts(db: GrowthDb, destinationId: string, 
     .prepare(
       `SELECT COUNT(*) AS n FROM jobs
        WHERE network = 'youtube' AND destination_id = ? AND created_at >= ?
-       AND COALESCE(error_code, '') != 'daily_upload_limit'`
+       AND COALESCE(error_code, '') NOT IN ('daily_upload_limit', 'shorts_quality', 'shorts_review', 'shorts_daily_cap')`
     )
     .get(destinationId, sinceIso) as Row | undefined;
   return row ? num(row, "n") : 0;

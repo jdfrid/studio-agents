@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { followCta, narrationFromScriptJson, shortsBriefSeconds, shortsProductionNotes } from "@studio/shared";
 import { loadPromoPackages, type PromoPackage } from "./catalog.js";
-import { subscribeCue, subscribeCueNote } from "./languageCopy.js";
 import { nid } from "./crypto.js";
 import { getItem, listItems, updateItem, type GrowthDb, type Item } from "./db.js";
 
@@ -25,9 +25,9 @@ export function briefForPackage(pkg: PromoPackage): Record<string, unknown> {
     ].join("\n"),
     targetAudience: pkg.audience,
     language: "en",
-    instructions: `This video is only about Reelmino, the product in the package. ${subscribeCueNote("en")}`,
-    branding: { slogan: subscribeCue("en") },
-    durationSeconds: scenes.length * SECONDS_PER_SCENE + END_CARD_SECONDS,
+    instructions: `This video is only about Reelmino, the product in the package. Show the finished ad before you explain the feature. ${shortsProductionNotes({ kind: "product", language: "en" })}`,
+    branding: { slogan: followCta("en") },
+    durationSeconds: shortsBriefSeconds(scenes.length * SECONDS_PER_SCENE + END_CARD_SECONDS),
     aspectRatio: "9:16",
     budgetMode: true,
     approvalMode: "auto"
@@ -67,7 +67,7 @@ export async function submitReelminoBrief(brief: Record<string, unknown>): Promi
   return created.id;
 }
 
-export async function downloadReelminoFinal(runId: string, mediaDir: string): Promise<{ filename: string } | null> {
+export async function downloadReelminoFinal(runId: string, mediaDir: string): Promise<{ filename: string; narration?: string } | null> {
   const payload = (await reelmino(`/runs/${runId}/artifacts`)) as { artifacts?: Array<{ id: string; kind: string }> } | Array<{ id: string; kind: string }>;
   const list = Array.isArray(payload) ? payload : payload.artifacts ?? [];
   const final = [...list].reverse().find((row) => row.kind === "final_video");
@@ -80,7 +80,23 @@ export async function downloadReelminoFinal(runId: string, mediaDir: string): Pr
   mkdirSync(mediaDir, { recursive: true });
   const filename = `${nid()}.mp4`;
   writeFileSync(path.join(mediaDir, filename), Buffer.from(await response.arrayBuffer()));
-  return { filename };
+  const narration = await scriptNarration(list);
+  return narration ? { filename, narration } : { filename };
+}
+
+async function scriptNarration(list: Array<{ id: string; kind: string }>): Promise<string> {
+  const script = [...list].reverse().find((row) => row.kind === "script_output");
+  if (!script) return "";
+  try {
+    const signed = (await reelmino(`/artifacts/${script.id}/signed-url`)) as { url?: string; signedUrl?: string };
+    const remote = signed.url ?? signed.signedUrl;
+    if (!remote) return "";
+    const response = await fetch(remote);
+    if (!response.ok) return "";
+    return narrationFromScriptJson(await response.text());
+  } catch {
+    return "";
+  }
 }
 
 export async function produceItem(db: GrowthDb, promoKit: string, item: Item): Promise<Item> {

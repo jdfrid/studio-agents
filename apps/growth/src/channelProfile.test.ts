@@ -9,7 +9,7 @@ describe("channel profiles", () => {
       expect(profile.description.length).toBeLessThanOrEqual(1000);
       expect(profile.keywords.length).toBeLessThanOrEqual(500);
       expect(profile.description).toContain("Reelmino");
-      expect(profile.description).toContain("יצירת וידאו");
+      expect(profile.description).not.toMatch(/visit our website/i);
       expect(profile.keywords).toContain('"video creation"');
       expect(profile.keywords).toContain('"יצירת וידאו"');
       expect(profile.videoTags).toContain("video creation");
@@ -27,12 +27,12 @@ describe("channel profiles", () => {
       { handle: "@kitchentips-reelmino", name: "Reelmino Kitchen Tips" }
     );
     expect(copy.body).toContain("Store the stems in water.");
-    expect(copy.body).toContain("Video creation");
-    expect(copy.body).toContain("https://reelmino.com");
+    expect(copy.body).toContain("Made with Reelmino.");
+    expect(copy.body).not.toContain("https://reelmino.com");
     expect(copy.body).not.toMatch(/\p{Script=Hebrew}/u);
-    expect(copy.hashtags).toContain("יצירת וידאו");
-    expect(copy.hashtags).toContain("kitchen tips");
+    expect(copy.hashtags).not.toContain("יצירת וידאו");
     expect(copy.hashtags).toContain("herbs");
+    expect(copy.hashtags).toContain("shorts");
   });
 
   it("writes a Hebrew video description in Hebrew and still tags video creation", () => {
@@ -40,9 +40,9 @@ describe("channel profiles", () => {
       { title: "סרטון לעסק", body: "משפט אחד מספיק.", language: "he", hashtags: [] },
       { handle: "@reelminoapp", name: "Reelmino" }
     );
-    expect(copy.body).toContain("יצירת וידאו");
     expect(copy.body).toContain("https://reelmino.com");
-    expect(copy.hashtags).toContain("video creation");
-    expect(copy.hashtags).toContain("video ads");
+    expect(copy.body).toContain("משפט אחד מספיק.");
+    expect(copy.hashtags).not.toContain("video creation");
+    expect(copy.hashtags).toContain("shorts");
   });
 });

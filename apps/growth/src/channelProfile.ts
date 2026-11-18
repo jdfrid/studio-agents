@@ -1,21 +1,19 @@
 import { createHash } from "node:crypto";
 import { channelBrandingUpdate } from "@studio/providers";
-import type { PackageCopyInput } from "@studio/shared";
+import { filterShortsHashtags, type PackageCopyInput } from "@studio/shared";
 import { destinationsForNetwork, getConnection, getSetting, setSetting, type Destination, type GrowthDb } from "./db.js";
 
 const TAG_LIMIT = 30;
 const TAG_CHARS = 500;
 
 const BRAND_DESCRIPTION = [
-  "Reelmino turns one sentence into a finished branded video for a small business. Write what the business wants to say, and Reelmino prepares the script, the scenes, and a video ad you can publish.",
-  "Reelmino הופכת משפט אחד לסרטון ממותג לעסק. כותבים מה העסק רוצה להגיד, והמערכת מכינה תסריט, סצנות וסרטון מוכן לפרסום. יצירת וידאו, מודעות וידאו וסרטונים קצרים לעסקים.",
+  "AI business video from one sentence. Type what the business wants to say and Reelmino makes a branded video ad you can publish.",
   "https://reelmino.com"
 ].join("\n\n");
 
 const KITCHEN_DESCRIPTION = [
-  "Original kitchen tips for home cooks: food storage, prep, layout, and everyday cooking. Each video is one practical idea.",
-  "הסרטונים האלה נוצרים ב-Reelmino, המערכת שהופכת משפט אחד לסרטון. יצירת וידאו, טיפים למטבח וסרטונים קצרים.",
-  "https://reelmino.com"
+  "English kitchen hacks for home cooks: keep food fresh, store it properly, and fix the layout. One practical idea in every video.",
+  "Made with Reelmino."
 ].join("\n\n");
 
 const PRODUCT_KEYWORDS = [
@@ -120,17 +118,6 @@ export function profileFor(destination: ChannelRef): ChannelProfile {
     : { kind, description: BRAND_DESCRIPTION, keywords: keywordField(BRAND_KEYWORDS), videoTags: BRAND_TAGS };
 }
 
-function footerLine(kind: ChannelKind, hebrew: boolean): string {
-  if (kind === "kitchen") {
-    return hebrew
-      ? "טיפ למטבח שנוצר ב-Reelmino. יצירת וידאו: משפט אחד הופך לסרטון ממותג לעסק."
-      : "A kitchen tip made with Reelmino. Video creation for a small business: one sentence becomes a branded video.";
-  }
-  return hebrew
-    ? "Reelmino: יצירת וידאו לעסק. משפט אחד הופך לסרטון ממותג שאפשר לפרסם."
-    : "Reelmino: video creation for a small business. One sentence becomes a branded video you can publish.";
-}
-
 export function mergeTags(primary: string[], extra: string[]): string[] {
   const seen = new Set<string>();
   const tags: string[] = [];
@@ -152,12 +139,20 @@ export function mergeTags(primary: string[], extra: string[]): string[] {
 export function applyVideoProfile(copy: PackageCopyInput, destination: ChannelRef): PackageCopyInput {
   const profile = profileFor(destination);
   const hebrew = (copy.language ?? "").toLowerCase().startsWith("he");
-  const line = footerLine(profile.kind, hebrew);
-  let body = (copy.body ?? "").trim();
-  if (line && !body.includes(line)) body = body ? `${body}\n\n${line}` : line;
-  if (!/reelmino\.com/i.test(body)) body = `${body}\nhttps://reelmino.com`;
+  const language = copy.language ?? (hebrew ? "he" : "en");
+  let body = (copy.body ?? "").replace(/a vertical video that follows the saved script\.?/gi, "").trim();
+  if (profile.kind === "kitchen") {
+    body = body.replace(/https?:\/\/(?:www\.)?reelmino\.com\/?\s*/gi, "").trim();
+    const mention = hebrew ? "נוצר עם Reelmino." : "Made with Reelmino.";
+    if (!/reelmino/i.test(body)) body = body ? `${body}\n\n${mention}` : mention;
+  } else if (!/reelmino\.com/i.test(body)) {
+    const mention = hebrew
+      ? "Reelmino הופך משפט אחד לסרטון ממותג.\nhttps://reelmino.com"
+      : "Reelmino turns one sentence into a branded video.\nhttps://reelmino.com";
+    body = body ? `${body}\n\n${mention}` : mention;
+  }
   const own = [...(copy.hashtags ?? []), ...(body.match(/#([\p{L}\p{N}_]+)/gu) ?? []).map((tag) => tag.slice(1))];
-  return { ...copy, body: body.trim(), hashtags: mergeTags(profile.videoTags, own) };
+  return { ...copy, body: body.trim(), hashtags: filterShortsHashtags(own, language) };
 }
 
 function profileHash(profile: ChannelProfile): string {
@@ -174,12 +169,14 @@ async function readBranding(accessToken: string, channelId: string): Promise<Rec
   return data.items?.[0]?.brandingSettings?.channel ?? {};
 }
 
-export async function writeChannelBranding(accessToken: string, channelId: string, profile: ChannelProfile): Promise<void> {
+export async function writeChannelBranding(accessToken: string, channelId: string, profile: ChannelProfile, trailer?: string): Promise<void> {
   const existing = await readBranding(accessToken, channelId);
   const payload = channelBrandingUpdate({
     channelId,
     description: profile.description,
     keywords: profile.keywords,
+    defaultLanguage: "en",
+    ...(trailer ? { unsubscribedTrailer: trailer } : {}),
     existing
   });
   const response = await fetch("https://www.googleapis.com/youtube/v3/channels?part=brandingSettings", {
@@ -209,7 +206,8 @@ async function ensureOne(
   const connection = getConnection(db, destination.connectionId);
   if (!connection || connection.status === "needs_reauth" || connection.status === "revoked") return;
   const profile = profileFor(destination);
-  const hash = profileHash(profile);
+  const trailer = process.env[channelKind(destination) === "kitchen" ? "SHORTS_TRAILER_KITCHEN" : "SHORTS_TRAILER_REELMINO"]?.trim() || "";
+  const hash = `${profileHash(profile)}:${trailer}`;
   const savedKey = `yt_channel_profile:${destination.id}`;
   if (getSetting(db, savedKey) === hash) return;
   const waitKey = `yt_channel_profile_wait:${destination.id}`;
@@ -217,7 +215,7 @@ async function ensureOne(
   if (wait && Date.parse(wait) > Date.now()) return;
   try {
     const tokens = await tokensFor(destination.connectionId);
-    await writeChannelBranding(tokens.accessToken, destination.externalId, profile);
+    await writeChannelBranding(tokens.accessToken, destination.externalId, profile, trailer || undefined);
     setSetting(db, savedKey, hash);
     setSetting(db, waitKey, "");
     console.log(`[growth] channel profile updated ${destination.handle || destination.name}`);

@@ -27,6 +27,7 @@ import {
   getDestination,
   getItem,
   getJob,
+  getSetting,
   getSlot,
   insertJob,
   listJobs,
@@ -39,8 +40,9 @@ import {
   type Job
 } from "./db.js";
 import { createLinkedInAdapter, linkedinTokenExpired } from "./linkedin.js";
-import { applyVideoProfile } from "./channelProfile.js";
+import { applyVideoProfile, channelKind } from "./channelProfile.js";
 import { queueYouTubeMirror } from "./telegramMirror.js";
+import { reviewYoutubeShort } from "./shortsGate.js";
 import { prepareYouTubeListing, systemThumbnailBytes, youtubeFileName, youtubeReleaseAt } from "./youtubeListing.js";
 import { applyLink, formatForNetwork, trackedLink } from "./utm.js";
 
@@ -70,6 +72,24 @@ function publishConfig(network: string, raw: unknown, link?: string) {
     firstComment: parsed.firstComment?.trim() || link,
     firstCommentDelayMinutes: parsed.firstCommentDelayMinutes ?? 2,
     linkInFirstComment: true
+  };
+}
+
+function attachLongForm(
+  db: GrowthDb,
+  item: Item,
+  destination: Destination,
+  copy: PackageCopyInput
+): { copy: PackageCopyInput; config: Record<string, unknown> } {
+  let body = copy.body ?? "";
+  if (destination.network === "youtube" && item.source !== "longform") {
+    const url = getSetting(db, `longform_url:${destination.id}`);
+    if (url && !body.includes(url)) body = `${body}\n\nFull video: ${url}`.trim();
+  }
+  const categoryId = destination.network === "youtube" ? (channelKind(destination) === "kitchen" ? "26" : "22") : undefined;
+  return {
+    copy: { ...copy, body },
+    config: categoryId ? { categoryId } : {}
   };
 }
 
@@ -177,11 +197,18 @@ export function mediaOf(item: Item, mediaDir: string, publicBase: string): Publi
   ];
 }
 
-function youtubeDelivery(item: Item, copy: PackageCopyInput, destination: Destination, media: PublishMediaFile[]): {
+function youtubeDelivery(
+  item: Item,
+  copy: PackageCopyInput,
+  destination: Destination,
+  media: PublishMediaFile[],
+  publishAt?: Date | null
+): {
   copy: PackageCopyInput;
   media: PublishMediaFile[];
   cover?: PublishMediaFile;
-  scheduleAt: Date;
+  /** Null publishes now. Undefined keeps the two-hour private hold. */
+  scheduleAt: Date | null;
 } {
   const prepared = prepareYouTubeListing(item, copy);
   const listed = applyVideoProfile(prepared.copy, destination);
@@ -204,7 +231,8 @@ function youtubeDelivery(item: Item, copy: PackageCopyInput, destination: Destin
         filename: thumb.filename
       }
     : undefined;
-  return { copy: listed, media: nextMedia, cover, scheduleAt: youtubeReleaseAt() };
+  const scheduleAt = publishAt === undefined ? youtubeReleaseAt() : publishAt;
+  return { copy: listed, media: nextMedia, cover, scheduleAt };
 }
 
 export async function freshConnectionTokens(db: GrowthDb, connectionId: string, key: Buffer, network: string): Promise<SocialTokens> {
@@ -232,6 +260,8 @@ export async function runPublish(input: {
   slotId?: string | null;
   campaign?: string;
   copy?: PackageCopyInput;
+  /** YouTube publish time. Null publishes now. Omit for the two-hour private hold. */
+  publishAt?: Date | null;
 }): Promise<Job> {
   if (input.destination.network === "youtube" && youtubeUploadBlock(input.db, input.destination.id)) {
     const stopped = insertJob(input.db, {
@@ -279,9 +309,31 @@ export async function runPublish(input: {
     const tokens = await freshConnectionTokens(input.db, input.destination.connectionId, input.key, input.destination.network);
     const config = publishConfig(input.destination.network, input.destination.config, copy.link);
     const loaded = mediaOf(input.item, input.mediaDir, input.publicBase);
-    const delivery = input.destination.network === "youtube" ? youtubeDelivery(input.item, copy, input.destination, loaded) : null;
+    const delivery = input.destination.network === "youtube" ? youtubeDelivery(input.item, copy, input.destination, loaded, input.publishAt) : null;
     if (delivery) copy = delivery.copy;
     const media = delivery?.media ?? loaded;
+    if (input.destination.network === "youtube") {
+      const verdict = await reviewYoutubeShort({
+        db: input.db,
+        item: input.item,
+        destination: input.destination,
+        copy,
+        media: media.find((file) => file.item.kind === "video")?.body ?? null,
+        exceptJobId: job.id
+      });
+      if (verdict.decision !== "publish") {
+        return updateJob(input.db, job.id, {
+          status: "failed",
+          lastError: verdict.reasons.join(" "),
+          errorCode: verdict.code,
+          attempts: 1
+        })!;
+      }
+      copy = { ...copy, title: verdict.title, body: verdict.description, hashtags: verdict.hashtags };
+      const linked = attachLongForm(input.db, input.item, input.destination, copy);
+      copy = linked.copy;
+      Object.assign(config, linked.config);
+    }
     const preview = adapter.preview(
       media.map((file) => file.item),
       copy,
@@ -309,8 +361,8 @@ export async function runPublish(input: {
       preview,
       media,
       cover: delivery?.cover,
-      scheduleAt: delivery?.scheduleAt,
-      mode: delivery ? "schedule" : "now"
+      scheduleAt: delivery?.scheduleAt ?? undefined,
+      mode: delivery?.scheduleAt ? "schedule" : "now"
     });
     return applyResult(input.db, job.id, result, { copy, config, network: input.destination.network });
   } catch (error) {
@@ -456,6 +508,30 @@ export async function retryPublish(input: {
     const delivery = destination.network === "youtube" ? youtubeDelivery(item, copy, destination, loaded) : null;
     if (delivery) copy = delivery.copy;
     const media = delivery?.media ?? loaded;
+    if (destination.network === "youtube") {
+      const verdict = await reviewYoutubeShort({
+        db: input.db,
+        item,
+        destination,
+        copy,
+        media: media.find((file) => file.item.kind === "video")?.body ?? null,
+        exceptJobId: job.id
+      });
+      if (verdict.decision !== "publish") {
+        return {
+          job: updateJob(input.db, job.id, {
+            status: "failed",
+            lastError: verdict.reasons.join(" "),
+            errorCode: verdict.code,
+            attempts: job.attempts + 1
+          })
+        };
+      }
+      copy = { ...copy, title: verdict.title, body: verdict.description, hashtags: verdict.hashtags };
+      const linked = attachLongForm(input.db, item, destination, copy);
+      copy = linked.copy;
+      Object.assign(config, linked.config);
+    }
     const preview = adapter.preview(
       media.map((file) => file.item),
       copy,
@@ -485,8 +561,8 @@ export async function retryPublish(input: {
       preview,
       media,
       cover: delivery?.cover,
-      scheduleAt: delivery?.scheduleAt,
-      mode: delivery ? "schedule" : "now"
+      scheduleAt: delivery?.scheduleAt ?? undefined,
+      mode: delivery?.scheduleAt ? "schedule" : "now"
     });
     return { job: applyResult(input.db, job.id, result, { copy, config, network: destination.network }) };
   } catch (error) {
