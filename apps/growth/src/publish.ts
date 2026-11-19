@@ -19,6 +19,7 @@ import {
   type SocialNetwork
 } from "@studio/shared";
 import { captionFromHandle, composeFreshCopy, type CaptionLock } from "./angles.js";
+import { applyPromoDescription } from "./promoLinks.js";
 import { YOUTUBE_DAILY_CODE, YOUTUBE_DAILY_MESSAGE, youtubeUploadBlock } from "./youtubeQuota.js";
 import type { ItemCopy } from "./copy.js";
 import { decryptJson, encryptJson, nid } from "./crypto.js";
@@ -332,6 +333,9 @@ export async function runPublish(input: {
       copy = { ...copy, title: verdict.title, body: verdict.description, hashtags: verdict.hashtags };
       const linked = attachLongForm(input.db, input.item, input.destination, copy);
       copy = linked.copy;
+      copy = await applyPromoDescription(input.db, input.item, input.destination, copy, async (connectionId) => {
+        return (await freshConnectionTokens(input.db, connectionId, input.key, "youtube")).accessToken;
+      });
       Object.assign(config, linked.config);
     }
     const preview = adapter.preview(

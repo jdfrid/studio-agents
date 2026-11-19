@@ -5,6 +5,7 @@ import { emptyCopy } from "./copy.js";
 import { freshConnectionTokens, runPublish } from "./publish.js";
 import { downloadReelminoFinal, submitReelminoBrief } from "./produce.js";
 import { KITCHEN_CHANNEL_ID, REELMINO_CHANNEL_ID, scheduledChannel } from "./shortsSchedule.js";
+import { advancePromoBackfill } from "./promoLinks.js";
 import { advanceTelegramCrossPosts } from "./telegramCrossPost.js";
 import { advanceZernioCrossPosts, crossPostCaption, logZernioAnalytics, zernioApiKey } from "./zernio.js";
 
@@ -260,6 +261,13 @@ export async function advanceSubscriberGrowth(ctx: RunContext, deps: SubscriberD
     await advanceTelegramCrossPosts(ctx.db, { now, mediaDir: ctx.mediaDir, log });
   }
   if (growthFlag("SHORTS_WEIGHT_TUNING")) await logZernioAnalytics(ctx.db, now, log);
+  if (growthFlag("SHORTS_PROMO_LINKS")) {
+    await advancePromoBackfill(ctx.db, {
+      now,
+      log,
+      tokenFor: async (connectionId) => (await freshConnectionTokens(ctx.db, connectionId, ctx.key, "youtube")).accessToken
+    });
+  }
 }
 
 async function bindLiveYoutube(ctx: RunContext, destination: Destination, deps: SubscriberDeps, log: (message: string) => void): Promise<SubscriberDeps> {

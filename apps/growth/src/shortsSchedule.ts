@@ -1,4 +1,5 @@
-import { evaluateShortsGate, nextProductDemo, nextSeriesTopic, productDemoComment, type ProductDemo } from "@studio/shared";
+import { evaluateShortsGate, nextProductDemo, nextSeriesTopic, type ProductDemo } from "@studio/shared";
+import { promoCommentText, savedPromo } from "./promoLinks.js";
 import { slugify } from "./catalog.js";
 import { emptyCopy } from "./copy.js";
 import { nid } from "./crypto.js";
@@ -345,7 +346,7 @@ async function runSlot(
     jobId: result.id,
     error: null
   });
-  if (input.kind === "product") await postDemoComment(ctx, deps, input.destination, result.remotePostId, item.copy.article.body || row.title);
+  await postPromoComment(ctx, deps, input.destination, input.kind, result.remotePostId, item);
 }
 
 async function startAttempt(
@@ -500,17 +501,23 @@ function scheduleCopy(title: string, description: string, script = "") {
   return copy;
 }
 
-async function postDemoComment(
+async function postPromoComment(
   ctx: ScheduleContext,
   deps: ScheduleDeps,
   destination: Destination,
+  kind: ScheduleKind,
   videoId: string | null | undefined,
-  fallbackPrompt: string
+  item: { id: string; language: string; copy: { article?: { body?: string } } }
 ): Promise<void> {
-  const itemScript = fallbackPrompt;
-  const text = productDemoComment(itemScript);
+  const text = promoCommentText({
+    kind,
+    script: item.copy.article?.body || "",
+    language: item.language,
+    promo: savedPromo(ctx.db, item.id)
+  });
+  if (!text) return;
   if (!videoId) {
-    log(deps, "product comment waiting for a YouTube video id. Pinning is not available in the YouTube API.");
+    log(deps, "promo comment waiting for a YouTube video id. Pinning is not available in the YouTube API.");
     return;
   }
   try {

@@ -33,7 +33,15 @@ A product Short is one feature and one business. The spoken script is the exampl
 
 The result beat is a Veo stand-in inside that same Reelmino render. The brief sets `resultSegment.source` to `veo-stand-in`, stores the example prompt, and sets `swapLater: true`. The growth host does not have a way to upload a second finished mp4 into the studio timeline, so a real export of the example prompt is not spliced in automatically. Replace the result beat later with that export when you have it.
 
-After the upload, the YouTube adapter posts a top-level comment (`commentThreads.insert`) with the example prompt and `https://reelmino.com`. YouTube’s Data API cannot pin a comment. Pin that comment in YouTube Studio. That pin step is still TODO.
+After the upload, the channel posts one top-level comment (`commentThreads.insert`). A product Short still includes the example prompt. Both channels add a line that points at one @reelminoapp function demo and `https://reelmino.com`. YouTube’s Data API cannot pin a comment, and it cannot set the Shorts “related video” link. Pin the comment in YouTube Studio. The related-video chip stays unset.
+
+## Promo links
+
+Every auto-produced Short on @KitchenTips-Reelmino and @reelminoapp links to a function demo from @reelminoapp. The growth tick reads that channel’s uploads playlist (public videos only) at most once a day and caches the video id, title, and function when the title or our own job row matches a `PRODUCT_FEATURES` id. Kitchen Shorts prefer a demo whose title shares a topic word, then rotate. A product Short never links to itself or to another video of the same function.
+
+The line is `See Reelmino do this: <title>` plus the watch URL and `https://reelmino.com`. It is added to the description at upload time, so it does not cost a separate `videos.update`. The same line is the channel comment.
+
+`SHORTS_PROMO_BACKFILL_PER_DAY` (default 1) updates descriptions of Shorts from the last 30 days that do not have the line yet. `videos.update` costs 50 quota units and `videos.list` costs 1. Six uploads are about 1,600 units each, and six new comments are 50 each, so a full day is about 9,900 of the default 10,000 units. One backfill update fits in what is left. Raise the env value only if the project quota is higher. A failed update is skipped until the next day. Set `SHORTS_PROMO_LINKS=0` to stop new links and the backfill.
 
 ## Quality gate
 
