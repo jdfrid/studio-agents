@@ -5,6 +5,7 @@ import { emptyCopy } from "./copy.js";
 import { freshConnectionTokens, runPublish } from "./publish.js";
 import { downloadReelminoFinal, submitReelminoBrief } from "./produce.js";
 import { KITCHEN_CHANNEL_ID, REELMINO_CHANNEL_ID, scheduledChannel } from "./shortsSchedule.js";
+import { advanceTelegramCrossPosts } from "./telegramCrossPost.js";
 import { advanceZernioCrossPosts, crossPostCaption, logZernioAnalytics, zernioApiKey } from "./zernio.js";
 
 export { crossPostCaption };
@@ -254,6 +255,9 @@ export async function advanceSubscriberGrowth(ctx: RunContext, deps: SubscriberD
   }
   if (growthFlag("SHORTS_CROSSPOST") && zernioApiKey()) {
     await advanceZernioCrossPosts(ctx.db, { now, mediaDir: ctx.mediaDir, log });
+  }
+  if (growthFlag("SHORTS_CROSSPOST")) {
+    await advanceTelegramCrossPosts(ctx.db, { now, mediaDir: ctx.mediaDir, log });
   }
   if (growthFlag("SHORTS_WEIGHT_TUNING")) await logZernioAnalytics(ctx.db, now, log);
 }

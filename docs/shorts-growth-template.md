@@ -112,7 +112,7 @@ These jobs run on the same 30-second tick as the Shorts clock. Each one is on un
 | `SHORTS_CHANNEL_SEO` | on | Channel description, keywords, and English as the default language. Applied by the existing channel-profile pass. |
 | `SHORTS_TOPIC_DEMAND` | on | Once a day, ranks search titles and offers the top fresh one to the next kitchen slot. |
 | `SHORTS_WEIGHT_TUNING` | on | Once a week, moves topic and feature weights between 0.5× and 2× from Analytics. |
-| `SHORTS_CROSSPOST` | on | After a Short’s YouTube `publishAt` time, uploads the same mp4 through Zernio to TikTok and X. Skips when `ZERNIO_API_KEY` is empty. |
+| `SHORTS_CROSSPOST` | on | After a Short’s YouTube `publishAt` time, uploads the same mp4 through Zernio to TikTok and X, and sends it to Telegram with the bot API. Skips each destination when its credentials are empty. |
 
 Kitchen playlists are produce, herbs, storage, cleaning, and cooking hacks. Product playlists are one per feature plus `Reelmino for <business>`.
 
@@ -130,7 +130,7 @@ New YouTube connects request `youtube.force-ssl` (comments and playlists) and `y
 
 Cross-posts go through Zernio (`https://zernio.com`). The growth process uploads the rendered mp4 to Zernio’s media endpoint (or sends an `https` media path when the file is already a public URL) and publishes a native TikTok video and an X video post. This runs only after the Short’s YouTube slot time. A Zernio failure is logged and retried; the YouTube upload is left as it is.
 
-Connected accounts: TikTok `user811120410700` (`6afd5d11e23b7dac9dfd7e84`) and X `@reelmino2026` (`6afd5d2a030baa4c27c55943`). Add later platforms in `ZERNIO_ACCOUNTS` as `telegram:<accountId>`, `instagram:<accountId>`, or `facebook:<accountId>`. The API name for X is `twitter`; `x:` in the env value is accepted.
+Connected Zernio accounts: TikTok `user811120410700` (`6afd5d11e23b7dac9dfd7e84`) and X `@reelmino2026` (`6afd5d2a030baa4c27c55943`). The free Zernio plan allows two accounts, so Telegram is not sent through Zernio. Add Instagram or Facebook later in `ZERNIO_ACCOUNTS` as `instagram:<accountId>` or `facebook:<accountId>`. The API name for X is `twitter`; `x:` in the env value is accepted.
 
 | Env | Default | What it does |
 | --- | --- | --- |
@@ -144,6 +144,8 @@ Each video is posted once per platform. The Zernio post id is stored in `growth_
 
 Caption: the Short title, then 2–3 hashtags, then `More on YouTube: <channel URL>`. X captions stay within 280 characters.
 
-Set the key on the Hetzner growth host, not on Render. The file is `infra/hetzner/.env` on that server (the copy of `infra/hetzner/env.example`). `infra/hetzner/docker-compose.yml` passes `ZERNIO_API_KEY` into the `growth` container. After editing the file, run `bash infra/hetzner/deploy.sh` from the repo on the server so the container restarts with the new value.
+Telegram uses the Bot API directly. `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_IDS` must both be set; otherwise the step returns without a log line. Chat ids are comma-separated. The first target is the private ReelMino channel, `-1004473673094`. Each newly published Short is sent after its YouTube `publishAt`, at least `ZERNIO_MIN_GAP_HOURS` after the previous Telegram send. A file of 50MB or smaller is `sendVideo`. A larger file, a missing file, or the weekly long video is `sendMessage` with the YouTube link. The caption is the title, a short description, the YouTube link, and `https://reelmino.com`, in English or Hebrew to match the video, and at most 1024 characters. Message ids are stored in `growth_crossposts` per video and chat. A failed chat is logged and retried; the other chats and the YouTube upload continue.
+
+Set the keys on the Hetzner growth host, not on Render. The file is `infra/hetzner/.env` on that server (the copy of `infra/hetzner/env.example`). `infra/hetzner/docker-compose.yml` passes `ZERNIO_API_KEY`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_IDS` into the `growth` container. After editing the file, run `bash infra/hetzner/deploy.sh` from the repo on the server so the container restarts with the new value.
 
 If `ZERNIO_API_KEY` is empty and the older Buffer or Facebook Page tokens are set, the previous caption-only post still runs. It does not upload the mp4.
