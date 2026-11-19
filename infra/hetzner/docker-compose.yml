@@ -252,6 +252,8 @@ services:
       ZERNIO_DAILY_CAP: ${ZERNIO_DAILY_CAP:-3}
       ZERNIO_MIN_GAP_HOURS: ${ZERNIO_MIN_GAP_HOURS:-2}
       ZERNIO_SLOT_PREFER: ${ZERNIO_SLOT_PREFER:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_IDS: ${TELEGRAM_CHAT_IDS:-}
       GROWTH_WEB_PUBLIC: /srv/site
     volumes:
       - growth_data:/app/apps/growth/data
