@@ -62,15 +62,19 @@ export function detailedDescription(input: {
   sourceText: string;
   language: string;
 }): { body: string; keywords: string[] } {
-  const hebrew = input.language.toLowerCase().startsWith("he");
   const keywords = listingKeywords([input.title, input.summary, input.body, input.sourceText].join("\n"), input.language);
-  let body = (input.body || input.summary || "").trim();
-  const missing = keywords.filter((word) => !body.toLowerCase().includes(word.toLowerCase())).slice(0, 6);
-  if (missing.length) {
-    const line = hebrew ? `בסרטון: ${missing.join(", ")}.` : `In this video: ${missing.join(", ")}.`;
-    body = body ? `${body}\n\n${line}` : line;
-  }
+  const body = cleanListingBody(input.body || input.summary || "");
   return { body: body.slice(0, 4500), keywords };
+}
+
+export function cleanListingBody(body: string): string {
+  return body
+    .replace(/a vertical video that follows the saved script\.?/gi, "")
+    .replace(/^in this video:.*$/gim, "")
+    .replace(/^בסרטון:.*$/gim, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function youtubeFileName(title: string, keywords: string[]): string {

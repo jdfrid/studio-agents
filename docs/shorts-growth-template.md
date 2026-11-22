@@ -124,7 +124,11 @@ These jobs run on the same 30-second tick as the Shorts clock. Each one is on un
 
 Kitchen playlists are produce, herbs, storage, cleaning, and cooking hacks. Product playlists are one per feature plus `Reelmino for <business>`.
 
-The weekly kitchen video is “N tricks to &lt;topic&gt;” with chapters. The product video is a walkthrough of one feature. The long-form gate requires a search title, at least three chapters, no greeting, and the word “subscribe” in the middle and at the end. Each later Short description links that long video.
+The weekly kitchen video is “N tricks to &lt;topic&gt;” with chapters. The product video is a walkthrough of one feature. The long-form gate requires a search title, at least three chapters, no greeting, and the word “subscribe” in the middle and at the end. If the upload copy loses the chapters, they are rebuilt from the script before the gate. A failed weekly upload waits 15 minutes, then longer, and stops after three attempts. Each later Short description links that long video.
+
+A Short that stays in `producing` for more than 90 minutes is retried. TikTok and other processing jobs stop after 8 polls, with a longer wait between polls. Jobs that already have 8 or more attempts are marked failed.
+
+YouTube can set the channel trailer with `brandingSettings.channel.unsubscribedTrailer`. When a product upload title contains “one sentence”, that video is saved as the @reelminoapp trailer. The kitchen channel description includes `https://reelmino.com`. Three old kitchen titles are set to private: “What matters now”, “אשה מדברת בסגנון קליל ומצחיק”, and “איך חותכים בצל עם פחות דמעות?”.
 
 Comment replies are at most 200 characters, in the comment’s language, and end with a question. Spam, abuse, complaints, and political or sensitive comments are logged and not answered. The only link allowed is `reelmino.com`, and only on the product channel when the person asks how to try it. Replied comment ids are stored so a thread is answered once.
 

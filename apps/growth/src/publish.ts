@@ -426,6 +426,27 @@ function applyResult(
   return job;
 }
 
+export const PUBLISH_POLL_MAX = 8;
+
+export function pollBackoffMs(attempts: number): number {
+  return Math.min(60 * 60 * 1000, 30_000 * 2 ** Math.min(Math.max(attempts, 0), 8));
+}
+
+export function publishPollDecision(job: { status: string; attempts: number; updatedAt?: string | null }, now: Date): "poll" | "wait" | "fail" {
+  if (job.status !== "processing") return "wait";
+  if (job.attempts >= PUBLISH_POLL_MAX) return "fail";
+  const updated = Date.parse(job.updatedAt ?? "");
+  if (job.attempts > 0 && Number.isFinite(updated) && now.getTime() - updated < pollBackoffMs(job.attempts)) return "wait";
+  return "poll";
+}
+
+export function failExhaustedPublishes(db: GrowthDb, now = new Date()): void {
+  db.prepare(
+    `UPDATE jobs SET status = 'failed', last_error = 'Stopped after too many attempts', error_code = 'attempt_cap', updated_at = ?
+     WHERE status = 'processing' AND attempts >= ?`
+  ).run(now.toISOString(), PUBLISH_POLL_MAX);
+}
+
 export async function pollPublish(db: GrowthDb, key: Buffer, jobId: string): Promise<Job | null> {
   const job = getJob(db, jobId);
   if (!job || job.status !== "processing" || !job.destinationId) return job;

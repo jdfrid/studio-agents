@@ -9,9 +9,13 @@ import {
   commentDecision,
   crossPostCaption,
   crossPostTargets,
+  ensureChapterDescription,
   evaluateLongForm,
   finishReply,
+  longFormBackoffMs,
   longFormDecision,
+  playlistEdits,
+  playlistTargets,
   longFormPackage,
   playlistForKitchen,
   playlistsForProduct,
@@ -58,6 +62,19 @@ describe("subscriber growth", () => {
     expect(longFormDecision(new Date(sunday.graceEnd.getTime() + 60_000), sunday, null)).toBe("skip");
     expect(longFormDecision(sunday.at, sunday, "published")).toBe("wait");
     expect(longFormDecision(sunday.at, sunday, "upload_failed")).toBe("retry");
+    expect(longFormDecision(sunday.at, sunday, "upload_failed", 1, sunday.at)).toBe("wait");
+    expect(longFormDecision(new Date(sunday.at.getTime() + longFormBackoffMs(1) + 1000), sunday, "upload_failed", 1, sunday.at)).toBe("retry");
+    expect(longFormDecision(sunday.at, sunday, "failed", 3, null)).toBe("skip");
+    const repaired = ensureChapterDescription("A long video without timestamps.", "Keep the herbs.\nDry the produce.\nLabel the leftovers.");
+    expect(evaluateLongForm({ title: "3 tricks to keep food fresh", description: repaired, script: "Keep the herbs.\nSubscribe.\nSubscribe.", durationSeconds: 240 }).ok).toBe(true);
+    expect(playlistTargets("product", "Brand a restaurant video from a logo").map((item) => item.title)).toEqual(["Automatic branding", "Reelmino for restaurant"]);
+    expect(playlistTargets("product", "A quiet afternoon").map((item) => item.title)).toEqual([]);
+    const edits = playlistEdits({
+      kind: "product",
+      items: [{ playlistKey: "business:bakery", playlistItemId: "pi1", videoId: "v1", title: "Brand a restaurant video from a logo" }]
+    });
+    expect(edits.remove).toEqual(["pi1"]);
+    expect(edits.add.some((item) => item.playlistKey === "business:restaurant" && item.videoId === "v1")).toBe(true);
   });
 
   it("replies only to real comments, once, and caps the length", () => {

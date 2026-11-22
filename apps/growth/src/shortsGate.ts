@@ -123,10 +123,12 @@ export async function reviewYoutubeShort(input: {
   const durationSeconds = measured ?? metadata;
   const script = input.item.copy.article?.body || input.item.summary || "";
   if (input.item.source === "longform") {
-    const { evaluateLongForm } = await import("./subscriberGrowth.js");
+    const { ensureChapterDescription, evaluateLongForm } = await import("./subscriberGrowth.js");
+    const stored = input.item.copy.youtube?.body || input.item.copy.article?.description || "";
+    const description = ensureChapterDescription(input.copy.body || stored, script);
     const gate = evaluateLongForm({
       title: input.copy.title || input.item.title,
-      description: input.copy.body || "",
+      description,
       script,
       durationSeconds: durationSeconds && durationSeconds > 60 ? durationSeconds : 240
     });
@@ -135,7 +137,7 @@ export async function reviewYoutubeShort(input: {
       code: gate.ok ? "ok" : "shorts_quality",
       reasons: gate.reasons,
       title: (input.copy.title || input.item.title).slice(0, 100),
-      description: input.copy.body || "",
+      description,
       hashtags: input.copy.hashtags ?? []
     };
   }
