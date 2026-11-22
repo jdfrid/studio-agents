@@ -13,7 +13,8 @@ const BRAND_DESCRIPTION = [
 
 const KITCHEN_DESCRIPTION = [
   "English kitchen hacks for home cooks: keep food fresh, store it properly, and fix the layout. One practical idea in every video.",
-  "Made with Reelmino."
+  "Made with Reelmino.",
+  "https://reelmino.com"
 ].join("\n\n");
 
 const PRODUCT_KEYWORDS = [

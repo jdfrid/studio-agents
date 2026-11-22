@@ -1,4 +1,5 @@
-import { matchProductDemo } from "@studio/shared";
+import { matchProductDemo, shortsDescription } from "@studio/shared";
+import { cleanListingBody } from "./youtubeListing.js";
 import { destinationsForNetwork, getSetting, setSetting, type GrowthDb } from "./db.js";
 import { jerusalemDayStart } from "./youtubeQuota.js";
 
@@ -104,7 +105,7 @@ export function nextBackfillTarget(rows: PromoUpload[], now: Date, done: string[
   const cutoff = now.getTime() - 30 * 24 * 60 * 60 * 1000;
   const waiting = rows.filter((row) => {
     const at = Date.parse(row.publishedAt);
-    return Number.isFinite(at) && at >= cutoff && at <= now.getTime() && !doneSet.has(row.videoId) && !hasPromo(row.description);
+    return Number.isFinite(at) && at >= cutoff && at <= now.getTime() && !doneSet.has(row.videoId) && descriptionNeedsRepair(row.description, row.channel);
   });
   waiting.sort((a, b) => Date.parse(a.publishedAt) - Date.parse(b.publishedAt));
   return waiting[0] ?? null;
@@ -127,6 +128,14 @@ export function youtubeSnippetUpdate(
 
 export function hasPromo(description: string): boolean {
   return description.includes(PROMO_MARKER) || description.includes(PROMO_MARKER_HE);
+}
+
+export function descriptionNeedsRepair(description: string, channel: "kitchen" | "product"): boolean {
+  if (/vertical video that follows the saved script/i.test(description)) return true;
+  if (/^in this video:/im.test(description)) return true;
+  if (channel === "product" && !hasPromo(description)) return true;
+  if (channel === "kitchen" && description.trim().length < 40) return true;
+  return false;
 }
 
 export async function applyPromoDescription<T extends { body?: string; language?: string; title?: string }>(
@@ -188,8 +197,17 @@ export async function advancePromoBackfill(
       selfVideoId: target.videoId,
       recentIds: readIds(db, "promo_recent")
     });
-    if (!promo) return;
-    const description = withPromoDescription(current.description || target.description, promo, "en");
+    const raw = current.description || target.description;
+    let base = cleanListingBody(raw);
+    if (base.length < 40 || /vertical video that follows/i.test(raw)) {
+      base = shortsDescription({
+        title: current.title,
+        script: base || current.title,
+        language: "en",
+        kind: target.channel === "kitchen" ? "kitchen" : "product"
+      });
+    }
+    const description = promo ? withPromoDescription(cleanListingBody(base), promo, "en") : cleanListingBody(base);
     if (description === (current.description || target.description)) {
       markDone(db, target.videoId);
       return;
@@ -197,8 +215,8 @@ export async function advancePromoBackfill(
     await updateVideoSnippet(token, youtubeSnippetUpdate(target.videoId, current, description));
     markDone(db, target.videoId);
     setSetting(db, `promo_backfill_count:${day}`, String(used + 1));
-    setSetting(db, "promo_recent", JSON.stringify([...readIds(db, "promo_recent"), promo.videoId].slice(-24)));
-    log(`promo backfill ${target.videoId} -> ${promo.videoId}`);
+    if (promo) setSetting(db, "promo_recent", JSON.stringify([...readIds(db, "promo_recent"), promo.videoId].slice(-24)));
+    log(`promo backfill ${target.videoId} -> ${promo?.videoId ?? "cleaned"}`);
   } catch (error) {
     const skipped = readIds(db, `promo_backfill_skip:${day}`);
     setSetting(db, `promo_backfill_skip:${day}`, JSON.stringify([...skipped, target.videoId]));

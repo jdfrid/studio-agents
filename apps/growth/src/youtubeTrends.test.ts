@@ -90,7 +90,7 @@ describe("youtube trend loop", () => {
       recentTokens: [],
       recentVideoIds: [],
       niche: "kitchen herbs",
-      kitchenOnly: true
+      channel: "kitchen"
     })?.videoId).not.toBe("music");
     expect(pickTopic({
       chart: [business],

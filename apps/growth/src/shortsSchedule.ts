@@ -44,6 +44,7 @@ type SlotRow = {
   runId: string | null;
   jobId: string | null;
   error: string | null;
+  updatedAt?: string | null;
 };
 
 export type ScheduleContext = {
@@ -130,9 +131,16 @@ export function decideSlot(input: {
   publishedToday: number;
   dailyCap: number;
   maxAttempts?: number;
+  updatedAt?: Date | null;
+  produceTimeoutMs?: number;
 }): SlotDecision {
   const maxAttempts = input.maxAttempts ?? SHORTS_MAX_ATTEMPTS;
   const status = input.status;
+  const timeoutMs = input.produceTimeoutMs ?? 90 * 60 * 1000;
+  if (status === "producing" && input.updatedAt && input.now.getTime() - input.updatedAt.getTime() > timeoutMs) {
+    if (input.attempts >= maxAttempts) return { action: "skip", reason: "production timed out" };
+    return { action: "regenerate", reason: "production timed out" };
+  }
   if (status === "published" || status === "publishing" || status === "skipped") return { action: "wait", reason: "" };
   if (input.dailyCap <= 0) {
     if (!status && input.now.getTime() > input.publishAt.getTime()) {
@@ -263,6 +271,7 @@ async function runSlot(
     leadAt: input.leadAt,
     status: row?.status ?? null,
     attempts: row?.attempts ?? 0,
+    updatedAt: row?.updatedAt ? new Date(row.updatedAt) : null,
     fileReady: false,
     gateFailed,
     publishedToday: input.publishedToday,
@@ -582,7 +591,8 @@ function readSlot(db: GrowthDb, slotKey: string): SlotRow | null {
     itemId: row.item_id ? String(row.item_id) : null,
     runId: row.run_id ? String(row.run_id) : null,
     jobId: row.job_id ? String(row.job_id) : null,
-    error: row.error ? String(row.error) : null
+    error: row.error ? String(row.error) : null,
+    updatedAt: row.updated_at ? String(row.updated_at) : null
   };
 }
 

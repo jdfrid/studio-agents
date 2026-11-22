@@ -1,4 +1,4 @@
-import { evaluateShortsGate, filterShortsHashtags, fitTitle, followCta, kitchenRelevantPhrase, nextSeriesTopic, shortsBriefSeconds, shortsProductionNotes, titleFromScript, type ShortsChannelKind } from "@studio/shared";
+import { evaluateShortsGate, filterShortsHashtags, fitTitle, followCta, isGenericTitle, nextSeriesTopic, shortsBriefSeconds, shortsProductionNotes, titleFromScript, topicRelevant, type ShortsChannelKind } from "@studio/shared";
 import { slugify } from "./catalog.js";
 import { channelKind } from "./channelProfile.js";
 import { chosenDuration, durationPhrase, taskDurationSeconds } from "./duration.js";
@@ -193,7 +193,7 @@ export function pickTopic(input: {
   niche: string;
   ownChannel?: string;
   now?: number;
-  kitchenOnly?: boolean;
+  channel?: ShortsChannelKind;
 }): { topic: string; score: number; videoId: string; tokens: string[]; inspirationTitle: string } | null {
   const now = input.now ?? Date.now();
   const nicheTokens = tokens(input.niche);
@@ -201,7 +201,7 @@ export function pickTopic(input: {
   const ranked = input.chart
     .filter((video) => video.source !== "channel" && !used.has(video.videoId))
     .filter((video) => !input.ownChannel || video.channelTitle !== input.ownChannel)
-    .filter((video) => !input.kitchenOnly || kitchenRelevantPhrase(video.title))
+    .filter((video) => !input.channel || topicRelevant(video.title, input.channel))
     .map((video) => {
       const words = tokens(video.title);
       let score = attentionScore(video, now);
@@ -517,29 +517,32 @@ async function senseAndSubmit(ctx: TrendContext, cycle: TrendCycle, deps: TrendD
       niche: current.niche || settings.niche,
       ownChannel: destination.name,
       now,
-      kitchenOnly: kind === "kitchen"
+      channel: kind
     });
-    const series = kind === "kitchen" || !picked ? nextSeriesTopic({ kind, language, recentTitles }) : null;
+    const series = nextSeriesTopic({ kind, language, recentTitles, salt: recentTitles.length });
     if (!picked && !series) {
       updateTrendCycle(ctx.db, current.id, { status: "skipped", error: MSG_TOPIC, signal: { chartSize: chart.length, channelSize: channel.length } });
       return;
     }
-    const topic = picked?.topic || series?.title || "";
+    const usablePick = picked && topicRelevant(picked.topic, kind) ? picked : null;
+    const topic = series && textMatchesLanguage(series.title, language) ? series.title : (usablePick?.topic || series?.title || "a practical tip");
     const content = contentForTrend({
-      topic: kind === "kitchen" ? (series?.title || topic) : topic,
+      topic,
       niche: current.niche || settings.niche,
       language,
       durationSeconds: settings.durationSeconds,
       channel: kind,
       hook: series?.hook,
-      angle: series?.angle
+      angle: series?.angle || usablePick?.topic
     });
-    if (kind === "kitchen") {
-      const ownTitle = series?.title || titleFromScript(String(content.brief.sourceText ?? ""), content.title);
+    const scriptTitle = titleFromScript(String(content.brief.sourceText ?? ""), "");
+    const bankTitle = series && textMatchesLanguage(series.title, language) ? series.title : "";
+    const ownTitle = scriptTitle && !isGenericTitle(scriptTitle) && textMatchesLanguage(scriptTitle, language) ? scriptTitle : bankTitle;
+    if (ownTitle && textMatchesLanguage(ownTitle, language)) {
       content.title = ownTitle;
       content.brief.title = ownTitle;
-      content.brief.durationSeconds = 20;
     }
+    if (kind === "kitchen") content.brief.durationSeconds = 20;
     const gateNow = deps.now ?? new Date();
     const planned = evaluateShortsGate({
       mode: "plan",

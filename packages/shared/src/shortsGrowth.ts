@@ -267,7 +267,7 @@ export type ProductBusiness = {
 };
 
 export const PRODUCT_FEATURES: ProductFeature[] = [
-  { id: "branding", weight: 5, name: "automatic branding", aliases: ["automatic branding", "brand colors"], title: "Brand a {business} video from a logo" },
+  { id: "branding", weight: 5, name: "automatic branding", aliases: ["automatic branding", "brand colors", "from a logo"], title: "Brand a {business} video from a logo" },
   { id: "one-sentence", weight: 5, name: "one sentence to full video", aliases: ["one sentence to full video", "one sentence"], title: "Turn one sentence into a {business} video" },
   { id: "aspect", weight: 4, name: "aspect-ratio switch", aliases: ["aspect-ratio switch", "aspect ratio"], title: "A {business} video in 9:16 and 16:9" },
   { id: "multilingual", weight: 4, name: "multilingual voiceover", aliases: ["multilingual voiceover", "several languages"], title: "A {business} video in several languages" },
@@ -660,14 +660,30 @@ export function openingProblem(script: string): "ok" | "missing" | "intro" {
   return "ok";
 }
 
-const MUSIC_TITLE = /\b(official|lyrics|audio|remix|feat\.?|ft\.?|video oficial|music video)\b|\|/i;
+const BLOCKED_TREND = /\b(official|lyrics|audio|remix|feat\.?|ft\.?|video oficial|music video|trailer|teaser|christmas|santa|taylor swift|anuel|dune|jumanji|song)\b|\|/i;
 const KITCHEN_WORDS = ["herb", "produce", "lettuce", "leftover", "fridge", "kitchen", "spice", "bread", "egg", "cheese", "freezer", "soup", "onion", "berr", "rice", "pan", "stove", "food", "cook", "meal", "veget", "fruit", "sink", "oil", "salt", "fresh"];
+const PRODUCT_WORDS = ["business", "marketing", "brand", "video", "advert", "reel", "content", "customer", "shop", "sale", "logo", "template", "campaign", "sentence", "עסק", "סרטון", "מותג", "שיווק", "וידאו", "לקוח"];
 
 export function kitchenRelevantPhrase(text: string): boolean {
   const value = text.replace(/\s+/g, " ").trim();
-  if (value.length < 8 || MUSIC_TITLE.test(value)) return false;
+  if (value.length < 8 || BLOCKED_TREND.test(value)) return false;
   const lower = value.toLowerCase();
   return KITCHEN_WORDS.some((word) => lower.includes(word));
+}
+
+export function productRelevantPhrase(text: string): boolean {
+  const value = text.replace(/\s+/g, " ").trim();
+  if (value.length < 8 || BLOCKED_TREND.test(value)) return false;
+  const lower = value.toLowerCase();
+  return PRODUCT_WORDS.some((word) => lower.includes(word));
+}
+
+export function topicRelevant(text: string, channel: ShortsChannelKind): boolean {
+  return channel === "kitchen" ? kitchenRelevantPhrase(text) : productRelevantPhrase(text);
+}
+
+export function titleLooksLikePrompt(title: string): boolean {
+  return LEAK.test(title) || /בסגנון קליל|אשה מדברת|what matters now|vertical video that follows/i.test(title);
 }
 
 export function isOnScreenPrompt(line: string): boolean {
@@ -776,7 +792,10 @@ export function evaluateShortsGate(input: ShortsGateInput): ShortsGateResult {
   }
 
   if (title.length < 2) reasons.push("Title is empty.");
-  else if (isGenericTitle(title)) reasons.push(`Title is generic and does not describe the video: ${title}.`);
+  else if (isGenericTitle(title) || titleLooksLikePrompt(title)) reasons.push(`Title is generic or looks like a prompt: ${title}.`);
+  if (title && /\p{Script=Hebrew}/u.test(title) && !language.toLowerCase().startsWith("he")) {
+    reasons.push("Title language does not match the channel language.");
+  }
   if (title.length > SHORTS_TITLE_MAX) reasons.push("Title is longer than 60 characters.");
   const leaks = unique([
     ...promptLeakSpans(title),

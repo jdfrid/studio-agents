@@ -105,6 +105,7 @@ describe("shorts schedule", () => {
     expect(decideSlot({ ...base, now: leadAt, status: null, publishedToday: 3 }).reason).toBe("daily cap");
     expect(decideSlot({ ...base, now: leadAt, status: "failed", attempts: 1, gateFailed: true }).action).toBe("regenerate");
     expect(decideSlot({ ...base, now: leadAt, status: "failed", attempts: 3, gateFailed: true }).action).toBe("skip");
+    expect(decideSlot({ ...base, now: new Date(leadAt.getTime() + 2 * 60 * 60 * 1000), status: "producing", attempts: 1, updatedAt: leadAt }).reason).toBe("production timed out");
   });
 
   it("builds a kitchen short and a product short from different topic lists", () => {

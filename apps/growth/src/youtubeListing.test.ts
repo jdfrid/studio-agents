@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { emptyCopy } from "./copy.js";
-import { clickTitle, detailedDescription, listingKeywords, prepareYouTubeListing, youtubeFileName, youtubeReleaseAt, YOUTUBE_PRIVATE_MS } from "./youtubeListing.js";
+import { cleanListingBody, clickTitle, detailedDescription, listingKeywords, prepareYouTubeListing, youtubeFileName, youtubeReleaseAt, YOUTUBE_PRIVATE_MS } from "./youtubeListing.js";
+import { publishPollDecision } from "./publish.js";
+import { filterShortsHashtags } from "@studio/shared";
 
 describe("youtube listing", () => {
   it("holds a new upload private for two hours", () => {
@@ -18,7 +20,11 @@ describe("youtube listing", () => {
       language: "en"
     });
     expect(described.body).toContain("Store the stems in water.");
-    expect(described.body).toContain("In this video:");
+    expect(described.body).not.toContain("In this video:");
+    expect(cleanListingBody("A vertical video that follows the saved script.\n\nIn this video: Pick, feed.\n\nStand the stems in water.")).toBe("Stand the stems in water.");
+    expect(filterShortsHashtags(["to", "save", "wooden", "herbs"], "en")).toEqual(["shorts", "herbs"]);
+    expect(publishPollDecision({ status: "processing", attempts: 8, updatedAt: "2026-11-22T00:00:00.000Z" }, new Date("2026-11-22T01:00:00.000Z"))).toBe("fail");
+    expect(publishPollDecision({ status: "processing", attempts: 2, updatedAt: new Date().toISOString() }, new Date())).toBe("wait");
     expect(described.body).not.toMatch(/\p{Script=Hebrew}/u);
     expect(described.keywords).not.toContain("חיתוך");
     const file = youtubeFileName("Keep herbs alive", described.keywords);

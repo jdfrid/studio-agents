@@ -24,7 +24,7 @@ import { composeFreshCopy } from "./angles.js";
 import { applyLink, trackedLink } from "./utm.js";
 import { deliverDueGroupPosts } from "./groups.js";
 import { ensureYouTubeChannels } from "./channelProfile.js";
-import { freshConnectionTokens, pollPublish, postDueFirstComments, runPublish } from "./publish.js";
+import { failExhaustedPublishes, freshConnectionTokens, pollPublish, postDueFirstComments, publishPollDecision, runPublish } from "./publish.js";
 import { advanceShortsSchedule } from "./shortsSchedule.js";
 import { advanceSubscriberGrowth } from "./subscriberGrowth.js";
 import { advanceTextCampaigns, writeTextPosts } from "./textPosts.js";
@@ -145,7 +145,10 @@ export async function tick(ctx: DispatchContext): Promise<void> {
       setSlotStatus(ctx.db, slot.id, "failed", error instanceof Error ? error.message : String(error));
     }
   }
+  failExhaustedPublishes(ctx.db);
   for (const job of processingJobs(ctx.db)) {
+    const decision = publishPollDecision(job, new Date());
+    if (decision !== "poll") continue;
     try {
       await pollPublish(ctx.db, ctx.key, job.id);
     } catch (error) {
