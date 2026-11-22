@@ -11,6 +11,7 @@ import {
   decideSlot,
   localDay,
   parseClockList,
+  longFormReplacesShort,
   scheduleFor,
   slotInstant,
   slotKey
@@ -72,6 +73,12 @@ describe("shorts schedule", () => {
     expect(parseClockList("23:00, 15:00, 15:00, noon", ["15:00"])).toEqual(["15:00", "23:00"]);
     expect(scheduleFor("kitchen")).toEqual(["15:00", "19:00", "23:00"]);
     expect(scheduleFor("product")).toEqual(["16:00", "21:00"]);
+    const tuesday = at("2026-11-17", "19:00");
+    const thursday = at("2026-11-19", "16:00");
+    expect(longFormReplacesShort("kitchen", "19:00", tuesday, "Asia/Jerusalem")).toBe(true);
+    expect(longFormReplacesShort("kitchen", "15:00", tuesday, "Asia/Jerusalem")).toBe(false);
+    expect(longFormReplacesShort("product", "16:00", thursday, "Asia/Jerusalem")).toBe(true);
+    expect(longFormReplacesShort("product", "16:00", tuesday, "Asia/Jerusalem")).toBe(false);
     const slot = at("2026-11-17", "15:00");
     const jerusalem = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Asia/Jerusalem",

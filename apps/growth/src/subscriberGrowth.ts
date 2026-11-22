@@ -1,4 +1,4 @@
-import { KITCHEN_TOPICS, kitchenRelevantPhrase, PRODUCT_BUSINESSES, PRODUCT_FEATURES, type ShortsChannelKind } from "@studio/shared";
+import { KITCHEN_TOPICS, KITCHEN_WINNER_SEED, kitchenRelevantPhrase, PRODUCT_BUSINESSES, PRODUCT_FEATURES, rankTopicPerformance, seriesForTopic, subscribeUrl, type ShortsChannelKind, type TopicScore } from "@studio/shared";
 import { destinationsForNetwork, getItem, getSetting, insertItem, setSetting, updateItem, type Destination, type GrowthDb } from "./db.js";
 import { nid } from "./crypto.js";
 import { emptyCopy } from "./copy.js";
@@ -30,6 +30,8 @@ export function growthFlag(name: string, defaultOn = true): boolean {
 export type PlaylistSpec = { key: string; title: string; description: string };
 
 const KITCHEN_PLAYLISTS: Array<PlaylistSpec & { match: RegExp }> = [
+  { key: "fresh-longer", title: "Fresh Longer", description: "Storage and freshness fixes, one new angle each Short.", match: /^fresh longer\b/i },
+  { key: "work-triangle", title: "Work Triangle", description: "Kitchen layout, the work triangle, and where the daily tools go.", match: /^work triangle\b/i },
   { key: "produce", title: "Keep produce fresh", description: "How to keep fruit and vegetables crisp for longer.", match: /produce|lettuce|crisp|fruit|vegetable/i },
   { key: "herbs", title: "Keep fresh herbs alive", description: "Stop herbs turning to mush. One storage fix per video.", match: /herb/i },
   { key: "storage", title: "Food storage that works", description: "Leftovers, fridge layout, and containers that actually keep food.", match: /storage|leftover|fridge/i },
@@ -163,7 +165,7 @@ export function evaluateLongForm(input: { title: string; description: string; sc
   if (chapters.length < 3) reasons.push("Description needs at least three chapters.");
   const subscribes = input.script.match(/\bsubscribe\b/gi) ?? [];
   if (subscribes.length < 2) reasons.push("Say subscribe once in the middle and once at the end.");
-  if (input.durationSeconds < 180 || input.durationSeconds > 360) reasons.push("Length must be 3 to 6 minutes.");
+  if (input.durationSeconds < 180 || input.durationSeconds > 300) reasons.push("Length must be 3 to 5 minutes.");
   return { ok: reasons.length === 0, reasons };
 }
 
@@ -176,26 +178,28 @@ export function longFormPackage(input: { kind: ShortsChannelKind; topic: string;
   const topic = input.topic.replace(/\s+/g, " ").trim();
   const title = input.kind === "kitchen"
     ? `${Math.max(3, input.parts.length)} tricks to ${topic}`.slice(0, 70)
-    : `Reelmino for ${topic}: the full walkthrough`.slice(0, 70);
+    : `How to make a ${topic} ad in 60 seconds with Reelmino`.slice(0, 70);
   const steps = input.parts.length ? input.parts : ["Show the problem", "Do the fix", "Show the result"];
   const playlist = input.playlistUrl ? `\n\nShorts in this series: ${input.playlistUrl}` : "";
-  const description = `${ensureChapterDescription(`${title}.`, steps.join("\n"))}${playlist}`;
-  const mid = steps[Math.floor(steps.length / 2)] ?? steps[0];
+  const description = `${ensureChapterDescription(`${title}.`, steps.join("\n"))}${playlist}\n\nEnd screen: subscribe and watch the next Short.`;
+  const reason = input.kind === "kitchen"
+    ? "New kitchen tip every day - subscribe so you don't miss tomorrow's."
+    : "A new Reelmino trick every day - subscribe.";
   const script = [
     `${topic} is the whole video.`,
     ...steps.map((step) => `${step}.`),
-    `If ${mid} helped, subscribe for the next one.`,
-    `That is the last step. Subscribe and tell me which one you will try.`
+    `Halfway through: ${reason}`,
+    `At the end: ${reason}`
   ].join("\n");
   return { title, description, script, durationSeconds: 240 };
 }
 
-export function sundaySlot(now: Date, timeZone: string, hour = 18, minute = 0): { key: string; at: Date; leadAt: Date; graceEnd: Date } {
+export function sundaySlot(now: Date, timeZone: string, hour = 18, minute = 0, weekdayWanted = 0): { key: string; at: Date; leadAt: Date; graceEnd: Date } {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
   const [year, month, date] = day.split("-").map(Number);
   const weekday = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(now);
   const index = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(weekday);
-  const delta = index === 0 ? 0 : -index;
+  const delta = weekdayWanted - index;
   const sunday = new Date(Date.UTC(year ?? 1970, (month ?? 1) - 1, (date ?? 1) + delta));
   const sundayDay = sunday.toISOString().slice(0, 10);
   const at = zoned(sundayDay, hour, minute, timeZone);
@@ -205,6 +209,17 @@ export function sundaySlot(now: Date, timeZone: string, hour = 18, minute = 0): 
     leadAt: new Date(at.getTime() - 6 * 60 * 60 * 1000),
     graceEnd: new Date(at.getTime() + 6 * 60 * 60 * 1000)
   };
+}
+
+export function tutorialSlot(now: Date, timeZone: string, kind: ShortsChannelKind): { key: string; at: Date; leadAt: Date; graceEnd: Date } {
+  return sundaySlot(now, timeZone, 18, 0, kind === "kitchen" ? 2 : 4);
+}
+
+export function readWinnerIds(db: GrowthDb, kind: ShortsChannelKind): string[] {
+  const raw = getSetting(db, `winners:${kind}`);
+  const fallback = kind === "kitchen" ? KITCHEN_WINNER_SEED : [];
+  const parsed = raw ? (JSON.parse(raw) as TopicScore[]) : fallback;
+  return (Array.isArray(parsed) ? parsed : fallback).map((row) => row.topicId).filter(Boolean);
 }
 
 export const LONGFORM_MAX_ATTEMPTS = 3;
@@ -322,6 +337,7 @@ export async function advanceSubscriberGrowth(ctx: RunContext, deps: SubscriberD
     if (!kind) continue;
     const bound = await bindLiveYoutube(ctx, destination, deps, log);
     if (growthFlag("SHORTS_TOPIC_DEMAND")) await refreshDemand(ctx.db, kind, bound, now, log);
+    if (growthFlag("SHORTS_WINNERS")) await refreshWinners(ctx, destination, kind, now, log);
     if (growthFlag("SHORTS_WEIGHT_TUNING")) await refreshWeights(ctx.db, destination, kind, bound, now, log);
     if (growthFlag("SHORTS_PLAYLISTS")) await ensurePlaylists(ctx.db, destination, kind, bound, log);
     if (growthFlag("SHORTS_LONGFORM")) await advanceLongForm(ctx, destination, kind, now, bound, log);
@@ -506,6 +522,35 @@ async function draftReply(comment: string, product: boolean): Promise<string | n
   }
 }
 
+async function refreshWinners(ctx: RunContext, destination: Destination, kind: ShortsChannelKind, now: Date, log: (message: string) => void): Promise<void> {
+  const stamp = `winners_at:${kind}`;
+  const last = Date.parse(getSetting(ctx.db, stamp) ?? "");
+  if (Number.isFinite(last) && now.getTime() - last < 24 * 60 * 60 * 1000) return;
+  if (!getSetting(ctx.db, `winners:${kind}`) && kind === "kitchen") writeJsonSetting(ctx.db, `winners:${kind}`, KITCHEN_WINNER_SEED);
+  try {
+    const token = (await freshConnectionTokens(ctx.db, destination.connectionId, ctx.key, "youtube")).accessToken;
+    const uploads = await listOwnedUploads(token);
+    const ids = uploads.slice(0, 50).map((video) => video.id);
+    if (ids.length) {
+      const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${encodeURIComponent(ids.join(","))}`, {
+        headers: { authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = (await response.json()) as { items?: Array<{ snippet?: { title?: string }; statistics?: { viewCount?: string } }> };
+        const ranked = rankTopicPerformance((data.items ?? []).map((item) => ({
+          title: item.snippet?.title ?? "",
+          views: Number(item.statistics?.viewCount ?? 0)
+        })), kind);
+        if (ranked.length) writeJsonSetting(ctx.db, `winners:${kind}`, ranked);
+        log(`${kind} winners ${ranked.map((row) => row.topicId).join(", ")}`);
+      }
+    }
+  } catch (error) {
+    log(`${kind} winners unavailable: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  setSetting(ctx.db, stamp, now.toISOString());
+}
+
 async function refreshDemand(db: GrowthDb, kind: ShortsChannelKind, deps: SubscriberDeps, now: Date, log: (message: string) => void): Promise<void> {
   const key = `demand_at:${kind}`;
   const last = Date.parse(getSetting(db, key) ?? "");
@@ -634,7 +679,7 @@ async function advanceLongForm(
   deps: SubscriberDeps,
   log: (message: string) => void
 ): Promise<void> {
-  const slot = sundaySlot(now, process.env.SHORTS_TIMEZONE?.trim() || "Asia/Jerusalem");
+  const slot = tutorialSlot(now, process.env.SHORTS_TIMEZONE?.trim() || "Asia/Jerusalem", kind);
   const key = `${slot.key}:${destination.externalId}`;
   const row = ctx.db.prepare("SELECT status, run_id, item_id, attempts, updated_at FROM shorts_slots WHERE slot_key = ?").get(key) as { status?: string; run_id?: string; item_id?: string; attempts?: number; updated_at?: string } | undefined;
   const attempts = Number(row?.attempts ?? 0);
@@ -664,8 +709,15 @@ async function advanceLongForm(
     log(`${key} skipped: missed weekly slot`);
     return;
   }
-  const parts = kind === "kitchen" ? ["Keep the herbs", "Dry the produce", "Label the leftovers"] : ["Type one sentence", "Apply the brand", "Publish the video"];
-  const topic = kind === "kitchen" ? "keep food fresh" : "a bakery";
+  const winnerId = readWinnerIds(ctx.db, kind)[0] ?? (kind === "kitchen" ? "herbs" : "one-sentence");
+  const seriesName = seriesForTopic(winnerId)?.name;
+  const business = PRODUCT_BUSINESSES[Math.floor(now.getTime() / (7 * 24 * 60 * 60 * 1000)) % PRODUCT_BUSINESSES.length];
+  const parts = kind === "kitchen"
+    ? (seriesName === "Work Triangle" ? ["Clear the counter", "Place the daily pan", "Check the triangle"] : ["Keep the herbs", "Dry the produce", "Label the leftovers"])
+    : ["Type one sentence", "Apply the brand", "Publish the video"];
+  const topic = kind === "kitchen" ? (seriesName === "Work Triangle" ? "the work triangle" : "keep food fresh") : (business?.label ?? "bakery");
+  const seriesLabel = kind === "kitchen" ? seriesName : business?.label;
+  if (seriesLabel) setSetting(ctx.db, `longform_series:${destination.id}`, seriesLabel);
   const playlistId = readJsonSetting<Record<string, string>>(ctx.db, `playlists:${destination.id}`, {});
   const firstPlaylist = Object.values(playlistId)[0];
   const pack = longFormPackage({
@@ -686,8 +738,11 @@ async function advanceLongForm(
     return;
   }
   const copy = emptyCopy();
-  copy.youtube = { title: pack.title, body: pack.description };
-  copy.article = { title: pack.title, description: pack.description, body: pack.script };
+  const description = growthFlag("SHORTS_SUBSCRIBE_CTA")
+    ? `${pack.description}\n\nSubscribe: ${subscribeUrl(destination.externalId)}`
+    : pack.description;
+  copy.youtube = { title: pack.title, body: description };
+  copy.article = { title: pack.title, description, body: pack.script };
   const item = insertItem(ctx.db, {
     id: nid(),
     slug: `long-${nid()}`,

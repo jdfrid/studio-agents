@@ -375,6 +375,7 @@ export function nextProductDemo(input: {
   recent: Array<{ featureId?: string; businessId?: string; title?: string; script?: string }>;
   salt?: number;
   multipliers?: Record<string, number>;
+  preferredFeatureId?: string;
 }): ProductDemo | null {
   const recentPairs = input.recent.map((item) => item.featureId && item.businessId
     ? { featureId: item.featureId, businessId: item.businessId }
@@ -387,7 +388,10 @@ export function nextProductDemo(input: {
   const pool = features.length ? features : ranked;
   const salt = input.salt ?? 0;
   for (let step = 0; step < pool.length; step += 1) {
-    const feature = pool[(salt + step) % pool.length];
+    const indexed = pool[(salt + step) % pool.length];
+    const feature = step === 0 && input.preferredFeatureId
+      ? pool.find((item) => item.id === input.preferredFeatureId) ?? indexed
+      : indexed;
     if (!feature) continue;
     const businesses = PRODUCT_BUSINESSES.filter((business) => {
       if (business.id === last?.businessId) return false;
@@ -590,23 +594,98 @@ export function shortsProductionNotes(input: {
   return [shape, channel, ...given].join(" ");
 }
 
+export type TopicScore = { topicId: string; views: number };
+
+export const KITCHEN_SERIES: Array<{ id: string; name: string; topicIds: string[] }> = [
+  { id: "fresh-longer", name: "Fresh Longer", topicIds: ["herbs", "produce", "storage", "bread", "cheese", "berries", "spices", "freezer", "rice"] },
+  { id: "work-triangle", name: "Work Triangle", topicIds: ["kitchen-layout", "fridge-layout", "pans", "cleaning"] }
+];
+
+export const KITCHEN_WINNER_SEED: TopicScore[] = [
+  { topicId: "herbs", views: 236 },
+  { topicId: "produce", views: 144 },
+  { topicId: "kitchen-layout", views: 100 }
+];
+
+export function seriesForTopic(topicId: string): { id: string; name: string } | null {
+  const found = KITCHEN_SERIES.find((series) => series.topicIds.includes(topicId));
+  return found ? { id: found.id, name: found.name } : null;
+}
+
+export function seriesEpisode(name: string, recentTitles: string[]): number {
+  return recentTitles.filter((title) => title.toLowerCase().startsWith(name.toLowerCase())).length + 1;
+}
+
+export function seriesTitle(name: string, episode: number, rest: string): string {
+  return fitTitle(`${name} #${episode}: ${rest}`);
+}
+
+export function subscribeLine(kind: ShortsChannelKind): string {
+  return kind === "kitchen"
+    ? "New kitchen tip every day - subscribe so you don't miss tomorrow's."
+    : "A new Reelmino trick every day - subscribe.";
+}
+
+export function subscribeUrl(channelId: string): string {
+  return `https://www.youtube.com/channel/${channelId}?sub_confirmation=1`;
+}
+
+export function followWinner(salt: number): boolean {
+  return salt % 2 === 0;
+}
+
+export function mapTitleToTopic(title: string, kind: ShortsChannelKind): string | null {
+  if (kind === "kitchen") {
+    if (/herb/i.test(title)) return "herbs";
+    if (/produce|crisp|lettuce/i.test(title)) return "produce";
+    if (/triangle|layout|counter/i.test(title)) return "kitchen-layout";
+    if (/leftover|fridge|storage/i.test(title)) return "storage";
+  }
+  const topics = shortsChannelTopics(kind);
+  let best: { id: string; score: number } | null = null;
+  for (const topic of topics) {
+    const score = Math.max(tokenSimilarity(title, topic.titles.en), tokenSimilarity(title, topic.titles.he));
+    if (!best || score > best.score) best = { id: topic.id, score };
+  }
+  return best && best.score >= 0.2 ? best.id : null;
+}
+
+export function rankTopicPerformance(videos: Array<{ title: string; views: number }>, kind: ShortsChannelKind): TopicScore[] {
+  const totals = new Map<string, number>();
+  for (const video of videos) {
+    const topicId = mapTitleToTopic(video.title, kind);
+    if (!topicId) continue;
+    totals.set(topicId, (totals.get(topicId) ?? 0) + Math.max(0, video.views));
+  }
+  return [...totals.entries()].map(([topicId, views]) => ({ topicId, views })).sort((a, b) => b.views - a.views);
+}
+
 export function nextSeriesTopic(input: {
   kind: ShortsChannelKind;
   language: string;
   recentTitles: string[];
   salt?: number;
   multipliers?: Record<string, number>;
+  winners?: string[];
+  preferWinner?: boolean;
 }): { id: string; title: string; hook: string; angle: string } | null {
   const hebrew = input.language.toLowerCase().startsWith("he");
   const lang = hebrew ? "he" : "en";
   const ranked = [...shortsChannelTopics(input.kind)]
     .map((topic) => ({ ...topic, weight: topic.weight * boundedMultiplier(input.multipliers?.[topic.id]) }))
     .sort((a, b) => b.weight - a.weight);
-  const fresh = ranked.find((topic) => {
+  const freshEnough = (topic: (typeof ranked)[number]) => {
     const title = topic.titles[lang];
     return !input.recentTitles.some((recent) => tokenSimilarity(title, recent) >= 0.6);
-  });
-  const chosen = fresh ?? ranked[(input.salt ?? 0) % ranked.length];
+  };
+  const winning = input.preferWinner && input.winners?.length
+    ? ranked.filter((topic) => input.winners?.includes(topic.id) && freshEnough(topic))
+    : [];
+  const fresh = ranked.find((topic) => freshEnough(topic));
+  const pool = ranked;
+  const chosen = winning.length
+    ? winning[(input.salt ?? 0) % winning.length]
+    : (fresh ?? pool[(input.salt ?? 0) % pool.length]);
   if (!chosen) return null;
   const angles = chosen.angles[lang];
   const angle = angles[(input.salt ?? input.recentTitles.length) % angles.length] ?? angles[0] ?? "";
@@ -715,7 +794,7 @@ export function titleFromScript(script: string, fallback = ""): string {
 }
 
 /** Keep a Short script speakable in 15–20 seconds, with a full CTA and no cut-off lines. */
-export function fitShortScript(script: string, kind: ShortsChannelKind): string {
+export function fitShortScript(script: string, kind: ShortsChannelKind, options?: { subscribe?: boolean }): string {
   const spoken: string[] = [];
   for (const raw of script.split(/\n+/)) {
     const line = raw.trim();
@@ -732,7 +811,8 @@ export function fitShortScript(script: string, kind: ShortsChannelKind): string 
     spoken.push(PRODUCT_DEMO_CTA);
     if (loop && !/pinned comment/i.test(loop)) spoken.push(loop);
   }
-  const capped = capWords(spoken, 42);
+  if (options?.subscribe !== false && !spoken.some((line) => /subscribe/i.test(line))) spoken.push(subscribeLine(kind));
+  const capped = capWords(spoken, 46);
   return capped.join("\n");
 }
 
@@ -744,8 +824,13 @@ function finishSentence(line: string): string {
 
 function capWords(lines: string[], maxWords: number): string[] {
   const count = (rows: string[]) => rows.join(" ").split(/\s+/).filter(Boolean).length;
+  const keep = (line: string) => /subscribe/i.test(line) || /pinned comment/i.test(line);
   const next = [...lines];
-  while (next.length > 3 && count(next) > maxWords) next.splice(next.length - 2, 1);
+  while (next.length > 2 && count(next) > maxWords) {
+    const drop = next.findIndex((line, index) => index > 0 && !keep(line));
+    if (drop < 0) break;
+    next.splice(drop, 1);
+  }
   return next;
 }
 
