@@ -22,6 +22,7 @@ import {
   rankDemand,
   replyAllowsLink,
   sundaySlot,
+  tutorialSlot,
   tuneMultiplier
 } from "./subscriberGrowth.js";
 
@@ -46,6 +47,8 @@ function db(): { db: GrowthDb; dir: string } {
 
 describe("subscriber growth", () => {
   it("files a kitchen short and a product short into search playlists", () => {
+    expect(playlistForKitchen("Fresh Longer #2: Dry the lettuce").title).toBe("Fresh Longer");
+    expect(playlistForKitchen("Work Triangle #1: Clear the counter").title).toBe("Work Triangle");
     expect(playlistForKitchen("How to keep fresh herbs alive for weeks").title).toBe("Keep fresh herbs alive");
     expect(playlistForKitchen("Where food should go in the fridge").title).toBe("Food storage that works");
     const product = playlistsForProduct("branding", "bakery");
@@ -57,6 +60,12 @@ describe("subscriber growth", () => {
     expect(evaluateLongForm(pack).ok).toBe(true);
     expect(evaluateLongForm({ ...pack, script: "Welcome back.\nSubscribe.\nSubscribe." }).ok).toBe(false);
     const sunday = sundaySlot(new Date("2026-11-15T12:00:00.000Z"), "Asia/Jerusalem");
+    const kitchenTutorial = tutorialSlot(new Date("2026-11-15T12:00:00.000Z"), "Asia/Jerusalem", "kitchen");
+    const productTutorial = tutorialSlot(new Date("2026-11-15T12:00:00.000Z"), "Asia/Jerusalem", "product");
+    const clock = (value: Date) => new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Jerusalem", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(value);
+    expect(clock(kitchenTutorial.at)).toBe("Tue 18:00");
+    expect(clock(productTutorial.at)).toBe("Thu 18:00");
+    expect(longFormPackage({ kind: "product", topic: "bakery", parts: ["Type one sentence", "Apply the brand", "Publish the video"] }).title).toBe("How to make a bakery ad in 60 seconds with Reelmino");
     expect(longFormDecision(new Date(sunday.leadAt.getTime() - 60_000), sunday, null)).toBe("wait");
     expect(longFormDecision(new Date(sunday.leadAt.getTime() + 60_000), sunday, null)).toBe("start");
     expect(longFormDecision(new Date(sunday.graceEnd.getTime() + 60_000), sunday, null)).toBe("skip");

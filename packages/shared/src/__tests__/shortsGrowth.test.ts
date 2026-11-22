@@ -8,12 +8,18 @@ import {
   fitShortScript,
   fitTitle,
   followCta,
+  followWinner,
   incompleteLines,
   isGenericTitle,
+  isNearDuplicate,
   kitchenRelevantPhrase,
   narrationFromScriptJson,
   nextProductDemo,
   nextSeriesTopic,
+  rankTopicPerformance,
+  seriesEpisode,
+  seriesTitle,
+  subscribeLine,
   PRODUCT_BUSINESSES,
   PRODUCT_FEATURES,
   shortsBriefSeconds,
@@ -271,5 +277,62 @@ describe("product feature demos", () => {
     const titles = PRODUCT_FEATURES.flatMap((feature) => [feature.title]);
     const again = nextSeriesTopic({ kind: "kitchen", language: "en", recentTitles: titles.concat(["How to keep fresh herbs alive for weeks", "How to keep fresh produce crisp longer", "How to store leftovers so they stay fresh", "Where food should go in the fridge", "How to set up a small kitchen that works"]), salt: 2 });
     expect(again?.title.length).toBeGreaterThan(8);
+  });
+
+  it("weights about half of kitchen slots toward the winning topics and keeps the subscribe line inside 25 seconds", () => {
+    const ranked = rankTopicPerformance([
+      { title: "How to Keep Fresh Herbs Alive for Weeks", views: 236 },
+      { title: "Keep Fresh Produce Crisp Longer", views: 144 },
+      { title: "The Work Triangle Secret", views: 100 }
+    ], "kitchen");
+    expect(ranked.map((row) => row.topicId)).toEqual(["herbs", "produce", "kitchen-layout"]);
+    const winners = ranked.map((row) => row.topicId);
+    const followed: string[] = [];
+    let winnerSlots = 0;
+    for (let salt = 0; salt < 10; salt += 1) {
+      const topic = nextSeriesTopic({
+        kind: "kitchen",
+        language: "en",
+        recentTitles: [],
+        salt,
+        winners,
+        preferWinner: followWinner(salt)
+      });
+      expect(topic?.id).toBeTruthy();
+      if (!followWinner(salt)) continue;
+      winnerSlots += 1;
+      expect(winners).toContain(topic?.id);
+      followed.push(`${topic?.id}:${topic?.angle}`);
+    }
+    expect(winnerSlots).toBe(5);
+    expect(new Set(followed).size).toBeGreaterThan(1);
+    const first = seriesTitle("Fresh Longer", seriesEpisode("Fresh Longer", []), "Stop letting fresh herbs die in a jar");
+    const second = seriesTitle("Fresh Longer", seriesEpisode("Fresh Longer", [first]), "Dry the lettuce before it goes in the fridge");
+    expect(first.startsWith("Fresh Longer #1")).toBe(true);
+    expect(second.startsWith("Fresh Longer #2")).toBe(true);
+    expect(isNearDuplicate({
+      title: second,
+      script: "Dry the lettuce before it goes in the fridge.",
+      recent: [{ title: first, script: "Stop letting fresh herbs die in a jar." }]
+    }).match).toBe(false);
+    const fitted = fitShortScript("Stop letting fresh herbs die in a jar.\nTrim the stems.", "kitchen");
+    expect(fitted).toContain(subscribeLine("kitchen"));
+    expect(fitted.trim().endsWith(subscribeLine("kitchen"))).toBe(true);
+    const spoken = estimateSpokenSeconds(fitted);
+    const without = estimateSpokenSeconds(fitted.replace(subscribeLine("kitchen"), ""));
+    expect(spoken).toBeGreaterThan(without);
+    expect(spoken).toBeLessThanOrEqual(22);
+    expect(evaluateShortsGate({
+      mode: "publish",
+      title: first,
+      script: fitted,
+      description: "Trim the stems.",
+      language: "en",
+      durationSeconds: spoken,
+      channel: "kitchen"
+    }).decision).toBe("publish");
+    const product = fitShortScript("Reelmino runs automatic branding for this bakery.", "product");
+    expect(product).toContain(subscribeLine("product"));
+    expect(estimateSpokenSeconds(product)).toBeLessThanOrEqual(22);
   });
 });

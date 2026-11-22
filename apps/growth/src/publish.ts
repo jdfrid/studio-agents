@@ -16,7 +16,8 @@ import {
   type FirstCommentPlan,
   type PackageCopyInput,
   type PackageMediaItem,
-  type SocialNetwork
+  type SocialNetwork,
+  subscribeUrl
 } from "@studio/shared";
 import { captionFromHandle, composeFreshCopy, type CaptionLock } from "./angles.js";
 import { applyPromoDescription } from "./promoLinks.js";
@@ -85,7 +86,14 @@ function attachLongForm(
   let body = copy.body ?? "";
   if (destination.network === "youtube" && item.source !== "longform") {
     const url = getSetting(db, `longform_url:${destination.id}`);
-    if (url && !body.includes(url)) body = `${body}\n\nFull video: ${url}`.trim();
+    const series = getSetting(db, `longform_series:${destination.id}`)?.toLowerCase() ?? "";
+    const title = (copy.title ?? item.title).toLowerCase();
+    if (url && (!series || title.includes(series)) && !body.includes(url)) body = `${body}\n\nFull guide: ${url}`.trim();
+    const sub = subscribeUrl(destination.externalId);
+    const ctaOff = ["0", "false", "off", "no"].includes(process.env.SHORTS_SUBSCRIBE_CTA?.trim().toLowerCase() ?? "");
+    if (!ctaOff && !body.includes("sub_confirmation=1")) {
+      body = `${body}\n\nSubscribe: ${sub}`.trim();
+    }
   }
   const categoryId = destination.network === "youtube" ? (channelKind(destination) === "kitchen" ? "26" : "22") : undefined;
   return {

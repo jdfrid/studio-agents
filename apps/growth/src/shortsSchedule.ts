@@ -1,4 +1,4 @@
-import { estimateSpokenSeconds, evaluateShortsGate, fitShortScript, kitchenRelevantPhrase, nextProductDemo, nextSeriesTopic, titleFromScript, type ProductDemo } from "@studio/shared";
+import { estimateSpokenSeconds, evaluateShortsGate, fitShortScript, followWinner, kitchenRelevantPhrase, KITCHEN_SERIES, KITCHEN_WINNER_SEED, nextProductDemo, nextSeriesTopic, seriesEpisode, seriesForTopic, seriesTitle, subscribeLine, subscribeUrl, titleFromScript, type ProductDemo, type TopicScore } from "@studio/shared";
 import { promoCommentText, savedPromo } from "./promoLinks.js";
 import { slugify } from "./catalog.js";
 import { emptyCopy } from "./copy.js";
@@ -165,12 +165,16 @@ export function briefForScheduledShort(input: {
   salt?: number;
   demandPhrase?: string;
   multipliers?: Record<string, number>;
+  winners?: string[];
+  channelId?: string;
 }): { title: string; summary: string; description: string; brief: Record<string, unknown>; demo?: ProductDemo } | null {
   if (input.kind === "product") {
+    const winner = followWinner(input.salt ?? 0) ? input.winners?.[0] : undefined;
     const demo = nextProductDemo({
       recent: input.recentDemos ?? input.recentTitles.map((title) => ({ title })),
       salt: input.salt,
-      multipliers: input.multipliers
+      multipliers: input.multipliers,
+      preferredFeatureId: winner
     });
     if (!demo) return null;
     const content = contentForTrend({
@@ -184,9 +188,9 @@ export function briefForScheduledShort(input: {
     });
     content.title = demo.title;
     content.summary = `${demo.featureName} for a ${demo.businessLabel}.`;
-    content.description = demo.description;
+    content.description = withSubscribeLink(demo.description, input.channelId);
     content.brief.title = demo.title;
-    content.brief.sourceText = fitShortScript(demo.script, "product");
+    content.brief.sourceText = fitShortScript(demo.script, "product", { subscribe: subscribeCtaOn() });
     content.brief.durationSeconds = 20;
     content.brief.instructions = `${String(content.brief.instructions ?? "")} Follow the source text as the narration and do not add sentences. Speak at most 40 words. The last spoken line before the loop is exactly: Try it with your sentence - link in pinned comment. The finished file, including the end card, must stay under 25 seconds. This channel is the product channel. Do not make a kitchen, recipe, or food-storage video. No trailers, no third-party characters, and no logos you do not own.`;
     content.brief.resultSegment = {
@@ -206,11 +210,15 @@ export function briefForScheduledShort(input: {
     language: "en",
     recentTitles: input.recentTitles,
     salt: input.salt ?? input.recentTitles.length,
-    multipliers: input.multipliers
+    multipliers: input.multipliers,
+    winners: input.winners,
+    preferWinner: followWinner(input.salt ?? 0)
   });
   if (!series) return null;
-  const script = fitShortScript([series.hook, series.angle, series.hook].join("\n"), "kitchen");
-  const title = titleFromScript(script, series.title);
+  const named = seriesForTopic(series.id);
+  const script = fitShortScript([series.hook, series.angle, series.hook].join("\n"), "kitchen", { subscribe: subscribeCtaOn() });
+  const plain = titleFromScript(script, series.title);
+  const title = named ? seriesTitle(named.name, seriesEpisode(named.name, input.recentTitles), plain) : plain;
   const content = contentForTrend({
     topic: title,
     niche: "home cooking, food storage, kitchen layout",
@@ -224,6 +232,7 @@ export function briefForScheduledShort(input: {
   content.brief.title = title;
   content.brief.sourceText = script;
   content.brief.durationSeconds = 20;
+  content.description = withSubscribeLink(content.description, input.channelId);
   content.brief.instructions = `${String(content.brief.instructions ?? "")} Follow the source text as the narration and do not add sentences. Speak at most 40 words. The finished file, including the end card, must stay under 25 seconds. This channel is kitchen tips. Do not mention the product pitch, trailers, or third-party characters and logos.`;
   content.brief.approvalMode = "auto";
   return content;
@@ -244,6 +253,37 @@ export async function advanceShortsSchedule(ctx: ScheduleContext, deps: Schedule
       const publishAt = slotInstant(day, hhmm, zone);
       const leadAt = new Date(publishAt.getTime() - lead * 60_000);
       const key = slotKey(destination.externalId || destination.id, day, hhmm);
+      if (longFormReplacesShort(kind, hhmm, now, zone)) {
+        const existing = readSlot(ctx.db, key);
+        const decision = decideSlot({
+          now,
+          publishAt,
+          leadAt,
+          status: existing?.status ?? null,
+          attempts: existing?.attempts ?? 0,
+          updatedAt: existing?.updatedAt ? new Date(existing.updatedAt) : null,
+          fileReady: false,
+          gateFailed: existing?.status === "failed",
+          publishedToday,
+          dailyCap: cap
+        });
+        if (decision.action === "start" || decision.action === "regenerate") {
+          writeSlot(ctx.db, {
+            slotKey: key,
+            destinationId: destination.id,
+            publishAt: publishAt.toISOString(),
+            status: "skipped",
+            attempts: existing?.attempts ?? 0,
+            title: existing?.title ?? "",
+            itemId: existing?.itemId ?? null,
+            runId: existing?.runId ?? null,
+            jobId: existing?.jobId ?? null,
+            error: "replaced by the weekly tutorial"
+          });
+          log(deps, `${key} skipped: weekly tutorial uses this slot`);
+          continue;
+        }
+      }
       await runSlot(ctx, deps, { destination, kind, now, publishAt, leadAt, key, cap, publishedToday });
     }
   }
@@ -302,7 +342,7 @@ async function runSlot(
   if (!row?.runId || !row.itemId) return;
   const file = await (deps.downloadFinal ?? downloadReelminoFinal)(row.runId, ctx.mediaDir);
   if (!file) return;
-  const narration = file.narration ? fitShortScript(file.narration, input.kind) : "";
+  const narration = file.narration ? fitShortScript(file.narration, input.kind, { subscribe: subscribeCtaOn() }) : "";
   const item = updateItem(ctx.db, row.itemId, {
     mediaPath: file.filename,
     mediaMime: "video/mp4",
@@ -392,16 +432,19 @@ async function startAttempt(
       recentDemos: posts,
       salt: attempts + step,
       demandPhrase: step === 0 && input.kind === "kitchen" ? readDemandPhrase(ctx.db, "kitchen") : undefined,
-      multipliers: readWeightMap(ctx.db, input.kind)
+      multipliers: readWeightMap(ctx.db, input.kind),
+      winners: readWinnerIds(ctx.db, input.kind),
+      channelId: input.destination.externalId
     });
     if (!candidate) {
       gateError = "no fresh topic";
       continue;
     }
-    const script = fitShortScript(String(candidate.brief.sourceText ?? candidate.summary), input.kind);
+    const script = fitShortScript(String(candidate.brief.sourceText ?? candidate.summary), input.kind, { subscribe: subscribeCtaOn() });
     candidate.brief.sourceText = script;
     candidate.brief.durationSeconds = 20;
-    const ownTitle = titleFromScript(script, candidate.title);
+    const prefixed = KITCHEN_SERIES.some((series) => candidate.title.toLowerCase().startsWith(`${series.name.toLowerCase()} #`));
+    const ownTitle = prefixed ? candidate.title : titleFromScript(script, candidate.title);
     candidate.title = ownTitle;
     candidate.brief.title = ownTitle;
     const spoken = estimateSpokenSeconds(script);
@@ -520,14 +563,20 @@ async function postPromoComment(
   destination: Destination,
   kind: ScheduleKind,
   videoId: string | null | undefined,
-  item: { id: string; language: string; copy: { article?: { body?: string } } }
+  item: { id: string; title?: string; language: string; copy: { article?: { body?: string } } }
 ): Promise<void> {
-  const text = promoCommentText({
+  const promo = promoCommentText({
     kind,
     script: item.copy.article?.body || "",
     language: item.language,
     promo: savedPromo(ctx.db, item.id)
   });
+  const ctaOn = subscribeCtaOn();
+  const guide = getSetting(ctx.db, `longform_url:${destination.id}`);
+  const series = getSetting(ctx.db, `longform_series:${destination.id}`)?.toLowerCase() ?? "";
+  const title = (item.title ?? "").toLowerCase();
+  const guideLine = guide && series && title.includes(series) ? `Full guide: ${guide}` : "";
+  const text = [promo, guideLine, ctaOn ? subscribeLine(kind) : "", ctaOn ? subscribeUrl(destination.externalId) : ""].filter(Boolean).join("\n");
   if (!text) return;
   if (!videoId) {
     log(deps, "promo comment waiting for a YouTube video id. Pinning is not available in the YouTube API.");
@@ -557,6 +606,37 @@ function readWeightMap(db: GrowthDb, kind: string): Record<string, number> {
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
+  }
+}
+
+function subscribeCtaOn(): boolean {
+  const raw = process.env.SHORTS_SUBSCRIBE_CTA?.trim().toLowerCase();
+  if (!raw) return true;
+  return !["0", "false", "off", "no"].includes(raw);
+}
+
+function withSubscribeLink(description: string, channelId?: string): string {
+  if (!channelId || !subscribeCtaOn() || description.includes("sub_confirmation=1")) return description;
+  return `${description}\n\nSubscribe: ${subscribeUrl(channelId)}`.trim();
+}
+
+export function longFormReplacesShort(kind: ScheduleKind, hhmm: string, now: Date, zone: string): boolean {
+  const longOff = ["0", "false", "off", "no"].includes(process.env.SHORTS_LONGFORM?.trim().toLowerCase() ?? "");
+  const replaceOff = ["0", "false", "off", "no"].includes(process.env.SHORTS_LONGFORM_REPLACES_SHORT?.trim().toLowerCase() ?? "");
+  if (longOff || replaceOff) return false;
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "short" }).format(now);
+  if (kind === "kitchen") return weekday === "Tue" && hhmm === "19:00";
+  return weekday === "Thu" && hhmm === "16:00";
+}
+
+function readWinnerIds(db: GrowthDb, kind: ScheduleKind): string[] {
+  const raw = getSetting(db, `winners:${kind}`);
+  const fallback = kind === "kitchen" ? KITCHEN_WINNER_SEED : [];
+  try {
+    const parsed = raw ? (JSON.parse(raw) as TopicScore[]) : fallback;
+    return (Array.isArray(parsed) ? parsed : fallback).map((row) => row.topicId).filter(Boolean);
+  } catch {
+    return fallback.map((row) => row.topicId);
   }
 }
 

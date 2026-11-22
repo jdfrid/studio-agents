@@ -115,16 +115,21 @@ These jobs run on the same 30-second tick as the Shorts clock. Each one is on un
 | Env | Default | What it does |
 | --- | --- | --- |
 | `SHORTS_PLAYLISTS` | on | Creates topic playlists and adds every new Short. Backfills existing public uploads once. |
-| `SHORTS_LONGFORM` | on | Sunday 18:00 Asia/Jerusalem, one 3–6 minute 16:9 video per channel. Private upload with `publishAt`. |
+| `SHORTS_LONGFORM` | on | One 3–5 minute 16:9 tutorial. Kitchen Tuesday 18:00, product Thursday 18:00, Asia/Jerusalem. |
+| `SHORTS_LONGFORM_REPLACES_SHORT` | on | That day, skip one Short (kitchen 19:00, product 16:00) so the long video fits the 10,000 unit quota. |
+| `SHORTS_WINNERS` | on | Once a day, cache views from `videos.list` and send about half of new Shorts as a new angle on a top topic. |
+| `SHORTS_SUBSCRIBE_CTA` | on | End each Short with a one-line reason to subscribe, and add `?sub_confirmation=1` to the description and comment. |
 | `SHORTS_COMMENT_REPLIES` | on | Every 2 hours, one reply per genuine thread. Cap 30 replies per channel per day. |
 | `SHORTS_CHANNEL_SEO` | on | Channel description, keywords, and English as the default language. Applied by the existing channel-profile pass. |
 | `SHORTS_TOPIC_DEMAND` | on | Once a day, ranks search titles and offers the top fresh one to the next kitchen slot. |
 | `SHORTS_WEIGHT_TUNING` | on | Once a week, moves topic and feature weights between 0.5× and 2× from Analytics. |
 | `SHORTS_CROSSPOST` | on | After a Short’s YouTube `publishAt` time, uploads the same mp4 through Zernio to TikTok and X, and sends it to Telegram with the bot API. Skips each destination when its credentials are empty. |
 
-Kitchen playlists are produce, herbs, storage, cleaning, and cooking hacks. Product playlists are one per feature plus `Reelmino for <business>`.
+Kitchen playlists are Fresh Longer, Work Triangle, produce, herbs, storage, cleaning, and cooking hacks. A title that starts with the series name goes in that series playlist. Product playlists are one per feature plus `Reelmino for <business>`.
 
-The weekly kitchen video is “N tricks to &lt;topic&gt;” with chapters. The product video is a walkthrough of one feature. The long-form gate requires a search title, at least three chapters, no greeting, and the word “subscribe” in the middle and at the end. If the upload copy loses the chapters, they are rebuilt from the script before the gate. A failed weekly upload waits 15 minutes, then longer, and stops after three attempts. Each later Short description links that long video.
+About half of new Shorts follow a top-performing topic, with a new angle and a series prefix such as `Fresh Longer #3`. The other half stays on the normal rotation. The 14-day near-duplicate gate still applies. Kitchen winners start from herbs (236 views), produce (144), and the work triangle (100) until the daily view cache replaces them. Matching Shorts link the weekly tutorial with `Full guide: <url>`.
+
+The weekly kitchen video is a 3–5 minute guide to that week’s best cluster, on Tuesday at 18:00. The product video is a rotating business-ad tutorial on Thursday at 18:00. Both are 16:9, with chapters, a subscribe line in the middle and at the end, and an end-screen note. The product video is a full flow for one business type, rotating each week, titled like “How to make a bakery ad in 60 seconds with Reelmino”. The long-form gate requires a search title, at least three chapters, no greeting, a length of 3 to 5 minutes, and the word “subscribe” in the middle and at the end. If the upload copy loses the chapters, they are rebuilt from the script before the gate. A failed weekly upload waits 15 minutes, then longer, and stops after three attempts. A Short whose title matches that week’s series gets `Full guide: <url>` in the description and in the comment.
 
 A Short that stays in `producing` for more than 90 minutes is retried. TikTok and other processing jobs stop after 8 polls, with a longer wait between polls. Jobs that already have 8 or more attempts are marked failed.
 
