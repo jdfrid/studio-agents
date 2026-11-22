@@ -149,6 +149,106 @@ export const KITCHEN_TOPICS: SeriesTopic[] = [
       en: ["Keep the daily pan between the sink and the stove.", "Hang the three tools you actually reach for."],
       he: ["משאירים את המחבת היומית בין הכיור לכיריים.", "תולים את שלושת הכלים שבאמת שולפים."]
     }
+  },
+  {
+    id: "cleaning",
+    weight: 4,
+    titles: { en: "How to clean a greasy stove fast", he: "איך מנקים כיריים שומניים מהר" },
+    hooks: { en: "Stop scrubbing a cold greasy stove for twenty minutes.", he: "תפסיקו לקרצף כיריים קרים ושומניים עשרים דקות." },
+    angles: {
+      en: ["Heat the burner, then wipe with a damp cloth.", "Sprinkle salt on the spill while it is still warm."],
+      he: ["מחממים את הלהבה ומנגבים במטלית לחה.", "מפזרים מלח על הכתם כשהוא עוד חם."]
+    }
+  },
+  {
+    id: "spices",
+    weight: 3,
+    titles: { en: "How to keep spices from going stale", he: "איך שומרים על תבלינים שלא יתייבשו" },
+    hooks: { en: "Your spices taste like dust because they live above the stove.", he: "התבלינים טעימים כמו אבק כי הם מעל הכיריים." },
+    angles: {
+      en: ["Move the jars away from heat and light.", "Write the open date on the lid."],
+      he: ["מרחיקים את הצנצנות מחום ומאור.", "רושמים את תאריך הפתיחה על המכסה."]
+    }
+  },
+  {
+    id: "bread",
+    weight: 3,
+    titles: { en: "How to keep bread from going stale", he: "איך שומרים על לחם שלא יתייבש" },
+    hooks: { en: "Stop sealing warm bread in plastic the minute you get home.", he: "תפסיקו לאטום לחם חם בשקית ברגע שמגיעים הביתה." },
+    angles: {
+      en: ["Cool it first, then freeze the slices you will not eat today.", "Keep the heel on the cut face."],
+      he: ["מצננים קודם ומקפיאים את הפרוסות של מחר.", "משאירים את הקצה על הפנים החתוכות."]
+    }
+  },
+  {
+    id: "eggs",
+    weight: 3,
+    titles: { en: "How to tell if eggs are still good", he: "איך יודעים אם הביצים עדיין טובות" },
+    hooks: { en: "Stop throwing out eggs just because the carton date passed.", he: "תפסיקו לזרוק ביצים רק כי התאריך על הקרטון עבר." },
+    angles: {
+      en: ["Sink a raw egg in a glass of water.", "Keep the carton on a shelf, not in the door."],
+      he: ["טובלים ביצה חיה בכוס מים.", "משאירים את הקרטון על מדף, לא בדלת."]
+    }
+  },
+  {
+    id: "cheese",
+    weight: 3,
+    titles: { en: "How to store cheese so it stays fresh", he: "איך מאחסנים גבינה כדי שתישאר טרייה" },
+    hooks: { en: "Your cheese sweats because the plastic wrap is airtight.", he: "הגבינה מזיעה כי הניילון אטום לגמרי." },
+    angles: {
+      en: ["Wrap it in paper, then a loose bag.", "Keep a sugar cube in the box for soft cheese."],
+      he: ["עוטפים בנייר ואז בשקית רפויה.", "שמים קוביית סוכר בקופסה לגבינה רכה."]
+    }
+  },
+  {
+    id: "freezer",
+    weight: 3,
+    titles: { en: "How to freeze soup without freezer burn", he: "איך מקפיאים מרק בלי צריבה" },
+    hooks: { en: "Stop freezing soup in one giant tub.", he: "תפסיקו להקפיא מרק בקופסה ענקית אחת." },
+    angles: {
+      en: ["Freeze flat in a bag so it stacks.", "Leave a little headroom for the ice."],
+      he: ["מקפיאים שטוח בשקית כדי שזה ייערם.", "משאירים מקום לקרח למעלה."]
+    }
+  },
+  {
+    id: "onions",
+    weight: 3,
+    titles: { en: "How to cut an onion without the mess", he: "איך חותכים בצל בלי בלגן" },
+    hooks: { en: "Stop chasing onion layers across a wet board.", he: "תפסיקו לרדוף אחרי שכבות בצל על קרש רטוב." },
+    angles: {
+      en: ["Leave the root on until the last slice.", "Chill the onion for ten minutes first."],
+      he: ["משאירים את השורש עד הפרוסה האחרונה.", "מקררים את הבצל עשר דקות קודם."]
+    }
+  },
+  {
+    id: "berries",
+    weight: 3,
+    titles: { en: "How to keep berries from molding", he: "איך שומרים על פירות יער בלי עובש" },
+    hooks: { en: "Your berries mold because they went into the fridge wet.", he: "פירות היער מעפשים כי נכנסו למקרר רטובים." },
+    angles: {
+      en: ["Rinse in vinegar water, then dry completely.", "Store them in a paper-lined box."],
+      he: ["שוטפים במים עם חומץ ומייבשים לגמרי.", "שומרים בקופסה מרופדת בנייר."]
+    }
+  },
+  {
+    id: "rice",
+    weight: 3,
+    titles: { en: "How to reheat rice so it stays safe", he: "איך מחממים אורז כך שיישאר בטוח" },
+    hooks: { en: "Stop leaving cooked rice on the counter overnight.", he: "תפסיקו להשאיר אורז מבושל על השיש כל הלילה." },
+    angles: {
+      en: ["Cool it fast, then refrigerate within an hour.", "Reheat it until it is steaming hot."],
+      he: ["מצננים מהר ומכניסים למקרר תוך שעה.", "מחממים עד שהוא מהביל."]
+    }
+  },
+  {
+    id: "pans",
+    weight: 3,
+    titles: { en: "How to stop a pan from sticking", he: "איך מונעים ממחבת להידבק" },
+    hooks: { en: "Your eggs stick because the pan was not hot yet.", he: "הביצים נדבקות כי המחבת עוד לא הייתה חמה." },
+    angles: {
+      en: ["Heat the dry pan, then add the oil.", "Wait until a drop of water skitters."],
+      he: ["מחממים מחבת יבשה ואז שמים שמן.", "מחכים עד שטיפת מים רוקדת."]
+    }
   }
 ];
 
@@ -177,12 +277,12 @@ export const PRODUCT_FEATURES: ProductFeature[] = [
 ];
 
 export const PRODUCT_BUSINESSES: ProductBusiness[] = [
-  { id: "bakery", label: "bakery", prompt: "Bakery in Tel Aviv, weekend sale 20% off." },
-  { id: "restaurant", label: "restaurant", prompt: "Family restaurant, Tuesday pasta night, kids eat free." },
-  { id: "real-estate", label: "real estate", prompt: "Two-bedroom apartment for sale, sea view, open house Sunday." },
-  { id: "gym", label: "gym", prompt: "Neighborhood gym, first month half off for new members." },
-  { id: "salon", label: "salon", prompt: "Hair salon, balayage special this week, book online." },
-  { id: "ecommerce", label: "online shop", prompt: "Online shop, linen shirts, free shipping over fifty dollars." }
+  { id: "bakery", label: "bakery", prompt: "Bakery in Tel Aviv runs a weekend sale." },
+  { id: "restaurant", label: "restaurant", prompt: "A family restaurant serves Tuesday pasta night." },
+  { id: "real-estate", label: "real estate", prompt: "A two-bedroom apartment is for sale with a sea view." },
+  { id: "gym", label: "gym", prompt: "A neighborhood gym offers the first month half off." },
+  { id: "salon", label: "salon", prompt: "A hair salon runs a balayage special this week." },
+  { id: "ecommerce", label: "online shop", prompt: "An online shop ships linen shirts for free over fifty dollars." }
 ];
 
 export type ProductDemo = {
@@ -240,7 +340,6 @@ export function buildProductDemo(feature: ProductFeature, business: ProductBusin
     prompt,
     `${title}.`,
     `Reelmino runs ${feature.name} for this ${business.label}.`,
-    `The finished ${business.label} video plays with the brand on it.`,
     PRODUCT_DEMO_CTA,
     prompt
   ].join("\n");
@@ -286,15 +385,18 @@ export function nextProductDemo(input: {
     .sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id));
   const features = ranked.filter((feature) => feature.id !== last?.featureId);
   const pool = features.length ? features : ranked;
-  for (const feature of pool) {
+  const salt = input.salt ?? 0;
+  for (let step = 0; step < pool.length; step += 1) {
+    const feature = pool[(salt + step) % pool.length];
+    if (!feature) continue;
     const businesses = PRODUCT_BUSINESSES.filter((business) => {
       if (business.id === last?.businessId) return false;
       return !recentPairs.some((pair) => pair.featureId === feature.id && pair.businessId === business.id);
     });
     const choices = businesses.length ? businesses : PRODUCT_BUSINESSES.filter((business) => business.id !== last?.businessId);
-    if (!choices.length) continue;
-    const business = choices[(input.salt ?? 0) % choices.length] ?? choices[0];
-    if (!business) continue;
+    const fallback = choices.length ? choices : PRODUCT_BUSINESSES;
+    const business = fallback[salt % fallback.length];
+    if (!feature || !business) continue;
     const demo = buildProductDemo(feature, business);
     if (demo.title.length > SHORTS_TITLE_MAX) continue;
     return demo;
@@ -504,10 +606,11 @@ export function nextSeriesTopic(input: {
     const title = topic.titles[lang];
     return !input.recentTitles.some((recent) => tokenSimilarity(title, recent) >= 0.6);
   });
-  if (!fresh) return null;
-  const angles = fresh.angles[lang];
+  const chosen = fresh ?? ranked[(input.salt ?? 0) % ranked.length];
+  if (!chosen) return null;
+  const angles = chosen.angles[lang];
   const angle = angles[(input.salt ?? input.recentTitles.length) % angles.length] ?? angles[0] ?? "";
-  return { id: fresh.id, title: fresh.titles[lang], hook: fresh.hooks[lang], angle };
+  return { id: chosen.id, title: chosen.titles[lang], hook: chosen.hooks[lang], angle };
 }
 
 export function tokenSimilarity(left: string, right: string): number {
@@ -557,12 +660,89 @@ export function openingProblem(script: string): "ok" | "missing" | "intro" {
   return "ok";
 }
 
+const MUSIC_TITLE = /\b(official|lyrics|audio|remix|feat\.?|ft\.?|video oficial|music video)\b|\|/i;
+const KITCHEN_WORDS = ["herb", "produce", "lettuce", "leftover", "fridge", "kitchen", "spice", "bread", "egg", "cheese", "freezer", "soup", "onion", "berr", "rice", "pan", "stove", "food", "cook", "meal", "veget", "fruit", "sink", "oil", "salt", "fresh"];
+
+export function kitchenRelevantPhrase(text: string): boolean {
+  const value = text.replace(/\s+/g, " ").trim();
+  if (value.length < 8 || MUSIC_TITLE.test(value)) return false;
+  const lower = value.toLowerCase();
+  return KITCHEN_WORDS.some((word) => lower.includes(word));
+}
+
+export function isOnScreenPrompt(line: string): boolean {
+  const key = normalizePrompt(line);
+  if (key.length < 12) return false;
+  return PRODUCT_BUSINESSES.some((business) => {
+    const prompt = normalizePrompt(business.prompt);
+    if (!prompt) return false;
+    if (prompt.includes(key) || key.includes(prompt)) return true;
+    const left = new Set(key.split(" ").filter((word) => word.length > 3));
+    let shared = 0;
+    for (const word of prompt.split(" ")) if (left.has(word)) shared += 1;
+    return shared >= 3;
+  });
+}
+
+export function estimateSpokenSeconds(script: string): number {
+  const words = script.split(/\s+/).filter(Boolean).length;
+  return Math.round((words / 2.4) * 10) / 10;
+}
+
+export function titleFromScript(script: string, fallback = ""): string {
+  const line = script
+    .split(/\n+/)
+    .map((part) => part.trim())
+    .find((part) => part && !isOnScreenPrompt(part) && !/pinned comment/i.test(part) && !/^an original short/i.test(part));
+  const sentence = (line || fallback).replace(/[.!?]+$/g, "").trim();
+  return fitTitle(sentence);
+}
+
+/** Keep a Short script speakable in 15–20 seconds, with a full CTA and no cut-off lines. */
+export function fitShortScript(script: string, kind: ShortsChannelKind): string {
+  const spoken: string[] = [];
+  for (const raw of script.split(/\n+/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (kind === "product" && isOnScreenPrompt(line)) {
+      const full = PRODUCT_BUSINESSES.find((business) => isOnScreenPrompt(line) && normalizePrompt(line).split(" ").some((word) => normalizePrompt(business.prompt).includes(word) && word.length > 4));
+      spoken.push(finishSentence(full?.prompt || line));
+      continue;
+    }
+    spoken.push(finishSentence(line));
+  }
+  if (kind === "product" && !spoken.some((line) => /try it with your sentence/i.test(line) && /pinned comment/i.test(line))) {
+    const loop = spoken.length > 1 ? spoken.pop() : undefined;
+    spoken.push(PRODUCT_DEMO_CTA);
+    if (loop && !/pinned comment/i.test(loop)) spoken.push(loop);
+  }
+  const capped = capWords(spoken, 42);
+  return capped.join("\n");
+}
+
+function finishSentence(line: string): string {
+  const clean = line.replace(/\s+/g, " ").trim();
+  if (!clean) return clean;
+  return /[.!?…]["'״”)]?$/.test(clean) ? clean : `${clean}.`;
+}
+
+function capWords(lines: string[], maxWords: number): string[] {
+  const count = (rows: string[]) => rows.join(" ").split(/\s+/).filter(Boolean).length;
+  const next = [...lines];
+  while (next.length > 3 && count(next) > maxWords) next.splice(next.length - 2, 1);
+  return next;
+}
+
+function normalizePrompt(value: string): string {
+  return value.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+}
+
 export function incompleteLines(script: string): string[] {
   if (!looksLikeNarration(script)) return [];
   const bad: string[] = [];
   for (const raw of script.split(/\n+/)) {
     const line = raw.trim();
-    if (!line) continue;
+    if (!line || isOnScreenPrompt(line)) continue;
     if (/[.!?…]["'״”)]?$/.test(line)) continue;
     if (line.length < 24 && /[.!?]/.test(line)) continue;
     bad.push(line.slice(0, 80));

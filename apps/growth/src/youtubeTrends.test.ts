@@ -85,6 +85,14 @@ describe("youtube trend loop", () => {
     expect(picked?.topic).not.toBe(business.title);
     expect(picked?.inspirationTitle).toBe(business.title);
     expect(pickTopic({
+      chart: [music, business],
+      taste: new Map(),
+      recentTokens: [],
+      recentVideoIds: [],
+      niche: "kitchen herbs",
+      kitchenOnly: true
+    })?.videoId).not.toBe("music");
+    expect(pickTopic({
       chart: [business],
       taste: new Map(),
       recentTokens: [tokens(business.title)],

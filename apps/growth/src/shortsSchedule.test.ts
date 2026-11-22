@@ -114,7 +114,15 @@ describe("shorts schedule", () => {
     expect(String(kitchen?.brief.instructions)).toContain("15 to 20");
     expect(kitchen?.brief.durationSeconds).toBe(20);
     expect(product?.title.toLowerCase()).not.toMatch(/herb|produce|fridge|leftover/);
+    expect(String(product?.brief.sourceText)).toMatch(/pinned comment/i);
     expect(String(product?.brief.instructions)).toContain("Do not make a kitchen");
+    const music = briefForScheduledShort({
+      kind: "kitchen",
+      recentTitles: [],
+      demandPhrase: "Anuel AA | SE TOCO EL T*TITO CON MI GL*CK (Video Oficial)"
+    });
+    expect(music?.title.toLowerCase()).not.toContain("anuel");
+    expect(music?.title.toLowerCase()).toMatch(/herb|produce|leftover|fridge|kitchen|spice|bread|egg|cheese|soup|onion|berr|rice|pan|stove/);
     expect(String(product?.brief.instructions)).toContain("No trailers");
   });
 
@@ -244,6 +252,6 @@ describe("shorts schedule", () => {
     );
     expect(comments).toHaveLength(1);
     expect(comments[0]).toContain("https://reelmino.com");
-    expect(comments[0]).toMatch(/Bakery in Tel Aviv|Family restaurant|apartment|gym|salon|Online shop/);
+    expect(comments[0]).toMatch(/bakery in tel aviv|family restaurant|apartment|gym|salon|online shop/i);
   });
 });

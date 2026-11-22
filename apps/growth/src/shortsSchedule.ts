@@ -1,4 +1,4 @@
-import { evaluateShortsGate, nextProductDemo, nextSeriesTopic, type ProductDemo } from "@studio/shared";
+import { estimateSpokenSeconds, evaluateShortsGate, fitShortScript, kitchenRelevantPhrase, nextProductDemo, nextSeriesTopic, titleFromScript, type ProductDemo } from "@studio/shared";
 import { promoCommentText, savedPromo } from "./promoLinks.js";
 import { slugify } from "./catalog.js";
 import { emptyCopy } from "./copy.js";
@@ -178,8 +178,9 @@ export function briefForScheduledShort(input: {
     content.summary = `${demo.featureName} for a ${demo.businessLabel}.`;
     content.description = demo.description;
     content.brief.title = demo.title;
-    content.brief.sourceText = demo.script;
-    content.brief.instructions = `${String(content.brief.instructions ?? "")} Follow the source text as the narration. ${demo.script} This channel is the product channel. Do not make a kitchen, recipe, or food-storage video. No trailers, no third-party characters, and no logos you do not own.`;
+    content.brief.sourceText = fitShortScript(demo.script, "product");
+    content.brief.durationSeconds = 20;
+    content.brief.instructions = `${String(content.brief.instructions ?? "")} Follow the source text as the narration and do not add sentences. Speak at most 40 words. The last spoken line before the loop is exactly: Try it with your sentence - link in pinned comment. The finished file, including the end card, must stay under 25 seconds. This channel is the product channel. Do not make a kitchen, recipe, or food-storage video. No trailers, no third-party characters, and no logos you do not own.`;
     content.brief.resultSegment = {
       source: "veo-stand-in",
       examplePrompt: demo.prompt,
@@ -191,20 +192,7 @@ export function briefForScheduledShort(input: {
     return { ...content, demo };
   }
   const demand = input.demandPhrase?.trim();
-  if (demand && !input.recentTitles.some((title) => title.toLowerCase().includes(demand.toLowerCase().slice(0, 18)))) {
-    const content = contentForTrend({
-      topic: demand,
-      niche: "home cooking, food storage, kitchen layout",
-      language: "en",
-      durationSeconds: 20,
-      channel: "kitchen",
-      hook: `Stop losing ${demand}.`,
-      angle: demand
-    });
-    content.brief.instructions = `${String(content.brief.instructions ?? "")} This channel is kitchen tips. Do not mention the product pitch, trailers, or third-party characters and logos.`;
-    content.brief.approvalMode = "auto";
-    return content;
-  }
+  const demandOk = Boolean(demand && kitchenRelevantPhrase(demand) && !input.recentTitles.some((title) => title.toLowerCase().includes(demand.toLowerCase().slice(0, 24))));
   const series = nextSeriesTopic({
     kind: input.kind,
     language: "en",
@@ -213,16 +201,22 @@ export function briefForScheduledShort(input: {
     multipliers: input.multipliers
   });
   if (!series) return null;
+  const script = fitShortScript([series.hook, series.angle, series.hook].join("\n"), "kitchen");
+  const title = titleFromScript(script, series.title);
   const content = contentForTrend({
-    topic: series.title,
+    topic: title,
     niche: "home cooking, food storage, kitchen layout",
     language: "en",
     durationSeconds: 20,
     channel: "kitchen",
     hook: series.hook,
-    angle: series.angle
+    angle: demandOk ? demand : series.angle
   });
-  content.brief.instructions = `${String(content.brief.instructions ?? "")} This channel is kitchen tips. Do not mention the product pitch, trailers, or third-party characters and logos.`;
+  content.title = title;
+  content.brief.title = title;
+  content.brief.sourceText = script;
+  content.brief.durationSeconds = 20;
+  content.brief.instructions = `${String(content.brief.instructions ?? "")} Follow the source text as the narration and do not add sentences. Speak at most 40 words. The finished file, including the end card, must stay under 25 seconds. This channel is kitchen tips. Do not mention the product pitch, trailers, or third-party characters and logos.`;
   content.brief.approvalMode = "auto";
   return content;
 }
@@ -299,6 +293,7 @@ async function runSlot(
   if (!row?.runId || !row.itemId) return;
   const file = await (deps.downloadFinal ?? downloadReelminoFinal)(row.runId, ctx.mediaDir);
   if (!file) return;
+  const narration = file.narration ? fitShortScript(file.narration, input.kind) : "";
   const item = updateItem(ctx.db, row.itemId, {
     mediaPath: file.filename,
     mediaMime: "video/mp4",
@@ -306,7 +301,7 @@ async function runSlot(
     mediaWidth: 1080,
     mediaHeight: 1920,
     mediaDurationMs: 20_000,
-    ...(file.narration ? { copy: withNarration(ctx.db, row.itemId, file.narration) } : {})
+    ...(narration ? { title: titleFromScript(narration, row.title), copy: withNarration(ctx.db, row.itemId, narration) } : {})
   });
   if (!item) return;
   const publishAt = input.publishAt.getTime() > input.now.getTime() + 60_000 ? input.publishAt : null;
@@ -379,21 +374,32 @@ async function startAttempt(
   }
   const posts = recentChannelPosts(ctx.db, input.destination.id);
   const recent = [...posts.map((post) => post.title), ...recentSlotTitles(ctx.db, input.destination.id)];
-  let built = briefForScheduledShort({
-    kind: input.kind,
-    recentTitles: recent,
-    recentDemos: posts,
-    salt: attempts,
-    demandPhrase: input.kind === "kitchen" ? readDemandPhrase(ctx.db, "kitchen") : undefined,
-    multipliers: readWeightMap(ctx.db, input.kind)
-  });
+  let built: ReturnType<typeof briefForScheduledShort> = null;
   let gateError = "";
-  if (built) {
-    const script = String(built.brief.sourceText ?? built.summary);
+  for (let step = 0; step < 6 && !built; step += 1) {
+    const candidate = briefForScheduledShort({
+      kind: input.kind,
+      recentTitles: recent,
+      recentDemos: posts,
+      salt: attempts + step,
+      demandPhrase: step === 0 && input.kind === "kitchen" ? readDemandPhrase(ctx.db, "kitchen") : undefined,
+      multipliers: readWeightMap(ctx.db, input.kind)
+    });
+    if (!candidate) {
+      gateError = "no fresh topic";
+      continue;
+    }
+    const script = fitShortScript(String(candidate.brief.sourceText ?? candidate.summary), input.kind);
+    candidate.brief.sourceText = script;
+    candidate.brief.durationSeconds = 20;
+    const ownTitle = titleFromScript(script, candidate.title);
+    candidate.title = ownTitle;
+    candidate.brief.title = ownTitle;
+    const spoken = estimateSpokenSeconds(script);
     const gate = evaluateShortsGate({
       mode: "plan",
-      title: built.title,
-      description: built.description,
+      title: ownTitle,
+      description: candidate.description,
       script,
       language: "en",
       durationSeconds: 20,
@@ -403,10 +409,8 @@ async function startAttempt(
       publishedToday: countShortsToday(ctx.db, input.destination.id),
       dailyCap: readShortsDailyCap(ctx.db)
     });
-    if (gate.decision !== "publish") {
-      built = null;
-      gateError = gate.reasons.join(" ");
-    }
+    if (gate.decision === "publish" && spoken <= 22) built = candidate;
+    else gateError = gate.reasons.join(" ") || "script is too long to speak in 20 seconds";
   }
   if (!built) {
     const failed: SlotRow = {
@@ -552,7 +556,7 @@ function readDemandPhrase(db: GrowthDb, kind: string): string | undefined {
   if (!raw) return undefined;
   try {
     const parsed = JSON.parse(raw) as Array<{ phrase?: string }>;
-    return parsed.find((item) => item.phrase?.trim())?.phrase;
+    return parsed.find((item) => item.phrase && (kind !== "kitchen" || kitchenRelevantPhrase(item.phrase)))?.phrase;
   } catch {
     return undefined;
   }
