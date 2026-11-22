@@ -145,7 +145,7 @@ New YouTube connects request `youtube.force-ssl` (comments and playlists) and `y
 
 ### Cross-post accounts
 
-Cross-posts go through Zernio (`https://zernio.com`). The growth process uploads the rendered mp4 to Zernio’s media endpoint (or sends an `https` media path when the file is already a public URL) and publishes a native TikTok video and an X video post. This runs only after the Short’s YouTube slot time. A Zernio failure is logged and retried; the YouTube upload is left as it is.
+Cross-posts go through Zernio (`https://zernio.com`). The growth process uploads the rendered mp4 to Zernio’s media endpoint (or sends an `https` media path when the file is already a public URL) and publishes a native TikTok video and an X video post. This runs only after the Short’s YouTube slot time. When the daily schedule has nothing new to send, the same cap and gap apply to older published YouTube Shorts from the last `ZERNIO_BACKLOG_DAYS` (videos longer than 60 seconds, the weekly long video, and a missing mp4 are skipped). A Zernio failure is logged and retried; the YouTube upload is left as it is.
 
 Connected Zernio accounts: TikTok `user811120410700` (`6afd5d11e23b7dac9dfd7e84`) and X `@reelmino2026` (`6afd5d2a030baa4c27c55943`). The free Zernio plan allows two accounts, so Telegram is not sent through Zernio. Add Instagram or Facebook later in `ZERNIO_ACCOUNTS` as `instagram:<accountId>` or `facebook:<accountId>`. The API name for X is `twitter`; `x:` in the env value is accepted.
 
@@ -155,6 +155,8 @@ Connected Zernio accounts: TikTok `user811120410700` (`6afd5d11e23b7dac9dfd7e84`
 | `ZERNIO_ACCOUNTS` | `tiktok:6afd5d11e23b7dac9dfd7e84,x:6afd5d2a030baa4c27c55943` | Comma-separated `platform:accountId`. |
 | `ZERNIO_DAILY_CAP` | `3` | How many Shorts, across both YouTube channels, may be cross-posted per Jerusalem day. |
 | `ZERNIO_MIN_GAP_HOURS` | `2` | Minimum time between cross-posts. |
+| `ZERNIO_BACKLOG` | on | When no new scheduled Short is waiting, cross-post an older published YouTube Short that was not made by the daily schedule. `0`, `false`, `off`, or `no` turns it off. |
+| `ZERNIO_BACKLOG_DAYS` | `60` | How far back that backlog looks. A number above 0 and at most 365. Anything else falls back to 60. |
 | `ZERNIO_SLOT_PREFER` | `even:kitchen,odd:product` | Even schedule slots prefer the kitchen channel. Odd slots prefer the product channel. |
 
 Each video is posted once per platform. The Zernio post id is stored in `growth_crossposts`. A failed platform waits 2 minutes, then 8, 32, and up to 2 hours, and stops after 5 attempts. The weekly weight pass also reads Zernio analytics for posts sent through the API and writes the view and like totals to the growth log.
