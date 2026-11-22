@@ -1,4 +1,4 @@
-import { KITCHEN_TOPICS, PRODUCT_BUSINESSES, PRODUCT_FEATURES, type ShortsChannelKind } from "@studio/shared";
+import { KITCHEN_TOPICS, kitchenRelevantPhrase, PRODUCT_BUSINESSES, PRODUCT_FEATURES, type ShortsChannelKind } from "@studio/shared";
 import { destinationsForNetwork, getItem, getSetting, insertItem, setSetting, updateItem, type Destination, type GrowthDb } from "./db.js";
 import { nid } from "./crypto.js";
 import { emptyCopy } from "./copy.js";
@@ -417,7 +417,7 @@ async function refreshDemand(db: GrowthDb, kind: ShortsChannelKind, deps: Subscr
     setSetting(db, key, now.toISOString());
     return;
   }
-  const ranked = rankDemand(titles);
+  const ranked = rankDemand(kind === "kitchen" ? titles.filter((title) => kitchenRelevantPhrase(title)) : titles);
   writeJsonSetting(db, `demand:${kind}`, ranked);
   setSetting(db, key, now.toISOString());
   log(`${kind} demand topics: ${ranked.map((item) => item.phrase).join(" | ")}`);

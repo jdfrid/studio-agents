@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   applyPronunciationLexicon,
   buildProductDemo,
+  estimateSpokenSeconds,
   evaluateShortsGate,
   filterShortsHashtags,
+  fitShortScript,
   fitTitle,
   followCta,
+  incompleteLines,
   isGenericTitle,
+  kitchenRelevantPhrase,
   narrationFromScriptJson,
   nextProductDemo,
   nextSeriesTopic,
@@ -248,5 +252,24 @@ describe("product feature demos", () => {
     });
     expect(old.reasons.join(" ")).not.toMatch(/last 7 days/i);
     expect(gate({ script: herbScript }).decision).toBe("publish");
+  });
+
+  it("keeps a short script speakable, ignores an on-screen prompt fragment, and rotates features", () => {
+    expect(incompleteLines("bedroom apartment for sale, sea view, open house")).toEqual([]);
+    expect(kitchenRelevantPhrase("Anuel AA | SE TOCO EL T*TITO CON MI GL*CK (Video Oficial)")).toBe(false);
+    expect(kitchenRelevantPhrase("How to keep fresh herbs alive")).toBe(true);
+    const missing = "Reelmino runs automatic branding for this bakery.";
+    const fitted = fitShortScript(missing, "product");
+    expect(fitted).toMatch(/try it with your sentence/i);
+    expect(fitted).toMatch(/pinned comment/i);
+    expect(estimateSpokenSeconds(fitted)).toBeLessThanOrEqual(22);
+    expect(incompleteLines(fitted)).toEqual([]);
+    const features = [0, 1, 2].map((salt) => nextProductDemo({ recent: [], salt })?.featureId);
+    expect(new Set(features).size).toBe(3);
+    const businesses = [0, 1, 2].map((salt) => nextProductDemo({ recent: [], salt })?.businessId);
+    expect(new Set(businesses).size).toBe(3);
+    const titles = PRODUCT_FEATURES.flatMap((feature) => [feature.title]);
+    const again = nextSeriesTopic({ kind: "kitchen", language: "en", recentTitles: titles.concat(["How to keep fresh herbs alive for weeks", "How to keep fresh produce crisp longer", "How to store leftovers so they stay fresh", "Where food should go in the fridge", "How to set up a small kitchen that works"]), salt: 2 });
+    expect(again?.title.length).toBeGreaterThan(8);
   });
 });

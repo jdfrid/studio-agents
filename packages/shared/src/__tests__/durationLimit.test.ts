@@ -3,6 +3,7 @@ import {
   clampVideoDurationSeconds,
   durationOptionsFor,
   maxVideoDurationSeconds,
+  resolveRunDurationSeconds,
   taskDurationSeconds
 } from "../schemas/platform.js";
 
@@ -18,6 +19,10 @@ describe("video duration limits", () => {
     expect(clampVideoDurationSeconds(60, false)).toBe(30);
     expect(clampVideoDurationSeconds(45, true)).toBe(30);
     expect(clampVideoDurationSeconds(3, false)).toBe(30);
+    expect(resolveRunDurationSeconds(20)).toBe(20);
+    expect(resolveRunDurationSeconds(18)).toBe(18);
+    expect(resolveRunDurationSeconds(60)).toBe(30);
+    expect(resolveRunDurationSeconds(3)).toBe(30);
   });
 
   it("accepts a growth task length from 30 seconds through 10 minutes", () => {

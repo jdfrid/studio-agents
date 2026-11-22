@@ -32,6 +32,15 @@ export function clampVideoDurationSeconds(_seconds?: number, _allowOver30?: bool
   return STANDARD_MAX_DURATION_SECONDS;
 }
 
+/** Growth Shorts ask for 15–25 seconds. Keep that request. Everything else stays 30 seconds. */
+export function resolveRunDurationSeconds(requested: unknown, role?: string): number {
+  const seconds = typeof requested === "number" ? requested : Number(requested);
+  const task = taskDurationSeconds(seconds);
+  if (role === "ADMIN" && task) return task;
+  if (Number.isFinite(seconds) && seconds >= 15 && seconds <= 25) return Math.round(seconds);
+  return clampVideoDurationSeconds(Number.isFinite(seconds) ? seconds : undefined);
+}
+
 /** Lengths an operator can set when defining a growth task. The public studio form stays at 30 seconds. */
 export const TASK_DURATION_OPTIONS = [30, 60, 120, 180, 300, 600] as const;
 export const TASK_MAX_DURATION_SECONDS = 600;

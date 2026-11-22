@@ -103,8 +103,7 @@ import {
   PlatformSettingsPatchSchema,
   AdminUserCreateSchema,
   AdminUserUpdateSchema,
-  clampVideoDurationSeconds,
-  taskDurationSeconds
+  resolveRunDurationSeconds
 } from "@studio/shared";
 import {
   capacityRequirementsForRun,
@@ -492,14 +491,9 @@ export async function registerRoutes(app: FastifyInstance) {
         throw err;
       }
       let incomingBrief = body.brief;
-      const settings = await getPlatformSettings();
-      const requestedDuration = taskDurationSeconds(incomingBrief.durationSeconds);
       incomingBrief = {
         ...incomingBrief,
-        durationSeconds:
-          request.user?.role === "ADMIN" && requestedDuration
-            ? requestedDuration
-            : clampVideoDurationSeconds(incomingBrief.durationSeconds, settings.allowDurationOver30)
+        durationSeconds: resolveRunDurationSeconds(incomingBrief.durationSeconds, request.user?.role)
       };
       const predictedProfile = predictRenderProfileId({
         preferLipSync,
