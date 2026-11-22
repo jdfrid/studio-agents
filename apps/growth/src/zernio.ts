@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { getSetting, setSetting, type GrowthDb } from "./db.js";
@@ -63,6 +64,18 @@ export function zernioMinGapMs(): number {
   const parsed = Number(process.env.ZERNIO_MIN_GAP_HOURS?.trim());
   if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 48) return parsed * 60 * 60 * 1000;
   return 2 * 60 * 60 * 1000;
+}
+
+export function zernioBacklogEnabled(): boolean {
+  const raw = process.env.ZERNIO_BACKLOG?.trim().toLowerCase();
+  if (!raw) return true;
+  return !["0", "false", "off", "no"].includes(raw);
+}
+
+export function zernioBacklogDays(): number {
+  const parsed = Number(process.env.ZERNIO_BACKLOG_DAYS?.trim());
+  if (Number.isFinite(parsed) && parsed > 0 && parsed <= 365) return parsed;
+  return 60;
 }
 
 export function preferredKind(slotIndex: number, spec = process.env.ZERNIO_SLOT_PREFER): "kitchen" | "product" {
@@ -167,6 +180,22 @@ export function selectZernioShort(input: {
   return ready[0] ?? null;
 }
 
+export function selectBacklogShort(input: {
+  now: Date;
+  cap: number;
+  minGapMs: number;
+  postedToday: number;
+  lastPostedAt: Date | null;
+  candidates: ZernioCandidate[];
+}): ZernioCandidate | null {
+  if (input.postedToday >= input.cap) return null;
+  if (input.lastPostedAt && input.now.getTime() - input.lastPostedAt.getTime() < input.minGapMs) return null;
+  const ready = input.candidates
+    .filter((item) => item.publishAt.getTime() <= input.now.getTime())
+    .sort((a, b) => b.publishAt.getTime() - a.publishAt.getTime());
+  return ready[0] ?? null;
+}
+
 export function duePlatforms(accounts: ZernioAccount[], rows: ZernioCrossRow[], now: Date): ZernioAccount[] {
   return accounts.filter((account) => {
     const row = rows.find((item) => item.network === `zernio:${account.platform}`);
@@ -243,20 +272,43 @@ export async function advanceZernioCrossPosts(
   try {
     const shorts = readyShorts(db);
     const rows = crossRows(db);
-    await retryStarted(db, shorts, rows, accounts, input.now, input.mediaDir, client, input.log);
+    const rowIds = new Set(rows.map((row) => row.jobId));
+    const retryPool = [
+      ...shorts,
+      ...backlogShorts(db, input.now, input.mediaDir, Number.POSITIVE_INFINITY).filter((item) => rowIds.has(item.jobId))
+    ];
+    await retryStarted(db, retryPool, rows, accounts, input.now, input.mediaDir, client, input.log);
     const freshRows = crossRows(db);
     const started = new Set(freshRows.map((row) => row.jobId));
+    const zone = input.timeZone ?? scheduleZone();
+    const fresh = shorts.filter((item) => !started.has(item.jobId));
     const chosen = selectZernioShort({
       now: input.now,
       cap: zernioDailyCap(),
       minGapMs: zernioMinGapMs(),
-      postedToday: countPostedOnDay(freshRows, input.now, input.timeZone ?? scheduleZone()),
+      postedToday: countPostedOnDay(freshRows, input.now, zone),
       lastPostedAt: latestPostedAt(freshRows),
-      candidates: shorts.filter((item) => !started.has(item.jobId))
+      candidates: fresh
     });
-    if (!chosen) return;
-    const short = shorts.find((item) => item.jobId === chosen.jobId);
+    if (chosen) {
+      const short = shorts.find((item) => item.jobId === chosen.jobId);
+      if (short) await sendShort(db, short, accounts, input.now, input.mediaDir, client, input.log);
+      return;
+    }
+    if (fresh.length > 0 || !zernioBacklogEnabled()) return;
+    const backlog = backlogShorts(db, input.now, input.mediaDir).filter((item) => !started.has(item.jobId));
+    const picked = selectBacklogShort({
+      now: input.now,
+      cap: zernioDailyCap(),
+      minGapMs: zernioMinGapMs(),
+      postedToday: countPostedOnDay(freshRows, input.now, zone),
+      lastPostedAt: latestPostedAt(freshRows),
+      candidates: backlog
+    });
+    if (!picked) return;
+    const short = backlog.find((item) => item.jobId === picked.jobId);
     if (!short) return;
+    input.log(`zernio backlog ${short.jobId} (no new scheduled Short to cross-post)`);
     await sendShort(db, short, accounts, input.now, input.mediaDir, client, input.log);
   } catch (error) {
     input.log(`zernio cross-post failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -407,6 +459,57 @@ function readyShorts(db: GrowthDb): ReadyShort[] {
       channelUrl: channelUrl(destination),
       mediaPath: mediaPath && !mediaPath.startsWith("https://") ? mediaPath : null,
       mediaUrl: mediaPath.startsWith("https://") ? mediaPath : null
+    });
+  }
+  return shorts.filter((item) => item.jobId);
+}
+
+export function backlogShorts(db: GrowthDb, now: Date, mediaDir: string, maxAgeDays = zernioBacklogDays()): ReadyShort[] {
+  const rows = db.prepare(
+    `SELECT jobs.id AS job_id, COALESCE(jobs.published_at, jobs.updated_at) AS publish_at,
+            items.title AS title, items.copy_json AS copy_json, items.media_path AS media_path,
+            items.media_duration_ms AS duration_ms,
+            destinations.external_id AS external_id, destinations.handle AS handle,
+            destinations.name AS name, destinations.url AS url
+     FROM jobs
+     JOIN items ON items.id = jobs.item_id
+     JOIN destinations ON destinations.id = jobs.destination_id
+     WHERE jobs.status = 'published' AND jobs.network = 'youtube' AND jobs.remote_url LIKE '%youtu%'
+       AND items.source NOT IN ('shorts-schedule', 'longform')
+       AND items.media_path IS NOT NULL AND items.media_path != ''`
+  ).all() as Array<Record<string, unknown>>;
+  const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+  const seenMedia = new Set<string>();
+  const shorts: ReadyShort[] = [];
+  for (const row of rows) {
+    const destination = {
+      externalId: String(row.external_id ?? ""),
+      handle: String(row.handle ?? ""),
+      name: String(row.name ?? ""),
+      url: String(row.url ?? "")
+    };
+    const kind = scheduledChannel(destination);
+    if (!kind) continue;
+    const duration = Number(row.duration_ms);
+    if (Number.isFinite(duration) && duration > 60_000) continue;
+    const publishAt = new Date(String(row.publish_at ?? ""));
+    if (Number.isNaN(publishAt.getTime())) continue;
+    if (Number.isFinite(maxAgeMs) && now.getTime() - publishAt.getTime() > maxAgeMs) continue;
+    const rawPath = String(row.media_path ?? "");
+    if (seenMedia.has(rawPath)) continue;
+    seenMedia.add(rawPath);
+    const remote = rawPath.startsWith("https://");
+    if (!remote && !existsSync(path.join(mediaDir, rawPath))) continue;
+    shorts.push({
+      jobId: String(row.job_id ?? ""),
+      kind,
+      slotIndex: 0,
+      publishAt,
+      title: String(row.title ?? ""),
+      hashtags: parseCopy(String(row.copy_json ?? "")),
+      channelUrl: channelUrl(destination),
+      mediaPath: remote ? null : rawPath,
+      mediaUrl: remote ? rawPath : null
     });
   }
   return shorts.filter((item) => item.jobId);

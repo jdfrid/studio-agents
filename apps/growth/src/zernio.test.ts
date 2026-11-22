@@ -153,6 +153,34 @@ describe("zernio cross-post", () => {
     expect(future.n).toBe(0);
     expect(summarizeZernioAnalytics({ posts: [{ platform: "tiktok", analytics: { views: 10, likes: 2 } }, { platform: "twitter", analytics: { views: 4, likes: 1 } }] })).toContain("tiktok posts=1 views=10");
   });
+
+  it("cross-posts the newest eligible backlog Short, then the older one after the gap", async () => {
+    process.env.ZERNIO_ACCOUNTS = "tiktok:6afd5d11e23b7dac9dfd7e84,x:6afd5d2a030baa4c27c55943";
+    process.env.ZERNIO_DAILY_CAP = "3";
+    const opened = db();
+    seedBacklog(opened, { jobId: "job-10", publishedAt: "2026-11-10T12:00:00.000Z", durationMs: 30_000 });
+    seedBacklog(opened, { jobId: "job-15", publishedAt: "2026-11-15T12:00:00.000Z", durationMs: 30_000 });
+    seedBacklog(opened, { jobId: "job-16", publishedAt: "2026-11-16T12:00:00.000Z", durationMs: 180_000 });
+    const calls: string[] = [];
+    const notes: string[] = [];
+    const client: ZernioClient = {
+      upload: async () => "https://media.zernio.com/temp/clip.mp4",
+      publish: async (input) => {
+        calls.push(`${input.jobId}:${input.platform}`);
+        return { postId: `post-${input.platform}` };
+      }
+    };
+    const now = new Date("2026-11-22T12:00:00.000Z");
+    await advanceZernioCrossPosts(opened.db, { now, mediaDir: opened.dir, log: (line) => notes.push(line), client });
+    expect(calls).toEqual(["job-15:tiktok", "job-15:twitter"]);
+    expect(notes.join("\n")).toContain("zernio backlog job-15 (no new scheduled Short to cross-post)");
+    await advanceZernioCrossPosts(opened.db, { now: new Date(now.getTime() + 60_000), mediaDir: opened.dir, log: () => undefined, client });
+    expect(calls).toEqual(["job-15:tiktok", "job-15:twitter"]);
+    await advanceZernioCrossPosts(opened.db, { now: new Date(now.getTime() + 3 * 60 * 60 * 1000), mediaDir: opened.dir, log: () => undefined, client });
+    expect(calls).toEqual(["job-15:tiktok", "job-15:twitter", "job-10:tiktok", "job-10:twitter"]);
+    const long = opened.db.prepare("SELECT COUNT(*) AS n FROM growth_crossposts WHERE job_id = ?").get("job-16") as { n: number };
+    expect(long.n).toBe(0);
+  });
 });
 
 function fakeClient(calls: string[]): ZernioClient {
@@ -208,4 +236,47 @@ function seedShort(
     `INSERT INTO shorts_slots (slot_key, destination_id, publish_at, status, attempts, title, item_id, run_id, job_id, error, created_at, updated_at)
      VALUES (?, ?, ?, 'published', 1, ?, ?, NULL, ?, NULL, ?, ?)`
   ).run(`shorts:${channelId}:2026-11-17:${input.slot}`, destinationId, input.publishAt, item.title, item.id, input.jobId, now, now);
+}
+
+function seedBacklog(
+  opened: { db: GrowthDb; dir: string },
+  input: { jobId: string; publishedAt: string; durationMs: number }
+): void {
+  upsertDestination(opened.db, {
+    id: "kitchen",
+    connectionId: "conn-k",
+    network: "youtube",
+    kind: "channel",
+    externalId: KITCHEN_CHANNEL_ID,
+    name: "Kitchen Tips",
+    handle: "@KitchenTips-Reelmino",
+    url: "https://www.youtube.com/channel/UCsKPN8oZJOPM4KJC4bN_ANw",
+    config: {}
+  });
+  const copy = emptyCopy();
+  copy.hashtags = ["herbs", "storage"];
+  const item = insertItem(opened.db, {
+    id: `item-${input.jobId}`,
+    slug: `slug-${input.jobId}`,
+    source: "upload",
+    title: `Kitchen tip ${input.jobId}`,
+    summary: "short",
+    language: "en",
+    copy,
+    mediaPath: `${input.jobId}.mp4`,
+    mediaMime: "video/mp4",
+    mediaKind: "video",
+    mediaWidth: 1080,
+    mediaHeight: 1920,
+    mediaDurationMs: input.durationMs,
+    reelminoRunId: null
+  });
+  writeFileSync(path.join(opened.dir, `${input.jobId}.mp4`), "mp4");
+  insertJob(opened.db, { id: input.jobId, itemId: item.id, destinationId: "kitchen", slotId: null, network: "youtube", status: "published" });
+  opened.db.prepare("UPDATE jobs SET remote_url = ?, published_at = ?, updated_at = ? WHERE id = ?").run(
+    `https://youtu.be/${input.jobId}`,
+    input.publishedAt,
+    input.publishedAt,
+    input.jobId
+  );
 }
