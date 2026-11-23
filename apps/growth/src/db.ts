@@ -323,7 +323,19 @@ export function migrate(db: GrowthDb): void {
       name TEXT NOT NULL,
       members INTEGER,
       posts INTEGER,
+      posts_alive INTEGER,
+      reactions INTEGER,
+      replies INTEGER,
       views INTEGER,
+      banned INTEGER,
+      restricted INTEGER,
+      left_group INTEGER,
+      slowmode_seconds INTEGER,
+      write_restricted INTEGER,
+      paid_stars INTEGER,
+      access TEXT,
+      restriction TEXT,
+      posts_json TEXT,
       updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS view_telegram_channels (
@@ -348,6 +360,18 @@ export function migrate(db: GrowthDb): void {
       PRIMARY KEY (taken_at, scope)
     );
   `);
+  ensureColumn(db, "view_groups", "posts_alive", "INTEGER");
+  ensureColumn(db, "view_groups", "reactions", "INTEGER");
+  ensureColumn(db, "view_groups", "replies", "INTEGER");
+  ensureColumn(db, "view_groups", "banned", "INTEGER");
+  ensureColumn(db, "view_groups", "restricted", "INTEGER");
+  ensureColumn(db, "view_groups", "left_group", "INTEGER");
+  ensureColumn(db, "view_groups", "slowmode_seconds", "INTEGER");
+  ensureColumn(db, "view_groups", "write_restricted", "INTEGER");
+  ensureColumn(db, "view_groups", "paid_stars", "INTEGER");
+  ensureColumn(db, "view_groups", "access", "TEXT");
+  ensureColumn(db, "view_groups", "restriction", "TEXT");
+  ensureColumn(db, "view_groups", "posts_json", "TEXT");
 }
 
 function ensureTextColumn(db: GrowthDb, table: string, column: string): void {
@@ -361,6 +385,13 @@ function ensureIntColumn(db: GrowthDb, table: string, column: string, fallback: 
   const columns = rows(db.prepare(`PRAGMA table_info(${table})`).all());
   if (columns.length && !columns.some((item) => str(item, "name") === column)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} INTEGER NOT NULL DEFAULT ${fallback}`);
+  }
+}
+
+function ensureColumn(db: GrowthDb, table: string, column: string, decl: string): void {
+  const columns = rows(db.prepare(`PRAGMA table_info(${table})`).all());
+  if (columns.length && !columns.some((item) => str(item, "name") === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
   }
 }
 
