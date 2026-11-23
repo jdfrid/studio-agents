@@ -47,12 +47,37 @@ export type TelegramPost = {
   text: string;
 };
 
+export type TelegramGroupPost = {
+  id: string | null;
+  sourceId: string | null;
+  sentAt: string | null;
+  deleted: boolean;
+  views: number | null;
+  forwards: number | null;
+  replies: number | null;
+  reactionCount: number | null;
+  reactions: Array<{ emoji: string; count: number }>;
+  text: string;
+};
+
 export type TelegramGroup = {
   id: string | null;
   name: string;
   members: number | null;
   posts: number | null;
+  postsAlive: number | null;
+  reactions: number | null;
+  replies: number | null;
   views: number | null;
+  banned: boolean;
+  restricted: boolean;
+  left: boolean;
+  slowmodeSeconds: number | null;
+  writeRestricted: boolean;
+  paidStars: number | null;
+  access: string | null;
+  restriction: string | null;
+  messages: TelegramGroupPost[];
 };
 
 export type TelegramChannel = {
@@ -91,7 +116,25 @@ export type ViewsReport = {
     telegram: number | null;
     total: number | null;
   }>;
-  groups: Array<{ id: string; name: string; members: number | null; posts: number | null; views: number | null }>;
+  groups: Array<{
+    id: string;
+    name: string;
+    members: number | null;
+    posts: number | null;
+    postsAlive: number | null;
+    reactions: number | null;
+    replies: number | null;
+    views: number | null;
+    banned: boolean;
+    restricted: boolean;
+    left: boolean;
+    slowmodeSeconds: number | null;
+    writeRestricted: boolean;
+    paidStars: number | null;
+    access: string | null;
+    restriction: string | null;
+    messages: TelegramGroupPost[];
+  }>;
   telegramChannels: Array<{ id: string; name: string; members: number | null; posts: number | null; views: number | null }>;
   series: Array<{ at: string; views: number }>;
 };
@@ -586,18 +629,101 @@ export function titleInText(text: string, title: string): boolean {
   return body === heading || body.startsWith(`${heading} `);
 }
 
+function boolField(row: Record<string, unknown>, keys: string[]): boolean {
+  for (const key of keys) {
+    if (!(key in row)) continue;
+    const value = row[key];
+    if (value === true || value === 1 || value === "1" || value === "true") return true;
+    if (value === false || value === 0 || value === "0" || value === "false") return false;
+  }
+  return false;
+}
+
+function asTelegramGroupPost(raw: unknown): TelegramGroupPost | null {
+  const row = asRecord(raw);
+  if (!row) return null;
+  const id = stringField(row, ["id", "message_id", "messageId", "dst"]);
+  const deleted = boolField(row, ["deleted", "is_deleted", "isDeleted"]);
+  const sentAt = dateField(row, ["sentAt", "sent_at", "date"]);
+  const views = firstNumber(row, ["views", "view_count", "viewCount"]);
+  const forwards = firstNumber(row, ["forwards", "forwards_count", "forwardsCount"]);
+  const replies = firstNumber(row, ["replies", "reply_count", "replyCount"]);
+  const reactionCount = firstNumber(row, ["reactionCount", "reaction_count", "reactionsCount"]);
+  const reactions: Array<{ emoji: string; count: number }> = [];
+  for (const item of arrayField(row, ["reactions"])) {
+    const entry = asRecord(item);
+    if (!entry) continue;
+    const emoji = stringField(entry, ["emoji", "emoticon", "reaction"]) ?? "";
+    const count = firstNumber(entry, ["count"]) ?? 0;
+    if (!emoji) continue;
+    reactions.push({ emoji, count });
+  }
+  const text = clip(stringField(row, ["text", "message", "caption"]) ?? "", 200);
+  if (id == null && !deleted && !sentAt && views == null && forwards == null && replies == null && reactionCount == null && !reactions.length) {
+    return null;
+  }
+  return {
+    id,
+    sourceId: stringField(row, ["sourceId", "source_id", "src"]),
+    sentAt,
+    deleted,
+    views,
+    forwards,
+    replies,
+    reactionCount: reactionCount ?? (reactions.length ? reactions.reduce((sum, item) => sum + item.count, 0) : null),
+    reactions,
+    text
+  };
+}
+
+function emptyGroupFlags(): Pick<TelegramGroup, "banned" | "restricted" | "left" | "slowmodeSeconds" | "writeRestricted" | "paidStars" | "access" | "restriction" | "messages"> {
+  return {
+    banned: false,
+    restricted: false,
+    left: false,
+    slowmodeSeconds: null,
+    writeRestricted: false,
+    paidStars: null,
+    access: null,
+    restriction: null,
+    messages: []
+  };
+}
+
 function asTelegramGroup(raw: unknown): TelegramGroup | null {
   const row = asRecord(raw);
   if (!row) return null;
   const name = clip(stringField(row, ["name", "title", "group_name", "groupName"]) ?? "", 200);
   if (!name) return null;
   const posts = countOrLength(row, ["posts_sent", "postsSent", "post_count", "postCount", "messages_sent", "sent", "posts", "messages"]);
+  const messages = arrayField(row, ["posts", "messages", "copies"]).flatMap((item) => {
+    const post = asTelegramGroupPost(item);
+    return post ? [post] : [];
+  });
+  const postsAlive = firstNumber(row, ["posts_alive", "postsAlive", "alive", "alive_posts", "alivePosts"])
+    ?? (messages.length ? messages.filter((item) => !item.deleted).length : null);
+  const reactions = firstNumber(row, ["reactions", "reaction_count", "reactionCount"])
+    ?? (messages.length ? messages.reduce((sum, item) => sum + (item.reactionCount ?? 0), 0) : null);
+  const replies = firstNumber(row, ["replies", "reply_count", "replyCount"])
+    ?? (messages.length ? messages.reduce((sum, item) => sum + (item.replies ?? 0), 0) : null);
   return {
     id: stringField(row, ["id", "chat_id", "chatId"]),
     name,
     members: firstNumber(row, ["members", "member_count", "memberCount", "participants", "participants_count", "subscribers"]),
     posts,
-    views: firstNumber(row, ["views", "view_count", "viewCount"])
+    postsAlive,
+    reactions,
+    replies,
+    views: firstNumber(row, ["views", "view_count", "viewCount"]),
+    banned: boolField(row, ["banned", "is_banned", "isBanned"]),
+    restricted: boolField(row, ["restricted", "is_restricted", "isRestricted"]),
+    left: boolField(row, ["left", "is_left", "isLeft"]),
+    slowmodeSeconds: firstNumber(row, ["slowmodeSeconds", "slowmode_seconds", "slow_mode_seconds", "slowmode"]),
+    writeRestricted: boolField(row, ["writeRestricted", "write_restricted", "can_not_write"]),
+    paidStars: firstNumber(row, ["paidStars", "paid_stars", "send_paid_messages_stars"]),
+    access: stringField(row, ["access", "status"]) ,
+    restriction: stringField(row, ["restriction", "restrict_reason", "disabled"]),
+    messages
   };
 }
 
@@ -885,13 +1011,36 @@ export function applyTelegramViews(db: GrowthDb, parsed: TelegramParse, now: Dat
   }
   if (parsed.sawGroups) {
     const insert = db.prepare(
-      `INSERT INTO view_groups (group_key, name, members, posts, views, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO view_groups (
+        group_key, name, members, posts, posts_alive, reactions, replies, views,
+        banned, restricted, left_group, slowmode_seconds, write_restricted, paid_stars,
+        access, restriction, posts_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     withTransaction(db, () => {
       db.prepare("DELETE FROM view_groups").run();
       parsed.groups.forEach((group, index) => {
         const key = (group.id || `name:${group.name}:${index}`).slice(0, 160);
-        insert.run(key, group.name, group.members, group.posts, group.views, now.toISOString());
+        insert.run(
+          key,
+          group.name,
+          group.members,
+          group.posts,
+          group.postsAlive,
+          group.reactions,
+          group.replies,
+          group.views,
+          group.banned ? 1 : 0,
+          group.restricted ? 1 : 0,
+          group.left ? 1 : 0,
+          group.slowmodeSeconds,
+          group.writeRestricted ? 1 : 0,
+          group.paidStars,
+          group.access ?? "",
+          group.restriction ?? "",
+          JSON.stringify(group.messages),
+          now.toISOString()
+        );
       });
     });
   }
@@ -1003,12 +1152,27 @@ export function viewsReport(db: GrowthDb): ViewsReport {
       views: countSum(db, "SELECT SUM(youtube_views) AS views, COUNT(youtube_views) AS n FROM view_videos WHERE channel_id = ?", [channel.id])
     })),
     videos,
-    groups: rows(db.prepare("SELECT group_key, name, members, posts, views FROM view_groups ORDER BY name").all()).map((row) => ({
+    groups: rows(db.prepare(`SELECT group_key, name, members, posts, posts_alive, reactions, replies, views,
+        banned, restricted, left_group, slowmode_seconds, write_restricted, paid_stars,
+        access, restriction, posts_json
+      FROM view_groups ORDER BY name`).all()).map((row) => ({
       id: String(row.group_key ?? ""),
       name: String(row.name ?? ""),
       members: finiteNumber(row.members),
       posts: finiteNumber(row.posts),
-      views: finiteNumber(row.views)
+      postsAlive: finiteNumber(row.posts_alive),
+      reactions: finiteNumber(row.reactions),
+      replies: finiteNumber(row.replies),
+      views: finiteNumber(row.views),
+      banned: Number(row.banned ?? 0) === 1,
+      restricted: Number(row.restricted ?? 0) === 1,
+      left: Number(row.left_group ?? 0) === 1,
+      slowmodeSeconds: finiteNumber(row.slowmode_seconds),
+      writeRestricted: Number(row.write_restricted ?? 0) === 1,
+      paidStars: finiteNumber(row.paid_stars),
+      access: String(row.access ?? "") || null,
+      restriction: String(row.restriction ?? "") || null,
+      messages: parseGroupMessages(row.posts_json)
     })),
     telegramChannels: rows(db.prepare("SELECT channel_key, name, members, posts, views FROM view_telegram_channels ORDER BY views IS NULL, views DESC, name").all()).map((row) => ({
       id: String(row.channel_key ?? ""),
@@ -1029,6 +1193,20 @@ function tiktokTotals(db: GrowthDb): { views: number | null; unmapped: number } 
   const mapped = countSum(db, "SELECT SUM(tiktok_views) AS views, COUNT(tiktok_views) AS n FROM view_videos");
   const loose = countSum(db, "SELECT SUM(views) AS views, COUNT(views) AS n FROM view_unmapped WHERE source = 'tiktok'");
   return { views: knownSum([mapped, loose]), unmapped: loose ?? 0 };
+}
+
+function parseGroupMessages(raw: unknown): TelegramGroupPost[] {
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) => {
+      const post = asTelegramGroupPost(item);
+      return post ? [post] : [];
+    });
+  } catch {
+    return [];
+  }
 }
 
 function countSum(db: GrowthDb, sql: string, args: unknown[] = []): number | null {

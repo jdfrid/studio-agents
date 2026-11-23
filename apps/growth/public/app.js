@@ -1186,6 +1186,61 @@ function sortMark(key) {
   return viewsSort.dir === "asc" ? " ▲" : " ▼";
 }
 
+function groupStatus(group) {
+  const parts = [];
+  if (group.banned) parts.push("החשבון חסום");
+  else if (group.left) parts.push("לא חבר בקבוצה");
+  else if (group.restricted) parts.push("החשבון מוגבל");
+  if (group.paidStars) parts.push(`כתיבה בתשלום (${group.paidStars} כוכבים)`);
+  else if (group.writeRestricted && !group.banned && !(group.restriction || "").includes("PAYMENT")) parts.push("אין הרשאת כתיבה");
+  else if ((group.access === "payment_required" || /PAYMENT/i.test(group.restriction || "")) && !group.paidStars) parts.push("כתיבה בתשלום");
+  if (group.slowmodeSeconds) parts.push(`מצב איטי (${group.slowmodeSeconds} שנ׳)`);
+  if (group.restriction && !parts.length) parts.push(group.restriction);
+  return parts.join(" · ") || "תקין";
+}
+
+function reactionLabel(post) {
+  if (Array.isArray(post.reactions) && post.reactions.length) {
+    return post.reactions.map((item) => `${item.emoji} ${item.count}`).join(" ");
+  }
+  return viewCell(post.reactionCount);
+}
+
+function groupMessagesTable(group) {
+  const messages = group.messages || [];
+  if (!messages.length) return "";
+  const rows = messages.map((post) => `<tr>
+      <td>${post.id ? esc(String(post.id)) : "—"}</td>
+      <td>${post.sentAt ? esc(localWhen(post.sentAt)) : "—"}</td>
+      <td>${post.deleted ? "נמחק" : "קיים"}</td>
+      <td>${reactionLabel(post)}</td>
+      <td>${viewCell(post.replies)}</td>
+      <td>${viewCell(post.forwards)}</td>
+      <td>${viewCell(post.views)}</td>
+      <td>${esc(post.text || "—")}</td>
+    </tr>`).join("");
+  return `<tr class="group-posts"><td colspan="8"><details class="group-posts">
+    <summary>פירוט פוסטים (${viewCell(group.postsAlive)} קיימים מתוך ${viewCell(group.posts)})</summary>
+    <table class="nested">
+      <thead><tr><th>מזהה</th><th>נשלח</th><th>מצב</th><th>תגובות</th><th>תשובות</th><th>העברות</th><th>צפיות</th><th>טקסט</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </details></td></tr>`;
+}
+
+function groupRow(group) {
+  return `<tr>
+    <td>${esc(group.name)}</td>
+    <td>${viewCell(group.members)}</td>
+    <td>${viewCell(group.posts)}</td>
+    <td>${viewCell(group.postsAlive)}</td>
+    <td>${viewCell(group.reactions)}</td>
+    <td>${viewCell(group.replies)}</td>
+    <td>${viewCell(group.views)}</td>
+    <td>${esc(groupStatus(group))}</td>
+  </tr>${groupMessagesTable(group)}`;
+}
+
 function paintViews(data) {
   viewsCache = data;
   const videos = sortVideos(data.videos || [], viewsSort);
@@ -1252,14 +1307,18 @@ function paintViews(data) {
     <div class="card">
       <h2>קבוצות טלגרם</h2>
       <table>
-        <thead><tr><th>שם</th><th>חברים</th><th>פוסטים שנשלחו</th><th>צפיות</th></tr></thead>
+        <thead><tr>
+          <th>שם</th>
+          <th>חברים</th>
+          <th>נשלחו</th>
+          <th>קיימים</th>
+          <th>תגובות</th>
+          <th>תשובות</th>
+          <th>צפיות</th>
+          <th>מצב</th>
+        </tr></thead>
         <tbody>
-          ${(data.groups || []).map((group) => `<tr>
-            <td>${esc(group.name)}</td>
-            <td>${viewCell(group.members)}</td>
-            <td>${viewCell(group.posts)}</td>
-            <td>${viewCell(group.views)}</td>
-          </tr>`).join("") || `<tr><td colspan="4">אין נתוני קבוצות</td></tr>`}
+          ${(data.groups || []).map((group) => `${groupRow(group)}`).join("") || `<tr><td colspan="8">אין נתוני קבוצות</td></tr>`}
         </tbody>
       </table>
     </div>

@@ -332,6 +332,118 @@ describe("views dashboard", () => {
     ]);
   });
 
+  it("stores Telegram group engagement and per-post details", () => {
+    const parsed = parseTelegramViews({
+      groups: [{
+        username: "kitchenchat",
+        id: -1001,
+        title: "קבוצת מטבח",
+        members: 40,
+        postsSent: 2,
+        postsAlive: 1,
+        reactions: 3,
+        replies: 4,
+        views: null,
+        banned: false,
+        restricted: false,
+        slowmodeSeconds: 15,
+        writeRestricted: true,
+        paidStars: 3,
+        access: "payment_required",
+        restriction: "ALLOW_PAYMENT_REQUIRED_3",
+        posts: [
+          {
+            id: 88,
+            sourceId: 25,
+            sentAt: "2026-11-22T18:00:00Z",
+            deleted: false,
+            views: null,
+            forwards: 1,
+            replies: 4,
+            reactionCount: 3,
+            reactions: [{ emoji: "👍", count: 3 }],
+            text: "טיפ"
+          },
+          {
+            id: 89,
+            sentAt: "2026-11-21T18:00:00Z",
+            deleted: true,
+            views: null,
+            forwards: null,
+            replies: null,
+            reactionCount: 0,
+            reactions: [],
+            text: ""
+          }
+        ]
+      }]
+    });
+    expect(parsed.sawGroups).toBe(true);
+    expect(parsed.groups[0]).toMatchObject({
+      id: "-1001",
+      name: "קבוצת מטבח",
+      members: 40,
+      posts: 2,
+      postsAlive: 1,
+      reactions: 3,
+      replies: 4,
+      views: null,
+      slowmodeSeconds: 15,
+      writeRestricted: true,
+      paidStars: 3,
+      access: "payment_required"
+    });
+    expect(parsed.groups[0]?.messages).toEqual([
+      {
+        id: "88",
+        sourceId: "25",
+        sentAt: "2026-11-22T18:00:00.000Z",
+        deleted: false,
+        views: null,
+        forwards: 1,
+        replies: 4,
+        reactionCount: 3,
+        reactions: [{ emoji: "👍", count: 3 }],
+        text: "טיפ"
+      },
+      {
+        id: "89",
+        sourceId: null,
+        sentAt: "2026-11-21T18:00:00.000Z",
+        deleted: true,
+        views: null,
+        forwards: null,
+        replies: null,
+        reactionCount: 0,
+        reactions: [],
+        text: ""
+      }
+    ]);
+    const opened = db();
+    applyTelegramViews(opened, parsed, new Date("2026-11-23T08:00:00.000Z"));
+    const group = viewsReport(opened).groups[0];
+    expect(group).toMatchObject({
+      id: "-1001",
+      name: "קבוצת מטבח",
+      members: 40,
+      posts: 2,
+      postsAlive: 1,
+      reactions: 3,
+      replies: 4,
+      views: null,
+      banned: false,
+      restricted: false,
+      slowmodeSeconds: 15,
+      writeRestricted: true,
+      paidStars: 3,
+      access: "payment_required",
+      restriction: "ALLOW_PAYMENT_REQUIRED_3"
+    });
+    expect(group?.messages).toHaveLength(2);
+    expect(group?.messages[0]).toMatchObject({ id: "88", deleted: false, replies: 4, forwards: 1 });
+    expect(group?.messages[1]).toMatchObject({ id: "89", deleted: true });
+  });
+
   it("maps TikTok analytics when the analytics id is not the publish id", () => {
     const opened = db();
     seedVideo(opened, { jobId: "job-1", videoId: "kitchentip1", channelId: KITCHEN_CHANNEL_ID, title: "Keep herbs alive" });
