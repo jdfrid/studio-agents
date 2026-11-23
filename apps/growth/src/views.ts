@@ -444,6 +444,7 @@ export function tiktokUrlKey(url: string): string {
 
 const POST_KEYS = ["posts", "messages", "channel_posts", "channelPosts", "items"];
 const GROUP_KEYS = ["groups", "group_list", "groupList", "chats", "dialogs"];
+const DEFAULT_TELEGRAM_CHANNEL = "ReelMino";
 
 export function parseTelegramViews(raw: unknown): TelegramParse {
   const root = asRecord(raw);
@@ -470,15 +471,17 @@ export function parseTelegramViews(raw: unknown): TelegramParse {
       if (group) groups.push(group);
     }
   };
-  const takeChannel = (row: Record<string, unknown>) => {
-    const channel = asTelegramChannel(row);
-    if (!channel) return;
+  const rememberChannel = (channel: TelegramChannel) => {
     sawChannels = true;
-    const chatId = channel.id;
-    for (const postKey of POST_KEYS) if (postKey in row) takePosts(row[postKey], chatId);
     const existing = channels.findIndex((item) => item.id && channel.id && item.id === channel.id);
     if (existing >= 0) channels[existing] = { ...channels[existing], ...channel, name: channel.name || channels[existing]!.name };
     else channels.push(channel);
+  };
+  const takeChannel = (row: Record<string, unknown>) => {
+    const channel = asTelegramChannel(row);
+    const chatId = channel?.id ?? channelChatId(row);
+    for (const postKey of POST_KEYS) if (postKey in row) takePosts(row[postKey], chatId);
+    if (channel) rememberChannel(channel);
   };
   for (const key of POST_KEYS) if (key in root) takePosts(root[key], null);
   for (const key of GROUP_KEYS) if (key in root) takeGroups(root[key]);
@@ -491,6 +494,11 @@ export function parseTelegramViews(raw: unknown): TelegramParse {
       const row = asRecord(item);
       if (row) takeChannel(row);
     }
+  }
+  if (!channels.some((item) => !item.id)) {
+    const rootPosts = POST_KEYS.flatMap((key) => (Array.isArray(root[key]) ? (root[key] as unknown[]) : []));
+    const channel = rootPosts.length ? asTelegramChannel({ posts: rootPosts }) : null;
+    if (channel) rememberChannel(channel);
   }
   return {
     updatedAt: dateField(root, ["exportedAt", "exported_at", "updatedAt", "updated_at", "fetchedAt", "fetched_at", "generatedAt", "generated_at", "timestamp"]),
@@ -513,8 +521,8 @@ function asTelegramChannel(raw: unknown): TelegramChannel | null {
   if (!row) return null;
   const id = channelChatId(row);
   const name = clip(stringField(row, ["name", "title", "channel_name", "channelName"]) ?? "", 200);
-  if (!id && !name) return null;
   const list = arrayField(row, POST_KEYS);
+  if (!id && !name && !list.length) return null;
   let posts: number | null = firstNumber(row, ["posts_count", "postCount", "post_count"]);
   let views: number | null = firstNumber(row, ["views", "view_count", "viewCount"]);
   if (list.length) {
@@ -535,7 +543,7 @@ function asTelegramChannel(raw: unknown): TelegramChannel | null {
   }
   return {
     id,
-    name: name || id || "טלגרם",
+    name: name || id || DEFAULT_TELEGRAM_CHANNEL,
     members: firstNumber(row, ["members", "member_count", "memberCount", "participants", "participants_count", "subscribers"]),
     posts,
     views
@@ -901,7 +909,7 @@ export function applyTelegramViews(db: GrowthDb, parsed: TelegramParse, now: Dat
       db.prepare("DELETE FROM view_telegram_channels").run();
       parsed.channels.forEach((channel, index) => {
         insert.run(
-          channel.id || `channel-${index}`,
+          channel.id || DEFAULT_TELEGRAM_CHANNEL,
           channel.name,
           channel.members,
           channel.posts,
