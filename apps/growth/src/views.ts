@@ -37,6 +37,7 @@ export type TikTokMetric = {
 
 export type TelegramPost = {
   messageId: string | null;
+  chatId: string | null;
   youtubeId: string | null;
   views: number | null;
   text: string;
@@ -359,10 +360,8 @@ export function tiktokPostsFromPayload(payload: unknown): { posts: TikTokMetric[
 export async function collectTikTokPosts(load: (page: number) => Promise<unknown>): Promise<TikTokMetric[]> {
   const all: TikTokMetric[] = [];
   const seen = new Set<string>();
-  let pages = 1;
-  for (let page = 1; page <= pages && page <= TIKTOK_PAGES; page += 1) {
+  for (let page = 1; page <= TIKTOK_PAGES; page += 1) {
     const parsed = tiktokPostsFromPayload(await load(page));
-    if (parsed.pages != null && parsed.pages > 0) pages = Math.min(TIKTOK_PAGES, parsed.pages);
     let added = 0;
     for (const post of parsed.posts) {
       if (post.platform && post.platform !== "tiktok") continue;
@@ -372,7 +371,8 @@ export async function collectTikTokPosts(load: (page: number) => Promise<unknown
       added += 1;
     }
     if (added === 0) break;
-    if (parsed.pages == null && parsed.posts.length < 50) break;
+    if (parsed.pages != null && page >= parsed.pages) break;
+    if (parsed.posts.length < 50) break;
   }
   return all;
 }
@@ -387,11 +387,11 @@ export function parseTelegramViews(raw: unknown): TelegramParse {
   const groups: TelegramGroup[] = [];
   let sawPosts = false;
   let sawGroups = false;
-  const takePosts = (list: unknown) => {
+  const takePosts = (list: unknown, parentChatId: string | null) => {
     if (!Array.isArray(list)) return;
     sawPosts = true;
     for (const item of list) {
-      const post = asTelegramPost(item);
+      const post = asTelegramPost(item, parentChatId);
       if (post) posts.push(post);
     }
   };
@@ -403,17 +403,19 @@ export function parseTelegramViews(raw: unknown): TelegramParse {
       if (group) groups.push(group);
     }
   };
-  for (const key of POST_KEYS) if (key in root) takePosts(root[key]);
+  for (const key of POST_KEYS) if (key in root) takePosts(root[key], null);
   for (const key of GROUP_KEYS) if (key in root) takeGroups(root[key]);
   const channel = asRecord(root.channel);
   if (channel) {
-    for (const key of POST_KEYS) if (key in channel) takePosts(channel[key]);
+    const chatId = channelChatId(channel);
+    for (const key of POST_KEYS) if (key in channel) takePosts(channel[key], chatId);
   }
   if (Array.isArray(root.channels)) {
     for (const item of root.channels) {
       const row = asRecord(item);
       if (!row) continue;
-      for (const key of POST_KEYS) if (key in row) takePosts(row[key]);
+      const chatId = channelChatId(row);
+      for (const key of POST_KEYS) if (key in row) takePosts(row[key], chatId);
     }
   }
   return {
@@ -430,7 +432,7 @@ function emptyTelegram(): TelegramParse {
   return { updatedAt: null, posts: [], groups: [], sawPosts: false, sawGroups: false, recognized: false };
 }
 
-function asTelegramPost(raw: unknown): TelegramPost | null {
+function asTelegramPost(raw: unknown, parentChatId: string | null): TelegramPost | null {
   const row = asRecord(raw);
   if (!row || firstNumber(row, ["members", "member_count", "memberCount", "participants", "participants_count"]) != null) return null;
   const text = stringField(row, ["text", "caption", "message", "content", "body"]) ?? "";
@@ -444,7 +446,11 @@ function asTelegramPost(raw: unknown): TelegramPost | null {
   else if (typeof messageRaw === "string" && isVideoId(messageRaw.trim()) && !youtubeId) youtubeId = messageRaw.trim();
   const views = firstNumber(row, ["views", "view_count", "viewCount"]);
   if (!messageId && !youtubeId && views == null) return null;
-  return { messageId, youtubeId, views, text: clip(text, 500) };
+  return { messageId, chatId: stringField(row, ["chat_id", "chatId", "channel_id", "channelId"]) ?? parentChatId, youtubeId, views, text: clip(text, 500) };
+}
+
+function channelChatId(row: Record<string, unknown>): string | null {
+  return stringField(row, ["chat_id", "chatId", "channel_id", "channelId", "id"]);
 }
 
 function asTelegramGroup(raw: unknown): TelegramGroup | null {
@@ -477,7 +483,7 @@ function dedupePosts(posts: TelegramPost[]): TelegramPost[] {
   const seen = new Set<string>();
   const out: TelegramPost[] = [];
   for (const post of posts) {
-    const key = `${post.messageId ?? ""}|${post.youtubeId ?? ""}|${post.views ?? ""}|${post.text.slice(0, 80)}`;
+    const key = `${post.chatId ?? ""}|${post.messageId ?? ""}|${post.youtubeId ?? ""}|${post.views ?? ""}|${post.text.slice(0, 80)}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(post);
@@ -513,6 +519,7 @@ export function loadTelegramViews(file: string): TelegramLoad {
 type VideoLink = {
   postId: string | null;
   messageId: string | null;
+  chatId: string | null;
   youtubeId: string | null;
   title: string;
   publishedAt: string | null;
@@ -521,7 +528,7 @@ type VideoLink = {
 
 function loadLinks(db: GrowthDb, networkSql: string, networkArgs: unknown[]): VideoLink[] {
   const records = rows(db.prepare(
-    `SELECT c.detail AS detail, j.remote_post_id AS remote_post_id, j.remote_url AS remote_url,
+    `SELECT c.network AS network, c.detail AS detail, j.remote_post_id AS remote_post_id, j.remote_url AS remote_url,
             j.published_at AS published_at, i.title AS title, d.external_id AS external_id
      FROM growth_crossposts c
      JOIN jobs j ON j.id = c.job_id
@@ -531,16 +538,27 @@ function loadLinks(db: GrowthDb, networkSql: string, networkArgs: unknown[]): Vi
   ).all(...networkArgs));
   return records.map((row) => {
     const detail = String(row.detail ?? "");
+    const network = String(row.network ?? "");
     const externalId = String(row.external_id ?? "");
+    const chatId = network.startsWith("telegram:") ? network.slice("telegram:".length).trim() || null : null;
     return {
       postId: crosspostPostId(detail),
       messageId: /^-?\d+$/.test(detail.trim()) ? detail.trim() : crosspostPostId(detail.startsWith("{") ? detail : ""),
+      chatId,
       youtubeId: youtubeVideoId(String(row.remote_post_id ?? "") || null, String(row.remote_url ?? "") || null),
       title: clip(String(row.title ?? "")),
       publishedAt: dateField(row, ["published_at"]),
       channelId: isChannelId(externalId) ? externalId : ""
     };
   });
+}
+
+function messageLink(links: VideoLink[], post: TelegramPost): VideoLink | undefined {
+  if (!post.messageId) return undefined;
+  const matches = links.filter((link) => link.messageId === post.messageId && link.youtubeId && (!post.chatId || link.chatId === post.chatId));
+  const videos = new Set(matches.map((link) => link.youtubeId));
+  if (videos.size !== 1) return undefined;
+  return matches[0];
 }
 
 function rows(value: unknown[]): Row[] {
@@ -614,25 +632,22 @@ function rememberNetworkViews(db: GrowthDb, videoId: string, column: "tiktok_vie
 
 export function applyTelegramViews(db: GrowthDb, parsed: TelegramParse, now: Date): { views: number | null; unmapped: number } {
   const links = loadLinks(db, "c.network LIKE ?", ["telegram:%"]);
-  const byMessage = new Map<string, VideoLink>();
-  for (const link of links) {
-    if (link.messageId && link.youtubeId) byMessage.set(link.messageId, link);
-  }
   const measured = parsed.posts.filter((post) => post.views != null);
   const perVideo = new Map<string, { views: number; link?: VideoLink; title: string }>();
-  if (measured.length) {
-    for (const post of measured) {
-      const linkedByVideo = post.youtubeId ? links.find((item) => item.youtubeId === post.youtubeId) : undefined;
-      const link = linkedByVideo ?? (post.messageId ? byMessage.get(post.messageId) : undefined);
-      const youtubeId = post.youtubeId || link?.youtubeId || null;
-      if (!youtubeId || post.views == null) continue;
-      const current = perVideo.get(youtubeId);
-      perVideo.set(youtubeId, {
-        views: (current?.views ?? 0) + post.views,
-        link: link ?? current?.link,
-        title: link?.title || current?.title || clip(post.text, 140)
-      });
-    }
+  for (const post of measured) {
+    const linkedByVideo = post.youtubeId ? links.find((item) => item.youtubeId === post.youtubeId) : undefined;
+    const link = linkedByVideo ?? messageLink(links, post);
+    const youtubeId = post.youtubeId || link?.youtubeId || null;
+    if (!youtubeId || post.views == null) continue;
+    const current = perVideo.get(youtubeId);
+    perVideo.set(youtubeId, {
+      views: (current?.views ?? 0) + post.views,
+      link: link ?? current?.link,
+      title: link?.title || current?.title || clip(post.text, 140)
+    });
+  }
+  const replaceVideoCounts = measured.length > 0 || (parsed.sawPosts && parsed.posts.length === 0);
+  if (replaceVideoCounts) {
     const stamp = now.toISOString();
     withTransaction(db, () => {
       db.prepare("UPDATE view_videos SET telegram_views = NULL").run();
@@ -640,6 +655,7 @@ export function applyTelegramViews(db: GrowthDb, parsed: TelegramParse, now: Dat
         rememberNetworkViews(db, videoId, "telegram_views", entry.views, entry.link ?? {
           postId: null,
           messageId: null,
+          chatId: null,
           youtubeId: videoId,
           title: entry.title,
           publishedAt: null,

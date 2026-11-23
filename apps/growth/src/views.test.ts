@@ -190,6 +190,31 @@ describe("views dashboard", () => {
     expect(viewsReport(opened).groups).toHaveLength(2);
   });
 
+  it("matches a Telegram message only inside its chat and clears an empty post snapshot", () => {
+    const opened = db();
+    seedVideo(opened, { jobId: "job-a", videoId: "kitchentip1", channelId: KITCHEN_CHANNEL_ID, title: "ערוץ א" });
+    seedVideo(opened, { jobId: "job-b", videoId: "reelminovid", channelId: REELMINO_CHANNEL_ID, title: "ערוץ ב" });
+    const stamp = "2026-11-01T00:00:00.000Z";
+    opened.prepare("INSERT INTO growth_crossposts (job_id, network, status, detail, created_at) VALUES (?, 'telegram:-1001', 'posted', '10', ?)").run("job-a", stamp);
+    opened.prepare("INSERT INTO growth_crossposts (job_id, network, status, detail, created_at) VALUES (?, 'telegram:-1002', 'posted', '10', ?)").run("job-b", stamp);
+    const scoped = parseTelegramViews({
+      channel: { id: "-1002", posts: [{ message_id: 10, views: 5 }] },
+      posts: [{ message_id: 10, views: 9 }, { message_id: 10, views: 4, youtubeId: "kitchentip1" }]
+    });
+    expect(scoped.posts.find((post) => post.views === 5)?.chatId).toBe("-1002");
+    const applied = applyTelegramViews(opened, scoped, new Date("2026-11-23T08:00:00.000Z"));
+    expect(viewsReport(opened).videos.find((video) => video.videoId === "reelminovid")?.telegram).toBe(5);
+    expect(viewsReport(opened).videos.find((video) => video.videoId === "kitchentip1")?.telegram).toBe(4);
+    expect(applied.unmapped).toBe(9);
+    applyTelegramViews(opened, parseTelegramViews({ posts: [{ message_id: 10, text: "בלי צפיות" }] }), new Date("2026-11-23T09:00:00.000Z"));
+    expect(viewsReport(opened).videos.find((video) => video.videoId === "reelminovid")?.telegram).toBe(5);
+    applyTelegramViews(opened, parseTelegramViews({ posts: [] }), new Date("2026-11-23T10:00:00.000Z"));
+    const cleared = viewsReport(opened);
+    expect(cleared.videos.find((video) => video.videoId === "reelminovid")?.telegram).toBeNull();
+    expect(cleared.videos.find((video) => video.videoId === "kitchentip1")?.telegram).toBeNull();
+    expect(cleared.networks.find((network) => network.id === "telegram")?.views).toBeNull();
+  });
+
   it("stores a snapshot from real counts and carries the last count forward", async () => {
     const opened = db();
     connectChannels(opened);
@@ -269,6 +294,14 @@ describe("views dashboard", () => {
     expect(pages).toEqual([1, 2]);
     expect(posts).toHaveLength(51);
     expect(posts.some((post) => post.platform === "twitter")).toBe(false);
+    const continued: number[] = [];
+    const rest = await collectTikTokPosts(async (page) => {
+      continued.push(page);
+      if (page === 1) return { posts: Array.from({ length: 50 }, (_, index) => ({ _id: `q${index}`, platform: "tiktok", analytics: { views: 1 } })) };
+      return { posts: [{ _id: "q-tail", platform: "tiktok", analytics: { views: 3 } }] };
+    });
+    expect(continued).toEqual([1, 2]);
+    expect(rest).toHaveLength(51);
 
     const opened = db();
     const dir = tempDir();
