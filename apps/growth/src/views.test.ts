@@ -168,6 +168,7 @@ describe("views dashboard", () => {
       ]
     });
     expect(parsed.recognized).toBe(true);
+    expect(parsed.channels).toEqual([{ id: null, name: "ReelMino", members: null, posts: 3, views: 11 }]);
     expect(parsed.groups.map((group) => [group.name, group.members, group.posts, group.views])).toEqual([
       ["קבוצת מטבח", 40, 3, null],
       ["רילמינו", 8, 2, 2]
@@ -180,6 +181,7 @@ describe("views dashboard", () => {
     const report = viewsReport(opened);
     expect(report.videos.find((video) => video.videoId === "kitchentip1")?.telegram).toBe(7);
     expect(report.videos.find((video) => video.videoId === "reelminovid")?.telegram).toBe(3);
+    expect(report.telegramChannels).toEqual([{ id: "ReelMino", name: "ReelMino", members: null, posts: 3, views: 11 }]);
     expect(report.groups.find((group) => group.name === "קבוצת מטבח")?.views).toBeNull();
     expect(report.groups.find((group) => group.name === "רילמינו")?.views).toBe(2);
     expect(loadTelegramViews(path.join(tempDir(), "missing.json")).status).toBe("missing");
@@ -226,6 +228,14 @@ describe("views dashboard", () => {
     const stored = viewsReport(opened);
     expect(stored.videos.find((video) => video.videoId === "kitchentip1")?.telegram).toBe(5);
     expect(stored.videos.find((video) => video.videoId === "reelminovid")?.telegram).toBe(8);
+    const loose = parseTelegramViews({
+      posts: [
+        { views: 4, text: "https://youtu.be/kitchentip1" },
+        { views: 1, text: "בלי קישור" }
+      ]
+    });
+    expect(loose.channels).toEqual([{ id: null, name: "ReelMino", members: null, posts: 2, views: 5 }]);
+    expect(loose.posts).toHaveLength(2);
   });
 
   it("reads sourceChannel posts and matches a truncated YouTube link by title", () => {
