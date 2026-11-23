@@ -16,6 +16,7 @@ import {
   loadTelegramViews,
   parseTelegramViews,
   parseYoutubeDump,
+  saveYoutubeVideos,
   viewsReport,
   type FetchLike
 } from "./views.js";
@@ -213,6 +214,114 @@ describe("views dashboard", () => {
     expect(cleared.videos.find((video) => video.videoId === "reelminovid")?.telegram).toBeNull();
     expect(cleared.videos.find((video) => video.videoId === "kitchentip1")?.telegram).toBeNull();
     expect(cleared.networks.find((network) => network.id === "telegram")?.views).toBeNull();
+    opened.prepare("DELETE FROM growth_crossposts").run();
+    opened.prepare("INSERT INTO growth_crossposts (job_id, network, status, detail, created_at) VALUES (?, 'telegram:-1001', 'posted', ?, ?)").run("job-a", JSON.stringify({ messageId: 42 }), stamp);
+    opened.prepare("INSERT INTO growth_crossposts (job_id, network, status, detail, created_at) VALUES (?, 'telegram:-1002', 'posted', ?, ?)").run("job-b", JSON.stringify({ messageId: "43" }), stamp);
+    applyTelegramViews(opened, parseTelegramViews({
+      posts: [
+        { chat_id: "-1001", message_id: 42, views: 5 },
+        { chat_id: "-1002", message_id: 43, views: 8 }
+      ]
+    }), new Date("2026-11-23T11:00:00.000Z"));
+    const stored = viewsReport(opened);
+    expect(stored.videos.find((video) => video.videoId === "kitchentip1")?.telegram).toBe(5);
+    expect(stored.videos.find((video) => video.videoId === "reelminovid")?.telegram).toBe(8);
+  });
+
+  it("reads sourceChannel posts and matches a truncated YouTube link by title", () => {
+    const parsed = parseTelegramViews({
+      exportedAt: "2026-11-23T06:00:00.000Z",
+      sourceChannel: {
+        id: "-1004473673094",
+        title: "ReelMino",
+        members: 80,
+        posts: [
+          { id: 15, views: 21, text: "טיפ למטבח\n\nיוטיוב: https://youtu.be/kitchentip1\nhttps://reelmino.com" },
+          { id: 16, views: 6, text: "שמירת עשבים\n\nיוטיוב: https://youtu.be/kitchenti" }
+        ]
+      },
+      groups: [{ id: "-1009", name: "קבוצת מטבח", members: 12, posts: 2 }]
+    });
+    expect(parsed.updatedAt).toBe("2026-11-23T06:00:00.000Z");
+    expect(parsed.posts.map((post) => [post.youtubeId, post.views, post.chatId])).toEqual([
+      ["kitchentip1", 21, "-1004473673094"],
+      [null, 6, "-1004473673094"]
+    ]);
+    expect(parsed.groups.map((group) => group.name)).toEqual(["קבוצת מטבח"]);
+    const opened = db();
+    saveYoutubeVideos(opened, [
+      { videoId: "kitchentip1", channelId: KITCHEN_CHANNEL_ID, title: "טיפ למטבח", publishedAt: "2026-11-01T10:00:00.000Z", views: 15 },
+      { videoId: "kitchentip2", channelId: KITCHEN_CHANNEL_ID, title: "שמירת עשבים", publishedAt: "2026-11-02T10:00:00.000Z", views: 4 }
+    ], new Date("2026-11-23T07:00:00.000Z"));
+    const applied = applyTelegramViews(opened, parsed, new Date("2026-11-23T08:00:00.000Z"));
+    const report = viewsReport(opened);
+    expect(report.videos.find((video) => video.videoId === "kitchentip1")?.telegram).toBe(21);
+    expect(report.videos.find((video) => video.videoId === "kitchentip2")?.telegram).toBe(6);
+    expect(applied).toEqual({ views: 27, unmapped: 0 });
+    expect(report.groups).toHaveLength(1);
+  });
+
+  it("maps TikTok analytics when the analytics id is not the publish id", () => {
+    const opened = db();
+    seedVideo(opened, { jobId: "job-1", videoId: "kitchentip1", channelId: KITCHEN_CHANNEL_ID, title: "Keep herbs alive" });
+    seedVideo(opened, { jobId: "job-2", videoId: "reelminovid", channelId: REELMINO_CHANNEL_ID, title: "One sentence bakery" });
+    const publishId = "6b03357812193c0dd2619e2b";
+    const analyticsId = "6b033ba6cf1341112329105b";
+    opened.prepare("INSERT INTO growth_crossposts (job_id, network, status, detail, created_at) VALUES (?, 'zernio:tiktok', 'posted', ?, ?)").run("job-1", publishId, "2026-11-01T10:00:00.000Z");
+    opened.prepare("INSERT INTO growth_crossposts (job_id, network, status, detail, created_at) VALUES (?, 'zernio:tiktok', 'posted', ?, ?)").run(
+      "job-2",
+      JSON.stringify({ postId: "6b03357812193c0dd2619e2c", platformPostUrl: "https://www.tiktok.com/@reelminoapp/video/7440000000000000001" }),
+      "2026-11-02T10:00:00.000Z"
+    );
+    const byOriginalId = applyTikTokViews(opened, [{
+      postId: analyticsId,
+      platform: "tiktok",
+      views: 12,
+      ids: [analyticsId, publishId],
+      publishedAt: "2026-11-01T10:02:00.000Z"
+    }], new Date("2026-11-23T08:00:00.000Z"));
+    expect(byOriginalId.views).toBe(12);
+    expect(viewsReport(opened).videos.find((video) => video.videoId === "kitchentip1")?.tiktok).toBe(12);
+
+    const byUrl = applyTikTokViews(opened, [{
+      postId: "6b033ba6cf1341112329105c",
+      platform: "tiktok",
+      views: 4,
+      ids: ["6b033ba6cf1341112329105c"],
+      urls: ["tiktok.com/@reelminoapp/video/7440000000000000001"],
+      content: "One sentence bakery\n#bakery",
+      publishedAt: "2026-11-02T10:01:00.000Z"
+    }], new Date("2026-11-23T08:00:00.000Z"));
+    expect(viewsReport(opened).videos.find((video) => video.videoId === "reelminovid")?.tiktok).toBe(4);
+    expect(byUrl.views).toBe(16);
+
+    opened.prepare("DELETE FROM growth_crossposts").run();
+    opened.prepare("UPDATE view_videos SET tiktok_views = NULL").run();
+    opened.prepare("DELETE FROM view_unmapped").run();
+    opened.prepare("INSERT INTO growth_crossposts (job_id, network, status, detail, created_at) VALUES (?, 'zernio:tiktok', 'posted', ?, ?)").run("job-1", "6b03357812193c0dd2619e2d", "2026-11-01T10:00:00.000Z");
+    opened.prepare("INSERT INTO growth_crossposts (job_id, network, status, detail, created_at) VALUES (?, 'zernio:tiktok', 'posted', ?, ?)").run("job-2", "6b03357812193c0dd2619e2e", "2026-11-05T10:00:00.000Z");
+    applyTikTokViews(opened, [
+      {
+        postId: "6b033ba6cf1341112329105d",
+        platform: "tiktok",
+        views: 7,
+        ids: ["6b033ba6cf1341112329105d"],
+        content: "Keep herbs alive\n#herbs\nMore on YouTube: https://www.youtube.com/channel/UCsKPN8oZJOPM4KJC4bN_ANw",
+        publishedAt: "2026-11-01T10:04:00.000Z"
+      },
+      {
+        postId: "6b033ba6cf1341112329105e",
+        platform: "tiktok",
+        views: 3,
+        ids: ["6b033ba6cf1341112329105e"],
+        content: "Keep herbs alive\n#herbs",
+        publishedAt: "2026-11-04T10:00:00.000Z"
+      }
+    ], new Date("2026-11-23T08:00:00.000Z"));
+    const report = viewsReport(opened);
+    expect(report.videos.find((video) => video.videoId === "kitchentip1")?.tiktok).toBe(7);
+    expect(report.videos.find((video) => video.videoId === "reelminovid")?.tiktok ?? null).toBeNull();
+    expect(report.networks.find((network) => network.id === "tiktok")?.unmapped).toBe(3);
   });
 
   it("stores a snapshot from real counts and carries the last count forward", async () => {

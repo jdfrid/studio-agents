@@ -33,6 +33,10 @@ export type TikTokMetric = {
   postId: string;
   platform: string;
   views: number | null;
+  ids?: string[];
+  urls?: string[];
+  content?: string;
+  publishedAt?: string | null;
 };
 
 export type TelegramPost = {
@@ -345,11 +349,16 @@ export function tiktokPostsFromPayload(payload: unknown): { posts: TikTokMetric[
   for (const item of list) {
     const row = asRecord(item);
     if (!row) continue;
-    const postId = stringField(row, ["_id", "id", "postId"]) ?? "";
+    const ids = zernioIds(row);
+    const postId = ids[0] ?? "";
     if (!postId || postId === "posted") continue;
     const analytics = asRecord(row.analytics);
     posts.push({
       postId,
+      ids,
+      urls: zernioUrls(row),
+      content: stringField(row, ["content", "caption", "text"]) ?? "",
+      publishedAt: dateField(row, ["publishedAt", "published_at"]),
       platform: (stringField(row, ["platform"]) ?? "").toLowerCase(),
       views: (analytics ? firstNumber(analytics, ["views", "viewCount", "view_count"]) : null) ?? firstNumber(row, ["views", "viewCount"])
     });
@@ -375,6 +384,51 @@ export async function collectTikTokPosts(load: (page: number) => Promise<unknown
     if (parsed.posts.length < 50) break;
   }
   return all;
+}
+
+const ZERNIO_ID_KEYS = ["_id", "id", "postId", "post_id", "platformPostId", "platform_post_id", "originalPostId", "original_post_id", "sourcePostId", "source_post_id", "latePostId"];
+
+function zernioIds(row: Record<string, unknown>): string[] {
+  const ids: string[] = [];
+  const add = (value: unknown) => {
+    if (typeof value !== "string") return;
+    const id = value.trim();
+    if (!id || id === "posted") return;
+    if (!ids.includes(id)) ids.push(id);
+  };
+  for (const key of ZERNIO_ID_KEYS) add(row[key]);
+  for (const item of arrayField(row, ["platforms"])) {
+    const platform = asRecord(item);
+    if (!platform) continue;
+    for (const key of ZERNIO_ID_KEYS) add(platform[key]);
+  }
+  return ids;
+}
+
+function zernioUrls(row: Record<string, unknown>): string[] {
+  const urls: string[] = [];
+  const add = (value: unknown) => {
+    if (typeof value !== "string" || !/tiktok\.com\//i.test(value)) return;
+    const url = tiktokUrlKey(value);
+    if (url && !urls.includes(url)) urls.push(url);
+  };
+  for (const key of ["platformPostUrl", "platform_post_url", "url", "postUrl", "post_url"]) add(row[key]);
+  for (const item of arrayField(row, ["platforms"])) {
+    const platform = asRecord(item);
+    if (!platform) continue;
+    for (const key of ["platformPostUrl", "platform_post_url", "url", "postUrl"]) add(platform[key]);
+  }
+  return urls;
+}
+
+export function tiktokUrlKey(url: string): string {
+  const trimmed = url.trim();
+  try {
+    const parsed = new URL(trimmed);
+    return `${parsed.hostname.replace(/^www\./i, "").toLowerCase()}${parsed.pathname.replace(/\/$/, "")}`;
+  } catch {
+    return trimmed.replace(/[?#].*$/, "").replace(/\/$/, "").replace(/^https?:\/\/(?:www\.)?/i, "").toLowerCase();
+  }
 }
 
 const POST_KEYS = ["posts", "messages", "channel_posts", "channelPosts", "items"];
@@ -405,10 +459,11 @@ export function parseTelegramViews(raw: unknown): TelegramParse {
   };
   for (const key of POST_KEYS) if (key in root) takePosts(root[key], null);
   for (const key of GROUP_KEYS) if (key in root) takeGroups(root[key]);
-  const channel = asRecord(root.channel);
-  if (channel) {
+  for (const key of ["sourceChannel", "source_channel", "channel"]) {
+    const channel = asRecord(root[key]);
+    if (!channel) continue;
     const chatId = channelChatId(channel);
-    for (const key of POST_KEYS) if (key in channel) takePosts(channel[key], chatId);
+    for (const postKey of POST_KEYS) if (postKey in channel) takePosts(channel[postKey], chatId);
   }
   if (Array.isArray(root.channels)) {
     for (const item of root.channels) {
@@ -419,7 +474,7 @@ export function parseTelegramViews(raw: unknown): TelegramParse {
     }
   }
   return {
-    updatedAt: dateField(root, ["updatedAt", "updated_at", "fetchedAt", "fetched_at", "generatedAt", "generated_at", "timestamp"]),
+    updatedAt: dateField(root, ["exportedAt", "exported_at", "updatedAt", "updated_at", "fetchedAt", "fetched_at", "generatedAt", "generated_at", "timestamp"]),
     posts: dedupePosts(posts),
     groups,
     sawPosts,
@@ -435,7 +490,7 @@ function emptyTelegram(): TelegramParse {
 function asTelegramPost(raw: unknown, parentChatId: string | null): TelegramPost | null {
   const row = asRecord(raw);
   if (!row || firstNumber(row, ["members", "member_count", "memberCount", "participants", "participants_count"]) != null) return null;
-  const text = stringField(row, ["text", "caption", "message", "content", "body"]) ?? "";
+  const text = postText(row);
   const explicit = stringField(row, ["youtubeId", "youtube_id", "videoId", "video_id", "yt_id"]) ?? "";
   const fromText = text.match(YT_URL)?.[1] ?? "";
   let youtubeId = isVideoId(explicit) ? explicit : isVideoId(fromText) ? fromText : null;
@@ -451,6 +506,21 @@ function asTelegramPost(raw: unknown, parentChatId: string | null): TelegramPost
 
 function channelChatId(row: Record<string, unknown>): string | null {
   return stringField(row, ["chat_id", "chatId", "channel_id", "channelId", "id"]);
+}
+
+function postText(row: Record<string, unknown>): string {
+  const direct = stringField(row, ["text", "caption", "message", "content", "body", "message_text"]);
+  if (direct) return direct;
+  const value = row.text ?? row.caption ?? row.message ?? row.content;
+  if (!Array.isArray(value)) return "";
+  return value.map((part) => (typeof part === "string" ? part : stringField(asRecord(part) ?? {}, ["text", "content"]) ?? "")).join("");
+}
+
+export function titleInText(text: string, title: string): boolean {
+  const heading = title.replace(/\s+/g, " ").trim();
+  const body = text.replace(/\s+/g, " ").trim();
+  if (heading.length < 4 || body.length < heading.length) return false;
+  return body === heading || body.startsWith(`${heading} `);
 }
 
 function asTelegramGroup(raw: unknown): TelegramGroup | null {
@@ -518,17 +588,20 @@ export function loadTelegramViews(file: string): TelegramLoad {
 
 type VideoLink = {
   postId: string | null;
+  ids: string[];
+  tiktokUrl: string | null;
   messageId: string | null;
   chatId: string | null;
   youtubeId: string | null;
   title: string;
   publishedAt: string | null;
+  createdAt: string | null;
   channelId: string;
 };
 
 function loadLinks(db: GrowthDb, networkSql: string, networkArgs: unknown[]): VideoLink[] {
   const records = rows(db.prepare(
-    `SELECT c.network AS network, c.detail AS detail, j.remote_post_id AS remote_post_id, j.remote_url AS remote_url,
+    `SELECT c.network AS network, c.detail AS detail, c.created_at AS created_at, j.remote_post_id AS remote_post_id, j.remote_url AS remote_url,
             j.published_at AS published_at, i.title AS title, d.external_id AS external_id
      FROM growth_crossposts c
      JOIN jobs j ON j.id = c.job_id
@@ -540,17 +613,70 @@ function loadLinks(db: GrowthDb, networkSql: string, networkArgs: unknown[]): Vi
     const detail = String(row.detail ?? "");
     const network = String(row.network ?? "");
     const externalId = String(row.external_id ?? "");
+    const stored = storedCrosspost(detail);
     const chatId = network.startsWith("telegram:") ? network.slice("telegram:".length).trim() || null : null;
     return {
-      postId: crosspostPostId(detail),
-      messageId: /^-?\d+$/.test(detail.trim()) ? detail.trim() : crosspostPostId(detail.startsWith("{") ? detail : ""),
+      postId: stored.ids[0] ?? null,
+      ids: stored.ids,
+      tiktokUrl: stored.url,
+      messageId: /^-?\d+$/.test(detail.trim()) ? detail.trim() : stored.ids.find((id) => /^-?\d+$/.test(id)) ?? null,
       chatId,
       youtubeId: youtubeVideoId(String(row.remote_post_id ?? "") || null, String(row.remote_url ?? "") || null),
       title: clip(String(row.title ?? "")),
       publishedAt: dateField(row, ["published_at"]),
+      createdAt: dateField(row, ["created_at"]),
       channelId: isChannelId(externalId) ? externalId : ""
     };
   });
+}
+
+function storedCrosspost(detail: string): { ids: string[]; url: string | null } {
+  const ids: string[] = [];
+  const add = (value: unknown) => {
+    if (typeof value !== "string") return;
+    const id = value.trim();
+    if (!id || id === "posted" || ids.includes(id)) return;
+    ids.push(id);
+  };
+  let url: string | null = null;
+  if (detail.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(detail) as Record<string, unknown>;
+      for (const key of ["postId", "platformPostId", "id"]) add(parsed[key]);
+      const messageId = parsed.messageId;
+      if (typeof messageId === "number" && Number.isFinite(messageId)) add(String(Math.trunc(messageId)));
+      else if (typeof messageId === "string" && /^-?\d+$/.test(messageId.trim())) add(messageId.trim());
+      if (typeof parsed.platformPostUrl === "string") url = tiktokUrlKey(parsed.platformPostUrl);
+    } catch {
+      add(detail);
+    }
+  } else {
+    add(crosspostPostId(detail));
+  }
+  return { ids, url };
+}
+
+function knownTitles(db: GrowthDb, links: VideoLink[]): Array<{ youtubeId: string; title: string; link?: VideoLink }> {
+  const found = new Map<string, { youtubeId: string; title: string; link?: VideoLink }>();
+  const add = (youtubeId: string, title: string, link?: VideoLink) => {
+    const heading = title.replace(/\s+/g, " ").trim();
+    if (!isVideoId(youtubeId) || heading.length < 4) return;
+    const key = `${youtubeId}\n${heading.toLowerCase()}`;
+    if (!found.has(key)) found.set(key, { youtubeId, title: heading, link });
+  };
+  for (const link of links) if (link.youtubeId) add(link.youtubeId, link.title, link);
+  for (const row of rows(db.prepare("SELECT video_id, title FROM view_videos").all())) add(String(row.video_id ?? ""), String(row.title ?? ""));
+  return [...found.values()];
+}
+
+function matchVideoTitle(text: string, titles: Array<{ youtubeId: string; title: string; link?: VideoLink }>): { youtubeId: string; title: string; link?: VideoLink } | undefined {
+  const hits = titles.filter((item) => titleInText(text, item.title));
+  if (!hits.length) return undefined;
+  const longest = hits.reduce((best, item) => Math.max(best, item.title.length), 0);
+  const best = hits.filter((item) => item.title.length === longest);
+  const videos = new Set(best.map((item) => item.youtubeId));
+  if (videos.size !== 1) return undefined;
+  return best[0];
 }
 
 function messageLink(links: VideoLink[], post: TelegramPost): VideoLink | undefined {
@@ -586,7 +712,6 @@ export function saveYoutubeVideos(db: GrowthDb, videos: YoutubeVideoStat[], now:
 
 export function applyTikTokViews(db: GrowthDb, posts: TikTokMetric[], now: Date): { views: number | null; unmapped: number } {
   const links = loadLinks(db, "c.network = ?", ["zernio:tiktok"]);
-  const byPost = new Map(links.filter((link) => link.postId).map((link) => [link.postId as string, link]));
   const perVideo = new Map<string, { views: number; link: VideoLink }>();
   const stamp = now.toISOString();
   const upsertUnmapped = db.prepare(
@@ -596,18 +721,43 @@ export function applyTikTokViews(db: GrowthDb, posts: TikTokMetric[], now: Date)
   const deleteUnmapped = db.prepare("DELETE FROM view_unmapped WHERE source = 'tiktok' AND post_id = ?");
   for (const post of posts) {
     if (post.platform && post.platform !== "tiktok") continue;
-    const link = byPost.get(post.postId);
+    const link = matchTikTokPost(post, links);
     if (!link?.youtubeId) {
       if (post.views != null) upsertUnmapped.run(post.postId, post.views, stamp);
       continue;
     }
     deleteUnmapped.run(post.postId);
+    for (const id of post.ids ?? [post.postId]) deleteUnmapped.run(id);
     if (post.views == null) continue;
     const current = perVideo.get(link.youtubeId);
     perVideo.set(link.youtubeId, { views: (current?.views ?? 0) + post.views, link });
   }
   for (const [videoId, entry] of perVideo) rememberNetworkViews(db, videoId, "tiktok_views", entry.views, entry.link, stamp);
   return tiktokTotals(db);
+}
+
+export function matchTikTokPost(post: TikTokMetric, links: VideoLink[]): VideoLink | undefined {
+  const ids = new Set((post.ids?.length ? post.ids : [post.postId]).map((id) => id.toLowerCase()));
+  const byId = links.find((link) => link.youtubeId && link.ids.some((id) => ids.has(id.toLowerCase())));
+  if (byId) return byId;
+  const urls = new Set(post.urls ?? []);
+  const byUrl = urls.size ? links.find((link) => link.youtubeId && link.tiktokUrl && urls.has(link.tiktokUrl)) : undefined;
+  if (byUrl) return byUrl;
+  return matchCaption(post.content ?? "", post.publishedAt ?? null, links);
+}
+
+function matchCaption(content: string, publishedAt: string | null, links: VideoLink[]): VideoLink | undefined {
+  const hits = links.filter((link) => link.youtubeId && titleInText(content, link.title) && withinHours(publishedAt, link.createdAt, 3));
+  const videos = new Set(hits.map((link) => link.youtubeId));
+  if (videos.size !== 1) return undefined;
+  return hits[0];
+}
+
+function withinHours(left: string | null, right: string | null, hours: number): boolean {
+  const start = Date.parse(left ?? "");
+  const end = Date.parse(right ?? "");
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
+  return Math.abs(start - end) <= hours * 60 * 60 * 1000;
 }
 
 function rememberNetworkViews(db: GrowthDb, videoId: string, column: "tiktok_views" | "telegram_views", views: number, link: VideoLink | undefined, stamp: string): void {
@@ -632,18 +782,21 @@ function rememberNetworkViews(db: GrowthDb, videoId: string, column: "tiktok_vie
 
 export function applyTelegramViews(db: GrowthDb, parsed: TelegramParse, now: Date): { views: number | null; unmapped: number } {
   const links = loadLinks(db, "c.network LIKE ?", ["telegram:%"]);
+  const titles = knownTitles(db, links);
   const measured = parsed.posts.filter((post) => post.views != null);
   const perVideo = new Map<string, { views: number; link?: VideoLink; title: string }>();
   for (const post of measured) {
     const linkedByVideo = post.youtubeId ? links.find((item) => item.youtubeId === post.youtubeId) : undefined;
-    const link = linkedByVideo ?? messageLink(links, post);
-    const youtubeId = post.youtubeId || link?.youtubeId || null;
+    const linkedByMessage = linkedByVideo ? undefined : messageLink(links, post);
+    const linkedByTitle = post.youtubeId || linkedByMessage?.youtubeId ? undefined : matchVideoTitle(post.text, titles);
+    const link = linkedByVideo ?? linkedByMessage ?? linkedByTitle?.link;
+    const youtubeId = post.youtubeId || link?.youtubeId || linkedByTitle?.youtubeId || null;
     if (!youtubeId || post.views == null) continue;
     const current = perVideo.get(youtubeId);
     perVideo.set(youtubeId, {
       views: (current?.views ?? 0) + post.views,
       link: link ?? current?.link,
-      title: link?.title || current?.title || clip(post.text, 140)
+      title: link?.title || linkedByTitle?.title || current?.title || clip(post.text, 140)
     });
   }
   const replaceVideoCounts = measured.length > 0 || (parsed.sawPosts && parsed.posts.length === 0);
@@ -654,11 +807,14 @@ export function applyTelegramViews(db: GrowthDb, parsed: TelegramParse, now: Dat
       for (const [videoId, entry] of perVideo) {
         rememberNetworkViews(db, videoId, "telegram_views", entry.views, entry.link ?? {
           postId: null,
+          ids: [],
+          tiktokUrl: null,
           messageId: null,
           chatId: null,
           youtubeId: videoId,
           title: entry.title,
           publishedAt: null,
+          createdAt: null,
           channelId: ""
         }, stamp);
       }

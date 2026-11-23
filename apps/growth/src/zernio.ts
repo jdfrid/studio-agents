@@ -246,7 +246,7 @@ function readDetail(detail: string): Detail {
 
 export type ZernioClient = {
   upload: (file: Uint8Array, filename: string) => Promise<string>;
-  publish: (input: { jobId: string; platform: string; accountId: string; content: string; mediaUrl: string }) => Promise<{ postId: string }>;
+  publish: (input: { jobId: string; platform: string; accountId: string; content: string; mediaUrl: string }) => Promise<{ postId: string; platformPostId?: string; platformPostUrl?: string }>;
   analytics?: (fromDate: string, toDate: string) => Promise<unknown>;
 };
 
@@ -390,7 +390,7 @@ async function sendShort(
     const content = zernioCaption({ title: short.title, hashtags: short.hashtags, channelUrl: short.channelUrl, maxLength: limit });
     try {
       const result = await client.publish({ jobId: short.jobId, platform: account.platform, accountId: account.accountId, content, mediaUrl });
-      writeRow(db, short.jobId, account.platform, "posted", result.postId || "posted", now);
+      writeRow(db, short.jobId, account.platform, "posted", crosspostDetail(result), now);
       log(`zernio ${account.platform} posted ${short.jobId} ${result.postId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -574,7 +574,7 @@ function liveZernioClient(): ZernioClient {
         headers: { "Idempotency-Key": zernioIdempotencyKey(input.jobId, input.platform) },
         body: JSON.stringify(zernioPostBody(input))
       });
-      return { postId: postIdOf(data) };
+      return zernioPublishResult(data, input.platform);
     },
     async analytics(fromDate, toDate) {
       const query = new URLSearchParams({ fromDate, toDate, source: "late", limit: "20", sortBy: "views", order: "desc" });
@@ -597,8 +597,37 @@ async function zernioJson(base: string, pathName: string, init: { method: string
   return data;
 }
 
-function postIdOf(data: Record<string, unknown>): string {
-  const post = (data.post ?? data) as Record<string, unknown>;
-  const id = post._id ?? post.id ?? data._id ?? data.id;
-  return typeof id === "string" && id ? id : "posted";
+export function zernioPublishResult(data: Record<string, unknown>, platform: string): { postId: string; platformPostId?: string; platformPostUrl?: string } {
+  const post = (data.post && typeof data.post === "object" ? data.post : data) as Record<string, unknown>;
+  const postId = firstId(post._id ?? post.id ?? data._id ?? data.id);
+  const platforms = Array.isArray(post.platforms) ? post.platforms : [];
+  const wanted = platform.toLowerCase();
+  const rows = platforms.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
+  const match = rows.find((row) => String(row.platform ?? "").toLowerCase() === wanted) ?? rows[0];
+  const platformPostId = match ? optionalId(match.platformPostId ?? match.platform_post_id ?? match.postId) : "";
+  const platformPostUrl = match && typeof match.platformPostUrl === "string" ? match.platformPostUrl.trim()
+    : match && typeof match.platform_post_url === "string" ? match.platform_post_url.trim() : "";
+  return {
+    postId,
+    ...(platformPostId && platformPostId !== postId ? { platformPostId } : {}),
+    ...(platformPostUrl ? { platformPostUrl } : {})
+  };
+}
+
+function optionalId(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function crosspostDetail(result: { postId: string; platformPostId?: string; platformPostUrl?: string }): string {
+  const postId = result.postId || "posted";
+  if (!result.platformPostId && !result.platformPostUrl) return postId;
+  return JSON.stringify({
+    postId,
+    ...(result.platformPostId ? { platformPostId: result.platformPostId } : {}),
+    ...(result.platformPostUrl ? { platformPostUrl: result.platformPostUrl } : {})
+  });
+}
+
+function firstId(value: unknown): string {
+  return typeof value === "string" && value.trim() ? value.trim() : "posted";
 }
