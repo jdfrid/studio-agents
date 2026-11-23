@@ -259,6 +259,67 @@ describe("views dashboard", () => {
     expect(report.videos.find((video) => video.videoId === "kitchentip2")?.telegram).toBe(6);
     expect(applied).toEqual({ views: 27, unmapped: 0 });
     expect(report.groups).toHaveLength(1);
+    expect(report.telegramChannels).toEqual([
+      { id: "-1004473673094", name: "ReelMino", members: 80, posts: 2, views: 27 }
+    ]);
+  });
+
+  it("lists each Telegram channel separately and does not double-count sourceChannel", () => {
+    const parsed = parseTelegramViews({
+      exportedAt: "2026-11-23T10:37:15.000Z",
+      sourceChannel: {
+        id: -1004473673094,
+        title: "ReelMino",
+        members: 4,
+        posts: [
+          { id: 2, views: 3, text: "טיפ למטבח" },
+          { id: 3, views: 2, text: "עוד טיפ" }
+        ]
+      },
+      channels: [
+        {
+          id: -1003589672905,
+          title: "Dealsluxy Hot Deals",
+          members: 3,
+          role: "creator",
+          posts: [
+            { id: 10, views: 1, text: "Deal one" },
+            { id: 11, views: 1, text: "Deal two" }
+          ]
+        },
+        {
+          id: -1004473673094,
+          title: "ReelMino",
+          members: 4,
+          role: "creator",
+          posts: [
+            { id: 2, views: 3, text: "טיפ למטבח" },
+            { id: 3, views: 2, text: "עוד טיפ" }
+          ]
+        }
+      ],
+      groups: [{ id: "-1009", name: "קבוצת מטבח", members: 12, postsSent: 0, posts: [] }]
+    });
+    expect(parsed.channels).toEqual([
+      { id: "-1004473673094", name: "ReelMino", members: 4, posts: 2, views: 5 },
+      { id: "-1003589672905", name: "Dealsluxy Hot Deals", members: 3, posts: 2, views: 2 }
+    ]);
+    expect(parsed.posts).toHaveLength(4);
+    const opened = db();
+    const applied = applyTelegramViews(opened, parsed, new Date("2026-11-23T11:00:00.000Z"));
+    const report = viewsReport(opened);
+    expect(applied).toEqual({ views: 7, unmapped: 7 });
+    expect(report.networks.find((row) => row.id === "telegram")).toEqual({
+      id: "telegram",
+      label: "Telegram",
+      views: 7,
+      paused: false,
+      unmapped: 7
+    });
+    expect(report.telegramChannels).toEqual([
+      { id: "-1004473673094", name: "ReelMino", members: 4, posts: 2, views: 5 },
+      { id: "-1003589672905", name: "Dealsluxy Hot Deals", members: 3, posts: 2, views: 2 }
+    ]);
   });
 
   it("maps TikTok analytics when the analytics id is not the publish id", () => {

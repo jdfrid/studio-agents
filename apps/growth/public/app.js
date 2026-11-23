@@ -1216,6 +1216,10 @@ function paintViews(data) {
     <div class="stats">
       ${(data.channels || []).map((row) => `<div class="card stat"><span class="muted">${esc(row.name)}</span><b>${viewCell(row.views)}</b></div>`).join("")}
     </div>
+    ${(data.telegramChannels || []).length ? `<h2>ערוצי טלגרם</h2>
+    <div class="stats">
+      ${(data.telegramChannels || []).map((row) => `<div class="card stat"><span class="muted">${esc(row.name)}</span><b>${viewCell(row.views)}</b><p class="muted">${[row.members != null ? `${viewCell(row.members)} חברים` : "", row.posts != null ? `${viewCell(row.posts)} פוסטים` : ""].filter(Boolean).join(" · ")}</p></div>`).join("")}
+    </div>` : ""}
     <div class="card">
       <h2>צפיות מצטברות</h2>
       ${viewsChart(data.series || [])}

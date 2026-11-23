@@ -326,6 +326,14 @@ export function migrate(db: GrowthDb): void {
       views INTEGER,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS view_telegram_channels (
+      channel_key TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      members INTEGER,
+      posts INTEGER,
+      views INTEGER,
+      updated_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS view_unmapped (
       source TEXT NOT NULL,
       post_id TEXT NOT NULL,

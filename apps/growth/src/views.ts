@@ -55,12 +55,22 @@ export type TelegramGroup = {
   views: number | null;
 };
 
+export type TelegramChannel = {
+  id: string | null;
+  name: string;
+  members: number | null;
+  posts: number | null;
+  views: number | null;
+};
+
 export type TelegramParse = {
   updatedAt: string | null;
   posts: TelegramPost[];
   groups: TelegramGroup[];
+  channels: TelegramChannel[];
   sawPosts: boolean;
   sawGroups: boolean;
+  sawChannels: boolean;
   recognized: boolean;
 };
 
@@ -82,6 +92,7 @@ export type ViewsReport = {
     total: number | null;
   }>;
   groups: Array<{ id: string; name: string; members: number | null; posts: number | null; views: number | null }>;
+  telegramChannels: Array<{ id: string; name: string; members: number | null; posts: number | null; views: number | null }>;
   series: Array<{ at: string; views: number }>;
 };
 
@@ -439,8 +450,10 @@ export function parseTelegramViews(raw: unknown): TelegramParse {
   if (!root) return emptyTelegram();
   const posts: TelegramPost[] = [];
   const groups: TelegramGroup[] = [];
+  const channels: TelegramChannel[] = [];
   let sawPosts = false;
   let sawGroups = false;
+  let sawChannels = false;
   const takePosts = (list: unknown, parentChatId: string | null) => {
     if (!Array.isArray(list)) return;
     sawPosts = true;
@@ -457,34 +470,76 @@ export function parseTelegramViews(raw: unknown): TelegramParse {
       if (group) groups.push(group);
     }
   };
+  const takeChannel = (row: Record<string, unknown>) => {
+    const channel = asTelegramChannel(row);
+    if (!channel) return;
+    sawChannels = true;
+    const chatId = channel.id;
+    for (const postKey of POST_KEYS) if (postKey in row) takePosts(row[postKey], chatId);
+    const existing = channels.findIndex((item) => item.id && channel.id && item.id === channel.id);
+    if (existing >= 0) channels[existing] = { ...channels[existing], ...channel, name: channel.name || channels[existing]!.name };
+    else channels.push(channel);
+  };
   for (const key of POST_KEYS) if (key in root) takePosts(root[key], null);
   for (const key of GROUP_KEYS) if (key in root) takeGroups(root[key]);
   for (const key of ["sourceChannel", "source_channel", "channel"]) {
     const channel = asRecord(root[key]);
-    if (!channel) continue;
-    const chatId = channelChatId(channel);
-    for (const postKey of POST_KEYS) if (postKey in channel) takePosts(channel[postKey], chatId);
+    if (channel) takeChannel(channel);
   }
   if (Array.isArray(root.channels)) {
     for (const item of root.channels) {
       const row = asRecord(item);
-      if (!row) continue;
-      const chatId = channelChatId(row);
-      for (const key of POST_KEYS) if (key in row) takePosts(row[key], chatId);
+      if (row) takeChannel(row);
     }
   }
   return {
     updatedAt: dateField(root, ["exportedAt", "exported_at", "updatedAt", "updated_at", "fetchedAt", "fetched_at", "generatedAt", "generated_at", "timestamp"]),
     posts: dedupePosts(posts),
     groups,
+    channels,
     sawPosts,
     sawGroups,
-    recognized: sawPosts || sawGroups
+    sawChannels,
+    recognized: sawPosts || sawGroups || sawChannels
   };
 }
 
 function emptyTelegram(): TelegramParse {
-  return { updatedAt: null, posts: [], groups: [], sawPosts: false, sawGroups: false, recognized: false };
+  return { updatedAt: null, posts: [], groups: [], channels: [], sawPosts: false, sawGroups: false, sawChannels: false, recognized: false };
+}
+
+function asTelegramChannel(raw: unknown): TelegramChannel | null {
+  const row = asRecord(raw);
+  if (!row) return null;
+  const id = channelChatId(row);
+  const name = clip(stringField(row, ["name", "title", "channel_name", "channelName"]) ?? "", 200);
+  if (!id && !name) return null;
+  const list = arrayField(row, POST_KEYS);
+  let posts: number | null = firstNumber(row, ["posts_count", "postCount", "post_count"]);
+  let views: number | null = firstNumber(row, ["views", "view_count", "viewCount"]);
+  if (list.length) {
+    let count = 0;
+    let sum = 0;
+    let sawView = false;
+    for (const item of list) {
+      const post = asTelegramPost(item, id);
+      if (!post) continue;
+      count += 1;
+      if (post.views != null) {
+        sum += post.views;
+        sawView = true;
+      }
+    }
+    posts = count;
+    if (sawView) views = sum;
+  }
+  return {
+    id,
+    name: name || id || "טלגרם",
+    members: firstNumber(row, ["members", "member_count", "memberCount", "participants", "participants_count", "subscribers"]),
+    posts,
+    views
+  };
 }
 
 function asTelegramPost(raw: unknown, parentChatId: string | null): TelegramPost | null {
@@ -837,6 +892,25 @@ export function applyTelegramViews(db: GrowthDb, parsed: TelegramParse, now: Dat
   const unmapped = views == null ? 0 : Math.max(0, views - mapped);
   const observed = measured.length > 0 || (parsed.sawPosts && parsed.posts.length === 0);
   if (observed) {
+  if (parsed.sawChannels || parsed.channels.length > 0) {
+    const insert = db.prepare(
+      `INSERT INTO view_telegram_channels (channel_key, name, members, posts, views, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    const stamp = now.toISOString();
+    withTransaction(db, () => {
+      db.prepare("DELETE FROM view_telegram_channels").run();
+      parsed.channels.forEach((channel, index) => {
+        insert.run(
+          channel.id || `channel-${index}`,
+          channel.name,
+          channel.members,
+          channel.posts,
+          channel.views,
+          stamp
+        );
+      });
+    });
+  }
     setSetting(db, "views_telegram_total", views == null ? "" : String(views));
     setSetting(db, "views_telegram_unmapped", String(unmapped));
   }
@@ -923,6 +997,13 @@ export function viewsReport(db: GrowthDb): ViewsReport {
     videos,
     groups: rows(db.prepare("SELECT group_key, name, members, posts, views FROM view_groups ORDER BY name").all()).map((row) => ({
       id: String(row.group_key ?? ""),
+      name: String(row.name ?? ""),
+      members: finiteNumber(row.members),
+      posts: finiteNumber(row.posts),
+      views: finiteNumber(row.views)
+    })),
+    telegramChannels: rows(db.prepare("SELECT channel_key, name, members, posts, views FROM view_telegram_channels ORDER BY views IS NULL, views DESC, name").all()).map((row) => ({
+      id: String(row.channel_key ?? ""),
       name: String(row.name ?? ""),
       members: finiteNumber(row.members),
       posts: finiteNumber(row.posts),
@@ -1110,7 +1191,7 @@ function refreshTelegram(input: ViewStatsInput, now: Date, log: (message: string
   const applied = applyTelegramViews(input.db, loaded.parsed, now);
   const at = loaded.updatedAt || now.toISOString();
   setSetting(input.db, "views_telegram_at", at);
-  log(`views telegram posts=${loaded.parsed.posts.length} groups=${loaded.parsed.groups.length}`);
+  log(`views telegram posts=${loaded.parsed.posts.length} channels=${loaded.parsed.channels.length} groups=${loaded.parsed.groups.length}`);
   return applied.views;
 }
 
