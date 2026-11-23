@@ -643,6 +643,9 @@ function storedCrosspost(detail: string): { ids: string[]; url: string | null } 
     try {
       const parsed = JSON.parse(detail) as Record<string, unknown>;
       for (const key of ["postId", "platformPostId", "id"]) add(parsed[key]);
+      const messageId = parsed.messageId;
+      if (typeof messageId === "number" && Number.isFinite(messageId)) add(String(Math.trunc(messageId)));
+      else if (typeof messageId === "string" && /^-?\d+$/.test(messageId.trim())) add(messageId.trim());
       if (typeof parsed.platformPostUrl === "string") url = tiktokUrlKey(parsed.platformPostUrl);
     } catch {
       add(detail);

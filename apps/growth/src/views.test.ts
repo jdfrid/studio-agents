@@ -214,6 +214,18 @@ describe("views dashboard", () => {
     expect(cleared.videos.find((video) => video.videoId === "reelminovid")?.telegram).toBeNull();
     expect(cleared.videos.find((video) => video.videoId === "kitchentip1")?.telegram).toBeNull();
     expect(cleared.networks.find((network) => network.id === "telegram")?.views).toBeNull();
+    opened.prepare("DELETE FROM growth_crossposts").run();
+    opened.prepare("INSERT INTO growth_crossposts (job_id, network, status, detail, created_at) VALUES (?, 'telegram:-1001', 'posted', ?, ?)").run("job-a", JSON.stringify({ messageId: 42 }), stamp);
+    opened.prepare("INSERT INTO growth_crossposts (job_id, network, status, detail, created_at) VALUES (?, 'telegram:-1002', 'posted', ?, ?)").run("job-b", JSON.stringify({ messageId: "43" }), stamp);
+    applyTelegramViews(opened, parseTelegramViews({
+      posts: [
+        { chat_id: "-1001", message_id: 42, views: 5 },
+        { chat_id: "-1002", message_id: 43, views: 8 }
+      ]
+    }), new Date("2026-11-23T11:00:00.000Z"));
+    const stored = viewsReport(opened);
+    expect(stored.videos.find((video) => video.videoId === "kitchentip1")?.telegram).toBe(5);
+    expect(stored.videos.find((video) => video.videoId === "reelminovid")?.telegram).toBe(8);
   });
 
   it("reads sourceChannel posts and matches a truncated YouTube link by title", () => {
