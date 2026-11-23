@@ -15,6 +15,8 @@ import {
   zernioCaption,
   zernioIdempotencyKey,
   zernioPostBody,
+  zernioPublishResult,
+  crosspostDetail,
   type ZernioCandidate,
   type ZernioClient
 } from "./zernio.js";
@@ -44,6 +46,18 @@ function candidate(jobId: string, kind: "kitchen" | "product", slotIndex: number
 }
 
 describe("zernio cross-post", () => {
+  it("keeps the publish id and the TikTok url from the create-post response", () => {
+    const result = zernioPublishResult({
+      post: {
+        _id: "6b03357812193c0dd2619e2b",
+        platforms: [{ platform: "tiktok", platformPostUrl: "https://www.tiktok.com/@reelminoapp/video/7440000000000000001?is_from_webapp=1" }]
+      }
+    }, "tiktok");
+    expect(result.postId).toBe("6b03357812193c0dd2619e2b");
+    expect(crosspostDetail(result)).toContain("platformPostUrl");
+    expect(crosspostDetail({ postId: "post-tiktok" })).toBe("post-tiktok");
+  });
+
   it("builds a caption with two or three hashtags and keeps X inside 280 characters", () => {
     const url = "https://www.youtube.com/channel/UCsKPN8oZJOPM4KJC4bN_ANw";
     const caption = zernioCaption({ title: "Keep herbs alive", hashtags: ["herbs", "storage", "fridge", "shorts"], channelUrl: url });
