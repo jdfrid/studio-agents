@@ -308,6 +308,37 @@ export function migrate(db: GrowthDb): void {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS view_videos (
+      video_id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL DEFAULT '',
+      published_at TEXT,
+      youtube_views INTEGER,
+      tiktok_views INTEGER,
+      telegram_views INTEGER,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS view_groups (
+      group_key TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      members INTEGER,
+      posts INTEGER,
+      views INTEGER,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS view_unmapped (
+      source TEXT NOT NULL,
+      post_id TEXT NOT NULL,
+      views INTEGER NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (source, post_id)
+    );
+    CREATE TABLE IF NOT EXISTS view_snapshots (
+      taken_at TEXT NOT NULL,
+      scope TEXT NOT NULL,
+      views INTEGER NOT NULL,
+      PRIMARY KEY (taken_at, scope)
+    );
   `);
 }
 

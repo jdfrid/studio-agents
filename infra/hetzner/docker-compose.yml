@@ -254,10 +254,13 @@ services:
       ZERNIO_SLOT_PREFER: ${ZERNIO_SLOT_PREFER:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_IDS: ${TELEGRAM_CHAT_IDS:-}
+      TGRELAY_VIEWS_FILE: /app/apps/growth/tgrelay/views.json
       GROWTH_WEB_PUBLIC: /srv/site
     volumes:
       - growth_data:/app/apps/growth/data
       - growth_site:/srv/site
+      # tgrelay writes views.json here every few hours. Missing file is tolerated.
+      - /root/tgrelay/data:/app/apps/growth/tgrelay:ro
     ports:
       - "127.0.0.1:${GROWTH_HTTP_PORT:-8082}:4180"
     networks:

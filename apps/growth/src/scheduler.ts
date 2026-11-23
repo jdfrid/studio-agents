@@ -1,3 +1,4 @@
+import path from "node:path";
 import { decideSlot } from "./schedule.js";
 import {
   claimSlot,
@@ -29,6 +30,7 @@ import { advanceShortsSchedule } from "./shortsSchedule.js";
 import { advanceSubscriberGrowth } from "./subscriberGrowth.js";
 import { advanceTextCampaigns, writeTextPosts } from "./textPosts.js";
 import { advanceTelegramMirror } from "./telegramMirror.js";
+import { advanceViewStats } from "./views.js";
 
 export type DispatchContext = {
   db: GrowthDb;
@@ -205,6 +207,16 @@ export async function tick(ctx: DispatchContext): Promise<void> {
     }));
   } catch (error) {
     console.error("[growth] telegram mirror failed", error);
+  }
+  try {
+    await advanceViewStats({
+      db: ctx.db,
+      tokenFor: async (connectionId) => (await freshConnectionTokens(ctx.db, connectionId, ctx.key, "youtube")).accessToken,
+      youtubeDumpFile: path.join(path.dirname(ctx.mediaDir), "youtube_views_dump.json"),
+      log: (message) => console.log(`[growth] ${message}`)
+    });
+  } catch (error) {
+    console.error("[growth] views refresh failed", error);
   }
 }
 
