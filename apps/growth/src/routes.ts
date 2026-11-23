@@ -71,7 +71,8 @@ import { writeLearnSite } from "./internet.js";
 import { sendGrowthMail } from "./mail.js";
 import { applyLink, trackedLink } from "./utm.js";
 import { produceItem, pullItem, pullReady } from "./produce.js";
-import { retryPublish, runPublish } from "./publish.js";
+import { freshConnectionTokens, retryPublish, runPublish } from "./publish.js";
+import { advanceViewStats, viewsReport } from "./views.js";
 import { dispatchSlot, type DispatchContext } from "./scheduler.js";
 import { nextMondayIso } from "./time.js";
 import { fillKeywordFeed, keywordFeedView, saveKeywordFeed } from "./keywordFeeds.js";
@@ -107,6 +108,19 @@ export function registerRoutes(app: FastifyInstance, ctx: AppCtx): void {
   });
 
   app.get("/api/health", async () => ({ ok: true }));
+
+  app.get("/api/views", async () => viewsReport(ctx.db));
+
+  app.post("/api/views/refresh", async () => {
+    await advanceViewStats({
+      db: ctx.db,
+      force: true,
+      tokenFor: async (connectionId) => (await freshConnectionTokens(ctx.db, connectionId, ctx.key, "youtube")).accessToken,
+      youtubeDumpFile: path.join(path.dirname(ctx.mediaDir), "youtube_views_dump.json"),
+      log: (message) => console.log(`[growth] ${message}`)
+    });
+    return viewsReport(ctx.db);
+  });
 
   app.post("/api/login", async (request, reply) => {
     const body = request.body as { name?: string; password?: string };

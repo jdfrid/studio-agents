@@ -15,12 +15,15 @@ const PAGES = {
   calendar: "/calendar",
   internet: "/internet",
   results: "/results",
+  views: "/views",
   people: "/people"
 };
 
 let state = null;
 let tab = "own";
 let selected = null;
+let viewsSort = { key: "publishedAt", dir: "desc" };
+let viewsCache = null;
 
 function pageFromLocation() {
   const path = location.pathname.replace(/\/$/, "") || "/";
@@ -110,6 +113,7 @@ function render() {
   else if (tab === "linkedin") renderText("linkedin");
   else if (tab === "internet") renderInternet();
   else if (tab === "results") renderResults();
+  else if (tab === "views") renderViews();
   else renderPeople();
 }
 
@@ -1118,6 +1122,177 @@ function renderInternet() {
     };
   });
   panel.querySelectorAll("[data-send]").forEach((button) => { button.onclick = () => run(() => api(`/api/emails/${button.dataset.send}/send`, { method: "POST", body: "{}" })); });
+}
+
+function viewCell(value) {
+  return value == null || value === "" ? "—" : Number(value).toLocaleString("he-IL");
+}
+
+function sortVideos(videos, sort) {
+  const copy = [...videos];
+  const dir = sort.dir === "asc" ? 1 : -1;
+  const textKeys = new Set(["title", "channelName"]);
+  copy.sort((a, b) => {
+    const left = a[sort.key];
+    const right = b[sort.key];
+    const leftMissing = left == null || left === "";
+    const rightMissing = right == null || right === "";
+    if (leftMissing || rightMissing) {
+      if (leftMissing && rightMissing) return 0;
+      return leftMissing ? 1 : -1;
+    }
+    if (textKeys.has(sort.key)) return String(left).localeCompare(String(right), "he") * dir;
+    if (sort.key === "publishedAt") return (Date.parse(left) - Date.parse(right)) * dir;
+    return (Number(left) - Number(right)) * dir;
+  });
+  return copy;
+}
+
+function viewsChart(series) {
+  if (!series.length) return `<p class="muted">אין עדיין היסטוריה. נקודה חדשה נשמרת בכל רענון שהחזיר מספר.</p>`;
+  const width = 680;
+  const height = 220;
+  const padL = 56;
+  const padR = 16;
+  const padT = 16;
+  const padB = 32;
+  const values = series.map((point) => point.views);
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (min === max) {
+    min = Math.max(0, min - 1);
+    max += 1;
+  }
+  const xOf = (index) => (series.length === 1 ? padL + (width - padL - padR) / 2 : padL + (index / (series.length - 1)) * (width - padL - padR));
+  const yOf = (value) => padT + (1 - (value - min) / (max - min)) * (height - padT - padB);
+  const points = series.map((point, index) => `${xOf(index).toFixed(1)},${yOf(point.views).toFixed(1)}`).join(" ");
+  const dots = series.map((point, index) => `<circle cx="${xOf(index).toFixed(1)}" cy="${yOf(point.views).toFixed(1)}" r="3.5" fill="#173d35"><title>${esc(localWhen(point.at))}: ${point.views.toLocaleString("he-IL")}</title></circle>`).join("");
+  const start = `<text x="${xOf(0)}" y="${height - 8}" font-size="11" fill="#4d635c">${esc(localWhen(series[0].at))}</text>`;
+  const end = series.length > 1 ? `<text x="${xOf(series.length - 1)}" y="${height - 8}" text-anchor="end" font-size="11" fill="#4d635c">${esc(localWhen(series[series.length - 1].at))}</text>` : "";
+  return `<div class="chart-wrap"><svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="צפיות מצטברות">
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${height - padB}" stroke="#d5ddd6" />
+    <line x1="${padL}" y1="${height - padB}" x2="${width - padR}" y2="${height - padB}" stroke="#d5ddd6" />
+    <text x="${padL - 8}" y="${yOf(max) + 4}" text-anchor="end" font-size="11" fill="#4d635c">${max.toLocaleString("he-IL")}</text>
+    <text x="${padL - 8}" y="${yOf(min) + 4}" text-anchor="end" font-size="11" fill="#4d635c">${min.toLocaleString("he-IL")}</text>
+    <polyline fill="none" stroke="#173d35" stroke-width="2" points="${points}" />
+    ${dots}
+    ${start}
+    ${end}
+  </svg></div>`;
+}
+
+function sortMark(key) {
+  if (viewsSort.key !== key) return "";
+  return viewsSort.dir === "asc" ? " ▲" : " ▼";
+}
+
+function paintViews(data) {
+  viewsCache = data;
+  const videos = sortVideos(data.videos || [], viewsSort);
+  const header = (key, label) => `<th><button type="button" class="sort" data-sort="${key}">${label}${sortMark(key)}</button></th>`;
+  const sourceLine = ["youtube", "tiktok", "telegram"].map((id) => {
+    const label = id === "youtube" ? "YouTube" : id === "tiktok" ? "TikTok" : "Telegram";
+    return `${label} ${data.sources?.[id] ? esc(localWhen(data.sources[id])) : "—"}`;
+  }).join(" · ");
+  const unmapped = (data.networks || [])
+    .filter((row) => !row.paused && row.unmapped > 0)
+    .map((row) => `${esc(row.label)}: ${Number(row.unmapped).toLocaleString("he-IL")} צפיות בלי שיוך לסרטון`)
+    .join(" · ");
+  panel.innerHTML = `
+    <div class="card">
+      <div class="row">
+        <h2>צפיות</h2>
+        <button type="button" id="views-refresh">רענון</button>
+      </div>
+      <p class="muted">עודכן לאחרונה: ${data.updatedAt ? esc(localWhen(data.updatedAt)) : "—"} (Asia/Jerusalem)</p>
+      <p class="muted">${sourceLine}</p>
+      <p class="muted">מקף פירושו שאין נתון. הסה״כ סוכם רק מספרים ידועים.</p>
+      ${unmapped ? `<p class="warn-text">${unmapped}</p>` : ""}
+    </div>
+    <div class="stats">
+      ${(data.networks || []).map((row) => `<div class="card stat"><span class="muted">${esc(row.label)}</span><b class="${row.paused ? "paused" : ""}">${row.paused ? "מושהה" : viewCell(row.views)}</b></div>`).join("")}
+    </div>
+    <h2>ערוצי YouTube</h2>
+    <div class="stats">
+      ${(data.channels || []).map((row) => `<div class="card stat"><span class="muted">${esc(row.name)}</span><b>${viewCell(row.views)}</b></div>`).join("")}
+    </div>
+    <div class="card">
+      <h2>צפיות מצטברות</h2>
+      ${viewsChart(data.series || [])}
+    </div>
+    <div class="card">
+      <h2>סרטונים</h2>
+      <table>
+        <thead><tr>
+          ${header("title", "כותרת")}
+          ${header("publishedAt", "תאריך פרסום")}
+          ${header("channelName", "ערוץ")}
+          ${header("youtube", "YouTube")}
+          ${header("tiktok", "TikTok")}
+          ${header("telegram", "Telegram")}
+          ${header("total", "סה״כ")}
+        </tr></thead>
+        <tbody>
+          ${videos.map((video) => `<tr>
+            <td>${video.url ? `<a href="${esc(video.url)}" target="_blank" rel="noreferrer">${esc(video.title || video.videoId)}</a>` : esc(video.title || "—")}</td>
+            <td>${video.publishedAt ? esc(localWhen(video.publishedAt)) : "—"}</td>
+            <td>${esc(video.channelName || "—")}</td>
+            <td>${viewCell(video.youtube)}</td>
+            <td>${viewCell(video.tiktok)}</td>
+            <td>${viewCell(video.telegram)}</td>
+            <td>${viewCell(video.total)}</td>
+          </tr>`).join("") || `<tr><td colspan="7">אין עדיין נתוני סרטונים</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>קבוצות טלגרם</h2>
+      <table>
+        <thead><tr><th>שם</th><th>חברים</th><th>פוסטים שנשלחו</th><th>צפיות</th></tr></thead>
+        <tbody>
+          ${(data.groups || []).map((group) => `<tr>
+            <td>${esc(group.name)}</td>
+            <td>${viewCell(group.members)}</td>
+            <td>${viewCell(group.posts)}</td>
+            <td>${viewCell(group.views)}</td>
+          </tr>`).join("") || `<tr><td colspan="4">אין נתוני קבוצות</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+  panel.querySelectorAll("[data-sort]").forEach((button) => {
+    button.onclick = () => {
+      const key = button.dataset.sort;
+      const text = key === "title" || key === "channelName";
+      const dir = viewsSort.key === key ? (viewsSort.dir === "asc" ? "desc" : "asc") : text ? "asc" : "desc";
+      viewsSort = { key, dir };
+      if (viewsCache) paintViews(viewsCache);
+    };
+  });
+  const refresh = panel.querySelector("#views-refresh");
+  if (refresh) refresh.onclick = () => refreshViews();
+}
+
+async function renderViews() {
+  panel.innerHTML = `<p class="muted">טוען צפיות…</p>`;
+  try {
+    paintViews(await api("/api/views"));
+  } catch (error) {
+    panel.innerHTML = `<p class="error">${esc(error.message || String(error))}</p>`;
+  }
+}
+
+async function refreshViews() {
+  banner.className = "muted";
+  banner.textContent = "מרענן צפיות…";
+  try {
+    paintViews(await api("/api/views/refresh", { method: "POST", body: "{}" }));
+    banner.className = "muted";
+    banner.textContent = "הצפיות עודכנו";
+  } catch (error) {
+    banner.className = "error";
+    banner.textContent = error.message || String(error);
+  }
 }
 
 function renderResults() {
